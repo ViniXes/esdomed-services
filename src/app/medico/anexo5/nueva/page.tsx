@@ -6,11 +6,56 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 import type { SolicitudAnexo5 } from "@/types";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
+
+const establecimientosReferencia = [
+  "Hospital Nacional El Salvador",
+  "Hospital Nacional Rosales",
+  "Hospital Nacional de Niños Benjamín Bloom",
+  "Hospital Nacional de la Mujer Dra. María Isabel Rodríguez",
+  "Hospital Nacional Zacamil Dr. Juan José Fernández",
+  "Hospital Nacional Neumológico y de Medicina Familiar Dr. José Antonio Saldaña",
+  "Hospital Nacional Psiquiátrico Dr. José Molina Martínez",
+  "Hospital Nacional General de Ilopango Enf. Angélica Vidal de Najarro",
+  "Hospital Nacional Nuestra Señora de Fátima – Cojutepeque",
+  "Hospital Nacional Santa Gertrudis – San Vicente",
+  "Hospital Nacional Santa Teresa – Zacatecoluca",
+  "Hospital Nacional San Juan de Dios – San Miguel",
+  "Hospital Nacional San Pedro – Usulután",
+  "Hospital Nacional Jiquilisco – Usulután",
+  "Hospital Nacional Jorge Mena – Santiago de María",
+  "Hospital Nacional de La Unión",
+  "Hospital Nacional Santa Rosa de Lima – La Unión",
+  "Hospital Nacional Nueva Concepción – Chalatenango",
+  "Hospital Nacional Chalatenango Dr. Luis Edmundo Vásquez",
+  "Hospital Nacional Sonsonate Dr. Jorge Mazzini Villacorta",
+  "Hospital Nacional San Rafael – Santa Tecla",
+  "Hospital Nacional de San Francisco Gotera",
+  "Hospital Nacional de Sensuntepeque – San Jerónimo Emiliani",
+  "Hospital Nacional de Ilobasco Dr. José Luis Saca",
+  "Hospital Nacional Atiquizaya – Francisco Menéndez",
+  "Hospital Nacional Ahuachapán – Dr. Francisco Menéndez",
+  "Hospital Nacional Metapán Dr. Arturo Morales",
+  "Hospital Nacional de Nueva Guadalupe",
+  "Hospital Nacional de La Palma",
+  "Hospital Nacional de San Marcos",
+  "Hospital Nacional de Tecoluca – Prof. José Simeón Cañas",
+  "Hospital Nacional de Chalchuapa",
+  "Hospital Nacional San Juan de Dios - Santa Ana",
+  "Instituto Salvadoreño de Rehabilitación Integral – ISRI",
+];
+
+const normalizarBusqueda = (valor: string) =>
+  valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+const etiquetaEstablecimiento = (establecimiento: string) =>
+  establecimiento === "Hospital Nacional San Juan de Dios - Santa Ana"
+    ? 'Hospital Nacional "San Juan de Dios" - Santa Ana'
+    : establecimiento;
 
 export default function NuevaAnexo5Page() {
   const router = useRouter();
@@ -33,6 +78,14 @@ export default function NuevaAnexo5Page() {
 
   const [guardando, setGuardando] = useState(false);
   const [modalInfo, setModalInfo] = useState<{ tipo: "exito" | "error", mensaje: string } | null>(null);
+  const [establecimientosOpen, setEstablecimientosOpen] = useState(false);
+
+  const busquedaEstablecimiento = normalizarBusqueda(form.establecimientoReferencia.trim());
+  const establecimientosFiltrados = busquedaEstablecimiento
+    ? establecimientosReferencia.filter((establecimiento) =>
+        normalizarBusqueda(establecimiento).includes(busquedaEstablecimiento)
+      )
+    : establecimientosReferencia;
 
   useEffect(() => {
     if (profile?.nombre && !form.medicoRefiere) {
@@ -98,6 +151,7 @@ export default function NuevaAnexo5Page() {
       telefonoEstablecimiento: "7788-5522, 2594-2100, 2594-2139",
     });
     setModalInfo(null);
+    setEstablecimientosOpen(false);
   };
 
   return (
@@ -200,9 +254,58 @@ export default function NuevaAnexo5Page() {
             </div>
             <div className="md:col-span-2">
               <label className={lbl}>3. Establecimiento de referencia *</label>
-              <input type="text" className={inputCls} value={form.establecimientoReferencia}
-                onChange={(e) => setForm({ ...form, establecimientoReferencia: e.target.value })}
-                placeholder="Ej. Hospital Nacional Zacamil" />
+              <div className="relative">
+                <input
+                  type="text"
+                  className={`${inputCls} pr-9`}
+                  value={form.establecimientoReferencia}
+                  onFocus={() => setEstablecimientosOpen(true)}
+                  onBlur={() => setTimeout(() => setEstablecimientosOpen(false), 120)}
+                  onChange={(e) => {
+                    setForm({ ...form, establecimientoReferencia: e.target.value });
+                    setEstablecimientosOpen(true);
+                  }}
+                  placeholder="Seleccione o escriba un hospital"
+                  required
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setEstablecimientosOpen((open) => !open);
+                  }}
+                  className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  aria-label="Mostrar hospitales"
+                >
+                  <ChevronDown size={16} className={`transition-transform ${establecimientosOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {establecimientosOpen && (
+                  <div className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+                    {establecimientosFiltrados.length > 0 ? (
+                      establecimientosFiltrados.map((establecimiento) => (
+                        <button
+                          key={establecimiento}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setForm({ ...form, establecimientoReferencia: establecimiento });
+                            setEstablecimientosOpen(false);
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                        >
+                          {etiquetaEstablecimiento(establecimiento)}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
+                        Sin hospitales coincidentes
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Fila 4: Fecha cita + Especialidad + Médico */}
