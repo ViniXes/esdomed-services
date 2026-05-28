@@ -334,7 +334,13 @@ export interface Paciente {
   fechaPruebaCovid?: Date;
   estadoVacunaCovid?: string;
 
-  // Estado patológico (legado del CSV)
+  // Certificado de defunción — Parte I (cadena causal)
+  causaMuerteA?: string;  // Causa directa / inmediata
+  causaMuerteB?: string;  // Causa intermedia
+  causaMuerteC?: string;  // Causa antecedente
+  causaMuerteD?: string;  // Causa básica (subyacente)
+
+  // Certificado de defunción — Parte II (otros estados patológicos)
   estadoPatologicoI?: string;
   estadoPatologicoII?: string;
 
