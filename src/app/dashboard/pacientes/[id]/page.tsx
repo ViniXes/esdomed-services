@@ -424,10 +424,14 @@ function TabEgreso({ paciente, pacienteId }: { paciente: Paciente; pacienteId: s
 
 // ─── Causas de defunción (ESDOMED) ──────────────────────────────────────────
 
-const taCls =
-  "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-sm";
-
 const emptyDx = (): DiagnosticoCIE => ({ codigo: "", descripcion: "" });
+
+// Normaliza valores legacy: si Firestore devuelve un string en lugar de DiagnosticoCIE
+const normDx = (v: unknown): DiagnosticoCIE => {
+  if (!v) return emptyDx();
+  if (typeof v === "string") return { codigo: "", descripcion: v };
+  return v as DiagnosticoCIE;
+};
 
 function CausasDefuncionEditor({
   pacienteId,
@@ -444,8 +448,8 @@ function CausasDefuncionEditor({
     causaMuerteC: paciente.causaMuerteC ?? emptyDx(),
     causaMuerteB: paciente.causaMuerteB ?? emptyDx(),
     causaMuerteA: paciente.causaMuerteA ?? emptyDx(),
-    estadoI:  paciente.estadoPatologicoI  ?? "",
-    estadoII: paciente.estadoPatologicoII ?? "",
+    estadoI:  normDx(paciente.estadoPatologicoI),
+    estadoII: normDx(paciente.estadoPatologicoII),
     causaExterna: paciente.causaExterna ?? emptyDx(),
   });
 
@@ -458,11 +462,10 @@ function CausasDefuncionEditor({
     if (!editando) setForm(snapshot());
   }, [paciente, editando]); // eslint-disable-line
 
-  const setDx = (k: "causaMuerteD" | "causaMuerteC" | "causaMuerteB" | "causaMuerteA" | "causaExterna", v: DiagnosticoCIE) =>
-    setForm((p) => ({ ...p, [k]: v }));
-
-  const setStr = (k: "estadoI" | "estadoII", v: string) =>
-    setForm((p) => ({ ...p, [k]: v }));
+  const setDx = (
+    k: "causaMuerteD" | "causaMuerteC" | "causaMuerteB" | "causaMuerteA" | "estadoI" | "estadoII" | "causaExterna",
+    v: DiagnosticoCIE,
+  ) => setForm((p) => ({ ...p, [k]: v }));
 
   const guardar = async () => {
     setGuardando(true);
@@ -473,8 +476,8 @@ function CausasDefuncionEditor({
         causaMuerteC: form.causaMuerteC.descripcion ? form.causaMuerteC : null,
         causaMuerteB: form.causaMuerteB.descripcion ? form.causaMuerteB : null,
         causaMuerteA: form.causaMuerteA.descripcion ? form.causaMuerteA : null,
-        estadoPatologicoI:  form.estadoI.trim()  || null,
-        estadoPatologicoII: form.estadoII.trim() || null,
+        estadoPatologicoI:  form.estadoI.descripcion  ? form.estadoI  : null,
+        estadoPatologicoII: form.estadoII.descripcion ? form.estadoII : null,
         causaExterna: form.causaExterna.descripcion ? form.causaExterna : null,
         actualizadoEn: Timestamp.now(),
       });
@@ -488,7 +491,8 @@ function CausasDefuncionEditor({
   const hayDatos =
     !!(paciente.causaMuerteA?.descripcion || paciente.causaMuerteB?.descripcion ||
        paciente.causaMuerteC?.descripcion || paciente.causaMuerteD?.descripcion ||
-       paciente.estadoPatologicoI || paciente.estadoPatologicoII ||
+       normDx(paciente.estadoPatologicoI).descripcion ||
+       normDx(paciente.estadoPatologicoII).descripcion ||
        paciente.causaExterna?.descripcion);
 
   return (
@@ -545,15 +549,13 @@ function CausasDefuncionEditor({
             <p className="text-[11px] text-slate-400">
               Que contribuyeron a la muerte pero no relacionados con la enfermedad que la produjo.
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado I</label>
-                <textarea rows={2} value={form.estadoI} onChange={(e) => setStr("estadoI", e.target.value)} className={taCls} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado II</label>
-                <textarea rows={2} value={form.estadoII} onChange={(e) => setStr("estadoII", e.target.value)} className={taCls} />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado I</label>
+              <CIE10Combobox value={form.estadoI} onChange={(v) => setDx("estadoI", v)} placeholder="Buscar estado patológico..." />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado II</label>
+              <CIE10Combobox value={form.estadoII} onChange={(v) => setDx("estadoII", v)} placeholder="Buscar estado patológico..." />
             </div>
           </div>
 
@@ -623,24 +625,44 @@ function CausasDefuncionEditor({
             </div>
           </div>
 
-          {(paciente.estadoPatologicoI || paciente.estadoPatologicoII) && (
+          {(normDx(paciente.estadoPatologicoI).descripcion || normDx(paciente.estadoPatologicoII).descripcion) && (
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
                 Parte II — Otros estados patológicos
               </p>
               <div className="space-y-2">
-                {paciente.estadoPatologicoI && (
-                  <div className="flex gap-3 text-sm">
-                    <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">Estado I</span>
-                    <span className="text-slate-800 dark:text-slate-200">{paciente.estadoPatologicoI}</span>
-                  </div>
-                )}
-                {paciente.estadoPatologicoII && (
-                  <div className="flex gap-3 text-sm">
-                    <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">Estado II</span>
-                    <span className="text-slate-800 dark:text-slate-200">{paciente.estadoPatologicoII}</span>
-                  </div>
-                )}
+                {normDx(paciente.estadoPatologicoI).descripcion && (() => {
+                  const dx = normDx(paciente.estadoPatologicoI);
+                  return (
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">Estado I</span>
+                      <span className="text-slate-800 dark:text-slate-200 flex-1 flex items-baseline gap-2 flex-wrap">
+                        {dx.codigo && (
+                          <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                            {dx.codigo}
+                          </span>
+                        )}
+                        {dx.descripcion}
+                      </span>
+                    </div>
+                  );
+                })()}
+                {normDx(paciente.estadoPatologicoII).descripcion && (() => {
+                  const dx = normDx(paciente.estadoPatologicoII);
+                  return (
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">Estado II</span>
+                      <span className="text-slate-800 dark:text-slate-200 flex-1 flex items-baseline gap-2 flex-wrap">
+                        {dx.codigo && (
+                          <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                            {dx.codigo}
+                          </span>
+                        )}
+                        {dx.descripcion}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

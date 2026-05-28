@@ -341,8 +341,8 @@ export interface Paciente {
   causaMuerteD?: DiagnosticoCIE;  // Causa básica (subyacente)
 
   // Certificado de defunción — Parte II (otros estados patológicos)
-  estadoPatologicoI?: string;
-  estadoPatologicoII?: string;
+  estadoPatologicoI?: DiagnosticoCIE;
+  estadoPatologicoII?: DiagnosticoCIE;
 
   // Cierre vital — enlace con módulo Fallecidos si aplica
   fallecidoId?: string;
