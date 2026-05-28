@@ -1,8 +1,14 @@
+FROM eclipse-temurin:21-jre AS jre
+
 FROM node:20-slim
+
+ENV JAVA_HOME=/opt/java/openjdk
+COPY --from=jre ${JAVA_HOME} ${JAVA_HOME}
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Firestore emulator requiere Java
 RUN apt-get update && \
-    apt-get install -y default-jre-headless && \
+    apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g firebase-tools

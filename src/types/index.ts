@@ -347,3 +347,30 @@ export interface Paciente {
   actualizadoEn?: Date;
   actualizadoPor?: string;
 }
+
+// ============================================================================
+// Busqueda de telefono — auditoria de consultas hechas por medicos
+// ============================================================================
+
+export interface BusquedaTelefono {
+  id?: string;
+
+  usuarioUid: string;
+  usuarioNombre: string;
+  usuarioEmail?: string;
+  usuarioRole: "medico";
+  usuarioJvpm?: string;
+
+  expedienteBuscado: string;
+  expedienteNormalizado: string;
+
+  encontrado: boolean;
+  pacienteId?: string;
+  pacienteExpediente?: string;
+  pacienteNombre?: string;
+  pacienteEstado?: EstadoPaciente;
+  pacienteServicio?: string;
+  pacienteCama?: string;
+
+  creadoEn: Date;
+}
