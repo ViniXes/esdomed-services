@@ -67,6 +67,45 @@ service cloud.firestore {
     // ─── Control de ingresos ──────────────────────────────────────────────────
     // Los médicos tienen acceso de solo lectura para ver la cola.
     // Solo el personal ESDOMED puede registrar ingresos.
+    match /busquedas_telefono/{id} {
+      allow read: if isAdmin();
+      allow create: if isMedico()
+                    && request.resource.data.keys().hasOnly([
+                      'usuarioUid',
+                      'usuarioNombre',
+                      'usuarioEmail',
+                      'usuarioRole',
+                      'usuarioJvpm',
+                      'expedienteBuscado',
+                      'expedienteNormalizado',
+                      'encontrado',
+                      'pacienteId',
+                      'pacienteExpediente',
+                      'pacienteNombre',
+                      'pacienteEstado',
+                      'pacienteServicio',
+                      'pacienteCama',
+                      'creadoEn'
+                    ])
+                    && request.resource.data.keys().hasAll([
+                      'usuarioUid',
+                      'usuarioNombre',
+                      'usuarioRole',
+                      'expedienteBuscado',
+                      'expedienteNormalizado',
+                      'encontrado',
+                      'creadoEn'
+                    ])
+                    && request.resource.data.usuarioUid == uid()
+                    && request.resource.data.usuarioRole == 'medico'
+                    && request.resource.data.usuarioNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.expedienteBuscado is string
+                    && request.resource.data.expedienteNormalizado is string
+                    && request.resource.data.encontrado is bool
+                    && request.resource.data.creadoEn == request.time;
+      allow update, delete: if false;
+    }
+
     match /control_ingresos/{id} {
       allow read:   if isAuth();
       allow create: if isEsdomed() || isAdmin();

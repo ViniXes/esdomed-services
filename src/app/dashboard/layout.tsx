@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, Users, Inbox, BedDouble, FileText, ClipboardList, LogIn, Settings } from "lucide-react";
+import { LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, Users, Inbox, BedDouble, FileText, ClipboardList, LogIn, Settings, History } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -52,6 +52,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       : []),
     ...(verConfiguracion
       ? [{ href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings }]
+      : []),
+    ...(verConfiguracion
+      ? [{ href: "/dashboard/historial-busquedas", label: "Historial busquedas", icon: History }]
       : []),
   ];
 
