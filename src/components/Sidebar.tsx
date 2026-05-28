@@ -18,6 +18,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  badge?: number;
 }
 
 interface SidebarProps {
@@ -34,7 +35,25 @@ interface SidebarBodyProps extends SidebarProps {
   toggle: () => void;
 }
 
-function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onNavigate, onLogout }: SidebarBodyProps) {
+function Badge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="ml-auto flex-shrink-0 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 leading-none tabular-nums">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+function SidebarBody({
+  navItems,
+  roleLabel,
+  profile,
+  dark,
+  toggle,
+  isActive,
+  onNavigate,
+  onLogout,
+}: SidebarBodyProps) {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-blue-900/30 text-slate-700 dark:text-white">
       <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-white/15 flex flex-col items-center gap-3">
@@ -59,14 +78,18 @@ function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onN
             <span className="text-white text-[10px] font-bold tracking-wide">ES</span>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight font-heading">{roleLabel}</p>
-            <p className="text-[11px] text-slate-500 dark:text-white/70 truncate">{profile?.nombre}</p>
+            <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight font-heading">
+              {roleLabel}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-white/70 truncate">
+              {profile?.nombre}
+            </p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon, exact }) => {
+        {navItems.map(({ href, label, icon: Icon, exact, badge }) => {
           const active = isActive({ href, label, icon: Icon, exact });
           return (
             <Link
@@ -80,7 +103,8 @@ function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onN
               }`}
             >
               <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
-              {label}
+              <span className="flex-1">{label}</span>
+              <Badge count={badge ?? 0} />
             </Link>
           );
         })}
@@ -88,7 +112,9 @@ function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onN
 
       <div className="px-2 pb-4 pt-2 border-t border-slate-200 dark:border-white/15 space-y-1">
         {profile?.servicio && (
-          <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-white/60 truncate">{profile.servicio}</p>
+          <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-white/60 truncate">
+            {profile.servicio}
+          </p>
         )}
         <button
           onClick={toggle}
@@ -118,16 +144,22 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
 
   const isActive = (item: NavItem) =>
-    item.exact ? pathname === item.href : (pathname === item.href || pathname.startsWith(item.href + "/"));
+    item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(item.href + "/");
 
   const handleLogout = () => {
     logout();
     router.replace("/login");
   };
+
+  const totalBadge = navItems.reduce((sum, item) => sum + (item.badge ?? 0), 0);
 
   const sidebarProps = {
     navItems,
@@ -141,13 +173,17 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
 
   return (
     <>
+      {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-[var(--color-institutional-dark)] backdrop-blur-sm border-b border-slate-200 dark:border-blue-900/30 flex items-center h-14 px-3 gap-3">
         <button
           onClick={() => setOpen(true)}
-          className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/85 flex-shrink-0 transition-colors"
+          className="relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/85 flex-shrink-0 transition-colors"
           aria-label="Abrir menú"
         >
           <Menu size={20} />
+          {totalBadge > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+          )}
         </button>
         <div className="flex-1 flex justify-center">
           <Image
