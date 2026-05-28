@@ -43,7 +43,8 @@
       "PowerShell(node --version)",
       "Bash(npm list *)",
       "Bash(node scripts/importar-pacientes.mjs --dry-run)",
-      "Bash(node -e \"const t = require\\('./tsconfig.json'\\); console.log\\(JSON.stringify\\(t.compilerOptions, null, 2\\)\\)\")"
+      "Bash(node -e \"const t = require\\('./tsconfig.json'\\); console.log\\(JSON.stringify\\(t.compilerOptions, null, 2\\)\\)\")",
+      "Bash(git rm *)"
     ]
   }
 }
