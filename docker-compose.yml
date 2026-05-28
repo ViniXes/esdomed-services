@@ -1,0 +1,43 @@
+services:
+  emulators:
+    build:
+      context: .
+      dockerfile: Dockerfile.emulators
+    ports:
+      - "4000:4000"   # Emulator UI
+      - "8080:8080"   # Firestore
+      - "9099:9099"   # Auth
+      - "9199:9199"   # Storage
+    volumes:
+      - firebase-emulator-cache:/root/.cache/firebase/emulators
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NEXT_PUBLIC_USE_EMULATORS: "true"
+      NEXT_PUBLIC_FIREBASE_API_KEY: "demo-key"
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "demo-esdomed.firebaseapp.com"
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-esdomed"
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "demo-esdomed.appspot.com"
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000"
+    depends_on:
+      emulators:
+        condition: service_healthy
+
+volumes:
+  firebase-emulator-cache:

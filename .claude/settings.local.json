@@ -35,7 +35,9 @@
       "Bash(dir examples\\\\*.xlsx)",
       "PowerShell(python --version)",
       "PowerShell(python -c \"import openpyxl; print\\('openpyxl available'\\)\")",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(xargs grep -l \"traslado\\\\|Traslado\")"
     ]
   }
 }

@@ -1,0 +1,22 @@
+FROM node:20-slim
+
+# Firestore emulator requiere Java
+RUN apt-get update && \
+    apt-get install -y default-jre-headless && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g firebase-tools
+
+WORKDIR /firebase
+
+COPY firebase.json .
+COPY firestore.rules .
+COPY storage.rules .
+
+# Pre-descarga los binarios de los emuladores en la imagen
+RUN firebase setup:emulators:firestore --project demo-esdomed && \
+    firebase setup:emulators:storage --project demo-esdomed
+
+EXPOSE 4000 8080 9099 9199 4400 4500
+
+CMD ["firebase", "emulators:start", "--project", "demo-esdomed"]
