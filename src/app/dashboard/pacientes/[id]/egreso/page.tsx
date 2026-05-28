@@ -7,6 +7,7 @@ import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Save, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import type { DiagnosticoCIE, EstadoPaciente, Paciente } from "@/types";
 import {
   ESTADO_LABEL, diasEstancia, nombreCompleto, toDate,
@@ -115,8 +116,8 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
   const eliminarComplementario = (idx: number) =>
     setComplementarios((p) => p.filter((_, i) => i !== idx));
 
-  const actualizarComplementario = (idx: number, patch: Partial<DiagnosticoCIE>) =>
-    setComplementarios((p) => p.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
+  const actualizarComplementario = (idx: number, v: DiagnosticoCIE) =>
+    setComplementarios((p) => p.map((d, i) => (i === idx ? v : d)));
 
   const agregarProcedimiento = () => setProcedimientos((p) => [...p, ""]);
   const eliminarProcedimiento = (idx: number) =>
@@ -243,16 +244,10 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
 
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Diagnóstico principal de egreso</p>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className={labelCls}>CIE-10</label>
-              <input type="text" value={dxCodigo} onChange={(e) => setDxCodigo(e.target.value)} className={inputCls} placeholder="N18.5" />
-            </div>
-            <div className="md:col-span-3">
-              <label className={labelCls}>Descripción</label>
-              <input type="text" value={dxDescripcion} onChange={(e) => setDxDescripcion(e.target.value)} className={inputCls} />
-            </div>
-          </div>
+          <CIE10Combobox
+            value={{ codigo: dxCodigo, descripcion: dxDescripcion }}
+            onChange={(v) => { setDxCodigo(v.codigo); setDxDescripcion(v.descripcion); }}
+          />
         </div>
 
         <div>
@@ -270,24 +265,16 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
           ) : (
             <div className="space-y-2">
               {complementarios.map((d, idx) => (
-                <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-start">
-                  <input
-                    type="text"
-                    value={d.codigo}
-                    onChange={(e) => actualizarComplementario(idx, { codigo: e.target.value })}
-                    placeholder="CIE-10"
-                    className={`${inputCls} md:col-span-3`}
-                  />
-                  <input
-                    type="text"
-                    value={d.descripcion}
-                    onChange={(e) => actualizarComplementario(idx, { descripcion: e.target.value })}
-                    placeholder="Descripción"
-                    className={`${inputCls} md:col-span-8`}
-                  />
+                <div key={idx} className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <CIE10Combobox
+                      value={d}
+                      onChange={(v) => actualizarComplementario(idx, v)}
+                    />
+                  </div>
                   <button
                     onClick={() => eliminarComplementario(idx)}
-                    className="md:col-span-1 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors flex justify-center"
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors flex-shrink-0 mt-0.5"
                     aria-label="Eliminar"
                   >
                     <Trash2 size={14} />
@@ -300,16 +287,11 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
 
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Causa externa (opcional)</p>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className={labelCls}>CIE-10</label>
-              <input type="text" value={causaExtCodigo} onChange={(e) => setCausaExtCodigo(e.target.value)} className={inputCls} />
-            </div>
-            <div className="md:col-span-3">
-              <label className={labelCls}>Descripción</label>
-              <input type="text" value={causaExtDescripcion} onChange={(e) => setCausaExtDescripcion(e.target.value)} className={inputCls} />
-            </div>
-          </div>
+          <CIE10Combobox
+            value={{ codigo: causaExtCodigo, descripcion: causaExtDescripcion }}
+            onChange={(v) => { setCausaExtCodigo(v.codigo); setCausaExtDescripcion(v.descripcion); }}
+            placeholder="Buscar causa externa..."
+          />
         </div>
 
         <div>

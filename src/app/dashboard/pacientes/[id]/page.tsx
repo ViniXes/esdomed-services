@@ -10,7 +10,8 @@ import {
   ArrowLeft, BedDouble, MapPin, IdCard, User2, Stethoscope,
   Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil, Save,
 } from "lucide-react";
-import type { Paciente, MovimientoPaciente } from "@/types";
+import type { Paciente, MovimientoPaciente, DiagnosticoCIE } from "@/types";
+import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import {
   CIRCUNSTANCIA_LABEL, ESTADO_BADGE, ESTADO_LABEL, GENERO_LABEL,
   calcularEdad, diasEstancia, formatFecha, formatFechaHora, nombreCompleto, toDate,
@@ -426,6 +427,8 @@ function TabEgreso({ paciente, pacienteId }: { paciente: Paciente; pacienteId: s
 const taCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-sm";
 
+const emptyDx = (): DiagnosticoCIE => ({ codigo: "", descripcion: "" });
+
 function CausasDefuncionEditor({
   pacienteId,
   paciente,
@@ -437,12 +440,13 @@ function CausasDefuncionEditor({
   const puedeEditar = profile?.role === "esdomed" || profile?.role === "admin";
 
   const snapshot = () => ({
-    causaMuerteD:  paciente.causaMuerteD  ?? "",
-    causaMuerteC:  paciente.causaMuerteC  ?? "",
-    causaMuerteB:  paciente.causaMuerteB  ?? "",
-    causaMuerteA:  paciente.causaMuerteA  ?? "",
+    causaMuerteD: paciente.causaMuerteD ?? emptyDx(),
+    causaMuerteC: paciente.causaMuerteC ?? emptyDx(),
+    causaMuerteB: paciente.causaMuerteB ?? emptyDx(),
+    causaMuerteA: paciente.causaMuerteA ?? emptyDx(),
     estadoI:  paciente.estadoPatologicoI  ?? "",
     estadoII: paciente.estadoPatologicoII ?? "",
+    causaExterna: paciente.causaExterna ?? emptyDx(),
   });
 
   const [editando,  setEditando]  = useState(false);
@@ -454,7 +458,10 @@ function CausasDefuncionEditor({
     if (!editando) setForm(snapshot());
   }, [paciente, editando]); // eslint-disable-line
 
-  const set = (k: keyof ReturnType<typeof snapshot>, v: string) =>
+  const setDx = (k: "causaMuerteD" | "causaMuerteC" | "causaMuerteB" | "causaMuerteA" | "causaExterna", v: DiagnosticoCIE) =>
+    setForm((p) => ({ ...p, [k]: v }));
+
+  const setStr = (k: "estadoI" | "estadoII", v: string) =>
     setForm((p) => ({ ...p, [k]: v }));
 
   const guardar = async () => {
@@ -462,12 +469,13 @@ function CausasDefuncionEditor({
     setError(null);
     try {
       await updateDoc(doc(db, "pacientes", pacienteId), {
-        causaMuerteD:       form.causaMuerteD.trim() || null,
-        causaMuerteC:       form.causaMuerteC.trim() || null,
-        causaMuerteB:       form.causaMuerteB.trim() || null,
-        causaMuerteA:       form.causaMuerteA.trim() || null,
-        estadoPatologicoI:  form.estadoI.trim()      || null,
-        estadoPatologicoII: form.estadoII.trim()     || null,
+        causaMuerteD: form.causaMuerteD.descripcion ? form.causaMuerteD : null,
+        causaMuerteC: form.causaMuerteC.descripcion ? form.causaMuerteC : null,
+        causaMuerteB: form.causaMuerteB.descripcion ? form.causaMuerteB : null,
+        causaMuerteA: form.causaMuerteA.descripcion ? form.causaMuerteA : null,
+        estadoPatologicoI:  form.estadoI.trim()  || null,
+        estadoPatologicoII: form.estadoII.trim() || null,
+        causaExterna: form.causaExterna.descripcion ? form.causaExterna : null,
         actualizadoEn: Timestamp.now(),
       });
       setEditando(false);
@@ -478,9 +486,10 @@ function CausasDefuncionEditor({
   };
 
   const hayDatos =
-    !!(paciente.causaMuerteA || paciente.causaMuerteB ||
-       paciente.causaMuerteC || paciente.causaMuerteD ||
-       paciente.estadoPatologicoI || paciente.estadoPatologicoII);
+    !!(paciente.causaMuerteA?.descripcion || paciente.causaMuerteB?.descripcion ||
+       paciente.causaMuerteC?.descripcion || paciente.causaMuerteD?.descripcion ||
+       paciente.estadoPatologicoI || paciente.estadoPatologicoII ||
+       paciente.causaExterna?.descripcion);
 
   return (
     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
@@ -508,39 +517,23 @@ function CausasDefuncionEditor({
               Parte I — Cadena causal de defunción
             </p>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                D. Causa básica (subyacente)
-              </label>
-              <textarea
-                rows={2}
-                value={form.causaMuerteD}
-                onChange={(e) => set("causaMuerteD", e.target.value)}
-                placeholder="Enfermedad o estado que inició la cadena..."
-                className={taCls}
-              />
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">D. Causa básica (subyacente)</label>
+              <CIE10Combobox value={form.causaMuerteD} onChange={(v) => setDx("causaMuerteD", v)} placeholder="Enfermedad o estado que inició la cadena..." />
             </div>
             <CausalArrow />
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">C.</label>
-              <textarea rows={2} value={form.causaMuerteC} onChange={(e) => set("causaMuerteC", e.target.value)} className={taCls} />
+              <CIE10Combobox value={form.causaMuerteC} onChange={(v) => setDx("causaMuerteC", v)} />
             </div>
             <CausalArrow />
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">B.</label>
-              <textarea rows={2} value={form.causaMuerteB} onChange={(e) => set("causaMuerteB", e.target.value)} className={taCls} />
+              <CIE10Combobox value={form.causaMuerteB} onChange={(v) => setDx("causaMuerteB", v)} />
             </div>
             <CausalArrow />
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                A. Causa directa / inmediata
-              </label>
-              <textarea
-                rows={2}
-                value={form.causaMuerteA}
-                onChange={(e) => set("causaMuerteA", e.target.value)}
-                placeholder="Causa que produjo directamente la muerte..."
-                className={taCls}
-              />
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">A. Causa directa / inmediata</label>
+              <CIE10Combobox value={form.causaMuerteA} onChange={(v) => setDx("causaMuerteA", v)} placeholder="Causa que produjo directamente la muerte..." />
             </div>
           </div>
 
@@ -555,13 +548,19 @@ function CausasDefuncionEditor({
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado I</label>
-                <textarea rows={2} value={form.estadoI} onChange={(e) => set("estadoI", e.target.value)} className={taCls} />
+                <textarea rows={2} value={form.estadoI} onChange={(e) => setStr("estadoI", e.target.value)} className={taCls} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado II</label>
-                <textarea rows={2} value={form.estadoII} onChange={(e) => set("estadoII", e.target.value)} className={taCls} />
+                <textarea rows={2} value={form.estadoII} onChange={(e) => setStr("estadoII", e.target.value)} className={taCls} />
               </div>
             </div>
+          </div>
+
+          {/* Causa externa */}
+          <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Causa externa</p>
+            <CIE10Combobox value={form.causaExterna} onChange={(v) => setDx("causaExterna", v)} placeholder="Buscar causa externa..." />
           </div>
 
           {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -593,18 +592,25 @@ function CausasDefuncionEditor({
             <div className="space-y-1">
               {(
                 [
-                  { label: "D. Causa básica", value: paciente.causaMuerteD },
-                  { label: "C.",               value: paciente.causaMuerteC },
-                  { label: "B.",               value: paciente.causaMuerteB },
-                  { label: "A. Causa directa", value: paciente.causaMuerteA },
-                ] as { label: string; value?: string }[]
+                  { label: "D. Causa básica", dx: paciente.causaMuerteD },
+                  { label: "C.",               dx: paciente.causaMuerteC },
+                  { label: "B.",               dx: paciente.causaMuerteB },
+                  { label: "A. Causa directa", dx: paciente.causaMuerteA },
+                ] as { label: string; dx?: DiagnosticoCIE }[]
               )
-                .filter((r) => r.value)
-                .map(({ label, value }, i, arr) => (
+                .filter((r) => r.dx?.descripcion)
+                .map(({ label, dx }, i, arr) => (
                   <div key={label}>
                     <div className="flex gap-3 text-sm">
                       <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">{label}</span>
-                      <span className="text-slate-800 dark:text-slate-200 flex-1">{value}</span>
+                      <span className="text-slate-800 dark:text-slate-200 flex-1 flex items-baseline gap-2 flex-wrap">
+                        {dx?.codigo && (
+                          <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                            {dx.codigo}
+                          </span>
+                        )}
+                        {dx?.descripcion}
+                      </span>
                     </div>
                     {i < arr.length - 1 && (
                       <div className="flex items-center gap-1 ml-28 mt-0.5 mb-0.5">
@@ -635,6 +641,22 @@ function CausasDefuncionEditor({
                     <span className="text-slate-800 dark:text-slate-200">{paciente.estadoPatologicoII}</span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {paciente.causaExterna?.descripcion && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                Causa externa
+              </p>
+              <div className="flex items-baseline gap-2 text-sm flex-wrap">
+                {paciente.causaExterna.codigo && (
+                  <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                    {paciente.causaExterna.codigo}
+                  </span>
+                )}
+                <span className="text-slate-800 dark:text-slate-200">{paciente.causaExterna.descripcion}</span>
               </div>
             </div>
           )}

@@ -335,10 +335,10 @@ export interface Paciente {
   estadoVacunaCovid?: string;
 
   // Certificado de defunción — Parte I (cadena causal)
-  causaMuerteA?: string;  // Causa directa / inmediata
-  causaMuerteB?: string;  // Causa intermedia
-  causaMuerteC?: string;  // Causa antecedente
-  causaMuerteD?: string;  // Causa básica (subyacente)
+  causaMuerteA?: DiagnosticoCIE;  // Causa directa / inmediata
+  causaMuerteB?: DiagnosticoCIE;  // Causa intermedia
+  causaMuerteC?: DiagnosticoCIE;  // Causa antecedente
+  causaMuerteD?: DiagnosticoCIE;  // Causa básica (subyacente)
 
   // Certificado de defunción — Parte II (otros estados patológicos)
   estadoPatologicoI?: string;
