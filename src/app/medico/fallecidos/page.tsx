@@ -107,6 +107,7 @@ export default function MedicoFallecidosPage() {
         causaMuerte: causaMuerte.trim() || null,
         medicoId: user.uid,
         medicoNombre: profile.nombre,
+        medicoJvpm: profile.jvpm || null,
         medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
         estado: "pendiente",
         creadoEn: Timestamp.now(),

@@ -867,6 +867,8 @@ async function marcarPacienteFallecido(n: NotificacionFallecido) {
     fechaEgreso: Timestamp.fromDate(fechaDefuncion),
     diasEstancia: dias,
     fallecidoId: n.id,
+    medicoEgresoNombre: n.medicoNombre,
+    medicoEgresoJvpm: n.medicoJvpm || null,
     actualizadoEn: Timestamp.now(),
   });
 }

@@ -46,6 +46,7 @@ export interface NotificacionFallecido {
   id?: string;
   medicoId: string;
   medicoNombre: string;
+  medicoJvpm?: string;
   medicoServicio: string;
   pacienteNombre: string;
   pacienteExpediente: string;
