@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { BedDouble, Plus, Search, Clock, Filter, ChevronDown } from "lucide-react";
+import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import type { EstadoPaciente, Paciente } from "@/types";
 import {
   ESTADO_BADGE, ESTADO_LABEL, calcularEdad, diasEstancia, formatFecha,
@@ -27,6 +27,7 @@ const FILTROS: { value: FiltroEstado; label: string }[] = [
   { value: "todos",           label: "Todos" },
 ];
 
+const LIMIT_HISTORICO = 300;
 const PAGE_SIZE = 50;
 
 export default function PacientesPage() {
@@ -37,13 +38,16 @@ export default function PacientesPage() {
   const [filtro, setFiltro] = useState<FiltroEstado>("activo");
   const [servicioFiltro, setServicioFiltro] = useState<string>("");
   const [busqueda, setBusqueda] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!profile) return;
     const constraints: QueryConstraint[] = [];
     if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
     constraints.push(orderBy("fechaIngreso", "desc"));
-    constraints.push(limit(PAGE_SIZE));
+    // Activos: sin límite (acotado por capacidad hospitalaria)
+    // Históricos: límite razonable para no descargar toda la colección
+    if (filtro !== "activo") constraints.push(limit(LIMIT_HISTORICO));
 
     const q = query(collection(db, "pacientes"), ...constraints);
     const unsub = onSnapshot(q, (snap) => {
@@ -83,6 +87,12 @@ export default function PacientesPage() {
       return !!hay;
     });
   }, [pacientes, busqueda, servicioFiltro]);
+
+  // Resetear página al cambiar cualquier filtro
+  useEffect(() => setPage(1), [filtro, servicioFiltro, busqueda]);
+
+  const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
+  const paginados = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const activosCount = useMemo(
     () => pacientes.filter((p) => p.estado === "activo").length,
@@ -210,7 +220,7 @@ export default function PacientesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filtrados.map((p) => {
+                {paginados.map((p) => {
                   const edad = calcularEdad(p.fechaNacimiento);
                   const dias = diasEstancia(p.fechaIngreso, p.fechaEgreso);
                   return (
@@ -266,11 +276,70 @@ export default function PacientesPage() {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/30 text-xs text-slate-500 flex items-center justify-between">
-            <span>{filtrados.length} de {pacientes.length} mostrados</span>
-            {pacientes.length === PAGE_SIZE && (
-              <span className="text-amber-600 dark:text-amber-400">
-                Mostrando los {PAGE_SIZE} más recientes — afina filtros para ver más
+          <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between gap-4">
+            {/* Contador */}
+            <span className="text-xs text-slate-500 shrink-0">
+              {filtrados.length === 0 ? "0 resultados" : (
+                <>
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtrados.length)}
+                  {" "}de{" "}
+                  <span className="font-medium text-slate-700 dark:text-slate-300">{filtrados.length}</span>
+                  {filtrados.length < pacientes.length && <> (filtrados de {pacientes.length})</>}
+                </>
+              )}
+            </span>
+
+            {/* Controles de página */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+
+                {/* Números de página */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((n) => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+                  .reduce<(number | "…")[]>((acc, n, idx, arr) => {
+                    if (idx > 0 && n - (arr[idx - 1] as number) > 1) acc.push("…");
+                    acc.push(n);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === "…" ? (
+                      <span key={`ellipsis-${idx}`} className="w-7 text-center text-xs text-slate-400">…</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setPage(item as number)}
+                        className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors ${
+                          page === item
+                            ? "bg-blue-600 text-white"
+                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Aviso de techo histórico */}
+            {filtro !== "activo" && pacientes.length === LIMIT_HISTORICO && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
+                Límite de {LIMIT_HISTORICO} — afina filtros
               </span>
             )}
           </div>

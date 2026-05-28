@@ -7,7 +7,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   ArrowLeft, BedDouble, MapPin, IdCard, User2, Stethoscope,
-  Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse,
+  Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil,
 } from "lucide-react";
 import type { Paciente, MovimientoPaciente } from "@/types";
 import {
@@ -104,15 +104,24 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
             {paciente.dui && <> · DUI {paciente.dui}</>}
           </p>
         </div>
-        {esActivo && (
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Link
-            href={`/dashboard/pacientes/${paciente.id}/egreso`}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex-shrink-0"
+            href={`/dashboard/pacientes/${paciente.id}/editar`}
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
           >
-            <LogOutIcon size={14} />
-            Registrar egreso
+            <Pencil size={14} />
+            Editar
           </Link>
-        )}
+          {esActivo && (
+            <Link
+              href={`/dashboard/pacientes/${paciente.id}/egreso`}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              <LogOutIcon size={14} />
+              Registrar egreso
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Estado banner si fallecido */}
