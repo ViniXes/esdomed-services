@@ -7,7 +7,9 @@
     "dev:docker": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "importar:dry": "node scripts/importar-pacientes.mjs --dry-run",
+    "importar": "node scripts/importar-pacientes.mjs"
   },
   "dependencies": {
     "firebase": "^12.13.0",

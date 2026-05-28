@@ -37,7 +37,12 @@
       "PowerShell(python -c \"import openpyxl; print\\('openpyxl available'\\)\")",
       "Bash(python *)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(xargs grep -l \"traslado\\\\|Traslado\")"
+      "Bash(xargs grep -l \"traslado\\\\|Traslado\")",
+      "Bash(python3)",
+      "Bash(python3 -c \"import openpyxl; print\\('openpyxl available'\\)\")",
+      "PowerShell(node --version)",
+      "Bash(npm list *)",
+      "Bash(node scripts/importar-pacientes.mjs --dry-run)"
     ]
   }
 }
