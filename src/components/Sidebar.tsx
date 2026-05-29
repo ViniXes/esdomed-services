@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, Fragment, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon, KeyRound } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -32,6 +32,8 @@ interface SidebarBodyProps extends SidebarProps {
   dark: boolean;
   profile: UserProfile | null;
   isActive: (item: NavItem) => boolean;
+  isGroupCollapsed: (group: string) => boolean;
+  toggleGroup: (group: string) => void;
   onChangePassword: () => void;
   onLogout: () => void;
   onNavigate?: () => void;
@@ -54,10 +56,38 @@ function SidebarBody({
   dark,
   toggle,
   isActive,
+  isGroupCollapsed,
+  toggleGroup,
   onNavigate,
   onChangePassword,
   onLogout,
 }: SidebarBodyProps) {
+  const renderLink = (item: NavItem) => {
+    const { href, label, icon: Icon, badge } = item;
+    const active = isActive(item);
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={onNavigate}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+          active
+            ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20"
+            : "text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
+        }`}
+      >
+        <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+        <span className="flex-1">{label}</span>
+        <Badge count={badge ?? 0} />
+      </Link>
+    );
+  };
+
+  // Ítems sin grupo (p. ej. Inicio) arriba; el resto agrupado por sección colapsable.
+  const sinGrupo = navItems.filter((i) => !i.group);
+  const grupos: string[] = [];
+  for (const i of navItems) if (i.group && !grupos.includes(i.group)) grupos.push(i.group);
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-blue-900/30 text-slate-700 dark:text-white">
       <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-white/15 flex flex-col items-center gap-3">
@@ -93,31 +123,28 @@ function SidebarBody({
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {navItems.map((item, idx) => {
-          const { href, label, icon: Icon, badge, group } = item;
-          const active = isActive(item);
-          const showHeader = !!group && group !== navItems[idx - 1]?.group;
+        {sinGrupo.map(renderLink)}
+
+        {grupos.map((group) => {
+          const items = navItems.filter((i) => i.group === group);
+          const isCollapsed = isGroupCollapsed(group);
+          const groupBadge = items.reduce((s, i) => s + (i.badge ?? 0), 0);
           return (
-            <Fragment key={href}>
-              {showHeader && (
-                <p className="px-3 pt-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-white/40 first:pt-1">
-                  {group}
-                </p>
-              )}
-              <Link
-                href={href}
-                onClick={onNavigate}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                  active
-                    ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20"
-                    : "text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
-                }`}
+            <div key={group} className="pt-1.5 space-y-0.5">
+              <button
+                onClick={() => toggleGroup(group)}
+                aria-expanded={!isCollapsed}
+                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/70 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
               >
-                <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
-                <span className="flex-1">{label}</span>
-                <Badge count={badge ?? 0} />
-              </Link>
-            </Fragment>
+                <ChevronDown
+                  size={12}
+                  className={`flex-shrink-0 transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`}
+                />
+                <span className="flex-1 text-left">{group}</span>
+                {isCollapsed && <Badge count={groupBadge} />}
+              </button>
+              {!isCollapsed && items.map(renderLink)}
+            </div>
           );
         })}
       </nav>
@@ -165,6 +192,7 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const { profile, changePassword, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
@@ -177,10 +205,39 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
     };
   }, [open]);
 
+  // Estado de secciones colapsadas — persistido entre sesiones.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("sidebarCollapsedGroups");
+      if (saved) setCollapsed(JSON.parse(saved));
+    } catch {
+      /* localStorage no disponible */
+    }
+  }, []);
+
   const isActive = (item: NavItem) =>
     item.exact
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(item.href + "/");
+
+  // Por defecto las secciones están colapsadas; la sección de la ruta activa arranca
+  // abierta. La preferencia explícita del usuario (localStorage) tiene prioridad.
+  const activeGroup = navItems.find((i) => i.group && isActive(i))?.group;
+  const isGroupCollapsed = (group: string) =>
+    collapsed[group] ?? group !== activeGroup;
+
+  const toggleGroup = (group: string) => {
+    setCollapsed((prev) => {
+      const current = prev[group] ?? group !== activeGroup;
+      const next = { ...prev, [group]: !current };
+      try {
+        localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(next));
+      } catch {
+        /* localStorage no disponible */
+      }
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     logout();
@@ -242,6 +299,8 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
     dark,
     toggle,
     isActive,
+    isGroupCollapsed,
+    toggleGroup,
     onChangePassword: () => {
       setShowPasswordModal(true);
       setOpen(false);
