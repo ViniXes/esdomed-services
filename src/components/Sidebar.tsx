@@ -72,8 +72,8 @@ function SidebarBody({
         onClick={onNavigate}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
           active
-            ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20"
-            : "text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
+            ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20 dark:bg-[var(--color-institutional-navy)] dark:ring-1 dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15"
+            : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white"
         }`}
       >
         <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
@@ -89,8 +89,8 @@ function SidebarBody({
   for (const i of navItems) if (i.group && !grupos.includes(i.group)) grupos.push(i.group);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-blue-900/30 text-slate-700 dark:text-white">
-      <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-white/15 flex flex-col items-center gap-3">
+    <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-[#c9a892]/25 text-slate-700 dark:text-white">
+      <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-[#c9a892]/20 flex flex-col items-center gap-3">
         <Image
           src={SIDEBAR_LOGO_LIGHT_SRC}
           alt="Hospital Nacional El Salvador"
@@ -108,14 +108,14 @@ function SidebarBody({
           priority
         />
         <div className="flex items-center gap-2.5 w-full">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-institutional-accent)] flex items-center justify-center flex-shrink-0 shadow-sm">
-            <span className="text-white text-[10px] font-bold tracking-wide">ES</span>
+          <div className="w-8 h-8 rounded-lg bg-[var(--color-institutional-accent)] dark:bg-[var(--color-institutional-warm)] flex items-center justify-center flex-shrink-0 shadow-sm">
+            <span className="text-white dark:text-[var(--color-institutional-dark)] text-[10px] font-bold tracking-wide">ES</span>
           </div>
           <div className="min-w-0">
             <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight font-heading">
               {roleLabel}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-white/70 truncate">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
               {profile?.nombre}
             </p>
           </div>
@@ -134,7 +134,7 @@ function SidebarBody({
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/70 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-[#c9a892]/70 hover:text-slate-600 dark:hover:text-[#f0ece8] hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors"
               >
                 <ChevronDown
                   size={12}
@@ -149,29 +149,29 @@ function SidebarBody({
         })}
       </nav>
 
-      <div className="px-2 pb-4 pt-2 border-t border-slate-200 dark:border-white/15 space-y-1">
+      <div className="px-2 pb-4 pt-2 border-t border-slate-200 dark:border-[#c9a892]/20 space-y-1">
         {profile?.servicio && (
-          <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-white/60 truncate">
+          <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">
             {profile.servicio}
           </p>
         )}
         <button
           onClick={toggle}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-white/75 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all"
         >
           {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
         <button
           onClick={onChangePassword}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-white/75 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all"
         >
           <KeyRound size={16} />
           Cambiar contrasena
         </button>
         <button
           onClick={onLogout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-500 dark:text-white/65 hover:text-red-600 dark:hover:text-white hover:bg-red-50 dark:hover:bg-red-500/25 transition-all"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-white hover:bg-red-50 dark:hover:bg-red-500/25 transition-all"
         >
           <LogOut size={16} />
           Cerrar sesión

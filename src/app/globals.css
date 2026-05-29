@@ -8,22 +8,50 @@
   --font-body: var(--font-sans);
   --color-institutional: #1c2834;
   --color-institutional-dark: #1c2834;
+  --color-institutional-charcoal: #313945;
+  --color-institutional-navy: #1c1e4d;
+  --color-institutional-warm: #c9a892;
+  --color-institutional-emblem: #d2d2d2;
   --color-institutional-accent: #fb923c;
 }
 
-/* Override slate colors in dark mode to make it more elegant (zinc-like) and with less contrast */
+/* Institutional dark palette: MINSAL colors plus the existing ESDOMED accent. */
 .dark {
-  --color-slate-950: #0a0a0a; /* neutral-950 */
-  --color-slate-900: #171717; /* neutral-900 */
-  --color-slate-800: #262626; /* neutral-800 */
-  --color-slate-700: #404040; /* neutral-700 */
-  --color-slate-600: #525252; /* neutral-600 */
-  --color-slate-500: #737373; /* neutral-500 */
-  --color-slate-400: #8b8b8b; /* custom text-muted */
-  --color-slate-300: #a3a3a3; /* neutral-400 */
-  --color-slate-200: #a3a3a3; /* neutral-400 */
-  --color-slate-100: #c2c2c2; /* custom low-contrast text */
-  --color-slate-50:  #d4d4d4; /* custom lower-contrast text */
+  --color-slate-950: #1c2834;
+  --color-slate-900: #243342;
+  --color-slate-800: #313945;
+  --color-slate-700: #4d5866;
+  --color-slate-600: #748091;
+  --color-slate-500: #a2acba;
+  --color-slate-400: #c1c7cf;
+  --color-slate-300: #d2d2d2;
+  --color-slate-200: #e2dfdc;
+  --color-slate-100: #f0ece8;
+  --color-slate-50:  #f8f4f1;
+
+  --color-blue-950: #1c1e4d;
+  --color-blue-900: #22275f;
+  --color-blue-800: #29337c;
+  --color-blue-700: #2f48aa;
+  --color-blue-600: #2563eb;
+  --color-blue-500: #4f86ff;
+  --color-blue-400: #95b8ff;
+  --color-blue-300: #c2d5ff;
+  --color-blue-200: #dce6ff;
+  --color-blue-100: #eef3ff;
+  --color-blue-50:  #f6f8ff;
+
+  --color-amber-950: #49382f;
+  --color-amber-900: #6a5143;
+  --color-amber-800: #8a6957;
+  --color-amber-700: #a67c65;
+  --color-amber-600: #bd927a;
+  --color-amber-500: #c9a892;
+  --color-amber-400: #e0c1ad;
+  --color-amber-300: #ecd5c6;
+  --color-amber-200: #f4e4d8;
+  --color-amber-100: #faf0e8;
+  --color-amber-50:  #fdf7f2;
 }
 
 @theme inline {

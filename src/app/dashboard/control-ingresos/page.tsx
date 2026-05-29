@@ -31,7 +31,7 @@ type FormState = {
 };
 
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] dark:focus:border-[#c9a892] transition";
 
 const emptyForm = (): FormState => ({
   expediente: "",
@@ -212,22 +212,22 @@ export default function ControlIngresosPage() {
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950 rounded-xl flex items-center justify-center border border-teal-200 dark:border-teal-900 flex-shrink-0">
-          <ClipboardList size={17} className="text-teal-600 dark:text-teal-400" />
+        <div className="w-9 h-9 bg-teal-50 dark:bg-[#c9a892]/15 rounded-xl flex items-center justify-center border border-teal-200 dark:border-[#c9a892]/45 flex-shrink-0">
+          <ClipboardList size={17} className="text-teal-600 dark:text-[#e7c8b4]" />
         </div>
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
             Control de Ingresos
           </h1>
-          <p className="text-xs text-slate-500">{ingresos.length} registro(s) en total</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{ingresos.length} registro(s) en total</p>
         </div>
       </div>
 
       {/* Form card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm mb-6">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-[#c9a892]/25 rounded-2xl shadow-sm dark:shadow-[0_22px_70px_rgba(0,0,0,0.22)] mb-6">
 
         {/* Card header */}
-        <div className="flex items-center gap-4 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-4 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-[#c9a892]/15">
           <Image
             src="/logoEsdomed.png"
             alt="Logo ESDOMED"
@@ -239,7 +239,7 @@ export default function ControlIngresosPage() {
             <p className="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">
               {editingId ? "Editar ingreso" : "Nuevo ingreso"}
             </p>
-            <p className="text-xs text-slate-500 truncate">Responsable: {profile.nombre}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Responsable: {profile.nombre}</p>
           </div>
         </div>
 
@@ -343,7 +343,7 @@ export default function ControlIngresosPage() {
             <button
               type="submit"
               disabled={guardando}
-              className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-all active:scale-[0.99]"
+              className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 dark:bg-[var(--color-institutional-navy)] dark:hover:bg-blue-800 dark:ring-1 dark:ring-[#c9a892]/35 rounded-lg disabled:opacity-50 transition-all active:scale-[0.99]"
             >
               {guardando ? (editingId ? "Actualizando..." : "Registrando...") : (editingId ? "Actualizar ingreso" : "Registrar ingreso")}
             </button>
@@ -358,7 +358,7 @@ export default function ControlIngresosPage() {
         </p>
 
         {/* Barra de búsqueda y fechas */}
-        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-[#c9a892]/20">
           <div className="relative flex-1 min-w-[160px]">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
@@ -366,7 +366,7 @@ export default function ControlIngresosPage() {
               placeholder="Expediente o nombre..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
           <div className="flex items-center gap-1.5">
@@ -375,7 +375,7 @@ export default function ControlIngresosPage() {
               type="date"
               value={fechaDesde}
               onChange={e => setFechaDesde(e.target.value)}
-              className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+              className="px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
             />
           </div>
           <div className="flex items-center gap-1.5">
@@ -384,13 +384,13 @@ export default function ControlIngresosPage() {
               type="date"
               value={fechaHasta}
               onChange={e => setFechaHasta(e.target.value)}
-              className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+              className="px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
             />
           </div>
           {(busqueda || fechaDesde || fechaHasta) && (
             <button
               onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
             >
               <X size={12} /> Limpiar
             </button>
@@ -408,7 +408,7 @@ export default function ControlIngresosPage() {
           {lista.map(ingreso => (
             <div
               key={ingreso.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex items-start justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-[#c9a892]/20 rounded-xl px-4 py-3 flex items-start justify-between gap-3 hover:border-slate-300 dark:hover:border-[#c9a892]/40 transition-colors"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
