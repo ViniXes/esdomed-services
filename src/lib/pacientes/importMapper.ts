@@ -20,7 +20,26 @@ export interface FilaMapeada {
 // ── Normalizadores ──────────────────────────────────────────────────────────
 
 const txt = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
-const normalizar = (v: unknown): string => txt(v).replace(/\s+/g, " ");
+
+// Numerales romanos → dígito (el SIS usa "General 1", el catálogo puede usar "General I").
+const ROMANOS: Record<string, string> = {
+  i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10",
+};
+
+/**
+ * Clave de comparación de servicios: minúsculas, sin tildes, espacios colapsados y
+ * numerales romanos sueltos convertidos a dígito. Permite que el catálogo tenga los
+ * nombres "bonitos" (con tilde) y aun así calce el reporte del SIS (sin tilde).
+ */
+function claveServicio(v: unknown): string {
+  return txt(v)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita tildes/diacríticos
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .map((t) => ROMANOS[t] ?? t)
+    .join(" ");
+}
 
 function parseFechaHora(valor: unknown): Date | null {
   if (!valor) return null;
@@ -67,9 +86,9 @@ function limpiarMunicipio(str: unknown): string | undefined {
 
 /** Resuelve el nombre del servicio del Excel contra el catálogo vivo. */
 export function resolverServicio(servicioExcel: unknown, servicios: string[]): string | null {
-  const objetivo = normalizar(servicioExcel).toLowerCase();
+  const objetivo = claveServicio(servicioExcel);
   if (!objetivo) return null;
-  return servicios.find((s) => normalizar(s).toLowerCase() === objetivo) ?? null;
+  return servicios.find((s) => claveServicio(s) === objetivo) ?? null;
 }
 
 /** Intenta encajar la cama del Excel con el catálogo del servicio. */
