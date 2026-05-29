@@ -48,3 +48,6 @@ service-account.json
 next-env.d.ts
 
 .vercel
+
+# ejemplos / archivos de referencia internos
+/examples

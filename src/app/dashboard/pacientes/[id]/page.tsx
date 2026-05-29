@@ -3,13 +3,15 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, BedDouble, MapPin, IdCard, User2, Stethoscope,
-  Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil,
+  Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil, Save,
 } from "lucide-react";
-import type { Paciente, MovimientoPaciente } from "@/types";
+import type { Paciente, MovimientoPaciente, DiagnosticoCIE } from "@/types";
+import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import {
   CIRCUNSTANCIA_LABEL, ESTADO_BADGE, ESTADO_LABEL, GENERO_LABEL,
   calcularEdad, diasEstancia, formatFecha, formatFechaHora, nombreCompleto, toDate,
@@ -175,7 +177,7 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
       {/* Tab content */}
       {tab === "datos" && <TabDatos paciente={paciente} />}
       {tab === "movimientos" && <TabMovimientos paciente={paciente} />}
-      {tab === "egreso" && <TabEgreso paciente={paciente} />}
+      {tab === "egreso" && <TabEgreso paciente={paciente} pacienteId={id} />}
     </div>
   );
 }
@@ -338,7 +340,7 @@ function TimelineItem({
 
 // ─── Tab: Egreso ────────────────────────────────────────────────────────────
 
-function TabEgreso({ paciente }: { paciente: Paciente }) {
+function TabEgreso({ paciente, pacienteId }: { paciente: Paciente; pacienteId: string }) {
   if (paciente.estado === "activo") {
     return (
       <Card icon={LogOutIcon} title="Egreso pendiente">
@@ -357,60 +359,350 @@ function TabEgreso({ paciente }: { paciente: Paciente }) {
   }
 
   return (
-    <Card icon={LogOutIcon} title="Datos de egreso">
-      <Row label="Condición de egreso" value={ESTADO_LABEL[paciente.estado]} />
-      <Row label="Fecha y hora" value={formatFechaHora(paciente.fechaEgreso)} />
-      <Row label="Días de estancia" value={paciente.diasEstancia !== undefined ? `${paciente.diasEstancia} días` : undefined} />
-      <Row label="Médico responsable" value={paciente.medicoEgresoNombre} />
-      <Row label="JVPM" value={paciente.medicoEgresoJvpm} mono />
-      {paciente.diagnosticoEgreso && (
-        <Row
-          label="Diagnóstico principal"
-          value={
-            <span>
-              <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
-                {paciente.diagnosticoEgreso.codigo}
+    <div className="space-y-4">
+      <Card icon={LogOutIcon} title="Datos de egreso">
+        <Row label="Condición de egreso" value={ESTADO_LABEL[paciente.estado]} />
+        <Row label="Fecha y hora" value={formatFechaHora(paciente.fechaEgreso)} />
+        <Row label="Días de estancia" value={paciente.diasEstancia !== undefined ? `${paciente.diasEstancia} días` : undefined} />
+        <Row label="Médico responsable" value={paciente.medicoEgresoNombre} />
+        <Row label="JVPM" value={paciente.medicoEgresoJvpm} mono />
+        {paciente.diagnosticoEgreso && (
+          <Row
+            label="Diagnóstico principal"
+            value={
+              <span>
+                <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
+                  {paciente.diagnosticoEgreso.codigo}
+                </span>
+                {paciente.diagnosticoEgreso.descripcion}
               </span>
-              {paciente.diagnosticoEgreso.descripcion}
-            </span>
-          }
-        />
-      )}
-      {paciente.diagnosticosComplementarios && paciente.diagnosticosComplementarios.length > 0 && (
-        <div>
-          <p className="text-xs text-slate-500 font-medium mb-1.5">Diagnósticos complementarios</p>
-          <ul className="space-y-1">
-            {paciente.diagnosticosComplementarios.map((d, i) => (
-              <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex gap-2">
-                <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{d.codigo}</span>
-                <span>{d.descripcion}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {paciente.causaExterna && (
-        <Row
-          label="Causa externa"
-          value={
-            <span>
-              <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
-                {paciente.causaExterna.codigo}
+            }
+          />
+        )}
+        {paciente.diagnosticosComplementarios && paciente.diagnosticosComplementarios.length > 0 && (
+          <div>
+            <p className="text-xs text-slate-500 font-medium mb-1.5">Diagnósticos complementarios</p>
+            <ul className="space-y-1">
+              {paciente.diagnosticosComplementarios.map((d, i) => (
+                <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex gap-2">
+                  <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{d.codigo}</span>
+                  <span>{d.descripcion}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {paciente.causaExterna && (
+          <Row
+            label="Causa externa"
+            value={
+              <span>
+                <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
+                  {paciente.causaExterna.codigo}
+                </span>
+                {paciente.causaExterna.descripcion}
               </span>
-              {paciente.causaExterna.descripcion}
-            </span>
-          }
-        />
+            }
+          />
+        )}
+        {paciente.procedimientos && paciente.procedimientos.length > 0 && (
+          <div>
+            <p className="text-xs text-slate-500 font-medium mb-1.5">Procedimientos</p>
+            <ul className="text-sm text-slate-700 dark:text-slate-300 list-disc pl-5 space-y-0.5">
+              {paciente.procedimientos.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+      </Card>
+
+      {paciente.estado === "alta_fallecido" && (
+        <CausasDefuncionEditor pacienteId={pacienteId} paciente={paciente} />
       )}
-      {paciente.procedimientos && paciente.procedimientos.length > 0 && (
-        <div>
-          <p className="text-xs text-slate-500 font-medium mb-1.5">Procedimientos</p>
-          <ul className="text-sm text-slate-700 dark:text-slate-300 list-disc pl-5 space-y-0.5">
-            {paciente.procedimientos.map((p, i) => <li key={i}>{p}</li>)}
-          </ul>
+    </div>
+  );
+}
+
+// ─── Causas de defunción (ESDOMED) ──────────────────────────────────────────
+
+const emptyDx = (): DiagnosticoCIE => ({ codigo: "", descripcion: "" });
+
+// Normaliza valores legacy: si Firestore devuelve un string en lugar de DiagnosticoCIE
+const normDx = (v: unknown): DiagnosticoCIE => {
+  if (!v) return emptyDx();
+  if (typeof v === "string") return { codigo: "", descripcion: v };
+  return v as DiagnosticoCIE;
+};
+
+function CausasDefuncionEditor({
+  pacienteId,
+  paciente,
+}: {
+  pacienteId: string;
+  paciente: Paciente;
+}) {
+  const { profile } = useAuth();
+  const puedeEditar = profile?.role === "esdomed" || profile?.role === "admin";
+
+  const snapshot = () => ({
+    causaMuerteD: paciente.causaMuerteD ?? emptyDx(),
+    causaMuerteC: paciente.causaMuerteC ?? emptyDx(),
+    causaMuerteB: paciente.causaMuerteB ?? emptyDx(),
+    causaMuerteA: paciente.causaMuerteA ?? emptyDx(),
+    estadoI:  normDx(paciente.estadoPatologicoI),
+    estadoII: normDx(paciente.estadoPatologicoII),
+    causaExterna: paciente.causaExterna ?? emptyDx(),
+  });
+
+  const [editando,  setEditando]  = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [form,      setForm]      = useState(snapshot);
+
+  useEffect(() => {
+    if (!editando) setForm(snapshot());
+  }, [paciente, editando]); // eslint-disable-line
+
+  const setDx = (
+    k: "causaMuerteD" | "causaMuerteC" | "causaMuerteB" | "causaMuerteA" | "estadoI" | "estadoII" | "causaExterna",
+    v: DiagnosticoCIE,
+  ) => setForm((p) => ({ ...p, [k]: v }));
+
+  const guardar = async () => {
+    setGuardando(true);
+    setError(null);
+    try {
+      await updateDoc(doc(db, "pacientes", pacienteId), {
+        causaMuerteD: form.causaMuerteD.descripcion ? form.causaMuerteD : null,
+        causaMuerteC: form.causaMuerteC.descripcion ? form.causaMuerteC : null,
+        causaMuerteB: form.causaMuerteB.descripcion ? form.causaMuerteB : null,
+        causaMuerteA: form.causaMuerteA.descripcion ? form.causaMuerteA : null,
+        estadoPatologicoI:  form.estadoI.descripcion  ? form.estadoI  : null,
+        estadoPatologicoII: form.estadoII.descripcion ? form.estadoII : null,
+        causaExterna: form.causaExterna.descripcion ? form.causaExterna : null,
+        actualizadoEn: Timestamp.now(),
+      });
+      setEditando(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar");
+    }
+    setGuardando(false);
+  };
+
+  const hayDatos =
+    !!(paciente.causaMuerteA?.descripcion || paciente.causaMuerteB?.descripcion ||
+       paciente.causaMuerteC?.descripcion || paciente.causaMuerteD?.descripcion ||
+       normDx(paciente.estadoPatologicoI).descripcion ||
+       normDx(paciente.estadoPatologicoII).descripcion ||
+       paciente.causaExterna?.descripcion);
+
+  return (
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
+          <HeartPulse size={15} className="text-rose-400" />
+          Causas de defunción
+        </h3>
+        {puedeEditar && !editando && (
+          <button
+            onClick={() => setEditando(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 hover:border-slate-300 rounded-lg px-2.5 py-1.5 transition-colors"
+          >
+            <Pencil size={11} />
+            {hayDatos ? "Editar" : "Registrar"}
+          </button>
+        )}
+      </div>
+
+      {editando ? (
+        <div className="space-y-4">
+          {/* Parte I */}
+          <div className="space-y-3">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Parte I — Cadena causal de defunción
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">D. Causa básica (subyacente)</label>
+              <CIE10Combobox value={form.causaMuerteD} onChange={(v) => setDx("causaMuerteD", v)} placeholder="Enfermedad o estado que inició la cadena..." />
+            </div>
+            <CausalArrow />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">C.</label>
+              <CIE10Combobox value={form.causaMuerteC} onChange={(v) => setDx("causaMuerteC", v)} />
+            </div>
+            <CausalArrow />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">B.</label>
+              <CIE10Combobox value={form.causaMuerteB} onChange={(v) => setDx("causaMuerteB", v)} />
+            </div>
+            <CausalArrow />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">A. Causa directa / inmediata</label>
+              <CIE10Combobox value={form.causaMuerteA} onChange={(v) => setDx("causaMuerteA", v)} placeholder="Causa que produjo directamente la muerte..." />
+            </div>
+          </div>
+
+          {/* Parte II */}
+          <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+              Parte II — Otros estados patológicos significativos
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Que contribuyeron a la muerte pero no relacionados con la enfermedad que la produjo.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado I</label>
+              <CIE10Combobox value={form.estadoI} onChange={(v) => setDx("estadoI", v)} placeholder="Buscar estado patológico..." />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado II</label>
+              <CIE10Combobox value={form.estadoII} onChange={(v) => setDx("estadoII", v)} placeholder="Buscar estado patológico..." />
+            </div>
+          </div>
+
+          {/* Causa externa */}
+          <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Causa externa</p>
+            <CIE10Combobox value={form.causaExterna} onChange={(v) => setDx("causaExterna", v)} placeholder="Buscar causa externa..." />
+          </div>
+
+          {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              onClick={() => { setEditando(false); setError(null); }}
+              className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={guardar}
+              disabled={guardando}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
+            >
+              <Save size={13} />
+              {guardando ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
         </div>
+      ) : hayDatos ? (
+        <div className="space-y-4">
+          {/* Parte I lectura */}
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+              Parte I — Cadena causal
+            </p>
+            <div className="space-y-1">
+              {(
+                [
+                  { label: "D. Causa básica", dx: paciente.causaMuerteD },
+                  { label: "C.",               dx: paciente.causaMuerteC },
+                  { label: "B.",               dx: paciente.causaMuerteB },
+                  { label: "A. Causa directa", dx: paciente.causaMuerteA },
+                ] as { label: string; dx?: DiagnosticoCIE }[]
+              )
+                .filter((r) => r.dx?.descripcion)
+                .map(({ label, dx }, i, arr) => (
+                  <div key={label}>
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">{label}</span>
+                      <span className="text-slate-800 dark:text-slate-200 flex-1 flex items-baseline gap-2 flex-wrap">
+                        {dx?.codigo && (
+                          <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                            {dx.codigo}
+                          </span>
+                        )}
+                        {dx?.descripcion}
+                      </span>
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className="flex items-center gap-1 ml-28 mt-0.5 mb-0.5">
+                        <div className="w-px h-3 bg-slate-200 dark:bg-slate-700 ml-2" />
+                        <span className="text-[10px] text-slate-400 ml-1">debida a ↑</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {(normDx(paciente.estadoPatologicoI).descripcion || normDx(paciente.estadoPatologicoII).descripcion) && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                Parte II — Otros estados patológicos
+              </p>
+              <div className="space-y-2">
+                {normDx(paciente.estadoPatologicoI).descripcion && (() => {
+                  const dx = normDx(paciente.estadoPatologicoI);
+                  return (
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">Estado I</span>
+                      <span className="text-slate-800 dark:text-slate-200 flex-1 flex items-baseline gap-2 flex-wrap">
+                        {dx.codigo && (
+                          <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                            {dx.codigo}
+                          </span>
+                        )}
+                        {dx.descripcion}
+                      </span>
+                    </div>
+                  );
+                })()}
+                {normDx(paciente.estadoPatologicoII).descripcion && (() => {
+                  const dx = normDx(paciente.estadoPatologicoII);
+                  return (
+                    <div className="flex gap-3 text-sm">
+                      <span className="text-xs text-slate-500 font-medium w-28 flex-shrink-0 pt-0.5">Estado II</span>
+                      <span className="text-slate-800 dark:text-slate-200 flex-1 flex items-baseline gap-2 flex-wrap">
+                        {dx.codigo && (
+                          <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                            {dx.codigo}
+                          </span>
+                        )}
+                        {dx.descripcion}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {paciente.causaExterna?.descripcion && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+                Causa externa
+              </p>
+              <div className="flex items-baseline gap-2 text-sm flex-wrap">
+                {paciente.causaExterna.codigo && (
+                  <span className="font-mono text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                    {paciente.causaExterna.codigo}
+                  </span>
+                )}
+                <span className="text-slate-800 dark:text-slate-200">{paciente.causaExterna.descripcion}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400 italic">
+          {puedeEditar
+            ? 'Sin causas de defunción registradas. Pulsa "Registrar" para completarlas.'
+            : "Sin causas de defunción registradas."}
+        </p>
       )}
-    </Card>
+    </section>
+  );
+}
+
+function CausalArrow() {
+  return (
+    <div className="flex items-center gap-1.5 ml-2 my-0.5">
+      <div className="flex flex-col items-center text-slate-300 dark:text-slate-600">
+        <div className="w-px h-2 bg-current" />
+        <span className="text-[9px] leading-none">▲</span>
+      </div>
+      <span className="text-[10px] text-slate-400">debida a</span>
+    </div>
   );
 }
 
