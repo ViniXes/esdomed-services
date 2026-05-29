@@ -162,13 +162,6 @@ function normalizarArea(a) {
   return undefined;
 }
 
-function normalizarCircunstancia(tipo) {
-  const s = normalizar(tipo ?? "");
-  if (s.includes("emergencia")) return "emergencia";
-  if (s.includes("referid"))    return "referido";
-  return "demanda_espontanea";
-}
-
 function parsearDiagnostico(str) {
   if (!str) return undefined;
   const s = String(str).trim();
@@ -304,12 +297,9 @@ async function main() {
     const { cama, advertencia: advertenciaCama } = resolverCama(row["Cama"], servicioApp);
     if (advertenciaCama) advertenciasCama.push({ fila, expediente, servicio: servicioApp, advertencia: advertenciaCama });
 
-    // Diagnósticos
+    // Diagnóstico de ingreso. "Último diagnóstico" se ignora: en este reporte duplica
+    // al de ingreso y "complementarios" es un concepto de egreso, no de ingreso.
     const diagnosticoIngreso = parsearDiagnostico(row["Diagnóstico de ingreso"]);
-    const diagnosticoUltimo  = parsearDiagnostico(row["Último diagnóstico"]);
-    const diagnosticosCompl  = (diagnosticoUltimo && diagnosticoUltimo.codigo !== diagnosticoIngreso?.codigo)
-      ? [diagnosticoUltimo]
-      : [];
 
     // Responsable
     const respNombre = row["Nombre Responsable"]?.toString().trim();
@@ -344,14 +334,14 @@ async function main() {
       fechaIngreso:        "__TIMESTAMP__",
       _fechaIngresoDate:   fechaIngreso,
       servicioIngreso:     servicioApp,
-      circunstanciaIngreso: normalizarCircunstancia(row["Tipo Ingreso"]),
+      // circunstanciaIngreso NO se mapea: "Tipo Ingreso" (Ingreso/Traslado) es tipo de
+      // movimiento, no circunstancia (emergencia/referido/demanda). Se deja vacío.
       medicoIngresoNombre: parsearNombreMedico(row["Médico Ingreso"]),
       diagnosticoIngreso,
 
       servicioActual: servicioApp,
       camaActual:     cama || undefined,
 
-      diagnosticosComplementarios: diagnosticosCompl.length > 0 ? diagnosticosCompl : undefined,
       movimientos: [],
 
       estado:          "activo",
