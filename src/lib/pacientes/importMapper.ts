@@ -195,7 +195,10 @@ export function mapearFilaReporte(
       : undefined,
     establecimientoProcedencia: txt(row["Establecimiento Procedencia"]) || undefined,
     fechaIngreso: toDatetimeLocalInput(fechaIngreso),
-    servicioIngreso: servicioApp ?? servicioExcel,
+    // El reporte trae el servicio/cama ACTUAL del paciente, no el de ingreso.
+    // servicioIngreso se deja vacío: el personal lo completa la primera vez.
+    servicioActual: servicioApp ?? servicioExcel,
+    servicioIngreso: undefined,
     camaActual: cama ?? undefined,
     medicoIngresoNombre: parsearNombreMedico(row["Médico Ingreso"]),
     diagnosticoIngreso: parsearDiagnostico(row["Diagnóstico de ingreso"]),

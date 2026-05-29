@@ -31,7 +31,7 @@ function formatFecha(ts: unknown) {
 function formatHora(ts: unknown) {
   if (!ts) return "—";
   return tsToDate(ts).toLocaleTimeString("es-HN", {
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
   });
 }
 
@@ -103,7 +103,7 @@ export default function ColaExpedientesPage() {
           <span className="hidden sm:inline">En vivo</span>
           {ultimaActualizacion && (
             <span className="hidden md:inline text-slate-400">
-              · {ultimaActualizacion.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              · {ultimaActualizacion.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
             </span>
           )}
         </div>

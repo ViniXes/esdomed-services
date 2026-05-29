@@ -15,6 +15,19 @@ export const CAMPOS_PERSONALES = [
   "responsable",
 ] as const;
 
+/**
+ * Convierte un string de input[type=date] ("YYYY-MM-DD") a Date local a medianoche.
+ * Evita el corrimiento de un día: `new Date("2005-11-10")` se interpreta como UTC,
+ * que en zonas con offset negativo (UTC-6) cae en el día anterior.
+ */
+function fechaInputADate(s?: string): Date | null {
+  if (!s) return null;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 /** Sanea el responsable: null si no tiene al menos nombre. */
 export function limpiarResponsable(r?: ResponsablePaciente | null): ResponsablePaciente | null {
   if (!r || !r.nombre?.trim()) return null;
@@ -32,7 +45,7 @@ export function limpiarResponsable(r?: ResponsablePaciente | null): ResponsableP
  * No incluye campos clínicos ni de ingreso.
  */
 export function construirDatosPersonales(form: PacienteFormValue): Record<string, unknown> {
-  const fechaNacimiento = form.fechaNacimiento ? new Date(form.fechaNacimiento) : null;
+  const fechaNacimiento = fechaInputADate(form.fechaNacimiento);
   return {
     expediente:       form.expediente!.trim(),
     apellidos:        form.apellidos!.trim(),
@@ -65,12 +78,15 @@ export function construirDocIngreso(
   datosPersonales: Record<string, unknown>,
   autor: { uid: string; nombre: string },
 ): Record<string, unknown> {
-  const servicio = form.servicioIngreso!.trim();
+  // servicioIngreso puede venir vacío (importación): el personal lo completa luego.
+  // servicioActual: el de ingreso para altas manuales, o el del reporte en importación.
+  const servicioIngreso = (form.servicioIngreso ?? "").trim();
+  const servicioActual = (form.servicioActual ?? form.servicioIngreso ?? "").trim();
   const doc: Record<string, unknown> = {
     ...datosPersonales,
     fechaIngreso:    Timestamp.fromDate(new Date(form.fechaIngreso!)),
-    servicioIngreso: servicio,
-    servicioActual:  servicio,
+    servicioIngreso,
+    servicioActual,
     estado:          "activo" as const,
     movimientos:     [],
     creadoEn:        Timestamp.now(),

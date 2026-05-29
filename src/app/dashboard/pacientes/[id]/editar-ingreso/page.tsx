@@ -16,7 +16,6 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const { profile } = useAuth();
   const [form, setForm] = useState<PacienteFormValue>({});
-  const [tieneMovimientos, setTieneMovimientos] = useState(false);
   const [nombre, setNombre] = useState("");
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -32,7 +31,6 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
       }
       const data = snap.data() as Omit<Paciente, "id">;
       setNombre(`${data.nombres} ${data.apellidos}`.replace(/\s+/g, " ").trim());
-      setTieneMovimientos((data.movimientos?.length ?? 0) > 0);
       setForm(ingresoToForm(data));
       setLoading(false);
     });
@@ -69,8 +67,8 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
         actualizadoEn:  Timestamp.now(),
         actualizadoPor: profile.uid,
       };
-      // Solo si el paciente no se ha trasladado, el servicio actual sigue al de ingreso.
-      if (!tieneMovimientos) patch.servicioActual = servicioIngreso;
+      // No se toca servicioActual: representa la ubicación actual (gestionada por
+      // traslados / importación) y puede diferir del servicio de ingreso.
 
       await updateDoc(doc(db, "pacientes", id), patch);
       router.push(`/dashboard/pacientes/${id}`);

@@ -53,7 +53,7 @@ export default function PsicologiaFallecidosPage() {
   const formatHora = (ts: unknown) => {
     if (!ts) return null;
     const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
-    return d.toLocaleString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
   };
 
   return (

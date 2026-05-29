@@ -115,7 +115,7 @@ export default function ImportarReportePage() {
         }
 
         const existente = activos.get(m.expediente);
-        const servicioNuevo = (m.form.servicioIngreso ?? "").trim();
+        const servicioNuevo = (m.form.servicioActual ?? "").trim();
         const camaNueva = (m.form.camaActual ?? "").trim();
 
         if (existente) {

@@ -157,7 +157,7 @@ export default function ControlIngresosPage() {
     const d = ((ts as unknown) as { toDate?: () => Date }).toDate?.() ?? (ts as Date);
     return d.toLocaleString("es-HN", {
       day: "2-digit", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
     });
   };
 
