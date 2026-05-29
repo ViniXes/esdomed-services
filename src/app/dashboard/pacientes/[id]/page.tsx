@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, BedDouble, MapPin, IdCard, User2, Stethoscope,
-  Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil, Save,
+  Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil, Save, Users,
 } from "lucide-react";
 import type { Paciente, MovimientoPaciente, DiagnosticoCIE } from "@/types";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
@@ -106,13 +106,20 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
             {paciente.dui && <> · DUI {paciente.dui}</>}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
           <Link
-            href={`/dashboard/pacientes/${paciente.id}/editar`}
+            href={`/dashboard/pacientes/${paciente.id}/editar-persona`}
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          >
+            <Users size={14} />
+            Editar datos del paciente
+          </Link>
+          <Link
+            href={`/dashboard/pacientes/${paciente.id}/editar-ingreso`}
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
           >
             <Pencil size={14} />
-            Editar
+            Editar este ingreso
           </Link>
           {esActivo && (
             <Link

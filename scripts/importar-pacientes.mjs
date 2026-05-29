@@ -197,6 +197,24 @@ function sinNulos(obj) {
   );
 }
 
+// Claves de datos personales (espejo de CAMPOS_PERSONALES en src/lib/pacientes/persona.ts).
+// Viven canónicamente en personas/{expediente} y se replican como snapshot en cada ingreso.
+const CAMPOS_PERSONALES = [
+  "expediente", "apellidos", "nombres", "fechaNacimiento", "genero", "estadoFamiliar",
+  "dui", "numeroAfiliacion", "ocupacion", "nacionalidad",
+  "direccion", "municipio", "departamento", "canton", "area", "telefono", "otrosNumeros",
+  "responsable",
+];
+
+/** Extrae el subconjunto de datos personales de un doc de ingreso ya preparado. */
+function extraerPersona(docIngreso) {
+  const persona = {};
+  for (const k of CAMPOS_PERSONALES) {
+    if (docIngreso[k] !== undefined) persona[k] = docIngreso[k];
+  }
+  return persona;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   console.log("\n" + "=".repeat(62));
@@ -439,8 +457,20 @@ async function main() {
   for (let i = 0; i < listos.length; i += CHUNK) {
     const chunk = listos.slice(i, i + CHUNK);
     const batch = db.batch();
+    const personasEnBatch = new Set(); // un doc por expediente por batch (Firestore lo exige)
     for (const p of chunk) {
-      batch.set(db.collection("pacientes").doc(), preparar(p));
+      const docIngreso = preparar(p);
+      // Ingreso (un doc por fila)
+      batch.set(db.collection("pacientes").doc(), docIngreso);
+      // Persona canónica (deduplicada por expediente; reingresos comparten persona)
+      if (!personasEnBatch.has(docIngreso.expediente)) {
+        personasEnBatch.add(docIngreso.expediente);
+        batch.set(
+          db.collection("personas").doc(docIngreso.expediente),
+          { ...extraerPersona(docIngreso), creadoEn: ahora, actualizadoEn: ahora },
+          { merge: true },
+        );
+      }
     }
     await batch.commit();
     importados += chunk.length;

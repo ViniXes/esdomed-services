@@ -12,6 +12,7 @@
     "importar": "node scripts/importar-pacientes.mjs"
   },
   "dependencies": {
+    "claude": "^0.1.1",
     "firebase": "^12.13.0",
     "firebase-admin": "^13.10.0",
     "lucide-react": "^1.16.0",

@@ -277,11 +277,52 @@ export interface MovimientoPaciente {
   registradoPorNombre?: string;
 }
 
+// Datos personales del paciente — fuente de verdad en personas/{expediente}.
+// El expediente es la llave estable de persona (único por paciente, nunca cambia).
+// Estos mismos campos se replican como snapshot dentro de cada ingreso (Paciente)
+// para que listados y búsquedas funcionen sin joins; la propagación de cambios se
+// hace desde guardarPersona() en src/lib/pacientes/persona.ts.
+export interface Persona {
+  id?: string;              // == expediente (id del documento en personas)
+
+  // Identidad
+  expediente: string;       // llave estable de persona (único por paciente, nunca cambia)
+  apellidos: string;
+  nombres: string;
+  fechaNacimiento?: Date;
+  genero: Genero;
+  estadoFamiliar?: string;
+  dui?: string;
+  numeroAfiliacion?: string;
+  ocupacion?: string;
+  nacionalidad?: string;
+
+  // Domicilio
+  direccion?: string;
+  municipio?: string;
+  departamento?: string;
+  canton?: string;
+  area?: AreaGeografica;
+  telefono?: string;
+  otrosNumeros?: string;
+
+  // Responsable
+  responsable?: ResponsablePaciente;
+
+  // Metadata
+  creadoEn?: Date;
+  actualizadoEn?: Date;
+  actualizadoPor?: string;
+}
+
+// Documento de un INGRESO (colección pacientes/{id}). Contiene un snapshot de los
+// datos personales (ver Persona) + los datos clínicos/del ingreso y movimientos,
+// que sí pertenecen a este ingreso concreto.
 export interface Paciente {
   id?: string;
 
-  // Identidad
-  expediente: string;       // EXP del CSV — único por año pero puede repetirse entre años
+  // Identidad — snapshot de personas/{expediente}
+  expediente: string;       // llave estable de persona (único por paciente, nunca cambia)
   apellidos: string;
   nombres: string;
   fechaNacimiento?: Date;

@@ -25,10 +25,11 @@ interface PacienteFormProps {
   onChange: (next: PacienteFormValue) => void;
   disabled?: boolean;
   hideIngreso?: boolean;
+  /** Bloquea el campo expediente (llave de persona, no editable tras crear). */
+  expedienteReadOnly?: boolean;
 }
 
-export function PacienteForm({ value, onChange, disabled, hideIngreso }: PacienteFormProps) {
-  const { servicios, getCamas } = useServicios();
+export function PacienteForm({ value, onChange, disabled, hideIngreso, expedienteReadOnly }: PacienteFormProps) {
   const set = <K extends keyof PacienteFormValue>(k: K, v: PacienteFormValue[K]) =>
     onChange({ ...value, [k]: v });
 
@@ -36,17 +37,6 @@ export function PacienteForm({ value, onChange, disabled, hideIngreso }: Pacient
     onChange({
       ...value,
       responsable: { nombre: "", ...(value.responsable ?? {}), ...patch },
-    });
-
-  const setDiagnostico = (patch: Partial<DiagnosticoCIE>) =>
-    onChange({
-      ...value,
-      diagnosticoIngreso: {
-        codigo: "",
-        descripcion: "",
-        ...(value.diagnosticoIngreso ?? {}),
-        ...patch,
-      },
     });
 
   return (
@@ -58,7 +48,7 @@ export function PacienteForm({ value, onChange, disabled, hideIngreso }: Pacient
             type="text"
             value={value.expediente ?? ""}
             onChange={(e) => set("expediente", e.target.value)}
-            disabled={disabled}
+            disabled={disabled || expedienteReadOnly}
             className={inputCls}
             placeholder="22-26"
           />
@@ -286,138 +276,166 @@ export function PacienteForm({ value, onChange, disabled, hideIngreso }: Pacient
       </Seccion>
 
       {/* ── Ingreso ── */}
-      {!hideIngreso && (
-        <Seccion icon={BedDouble} title="Datos de ingreso">
-          <Field label="Fecha y hora de ingreso *">
-            <input
-              type="datetime-local"
-              value={value.fechaIngreso ?? ""}
-              onChange={(e) => set("fechaIngreso", e.target.value)}
-              disabled={disabled}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Circunstancia de ingreso">
-            <SelectWrapper>
-              <select
-                value={value.circunstanciaIngreso ?? ""}
-                onChange={(e) =>
-                  set("circunstanciaIngreso", e.target.value as Paciente["circunstanciaIngreso"])
-                }
-                disabled={disabled}
-                className={selectCls}
-              >
-                <option value="">— Sin especificar</option>
-                {(Object.keys(CIRCUNSTANCIA_LABEL) as Array<keyof typeof CIRCUNSTANCIA_LABEL>).map(
-                  (k) => (
-                    <option key={k} value={k}>
-                      {CIRCUNSTANCIA_LABEL[k]}
-                    </option>
-                  )
-                )}
-              </select>
-            </SelectWrapper>
-          </Field>
-          <Field label="Establecimiento de procedencia">
-            <input
-              type="text"
-              value={value.establecimientoProcedencia ?? ""}
-              onChange={(e) => set("establecimientoProcedencia", e.target.value)}
-              disabled={disabled}
-              className={inputCls}
-              placeholder="Demanda espontánea / Hospital..."
-            />
-          </Field>
+      {!hideIngreso && <IngresoForm value={value} onChange={onChange} disabled={disabled} />}
+    </div>
+  );
+}
 
-          <Field label="Servicio de ingreso *" className="col-span-2">
+// ── Formulario de datos de ingreso (clínico, por ingreso) ───────────────────────
+
+interface IngresoFormProps {
+  value: PacienteFormValue;
+  onChange: (next: PacienteFormValue) => void;
+  disabled?: boolean;
+}
+
+/** Sección "Datos de ingreso" reutilizable: editor de ingreso y formulario completo. */
+export function IngresoForm({ value, onChange, disabled }: IngresoFormProps) {
+  const { servicios, getCamas } = useServicios();
+  const set = <K extends keyof PacienteFormValue>(k: K, v: PacienteFormValue[K]) =>
+    onChange({ ...value, [k]: v });
+
+  const setDiagnostico = (patch: Partial<DiagnosticoCIE>) =>
+    onChange({
+      ...value,
+      diagnosticoIngreso: {
+        codigo: "",
+        descripcion: "",
+        ...(value.diagnosticoIngreso ?? {}),
+        ...patch,
+      },
+    });
+
+  return (
+    <Seccion icon={BedDouble} title="Datos de ingreso">
+      <Field label="Fecha y hora de ingreso *">
+        <input
+          type="datetime-local"
+          value={value.fechaIngreso ?? ""}
+          onChange={(e) => set("fechaIngreso", e.target.value)}
+          disabled={disabled}
+          className={inputCls}
+        />
+      </Field>
+      <Field label="Circunstancia de ingreso">
+        <SelectWrapper>
+          <select
+            value={value.circunstanciaIngreso ?? ""}
+            onChange={(e) =>
+              set("circunstanciaIngreso", e.target.value as Paciente["circunstanciaIngreso"])
+            }
+            disabled={disabled}
+            className={selectCls}
+          >
+            <option value="">— Sin especificar</option>
+            {(Object.keys(CIRCUNSTANCIA_LABEL) as Array<keyof typeof CIRCUNSTANCIA_LABEL>).map(
+              (k) => (
+                <option key={k} value={k}>
+                  {CIRCUNSTANCIA_LABEL[k]}
+                </option>
+              )
+            )}
+          </select>
+        </SelectWrapper>
+      </Field>
+      <Field label="Establecimiento de procedencia">
+        <input
+          type="text"
+          value={value.establecimientoProcedencia ?? ""}
+          onChange={(e) => set("establecimientoProcedencia", e.target.value)}
+          disabled={disabled}
+          className={inputCls}
+          placeholder="Demanda espontánea / Hospital..."
+        />
+      </Field>
+
+      <Field label="Servicio de ingreso *" className="col-span-2">
+        <SelectWrapper>
+          <select
+            value={value.servicioIngreso ?? ""}
+            onChange={(e) =>
+              onChange({ ...value, servicioIngreso: e.target.value, camaActual: "" })
+            }
+            disabled={disabled}
+            className={selectCls}
+          >
+            <option value="">— Seleccionar servicio</option>
+            {servicios.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </SelectWrapper>
+      </Field>
+      <Field label="Cama (actual)">
+        {(() => {
+          const camas = value.servicioIngreso ? getCamas(value.servicioIngreso) : [];
+          return camas.length > 0 ? (
             <SelectWrapper>
               <select
-                value={value.servicioIngreso ?? ""}
-                onChange={(e) =>
-                  onChange({ ...value, servicioIngreso: e.target.value, camaActual: "" })
-                }
+                value={value.camaActual ?? ""}
+                onChange={(e) => set("camaActual", e.target.value)}
                 disabled={disabled}
                 className={selectCls}
               >
-                <option value="">— Seleccionar servicio</option>
-                {servicios.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                <option value="">— Seleccionar cama</option>
+                {camas.map((c) => (
+                  <option key={c} value={c}>{c}</option>
                 ))}
               </select>
             </SelectWrapper>
-          </Field>
-          <Field label="Cama (actual)">
-            {(() => {
-              const camas = value.servicioIngreso ? getCamas(value.servicioIngreso) : [];
-              return camas.length > 0 ? (
-                <SelectWrapper>
-                  <select
-                    value={value.camaActual ?? ""}
-                    onChange={(e) => set("camaActual", e.target.value)}
-                    disabled={disabled}
-                    className={selectCls}
-                  >
-                    <option value="">— Seleccionar cama</option>
-                    {camas.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </SelectWrapper>
-              ) : (
-                <input
-                  type="text"
-                  value={value.camaActual ?? ""}
-                  onChange={(e) => set("camaActual", e.target.value)}
-                  disabled={disabled || !value.servicioIngreso}
-                  className={inputCls}
-                  placeholder={!value.servicioIngreso ? "Primero selecciona el servicio" : ""}
-                />
-              );
-            })()}
-          </Field>
-
-          <Field label="Médico que indicó el ingreso" className="col-span-3">
+          ) : (
             <input
               type="text"
-              value={value.medicoIngresoNombre ?? ""}
-              onChange={(e) => set("medicoIngresoNombre", e.target.value)}
+              value={value.camaActual ?? ""}
+              onChange={(e) => set("camaActual", e.target.value)}
+              disabled={disabled || !value.servicioIngreso}
+              className={inputCls}
+              placeholder={!value.servicioIngreso ? "Primero selecciona el servicio" : ""}
+            />
+          );
+        })()}
+      </Field>
+
+      <Field label="Médico que indicó el ingreso" className="col-span-3">
+        <input
+          type="text"
+          value={value.medicoIngresoNombre ?? ""}
+          onChange={(e) => set("medicoIngresoNombre", e.target.value)}
+          disabled={disabled}
+          className={inputCls}
+          placeholder="DR. NOMBRE APELLIDOS"
+        />
+      </Field>
+
+      <div className="col-span-3 pt-1">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+          <Stethoscope size={12} />
+          Diagnóstico principal de ingreso
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Field label="CIE-10">
+            <input
+              type="text"
+              value={value.diagnosticoIngreso?.codigo ?? ""}
+              onChange={(e) => setDiagnostico({ codigo: e.target.value.toUpperCase() })}
               disabled={disabled}
               className={inputCls}
-              placeholder="DR. NOMBRE APELLIDOS"
+              placeholder="N18.5"
             />
           </Field>
-
-          <div className="col-span-3 pt-1">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <Stethoscope size={12} />
-              Diagnóstico principal de ingreso
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <Field label="CIE-10">
-                <input
-                  type="text"
-                  value={value.diagnosticoIngreso?.codigo ?? ""}
-                  onChange={(e) => setDiagnostico({ codigo: e.target.value.toUpperCase() })}
-                  disabled={disabled}
-                  className={inputCls}
-                  placeholder="N18.5"
-                />
-              </Field>
-              <Field label="Descripción" className="md:col-span-3">
-                <input
-                  type="text"
-                  value={value.diagnosticoIngreso?.descripcion ?? ""}
-                  onChange={(e) => setDiagnostico({ descripcion: e.target.value })}
-                  disabled={disabled}
-                  className={inputCls}
-                  placeholder="Enfermedad renal crónica etapa 5..."
-                />
-              </Field>
-            </div>
-          </div>
-        </Seccion>
-      )}
-    </div>
+          <Field label="Descripción" className="md:col-span-3">
+            <input
+              type="text"
+              value={value.diagnosticoIngreso?.descripcion ?? ""}
+              onChange={(e) => setDiagnostico({ descripcion: e.target.value })}
+              disabled={disabled}
+              className={inputCls}
+              placeholder="Enfermedad renal crónica etapa 5..."
+            />
+          </Field>
+        </div>
+      </div>
+    </Seccion>
   );
 }
 
