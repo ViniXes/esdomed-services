@@ -53,6 +53,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     profile?.role === "admin" ||
     profile?.role === "trabajo_social";
   const verConfiguracion = profile?.role === "admin";
+  const verUsuarios = profile?.role === "admin";
 
   const navItems = [
     { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true },
@@ -81,7 +82,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble }]
       : []),
-    { href: "/dashboard/usuarios", label: "Usuarios", icon: Users },
+    ...(verUsuarios
+      ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users }]
+      : []),
     ...(verAltasVivos
       ? [
           {

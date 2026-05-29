@@ -1,42 +1,107 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
+import type { UserRole } from "@/types";
 
-async function getCallerRole(req: NextRequest): Promise<string | null> {
+const DEFAULT_TEST_PASSWORD = "123456";
+const VALID_ROLES = new Set<UserRole>([
+  "medico",
+  "esdomed",
+  "trabajo_social",
+  "psicologia",
+  "admin",
+  "enfermeria",
+]);
+
+async function getCaller(req: NextRequest): Promise<{ uid: string; role: string } | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const snap = await adminDb.collection("usuarios").doc(decoded.uid).get();
-    return snap.data()?.role ?? null;
+    const role = snap.data()?.role;
+    return typeof role === "string" ? { uid: decoded.uid, role } : null;
   } catch {
     return null;
   }
 }
 
-// PATCH — actualizar campos del usuario (esdomed o admin)
+function isSuperAdmin(caller: { role: string } | null) {
+  return caller?.role === "admin";
+}
+
+// PATCH - actualizar usuario o restablecer clave. Solo Administrador Superusuario.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ uid: string }> }) {
-  const role = await getCallerRole(req);
-  if (role !== "esdomed" && role !== "admin") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const caller = await getCaller(req);
+  if (!isSuperAdmin(caller)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const { uid } = await params;
   const body = await req.json();
-  const allowed = ["jvpm"] as const;
-  const update: Record<string, unknown> = {};
-  for (const key of allowed) {
-    if (key in body) update[key] = body[key] ?? "";
+
+  if (body.resetPassword === true) {
+    await adminAuth.updateUser(uid, { password: DEFAULT_TEST_PASSWORD });
+    return NextResponse.json({ ok: true });
   }
-  if (Object.keys(update).length === 0) return NextResponse.json({ error: "Sin campos válidos" }, { status: 400 });
+
+  const update: Record<string, unknown> = {};
+  const authUpdate: { email?: string; displayName?: string } = {};
+
+  if ("nombre" in body) {
+    const nombre = String(body.nombre ?? "").trim();
+    if (!nombre) return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 });
+    update.nombre = nombre;
+    authUpdate.displayName = nombre;
+  }
+
+  if ("email" in body) {
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (!email) return NextResponse.json({ error: "El correo es requerido" }, { status: 400 });
+    update.email = email;
+    authUpdate.email = email;
+  }
+
+  let nextRole: UserRole | undefined;
+  if ("userRole" in body) {
+    const userRole = body.userRole as UserRole;
+    if (!VALID_ROLES.has(userRole)) return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
+    nextRole = userRole;
+    update.role = userRole;
+  }
+
+  const targetRole = nextRole ?? (await adminDb.collection("usuarios").doc(uid).get()).data()?.role;
+  if ("servicios" in body || nextRole) {
+    const servicios = targetRole === "medico" && Array.isArray(body.servicios) ? body.servicios.map(String) : [];
+    update.servicios = servicios;
+    update.servicio = servicios[0] ?? "";
+  }
+
+  if ("jvpm" in body || nextRole) {
+    const jvpm = String(body.jvpm ?? "").trim();
+    update.jvpm = targetRole === "medico" && jvpm ? jvpm : FieldValue.delete();
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "Sin campos validos" }, { status: 400 });
+  }
+
+  if (Object.keys(authUpdate).length > 0) {
+    await adminAuth.updateUser(uid, authUpdate);
+  }
 
   await adminDb.collection("usuarios").doc(uid).update(update);
   return NextResponse.json({ ok: true });
 }
 
-// DELETE — eliminar usuario
+// DELETE - eliminar usuario. Solo Administrador Superusuario.
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ uid: string }> }) {
-  const role = await getCallerRole(req);
-  if (role !== "esdomed" && role !== "admin") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const caller = await getCaller(req);
+  if (!isSuperAdmin(caller)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const { uid } = await params;
+  if (caller?.uid === uid) {
+    return NextResponse.json({ error: "No puedes eliminar tu propio usuario" }, { status: 400 });
+  }
+
   await adminAuth.deleteUser(uid);
   await adminDb.collection("usuarios").doc(uid).delete();
 
