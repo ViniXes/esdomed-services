@@ -76,7 +76,10 @@ export default function ConfiguracionServiciosPage() {
   const [savedMsg, setSavedMsg] = useState("");
 
   useEffect(() => {
-    if (!isDirty) setDraft(listaCtx.map((s) => ({ ...s, camas: [...s.camas] })));
+    const timeout = window.setTimeout(() => {
+      if (!isDirty) setDraft(listaCtx.map((s) => ({ ...s, camas: [...s.camas] })));
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [listaCtx, isDirty]);
 
   const markDirty = () => setIsDirty(true);
@@ -190,7 +193,7 @@ export default function ConfiguracionServiciosPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto pb-24">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto pb-24">
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4">
         <div>

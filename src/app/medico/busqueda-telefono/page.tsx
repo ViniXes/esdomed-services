@@ -112,7 +112,7 @@ export default function BusquedaTelefonoPage() {
   const telefono = responsable?.telefono || resultado?.telefono || resultado?.otrosNumeros || "";
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900">
           <Phone size={17} className="text-blue-600 dark:text-blue-400" />

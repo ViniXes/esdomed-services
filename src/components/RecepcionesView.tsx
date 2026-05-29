@@ -54,7 +54,7 @@ export default function RecepcionesView() {
   const confirmados  = registros.filter(r => r.recibeDePsConfirmado);
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
 
       {/* Header */}
       <div className="flex items-center gap-3">

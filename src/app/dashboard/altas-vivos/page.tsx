@@ -93,20 +93,23 @@ function CreateModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!servicio) { setPacientes([]); setSelectedId(""); return; }
-    setLoadingPac(true);
-    setSelectedId("");
-    setTipoAlta("");
-    getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", servicio)))
-      .then(snap => {
-        const docs = snap.docs
-          .map(d => ({ id: d.id, ...d.data() } as Paciente))
-          .filter(p => p.estado === "activo" && p.camaActual);
-        docs.sort((a, b) => (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
-        setPacientes(docs);
-      })
-      .catch(() => setPacientes([]))
-      .finally(() => setLoadingPac(false));
+    const timeout = window.setTimeout(() => {
+      if (!servicio) { setPacientes([]); setSelectedId(""); return; }
+      setLoadingPac(true);
+      setSelectedId("");
+      setTipoAlta("");
+      getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", servicio)))
+        .then(snap => {
+          const docs = snap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Paciente))
+            .filter(p => p.estado === "activo" && p.camaActual);
+          docs.sort((a, b) => (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
+          setPacientes(docs);
+        })
+        .catch(() => setPacientes([]))
+        .finally(() => setLoadingPac(false));
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [servicio]);
 
   const selectedPaciente = pacientes.find(p => p.id === selectedId) ?? null;
@@ -385,7 +388,7 @@ export default function AltasVivosPage() {
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
