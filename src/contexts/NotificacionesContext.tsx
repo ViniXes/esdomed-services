@@ -9,11 +9,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type TipoNotif = "fallecido" | "traslado" | "alta";
+export type TipoNotif = "fallecido" | "traslado" | "alta" | "psicologia";
 
 export interface NotifToast {
   id: string;
@@ -52,6 +52,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const knownFallecidos = useRef<Set<string> | null>(null);
   const knownTraslados  = useRef<Set<string> | null>(null);
   const knownAltas      = useRef<Set<string> | null>(null);
+  const knownPsConfirm  = useRef<Set<string> | null>(null);
 
   const esEsdomed   = profile?.role === "esdomed" || profile?.role === "admin";
   const puedeAltas  = esEsdomed || profile?.role === "trabajo_social";
@@ -93,6 +94,40 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
         knownFallecidos.current = ids;
       }
       setCountFallecidos(snap.size);
+    });
+  }, [esEsdomed, addToast]);
+
+  // Confirmación de lectura de Psicología sobre un fallecido — avisa a esdomed/admin.
+  // Detecta cuando una notificación pasa a tener `recibeDePs` (la confirma Psicología).
+  useEffect(() => {
+    if (!esEsdomed) return;
+    knownPsConfirm.current = null;
+
+    const q = query(
+      collection(db, "notificaciones_fallecidos"),
+      orderBy("creadoEn", "desc"),
+      limit(200),
+    );
+    return onSnapshot(q, snap => {
+      const confirmados = new Set(
+        snap.docs.filter(d => d.data().recibeDePs).map(d => d.id),
+      );
+
+      if (knownPsConfirm.current === null) {
+        knownPsConfirm.current = confirmados;
+      } else {
+        snap.docs.forEach(doc => {
+          const d = doc.data();
+          if (d.recibeDePs && !knownPsConfirm.current!.has(doc.id)) {
+            addToast({
+              tipo: "psicologia",
+              titulo: "Psicología confirmó lectura",
+              mensaje: `${d.recibeDePs} · ${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
+            });
+          }
+        });
+        knownPsConfirm.current = confirmados;
+      }
     });
   }, [esEsdomed, addToast]);
 

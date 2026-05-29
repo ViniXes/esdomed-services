@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { doc, onSnapshot, updateDoc, Timestamp } from "firebase/firestore";
@@ -9,9 +9,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, BedDouble, MapPin, IdCard, User2, Stethoscope,
   Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil, Save, Users,
+  FileUp, Loader2, AlertTriangle, X as XIcon,
 } from "lucide-react";
 import type { Paciente, MovimientoPaciente, DiagnosticoCIE } from "@/types";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
+import { parsearCertificadoDefuncion } from "@/lib/pacientes/pdfParser";
 import {
   CIRCUNSTANCIA_LABEL, ESTADO_BADGE, ESTADO_LABEL, GENERO_LABEL,
   calcularEdad, diasEstancia, formatFecha, formatFechaHora, nombreCompleto, toDate,
@@ -465,6 +467,42 @@ function CausasDefuncionEditor({
   const [error,     setError]     = useState<string | null>(null);
   const [form,      setForm]      = useState(snapshot);
 
+  // ── Carga desde Certificado de Defunción (PDF, numeral 13) ──
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [cargandoPdf, setCargandoPdf] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState<{ tipo: "ok" | "warn" | "error"; texto: string } | null>(null);
+
+  const cargarCertificado = async (file: File) => {
+    setPdfMsg(null);
+    setCargandoPdf(true);
+    try {
+      const c = await parsearCertificadoDefuncion(file);
+      const dxs = [c.causaMuerteA, c.causaMuerteB, c.causaMuerteC, c.causaMuerteD, c.estadoPatologicoI, c.estadoPatologicoII];
+      const n = dxs.filter(Boolean).length;
+      setForm((prev) => ({
+        ...prev,
+        ...(c.causaMuerteA && { causaMuerteA: c.causaMuerteA }),
+        ...(c.causaMuerteB && { causaMuerteB: c.causaMuerteB }),
+        ...(c.causaMuerteC && { causaMuerteC: c.causaMuerteC }),
+        ...(c.causaMuerteD && { causaMuerteD: c.causaMuerteD }),
+        ...(c.estadoPatologicoI && { estadoI: c.estadoPatologicoI }),
+        ...(c.estadoPatologicoII && { estadoII: c.estadoPatologicoII }),
+      }));
+      setEditando(true);
+      if (!c.esCertificado) {
+        setPdfMsg({ tipo: "warn", texto: "El PDF no parece un Certificado de Defunción. Revisa los campos antes de guardar." });
+      } else if (n === 0) {
+        setPdfMsg({ tipo: "warn", texto: "No se detectaron causas en el numeral 13. Complétalas manualmente." });
+      } else {
+        setPdfMsg({ tipo: "ok", texto: `Se cargaron ${n} causa(s) del certificado. Revisa y guarda. (La causa externa se ingresa manual.)` });
+      }
+    } catch (e) {
+      setPdfMsg({ tipo: "error", texto: `No se pudo leer el PDF: ${e instanceof Error ? e.message : "error"}` });
+    } finally {
+      setCargandoPdf(false);
+    }
+  };
+
   useEffect(() => {
     if (!editando) setForm(snapshot());
   }, [paciente, editando]); // eslint-disable-line
@@ -509,16 +547,51 @@ function CausasDefuncionEditor({
           <HeartPulse size={15} className="text-rose-400" />
           Causas de defunción
         </h3>
-        {puedeEditar && !editando && (
-          <button
-            onClick={() => setEditando(true)}
-            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 hover:border-slate-300 rounded-lg px-2.5 py-1.5 transition-colors"
-          >
-            <Pencil size={11} />
-            {hayDatos ? "Editar" : "Registrar"}
-          </button>
+        {puedeEditar && (
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) cargarCertificado(f); e.target.value = ""; }}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={cargandoPdf}
+              className="flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 hover:bg-rose-50 dark:hover:bg-rose-950 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-50"
+            >
+              {cargandoPdf ? <Loader2 size={11} className="animate-spin" /> : <FileUp size={11} />}
+              {cargandoPdf ? "Leyendo..." : "Cargar certificado (PDF)"}
+            </button>
+            {!editando && (
+              <button
+                onClick={() => setEditando(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 hover:border-slate-300 rounded-lg px-2.5 py-1.5 transition-colors"
+              >
+                <Pencil size={11} />
+                {hayDatos ? "Editar" : "Registrar"}
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {pdfMsg && (
+        <div
+          className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs mb-4 ${
+            pdfMsg.tipo === "ok"
+              ? "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400"
+              : pdfMsg.tipo === "warn"
+                ? "bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400"
+                : "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400"
+          }`}
+        >
+          <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+          <span className="flex-1">{pdfMsg.texto}</span>
+          <button onClick={() => setPdfMsg(null)} className="flex-shrink-0 opacity-60 hover:opacity-100"><XIcon size={12} /></button>
+        </div>
+      )}
 
       {editando ? (
         <div className="space-y-4">

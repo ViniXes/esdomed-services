@@ -179,7 +179,7 @@ function parsearIdentificacion(texto: string): CamposExtraidos {
   if (direccion) out.direccion = direccion;
 
   const municipio = extraer(datosPaciente, "Municipio Domicilio", ["Departamento Domicilio", "Cantón"]);
-  if (municipio) out.municipio = municipio;
+  if (municipio) out.municipio = limpiarMunicipio(municipio);
 
   const departamento = extraer(datosPaciente, "Departamento Domicilio", ["Cantón", "Área Geográfica"]);
   if (departamento) out.departamento = departamento;
@@ -194,20 +194,23 @@ function parsearIdentificacion(texto: string): CamposExtraidos {
   if (afiliacion) out.numeroAfiliacion = afiliacion;
 
   // ── Responsable (sección B) ──
+  // Anclar al bloque que empieza en "Responsable:"; de lo contrario los labels
+  // "Nombre"/"Dirección" capturan los del Padre/Madre que aparecen antes.
+  const respBlock = seccion(datosFamilia, "Responsable", "C. Datos De Persona");
   const responsable: ResponsablePaciente = { nombre: "" };
-  const respTipo = extraer(datosFamilia, "Responsable", ["Nombre"]);
+  const respTipo = extraer(respBlock, "Responsable", ["Nombre"]);
   if (respTipo) responsable.parentesco = respTipo;
 
-  const respNombre = extraer(datosFamilia, "Nombre", ["Documento Identidad", "Dirección"]);
+  const respNombre = extraer(respBlock, "Nombre", ["Documento Identidad", "Dirección"]);
   if (respNombre) responsable.nombre = limpiarNombre(respNombre);
 
-  const respDoc = extraer(datosFamilia, "Documento Identidad", ["Dirección", "Teléfono"]);
+  const respDoc = extraer(respBlock, "Documento Identidad", ["Dirección", "Teléfono"]);
   if (respDoc) responsable.documento = respDoc.replace(/^DUI\s*:?\s*/i, "DUI: ").trim();
 
-  const respDir = extraer(datosFamilia, "Dirección", ["Teléfono", "C. Datos"]);
+  const respDir = extraer(respBlock, "Dirección", ["Teléfono", "C. Datos"]);
   if (respDir) responsable.direccion = respDir;
 
-  const respTel = datosFamilia.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
+  const respTel = respBlock.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
   if (respTel) responsable.telefono = respTel[1];
 
   if (responsable.nombre) out.responsable = responsable;
@@ -258,7 +261,7 @@ function parsearIngresoEgreso(texto: string): CamposExtraidos {
   if (departamento) out.departamento = departamento;
 
   const municipio = extraer(datosPaciente, "Municipio", ["Cantón", "Área geográfica"]);
-  if (municipio) out.municipio = municipio;
+  if (municipio) out.municipio = limpiarMunicipio(municipio);
 
   const canton = extraer(datosPaciente, "Cantón", ["Área geográfica", "Nacionalidad"]);
   if (canton && canton !== "N/A") out.canton = canton;
@@ -359,6 +362,87 @@ function limpiarNombre(raw: string): string {
     .trim();
 }
 
+/** Quita el sufijo de departamento del municipio: "El Paisnal SS" → "El Paisnal". */
+function limpiarMunicipio(raw: string): string | undefined {
+  return raw.trim().replace(/\s+[A-Z]{2,3}$/, "").trim() || undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parser: Certificado de Defunción — numeral 13 (causas de muerte)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CausasDefuncionExtraidas {
+  esCertificado: boolean;
+  causaMuerteA?: DiagnosticoCIE;  // (a) causa directa / inmediata
+  causaMuerteB?: DiagnosticoCIE;  // (b) intermedia
+  causaMuerteC?: DiagnosticoCIE;  // (c) antecedente
+  causaMuerteD?: DiagnosticoCIE;  // (d) CAUSA BÁSICA (subyacente)
+  estadoPatologicoI?: DiagnosticoCIE;
+  estadoPatologicoII?: DiagnosticoCIE;
+}
+
+const RE_CIE = /([A-Z]\d{2,3}(?:\.\d+)?)\s*[-–]\s*(.+)/;
+
+/** Recorta el ruido típico de la línea (intervalo, "CAUSA BÁSICA", "Debido a", marcadores). */
+function limpiarDescripcionCausa(desc: string): string {
+  return desc
+    .split(/\s+\d+\s*(?:mes|años?|anios?|d[ií]as?|horas?|semanas?|min)/i)[0]
+    .split(/\s+CAUSA\s+B[ÁA]SICA/i)[0]
+    .split(/\s+Debido a/i)[0]
+    .split(/\s+\([a-d]\)/i)[0]
+    .split(/\s+II\./)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dxDeChunk(chunk: string): DiagnosticoCIE | undefined {
+  const m = chunk.match(RE_CIE);
+  if (!m) return undefined;
+  const descripcion = limpiarDescripcionCausa(m[2]);
+  if (!descripcion) return undefined;
+  return { codigo: m[1].trim(), descripcion };
+}
+
+/** Extrae las causas del numeral 13 del Certificado de Defunción a partir del texto. */
+export function parsearCausasDefuncion(texto: string): CausasDefuncionExtraidas {
+  const esCertificado =
+    /CERTIFICADO\s+DE\s+DEFUNCI(?:Ó|O)N/i.test(texto) ||
+    /CAUSA\s+DE\s+DEFUNCI(?:Ó|O)N/i.test(texto);
+  const out: CausasDefuncionExtraidas = { esCertificado };
+
+  // En el texto aplanado el numeral 13 va desde "CAUSA DE DEFUNCIÓN" hasta "8. Edad".
+  let blk = seccion(texto, "CAUSA DE DEFUNCI", "8. Edad");
+  // Quitar la instrucción, que también contiene "(a), (b), (c) y (d)".
+  blk = blk.replace(/Anote s[oó]lo una causa[\s\S]*?\(a\),\s*\(b\),\s*\(c\)\s*y\s*\(d\)/i, " ");
+
+  const iA = blk.search(/\(a\)/);
+  const iB = blk.search(/\(b\)/);
+  const iC = blk.search(/\(c\)/);
+  const iD = blk.search(/\(d\)/);
+  const iII = blk.search(/II\.\s*Otros/i);
+
+  if (iA !== -1 && iB > iA) out.causaMuerteA = dxDeChunk(blk.slice(iA, iB));
+  if (iB !== -1 && iC > iB) out.causaMuerteB = dxDeChunk(blk.slice(iB, iC));
+  if (iC !== -1 && iD > iC) out.causaMuerteC = dxDeChunk(blk.slice(iC, iD));
+  if (iD !== -1)            out.causaMuerteD = dxDeChunk(blk.slice(iD, iII === -1 ? undefined : iII));
+
+  // Parte II — otros estados patológicos (hasta 2).
+  if (iII !== -1) {
+    const part2 = blk.slice(iII).replace(/^II\.[\s\S]*?que la produjo/i, " ");
+    const re = /([A-Z]\d{2,3}(?:\.\d+)?)\s*[-–]\s*([^]+?)(?=\s+[A-Z]\d{2,3}(?:\.\d+)?\s*[-–]|$)/g;
+    const encontrados: DiagnosticoCIE[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(part2)) !== null && encontrados.length < 2) {
+      const descripcion = limpiarDescripcionCausa(m[2]);
+      if (descripcion) encontrados.push({ codigo: m[1].trim(), descripcion });
+    }
+    out.estadoPatologicoI = encontrados[0];
+    out.estadoPatologicoII = encontrados[1];
+  }
+
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // API pública
 // ─────────────────────────────────────────────────────────────────────────────
@@ -370,6 +454,12 @@ export async function parsearPDF(file: File): Promise<ResultadoParser> {
   if (tipo === "identificacion") campos = parsearIdentificacion(textoCrudo);
   else if (tipo === "ingreso_egreso") campos = parsearIngresoEgreso(textoCrudo);
   return { tipo, campos, textoCrudo };
+}
+
+/** Lee un Certificado de Defunción y extrae las causas del numeral 13. */
+export async function parsearCertificadoDefuncion(file: File): Promise<CausasDefuncionExtraidas> {
+  const textoCrudo = await extraerTextoPDF(file);
+  return parsearCausasDefuncion(textoCrudo);
 }
 
 /**

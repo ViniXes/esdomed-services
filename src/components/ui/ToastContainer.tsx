@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, X } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -22,6 +22,11 @@ const CONFIG: Record<
     icon: LogIn,
     borderColor: "border-l-emerald-500",
     iconColor: "text-emerald-400",
+  },
+  psicologia: {
+    icon: BookCheck,
+    borderColor: "border-l-violet-500",
+    iconColor: "text-violet-400",
   },
 };
 

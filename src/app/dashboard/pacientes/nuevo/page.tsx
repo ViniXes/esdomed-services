@@ -12,6 +12,8 @@ import { PacientePDFUploader } from "@/components/pacientes/PacientePDFUploader"
 import type { CamposExtraidos } from "@/lib/pacientes/pdfParser";
 import type { Persona } from "@/types";
 import { construirDatosPersonales, construirDocIngreso, getPersona, guardarPersona } from "@/lib/pacientes/persona";
+import { resolverServicio } from "@/lib/pacientes/importMapper";
+import { useServicios } from "@/contexts/ServiciosContext";
 import { toDate } from "@/lib/pacientes/helpers";
 
 type Modo = "elegir" | "pdf" | "manual";
@@ -19,6 +21,7 @@ type Modo = "elegir" | "pdf" | "manual";
 export default function NuevoPacientePage() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { servicios } = useServicios();
   const [modo, setModo] = useState<Modo>("elegir");
   const [form, setForm] = useState<PacienteFormValue>({});
   const [guardando, setGuardando] = useState(false);
@@ -27,10 +30,12 @@ export default function NuevoPacientePage() {
   const expedienteCargado = useRef<string | null>(null);
 
   const aplicarCamposExtraidos = (campos: CamposExtraidos) => {
-    setForm((prev) => ({
-      ...prev,
-      ...convertirCampos(campos),
-    }));
+    const conv = convertirCampos(campos);
+    // El servicio es un select del catálogo: resolverlo (tolerante a tildes/romano).
+    if (conv.servicioIngreso) {
+      conv.servicioIngreso = resolverServicio(conv.servicioIngreso, servicios) ?? conv.servicioIngreso;
+    }
+    setForm((prev) => ({ ...prev, ...conv }));
   };
 
   // Reingreso: si el expediente ya tiene una persona registrada, se auto-rellenan
