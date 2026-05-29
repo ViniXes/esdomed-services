@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -55,65 +55,65 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verConfiguracion = profile?.role === "admin";
   const verUsuarios = profile?.role === "admin";
 
-  const navItems = [
+  // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
+  const G_PACIENTES = "Gestión de pacientes";
+  const G_DOCUMENTOS = "Documentos";
+  const G_ADMIN = "Administración";
+
+  const navItems: NavItem[] = [
     { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true },
+
+    // ── Gestión de pacientes ──
     ...(verControlIngresos
-      ? [{ href: "/dashboard/control-ingresos", label: "Control ingresos", icon: FileText }]
+      ? [{ href: "/dashboard/control-ingresos", label: "Control ingresos", icon: FileText, group: G_PACIENTES }]
+      : []),
+    ...(verPacientes
+      ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
       : []),
     {
       href: "/dashboard/traslados",
       label: "Traslados",
       icon: ArrowRightLeft,
       badge: pendientes.traslados,
+      group: G_PACIENTES,
     },
+    ...(verAltasVivos
+      ? [{
+          href: "/dashboard/altas-vivos",
+          label: "Altas Vivos",
+          icon: LogIn,
+          badge: pendientes.altas,
+          group: G_PACIENTES,
+        }]
+      : []),
     {
       href: "/dashboard/fallecidos",
       label: "Fallecidos",
       icon: HeartPulse,
       badge: pendientes.fallecidos,
+      group: G_PACIENTES,
     },
-    { href: "/dashboard/impresiones", label: "Impresiones", icon: Printer },
+    ...(profile?.role === "trabajo_social"
+      ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
+      : []),
+
+    // ── Documentos ──
+    { href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, group: G_DOCUMENTOS },
     ...(verIncapacidades
       ? [
-          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText },
-          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList },
+          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, group: G_DOCUMENTOS },
+          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, group: G_DOCUMENTOS },
         ]
       : []),
-    ...(verPacientes
-      ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble }]
-      : []),
+
+    // ── Administración ──
     ...(verUsuarios
-      ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users }]
-      : []),
-    ...(verAltasVivos
-      ? [
-          {
-            href: "/dashboard/altas-vivos",
-            label: "Altas Vivos",
-            icon: LogIn,
-            badge: pendientes.altas,
-          },
-        ]
-      : []),
-    ...(profile?.role === "trabajo_social"
-      ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox }]
+      ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN }]
       : []),
     ...(verConfiguracion
       ? [
-          {
-            href: "/dashboard/configuracion/servicios",
-            label: "Configuración",
-            icon: Settings,
-          },
-        ]
-      : []),
-    ...(verConfiguracion
-      ? [
-          {
-            href: "/dashboard/historial-busquedas",
-            label: "Historial busquedas",
-            icon: History,
-          },
+          { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, group: G_ADMIN },
+          { href: "/dashboard/historial-busquedas", label: "Historial busquedas", icon: History, group: G_ADMIN },
         ]
       : []),
   ];

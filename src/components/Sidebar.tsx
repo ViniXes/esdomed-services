@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, Fragment, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -19,6 +19,8 @@ export interface NavItem {
   icon: LucideIcon;
   exact?: boolean;
   badge?: number;
+  /** Encabezado de sección. Los ítems consecutivos con el mismo grupo se muestran juntos. */
+  group?: string;
 }
 
 interface SidebarProps {
@@ -91,23 +93,31 @@ function SidebarBody({
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon, exact, badge }) => {
-          const active = isActive({ href, label, icon: Icon, exact });
+        {navItems.map((item, idx) => {
+          const { href, label, icon: Icon, badge, group } = item;
+          const active = isActive(item);
+          const showHeader = !!group && group !== navItems[idx - 1]?.group;
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onNavigate}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                active
-                  ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20"
-                  : "text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
-              <span className="flex-1">{label}</span>
-              <Badge count={badge ?? 0} />
-            </Link>
+            <Fragment key={href}>
+              {showHeader && (
+                <p className="px-3 pt-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-white/40 first:pt-1">
+                  {group}
+                </p>
+              )}
+              <Link
+                href={href}
+                onClick={onNavigate}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  active
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20"
+                    : "text-slate-600 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+                <span className="flex-1">{label}</span>
+                <Badge count={badge ?? 0} />
+              </Link>
+            </Fragment>
           );
         })}
       </nav>
