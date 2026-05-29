@@ -6,8 +6,12 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, AlertTriangle, Stethoscope } from "lucide-react";
+import { ArrowLeft, Save, AlertTriangle, Stethoscope, FileUp } from "lucide-react";
 import { IngresoForm, type PacienteFormValue } from "@/components/pacientes/PacienteForm";
+import { PacientePDFUploader } from "@/components/pacientes/PacientePDFUploader";
+import type { CamposExtraidos } from "@/lib/pacientes/pdfParser";
+import { resolverServicio } from "@/lib/pacientes/importMapper";
+import { useServicios } from "@/contexts/ServiciosContext";
 import { toDate } from "@/lib/pacientes/helpers";
 import type { Paciente } from "@/types";
 
@@ -15,8 +19,11 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const router = useRouter();
   const { profile } = useAuth();
+  const { servicios } = useServicios();
   const [form, setForm] = useState<PacienteFormValue>({});
   const [nombre, setNombre] = useState("");
+  const [expediente, setExpediente] = useState("");
+  const [avisoPdf, setAvisoPdf] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -31,10 +38,33 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
       }
       const data = snap.data() as Omit<Paciente, "id">;
       setNombre(`${data.nombres} ${data.apellidos}`.replace(/\s+/g, " ").trim());
+      setExpediente(data.expediente ?? "");
       setForm(ingresoToForm(data));
       setLoading(false);
     });
   }, [id]);
+
+  // Autocompletar el recuadro "Datos del ingreso" desde la Hoja de Ingreso/Egreso (PDF).
+  // Solo se aplican los campos clínicos del ingreso (no datos personales).
+  const aplicarCamposPDF = (c: CamposExtraidos) => {
+    if (c.expediente && expediente && c.expediente.trim() !== expediente) {
+      setAvisoPdf(`El PDF parece del expediente ${c.expediente}, pero este ingreso es del ${expediente}. Revisa antes de guardar.`);
+    } else {
+      setAvisoPdf(null);
+    }
+    const patch: Partial<PacienteFormValue> = {};
+    if (c.fechaIngreso)               patch.fechaIngreso = toDatetimeLocalInput(c.fechaIngreso);
+    if (c.circunstanciaIngreso)       patch.circunstanciaIngreso = c.circunstanciaIngreso;
+    if (c.establecimientoProcedencia) patch.establecimientoProcedencia = c.establecimientoProcedencia;
+    if (c.medicoIngresoNombre)        patch.medicoIngresoNombre = c.medicoIngresoNombre;
+    if (c.diagnosticoIngreso)         patch.diagnosticoIngreso = c.diagnosticoIngreso;
+    if (c.servicioIngreso) {
+      // El servicio es un select del catálogo: solo se aplica si se reconoce.
+      const canon = resolverServicio(c.servicioIngreso, servicios);
+      if (canon) patch.servicioIngreso = canon;
+    }
+    setForm((prev) => ({ ...prev, ...patch }));
+  };
 
   const validar = (): string | null => {
     if (!form.fechaIngreso)            return "La fecha de ingreso es obligatoria.";
@@ -128,6 +158,28 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
             Editar datos del paciente
           </Link>.
         </p>
+      </div>
+
+      {/* Autocompletar desde PDF */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <FileUp size={15} className="text-blue-500" />
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
+            Autocompletar desde la Hoja de Ingreso/Egreso (PDF)
+          </h3>
+        </div>
+        <p className="text-xs text-slate-500">
+          Sube la hoja para rellenar el recuadro <strong>&ldquo;Datos del ingreso&rdquo;</strong>{" "}
+          (servicio, circunstancia, procedencia, fecha, diagnóstico y médico). Solo completa
+          campos del ingreso; revisa antes de guardar.
+        </p>
+        <PacientePDFUploader onCamposExtraidos={aplicarCamposPDF} />
+        {avisoPdf && (
+          <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+            <span>{avisoPdf}</span>
+          </div>
+        )}
       </div>
 
       <IngresoForm value={form} onChange={setForm} />
