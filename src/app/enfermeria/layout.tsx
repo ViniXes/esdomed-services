@@ -19,9 +19,9 @@ export default function EnfermeriaLayout({ children }: { children: React.ReactNo
   }, [loading, profile, router]);
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
       <Sidebar navItems={navItems} roleLabel="Enfermería" />
-      <main className="flex-1 overflow-y-auto pt-14 md:pt-0 bg-slate-50 dark:bg-slate-950">
+      <main className="flex-1 overflow-y-auto pt-14 md:pt-0 bg-slate-50 dark:bg-[var(--color-institutional-dark)]">
         {loading || !profile ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
