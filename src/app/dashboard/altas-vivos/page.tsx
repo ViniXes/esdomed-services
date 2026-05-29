@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, doc, getDocs, where, Timestamp,
+  addDoc, updateDoc, doc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,7 +11,7 @@ import {
   LogIn, Plus, X, CheckCircle2, AlertCircle, Search,
   Archive, ChevronDown, Check,
 } from "lucide-react";
-import { useServicios } from "@/contexts/ServiciosContext";
+import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
 import type { NotificacionAltaVivo, Paciente, TipoAltaVivo, EstadoNotificacionAlta } from "@/types";
 
 // ── Labels & badges ──────────────────────────────────────────────────────────
@@ -82,37 +82,11 @@ function CreateModal({
   onCreated: () => void;
 }) {
   const { user, profile } = useAuth();
-  const { servicios } = useServicios();
-  const [servicio, setServicio] = useState("");
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [loadingPac, setLoadingPac] = useState(false);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">("");
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (!servicio) { setPacientes([]); setSelectedId(""); return; }
-      setLoadingPac(true);
-      setSelectedId("");
-      setTipoAlta("");
-      getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", servicio)))
-        .then(snap => {
-          const docs = snap.docs
-            .map(d => ({ id: d.id, ...d.data() } as Paciente))
-            .filter(p => p.estado === "activo" && p.camaActual);
-          docs.sort((a, b) => (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
-          setPacientes(docs);
-        })
-        .catch(() => setPacientes([]))
-        .finally(() => setLoadingPac(false));
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [servicio]);
-
-  const selectedPaciente = pacientes.find(p => p.id === selectedId) ?? null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,48 +129,18 @@ function CreateModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Servicio */}
+          {/* Buscar paciente: por servicio, expediente o cama */}
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">Servicio</label>
-            <select value={servicio} onChange={e => setServicio(e.target.value)} required className={inputCls}>
-              <option value="">Seleccionar servicio...</option>
-              {servicios.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Buscar paciente</label>
+            <BuscadorPacienteActivo
+              value={selectedPaciente}
+              onSelect={(p) => { setSelectedPaciente(p); if (!p) setTipoAlta(""); }}
+              accent="blue"
+            />
           </div>
 
-          {/* Pacientes */}
-          {servicio && (
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Paciente (camas activas)</label>
-              {loadingPac ? (
-                <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  Buscando pacientes activos...
-                </div>
-              ) : pacientes.length === 0 ? (
-                <p className="text-sm text-slate-400 py-2 px-1">No hay pacientes activos en este servicio.</p>
-              ) : (
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {pacientes.map(p => (
-                    <button key={p.id} type="button" onClick={() => setSelectedId(p.id!)}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-all ${
-                        selectedId === p.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950 ring-1 ring-blue-500/30"
-                          : "border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-800"
-                      }`}>
-                      <span className="inline-block font-mono text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 rounded px-1.5 py-0.5 mr-2">
-                        Cama {p.camaActual}
-                      </span>
-                      <span className="font-medium text-slate-800 dark:text-slate-200">{p.apellidos}, {p.nombres}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Tipo de alta */}
-          {selectedId && (
+          {selectedPaciente && (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de alta</label>
               <div className="grid grid-cols-2 gap-2">
@@ -215,7 +159,7 @@ function CreateModal({
           )}
 
           {/* Notas */}
-          {selectedId && tipoAlta && (
+          {selectedPaciente && tipoAlta && (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">
                 Notas <span className="font-normal text-slate-400">(opcional)</span>
@@ -237,7 +181,7 @@ function CreateModal({
               className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50">
               Cancelar
             </button>
-            <button type="submit" disabled={saving || !selectedId || !tipoAlta}
+            <button type="submit" disabled={saving || !selectedPaciente || !tipoAlta}
               className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors">
               {saving ? "Guardando..." : "Notificar alta"}
             </button>
