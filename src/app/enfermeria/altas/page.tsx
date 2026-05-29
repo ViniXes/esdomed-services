@@ -33,19 +33,22 @@ export default function EnfermeriaAltasPage() {
   const [modal, setModal] = useState<ModalState>(null);
 
   useEffect(() => {
-    if (!servicio) { setPacientes([]); setSelectedId(""); return; }
-    setLoadingPac(true);
-    setSelectedId("");
-    setTipoAlta("");
-    getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", servicio)))
-      .then(snap => {
-        const docs = snap.docs
-          .map(d => ({ id: d.id, ...d.data() } as Paciente))
-          .filter(p => p.estado === "activo" && p.camaActual);
-        docs.sort((a, b) => (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
-        setPacientes(docs);
-      })
-      .finally(() => setLoadingPac(false));
+    const timeout = window.setTimeout(() => {
+      if (!servicio) { setPacientes([]); setSelectedId(""); return; }
+      setLoadingPac(true);
+      setSelectedId("");
+      setTipoAlta("");
+      getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", servicio)))
+        .then(snap => {
+          const docs = snap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Paciente))
+            .filter(p => p.estado === "activo" && p.camaActual);
+          docs.sort((a, b) => (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
+          setPacientes(docs);
+        })
+        .finally(() => setLoadingPac(false));
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [servicio]);
 
   const selectedPaciente = pacientes.find(p => p.id === selectedId) ?? null;
@@ -83,7 +86,7 @@ export default function EnfermeriaAltasPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950 rounded-xl flex items-center justify-center border border-teal-200 dark:border-teal-900">

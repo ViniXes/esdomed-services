@@ -169,7 +169,7 @@ export default function NuevaTrasladoPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <button onClick={() => router.back()}
           className="flex items-center gap-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-sm transition-colors">
