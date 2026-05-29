@@ -25,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const verIncapacidades = profile?.role === "esdomed" || profile?.role === "admin";
   const verAltasVivos = profile?.role === "esdomed" || profile?.role === "admin" || profile?.role === "trabajo_social";
   const verConfiguracion = profile?.role === "admin";
+  const verUsuarios = profile?.role === "admin";
 
   const navItems = [
     { href: "/dashboard",             label: "Inicio",       icon: LayoutDashboard, exact: true },
@@ -43,7 +44,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble }]
       : []),
-    { href: "/dashboard/usuarios",    label: "Usuarios",     icon: Users },
+    ...(verUsuarios
+      ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users }]
+      : []),
     ...(verAltasVivos
       ? [{ href: "/dashboard/altas-vivos", label: "Altas Vivos", icon: LogIn }]
       : []),

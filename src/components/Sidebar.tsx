@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, KeyRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -29,12 +29,13 @@ interface SidebarBodyProps extends SidebarProps {
   dark: boolean;
   profile: UserProfile | null;
   isActive: (item: NavItem) => boolean;
+  onChangePassword: () => void;
   onLogout: () => void;
   onNavigate?: () => void;
   toggle: () => void;
 }
 
-function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onNavigate, onLogout }: SidebarBodyProps) {
+function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onNavigate, onChangePassword, onLogout }: SidebarBodyProps) {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-blue-900/30 text-slate-700 dark:text-white">
       <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-white/15 flex flex-col items-center gap-3">
@@ -97,6 +98,15 @@ function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onN
           {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
+        {profile?.role !== "admin" && (
+          <button
+            onClick={onChangePassword}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-white/75 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+          >
+            <KeyRound size={16} />
+            Cambiar contrasena
+          </button>
+        )}
         <button
           onClick={onLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-500 dark:text-white/65 hover:text-red-600 dark:hover:text-white hover:bg-red-50 dark:hover:bg-red-500/25 transition-all"
@@ -111,7 +121,14 @@ function SidebarBody({ navItems, roleLabel, profile, dark, toggle, isActive, onN
 
 export function Sidebar({ navItems, roleLabel }: SidebarProps) {
   const [open, setOpen] = useState(false);
-  const { profile, logout } = useAuth();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const { profile, changePassword, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
@@ -129,6 +146,52 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
     router.replace("/login");
   };
 
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordMessage("");
+    setPasswordError("");
+    setSavingPassword(false);
+  };
+
+  const handleChangePassword = async (event: FormEvent) => {
+    event.preventDefault();
+    setPasswordError("");
+    setPasswordMessage("");
+
+    if (newPassword.length < 6) {
+      setPasswordError("La nueva contrasena debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("La confirmacion no coincide.");
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setPasswordMessage("Contrasena actualizada correctamente.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
+        setPasswordError("La contrasena actual no es correcta.");
+      } else if (code === "auth/weak-password") {
+        setPasswordError("La nueva contrasena debe tener al menos 6 caracteres.");
+      } else {
+        setPasswordError("No se pudo cambiar la contrasena. Intenta de nuevo.");
+      }
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const sidebarProps = {
     navItems,
     roleLabel,
@@ -136,6 +199,10 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
     dark,
     toggle,
     isActive,
+    onChangePassword: () => {
+      setShowPasswordModal(true);
+      setOpen(false);
+    },
     onLogout: handleLogout,
   };
 
@@ -201,6 +268,79 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
           <SidebarBody {...sidebarProps} />
         </div>
       </aside>
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <form onSubmit={handleChangePassword} className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 space-y-4">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Cuenta</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Cambiar contrasena</h2>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Contrasena actual</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Nueva contrasena</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Confirmar nueva contrasena</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {passwordError && (
+              <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{passwordError}</p>
+            )}
+            {passwordMessage && (
+              <p className="text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2">{passwordMessage}</p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={closePasswordModal}
+                className="flex-1 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {savingPassword ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   );
 }
