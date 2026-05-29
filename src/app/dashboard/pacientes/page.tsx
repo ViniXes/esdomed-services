@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload } from "lucide-react";
 import type { EstadoPaciente, Paciente } from "@/types";
 import {
   ESTADO_BADGE, ESTADO_LABEL, calcularEdad, diasEstancia, formatFecha,
@@ -118,6 +118,13 @@ export default function PacientesPage() {
               {activosCount} hospitalizados
             </div>
           )}
+          <Link
+            href="/dashboard/pacientes/importar"
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          >
+            <Upload size={15} />
+            Importar reporte
+          </Link>
           <Link
             href="/dashboard/pacientes/nuevo"
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"

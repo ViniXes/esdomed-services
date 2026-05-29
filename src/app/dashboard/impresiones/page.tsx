@@ -47,7 +47,7 @@ export default function DashboardImpresionesPage() {
   const formatFecha = (ts: unknown) => {
     if (!ts) return "—";
     const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
-    return d.toLocaleString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
   };
 
   return (

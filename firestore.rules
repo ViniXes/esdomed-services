@@ -64,6 +64,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Personas ─────────────────────────────────────────────────────────────
+    // Datos personales canónicos del paciente (clave = expediente). Mismo acceso
+    // que pacientes: el personal los consulta y ESDOMED/admin los crean y editan.
+    match /personas/{expediente} {
+      allow read:   if isStaff() || isMedico() || isEnfermeria();
+      allow create: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Control de ingresos ──────────────────────────────────────────────────
     // Los médicos tienen acceso de solo lectura para ver la cola.
     // Solo el personal ESDOMED puede registrar ingresos.
