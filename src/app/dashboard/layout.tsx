@@ -80,7 +80,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verAltasVivos
       ? [{
           href: "/dashboard/altas-vivos",
-          label: "Altas Vivos",
+          label: "Verificación de Altas",
           icon: LogIn,
           badge: pendientes.altas,
           group: G_PACIENTES,
