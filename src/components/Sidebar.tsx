@@ -162,15 +162,13 @@ function SidebarBody({
           {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
-        {profile?.role !== "admin" && (
-          <button
-            onClick={onChangePassword}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-white/75 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
-          >
-            <KeyRound size={16} />
-            Cambiar contrasena
-          </button>
-        )}
+        <button
+          onClick={onChangePassword}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-white/75 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
+        >
+          <KeyRound size={16} />
+          Cambiar contrasena
+        </button>
         <button
           onClick={onLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-500 dark:text-white/65 hover:text-red-600 dark:hover:text-white hover:bg-red-50 dark:hover:bg-red-500/25 transition-all"
@@ -207,12 +205,15 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
 
   // Estado de secciones colapsadas — persistido entre sesiones.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("sidebarCollapsedGroups");
-      if (saved) setCollapsed(JSON.parse(saved));
-    } catch {
-      /* localStorage no disponible */
-    }
+    const timeout = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem("sidebarCollapsedGroups");
+        if (saved) setCollapsed(JSON.parse(saved));
+      } catch {
+        /* localStorage no disponible */
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const isActive = (item: NavItem) =>
