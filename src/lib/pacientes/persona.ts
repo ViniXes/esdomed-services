@@ -55,6 +55,43 @@ export function construirDatosPersonales(form: PacienteFormValue): Record<string
   };
 }
 
+/**
+ * Construye el documento de un ingreso (pacientes/{id}) a partir del formulario:
+ * snapshot personal + datos clínicos + metadata. Lo usan tanto el alta manual como la
+ * importación, para que ambos caminos produzcan exactamente la misma estructura.
+ */
+export function construirDocIngreso(
+  form: PacienteFormValue,
+  datosPersonales: Record<string, unknown>,
+  autor: { uid: string; nombre: string },
+): Record<string, unknown> {
+  const servicio = form.servicioIngreso!.trim();
+  const doc: Record<string, unknown> = {
+    ...datosPersonales,
+    fechaIngreso:    Timestamp.fromDate(new Date(form.fechaIngreso!)),
+    servicioIngreso: servicio,
+    servicioActual:  servicio,
+    estado:          "activo" as const,
+    movimientos:     [],
+    creadoEn:        Timestamp.now(),
+    creadoPor:       autor.uid,
+    creadoPorNombre: autor.nombre,
+  };
+
+  // Campos clínicos opcionales — solo si están definidos
+  if (form.establecimientoProcedencia) doc.establecimientoProcedencia = form.establecimientoProcedencia.trim();
+  if (form.circunstanciaIngreso)       doc.circunstanciaIngreso = form.circunstanciaIngreso;
+  if (form.camaActual)                 doc.camaActual = form.camaActual.trim();
+  if (form.medicoIngresoNombre)        doc.medicoIngresoNombre = form.medicoIngresoNombre.trim();
+  if (form.diagnosticoIngreso?.codigo || form.diagnosticoIngreso?.descripcion) {
+    doc.diagnosticoIngreso = {
+      codigo:      (form.diagnosticoIngreso.codigo ?? "").trim(),
+      descripcion: (form.diagnosticoIngreso.descripcion ?? "").trim(),
+    };
+  }
+  return doc;
+}
+
 /** Lee la persona canónica por expediente, o null si no existe. */
 export async function getPersona(expediente: string): Promise<Persona | null> {
   const snap = await getDoc(doc(db, "personas", expediente.trim()));

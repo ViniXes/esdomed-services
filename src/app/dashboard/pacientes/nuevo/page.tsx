@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, Timestamp } from "firebase/firestore";
+import { addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Save, AlertTriangle, FileUp, Pencil, Users } from "lucide-react";
@@ -11,7 +11,7 @@ import { PacienteForm, type PacienteFormValue } from "@/components/pacientes/Pac
 import { PacientePDFUploader } from "@/components/pacientes/PacientePDFUploader";
 import type { CamposExtraidos } from "@/lib/pacientes/pdfParser";
 import type { Persona } from "@/types";
-import { construirDatosPersonales, getPersona, guardarPersona } from "@/lib/pacientes/persona";
+import { construirDatosPersonales, construirDocIngreso, getPersona, guardarPersona } from "@/lib/pacientes/persona";
 import { toDate } from "@/lib/pacientes/helpers";
 
 type Modo = "elegir" | "pdf" | "manual";
@@ -81,35 +81,12 @@ export default function NuevoPacientePage() {
     setGuardando(true);
     try {
       const expediente = form.expediente!.trim();
-      const fechaIngreso = new Date(form.fechaIngreso!);
 
       // Snapshot personal (mismas claves que personas/{expediente})
       const datosPersonales = construirDatosPersonales(form);
 
       // Documento de ingreso = snapshot personal + datos clínicos del ingreso
-      const doc: Record<string, unknown> = {
-        ...datosPersonales,
-        fechaIngreso: Timestamp.fromDate(fechaIngreso),
-        servicioIngreso: form.servicioIngreso!.trim(),
-        servicioActual: form.servicioIngreso!.trim(),
-        estado: "activo" as const,
-        movimientos: [],
-        creadoEn: Timestamp.now(),
-        creadoPor: profile.uid,
-        creadoPorNombre: profile.nombre,
-      };
-
-      // Campos clínicos opcionales — solo si están definidos
-      if (form.establecimientoProcedencia) doc.establecimientoProcedencia = form.establecimientoProcedencia.trim();
-      if (form.circunstanciaIngreso)  doc.circunstanciaIngreso = form.circunstanciaIngreso;
-      if (form.camaActual)            doc.camaActual = form.camaActual.trim();
-      if (form.medicoIngresoNombre)   doc.medicoIngresoNombre = form.medicoIngresoNombre.trim();
-      if (form.diagnosticoIngreso?.codigo || form.diagnosticoIngreso?.descripcion) {
-        doc.diagnosticoIngreso = {
-          codigo: (form.diagnosticoIngreso.codigo ?? "").trim(),
-          descripcion: (form.diagnosticoIngreso.descripcion ?? "").trim(),
-        };
-      }
+      const doc = construirDocIngreso(form, datosPersonales, profile);
 
       const ref = await addDoc(collection(db, "pacientes"), doc);
 
