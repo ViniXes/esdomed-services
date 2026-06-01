@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { UserProfile } from "@/types";
 
-const SIDEBAR_LOGO_LIGHT_SRC = "/logo_hnes.png";
+const SIDEBAR_LOGO_LIGHT_SRC = "/logo_hnes_sidebar.png";
 const SIDEBAR_LOGO_DARK_SRC = "/logo_hnes_sidebar.png";
 
 export interface NavItem {
@@ -97,7 +97,7 @@ function SidebarBody({
             alt="Hospital Nacional El Salvador"
             width={150}
             height={150}
-            className="h-20 w-auto object-contain dark:hidden"
+            className="h-20 w-auto object-contain opacity-80 brightness-0 dark:hidden"
             priority
           />
           <Image
@@ -331,7 +331,7 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
             alt="Hospital"
             width={72}
             height={36}
-            className="h-8 w-auto object-contain dark:hidden"
+            className="h-9 w-auto object-contain opacity-80 brightness-0 dark:hidden"
           />
           <Image
             src={SIDEBAR_LOGO_DARK_SRC}

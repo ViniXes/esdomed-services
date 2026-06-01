@@ -57,8 +57,8 @@ export default function BusquedaTelefonoPage() {
     const expedienteNormalizado = normalizarExpediente(expediente);
     const candidatos = candidatosExpediente(expediente);
 
-    if (!user || !profile || profile.role !== "medico") {
-      setError("No se pudo validar tu usuario medico.");
+    if (!user || !profile || (profile.role !== "medico" && profile.role !== "admin")) {
+      setError("No se pudo validar tu usuario para esta busqueda.");
       return;
     }
     if (!expedienteNormalizado || candidatos.length === 0) {
@@ -81,7 +81,7 @@ export default function BusquedaTelefonoPage() {
         usuarioUid: user.uid,
         usuarioNombre: profile.nombre,
         usuarioEmail: profile.email,
-        usuarioRole: "medico",
+        usuarioRole: profile.role,
         ...(profile.jvpm ? { usuarioJvpm: profile.jvpm } : {}),
         expedienteBuscado: expediente.trim(),
         expedienteNormalizado,

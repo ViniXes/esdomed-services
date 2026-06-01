@@ -12,6 +12,7 @@ import {
   Inbox,
   LayoutDashboard,
   LogIn,
+  Phone,
   Printer,
   Settings,
   Users,
@@ -54,6 +55,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     profile?.role === "trabajo_social";
   const verConfiguracion = profile?.role === "admin";
   const verUsuarios = profile?.role === "admin";
+  const verBusquedaTelefono = profile?.role === "admin";
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
@@ -69,6 +71,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
+      : []),
+    ...(verBusquedaTelefono
+      ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
       : []),
     {
       href: "/dashboard/traslados",

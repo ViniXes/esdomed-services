@@ -406,7 +406,7 @@ export interface BusquedaTelefono {
   usuarioUid: string;
   usuarioNombre: string;
   usuarioEmail?: string;
-  usuarioRole: "medico";
+  usuarioRole: "medico" | "admin";
   usuarioJvpm?: string;
 
   expedienteBuscado: string;
