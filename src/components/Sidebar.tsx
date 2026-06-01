@@ -72,8 +72,8 @@ function SidebarBody({
         onClick={onNavigate}
         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
           active
-            ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20 dark:bg-[var(--color-institutional-navy)] dark:ring-1 dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15"
-            : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white"
+            ? "bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 shadow-sm shadow-blue-100 dark:bg-[var(--color-institutional-navy)] dark:text-white dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15"
+            : "text-slate-600 dark:text-slate-300 hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white"
         }`}
       >
         <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
@@ -91,22 +91,24 @@ function SidebarBody({
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-[#c9a892]/25 text-slate-700 dark:text-white">
       <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-[#c9a892]/20 flex flex-col items-center gap-3">
-        <Image
-          src={SIDEBAR_LOGO_LIGHT_SRC}
-          alt="Hospital Nacional El Salvador"
-          width={120}
-          height={60}
-          className="h-16 w-auto object-contain dark:hidden"
-          priority
-        />
-        <Image
-          src={SIDEBAR_LOGO_DARK_SRC}
-          alt="Hospital Nacional El Salvador"
-          width={150}
-          height={150}
-          className="hidden h-20 w-auto object-contain dark:block"
-          priority
-        />
+        <div className="h-20 flex items-center justify-center">
+          <Image
+            src={SIDEBAR_LOGO_LIGHT_SRC}
+            alt="Hospital Nacional El Salvador"
+            width={150}
+            height={150}
+            className="h-20 w-auto object-contain dark:hidden"
+            priority
+          />
+          <Image
+            src={SIDEBAR_LOGO_DARK_SRC}
+            alt="Hospital Nacional El Salvador"
+            width={150}
+            height={150}
+            className="hidden h-20 w-auto object-contain dark:block"
+            priority
+          />
+        </div>
         <div className="flex items-center gap-2.5 w-full">
           <div className="w-8 h-8 rounded-lg bg-[var(--color-institutional-accent)] dark:bg-[var(--color-institutional-warm)] flex items-center justify-center flex-shrink-0 shadow-sm">
             <span className="text-white dark:text-[var(--color-institutional-dark)] text-[10px] font-bold tracking-wide">ES</span>
@@ -134,7 +136,7 @@ function SidebarBody({
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-[#c9a892]/70 hover:text-slate-600 dark:hover:text-[#f0ece8] hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors"
+                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-[#9d7c69] dark:text-[#c9a892]/70 hover:text-[#7d5f4f] dark:hover:text-[#f0ece8] hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/70 transition-colors"
               >
                 <ChevronDown
                   size={12}
@@ -157,14 +159,14 @@ function SidebarBody({
         )}
         <button
           onClick={toggle}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 transition-all"
         >
           {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
         <button
           onClick={onChangePassword}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 transition-all"
         >
           <KeyRound size={16} />
           Cambiar contrasena
