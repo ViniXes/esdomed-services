@@ -9,10 +9,16 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LogIn, Plus, X, CheckCircle2, AlertCircle, Search,
-  Archive, ChevronDown, Check,
+  Archive, ChevronDown, Check, MessageSquareWarning,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
-import type { NotificacionAltaVivo, Paciente, TipoAltaVivo, EstadoNotificacionAlta } from "@/types";
+import type {
+  EstadoNotificacionAlta,
+  MotivoObservacionAlta,
+  NotificacionAltaVivo,
+  Paciente,
+  TipoAltaVivo,
+} from "@/types";
 
 // ── Labels & badges ──────────────────────────────────────────────────────────
 
@@ -33,25 +39,41 @@ const TIPO_LABEL: Record<TipoAltaVivo, string> = {
 };
 
 const TIPO_COLOR: Record<TipoAltaVivo, string> = {
-  domicilio:   "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
-  exigida:     "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
-  referido:    "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-  fuga:        "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
-  in_extremis: "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+  domicilio:   "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
+  exigida:     "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
+  referido:    "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
+  fuga:        "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
+  in_extremis: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
 };
 
 const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   pendiente:  "Pendiente",
+  observada:  "Requiere correccion",
   deposito:   "En depósito",
   suspendida: "Suspendida",
-  procesada:  "Procesada",
+  procesada:  "Alta efectiva",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   pendiente:  "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+  observada:  "bg-rose-50/70 dark:bg-rose-950/40 text-slate-800 dark:text-rose-100 border-rose-200/80 dark:border-rose-900/70",
   deposito:   "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
   suspendida: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
   procesada:  "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
+};
+
+const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
+  cama_expediente: "Error de cama o expediente",
+  expediente_duplicado: "Expediente duplicado",
+  no_subido_sis: "No aparece subido en SIS",
+  otro: "Otra observacion",
+};
+
+const OBSERVACION_DEFAULT: Record<MotivoObservacionAlta, string> = {
+  cama_expediente: "Verificar cama y expediente reportado; los datos no coinciden para procesar el alta.",
+  expediente_duplicado: "El expediente aparece duplicado. Revisar antes de reenviar la notificacion.",
+  no_subido_sis: "El paciente no aparece subido en SIS al momento de la notificacion. Subirlo y reenviar la correccion.",
+  otro: "",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +128,7 @@ function CreateModal({
         tipoAlta,
         notas: notas.trim() || null,
         estado: "pendiente",
+        rectificacionUsada: false,
         creadoEn: Timestamp.now(),
       });
       onCreated();
@@ -230,6 +253,91 @@ function ConfirmModal({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+function ObservacionModal({
+  notificacion,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  notificacion: NotificacionAltaVivo;
+  onConfirm: (motivo: MotivoObservacionAlta, detalle: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [motivo, setMotivo] = useState<MotivoObservacionAlta>("cama_expediente");
+  const [detalle, setDetalle] = useState(OBSERVACION_DEFAULT.cama_expediente);
+
+  const elegirMotivo = (value: MotivoObservacionAlta) => {
+    setMotivo(value);
+    setDetalle(OBSERVACION_DEFAULT[value]);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 pt-16 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-900 flex items-center justify-center shrink-0">
+            <MessageSquareWarning size={18} className="text-rose-600 dark:text-rose-300" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-900 dark:text-slate-100">Marcar con observacion</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Enfermeria vera el motivo para corregir la notificacion de {notificacion.pacienteNombre}.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {(Object.keys(OBSERVACION_LABEL) as MotivoObservacionAlta[]).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => elegirMotivo(value)}
+              className={`px-3 py-2 rounded-lg border text-left text-xs font-semibold transition-all ${
+                motivo === value
+                  ? "border-rose-500 bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 ring-1 ring-rose-500/30"
+                  : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-rose-300"
+              }`}
+            >
+              {OBSERVACION_LABEL[value]}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">Mensaje para Enfermeria</label>
+          <textarea
+            value={detalle}
+            onChange={(e) => setDetalle(e.target.value)}
+            rows={3}
+            className={`${inputCls} resize-none focus:ring-rose-500`}
+            placeholder="Describe que debe corregirse..."
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(motivo, detalle)}
+            disabled={loading || !detalle.trim()}
+            className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Guardando..." : "Enviar observacion"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AltasVivosPage() {
   const { user, profile } = useAuth();
   const isTS = profile?.role === "trabajo_social";
@@ -251,6 +359,10 @@ export default function AltasVivosPage() {
 
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const [procesandoLoading, setProcesandoLoading] = useState(false);
+
+  const [observandoId, setObservandoId] = useState<string | null>(null);
+  const [observandoLoading, setObservandoLoading] = useState(false);
+  const [quitandoObservacionId, setQuitandoObservacionId] = useState<string | null>(null);
 
   const [editingTipoId, setEditingTipoId] = useState<string | null>(null);
   const [editingTipoLoading, setEditingTipoLoading] = useState(false);
@@ -299,15 +411,58 @@ export default function AltasVivosPage() {
     if (!procesandoId || !user || !profile) return;
     setProcesandoLoading(true);
     try {
-      await updateDoc(doc(db, "notificaciones_altas", procesandoId), {
-        estado: "procesada",
-        procesadoPorId: user.uid,
-        procesadoPorNombre: profile.nombre,
-        procesadoEn: Timestamp.now(),
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${procesandoId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "procesar" }),
       });
+      if (!res.ok) throw new Error("No se pudo procesar la notificacion.");
     } finally {
       setProcesandoLoading(false);
       setProcesandoId(null);
+    }
+  };
+
+  const observarNotificacion = async (motivo: MotivoObservacionAlta, detalle: string) => {
+    if (!observandoId || !user || !profile) return;
+    setObservandoLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${observandoId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "observar", motivo, detalle }),
+      });
+      if (!res.ok) throw new Error("No se pudo guardar la observacion.");
+    } finally {
+      setObservandoLoading(false);
+      setObservandoId(null);
+    }
+  };
+
+  const quitarObservacion = async (id: string) => {
+    if (!user || !profile) return;
+    setQuitandoObservacionId(id);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${id}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "quitar_observacion" }),
+      });
+      if (!res.ok) throw new Error("No se pudo quitar la observacion.");
+    } finally {
+      setQuitandoObservacionId(null);
     }
   };
 
@@ -330,6 +485,7 @@ export default function AltasVivosPage() {
 
   const archivingNot = archivingId ? notificaciones.find(n => n.id === archivingId) : null;
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
+  const observandoNot = observandoId ? notificaciones.find(n => n.id === observandoId) : null;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -372,7 +528,8 @@ export default function AltasVivosPage() {
           className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100">
           <option value="todas">Todos los estados</option>
           <option value="pendiente">Pendiente</option>
-          <option value="procesada">Procesada</option>
+          <option value="observada">Requiere correccion</option>
+          <option value="procesada">Alta efectiva</option>
           <option value="deposito">En depósito</option>
           <option value="suspendida">Suspendida</option>
         </select>
@@ -444,8 +601,25 @@ export default function AltasVivosPage() {
                 )}
                 {n.estado === "procesada" && n.procesadoPorNombre && (
                   <p className="text-xs text-green-600 dark:text-green-500 font-medium">
-                    Procesado por {n.procesadoPorNombre} · {formatFecha(n.procesadoEn)}
+                    Alta efectiva por {n.procesadoPorNombre} · {formatFecha(n.procesadoEn)}
                   </p>
+                )}
+                {n.observacionEsdomedMotivo && (
+                  <details className="group mt-2 rounded-lg border border-rose-200/70 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 px-3 py-2 text-slate-900 dark:text-slate-100">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold">
+                      <span>{OBSERVACION_LABEL[n.observacionEsdomedMotivo]}</span>
+                      <span className="shrink-0 text-[11px] font-medium underline-offset-2 group-open:hidden">Ver detalle</span>
+                      <span className="hidden shrink-0 text-[11px] font-medium underline-offset-2 group-open:inline">Ocultar</span>
+                    </summary>
+                    {n.observacionEsdomedDetalle && (
+                      <p className="mt-2 border-t border-rose-200/80 dark:border-rose-900 pt-2 text-xs leading-relaxed">{n.observacionEsdomedDetalle}</p>
+                    )}
+                    {n.observadoPorNombre && (
+                      <p className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                        Observado por {n.observadoPorNombre} - {formatFecha(n.observadoEn)}
+                      </p>
+                    )}
+                  </details>
                 )}
                 {n.notas && (
                   <p className="text-xs text-slate-400 italic">Nota: {n.notas}</p>
@@ -458,13 +632,31 @@ export default function AltasVivosPage() {
 
                   {/* ESDOMED: procesar */}
                   {isEsdomed && (
-                    <button
-                      onClick={() => setProcesandoId(n.id!)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
-                    >
-                      <Check size={13} />
-                      Acusar de recibido y dar alta en SIS
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setProcesandoId(n.id!)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
+                      >
+                        <Check size={13} />
+                        Acusar de recibido y dar alta en SIS
+                      </button>
+                      <button
+                        onClick={() => setObservandoId(n.id!)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1c1e4d] dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors"
+                      >
+                        <MessageSquareWarning size={13} />
+                        {n.estado === "observada" ? "Cambiar observacion" : "Marcar con observacion"}
+                      </button>
+                      {n.estado === "observada" && (
+                        <button
+                          onClick={() => quitarObservacion(n.id!)}
+                          disabled={quitandoObservacionId === n.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {quitandoObservacionId === n.id ? "Quitando..." : "Quitar observacion"}
+                        </button>
+                      )}
+                    </>
                   )}
 
                   {/* TS: editar tipo + archivar */}
@@ -563,6 +755,15 @@ export default function AltasVivosPage() {
           onConfirm={procesarNotificacion}
           onCancel={() => setProcesandoId(null)}
           loading={procesandoLoading}
+        />
+      )}
+
+      {observandoId && observandoNot && (
+        <ObservacionModal
+          notificacion={observandoNot}
+          onConfirm={observarNotificacion}
+          onCancel={() => setObservandoId(null)}
+          loading={observandoLoading}
         />
       )}
 

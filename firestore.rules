@@ -148,7 +148,7 @@ service cloud.firestore {
       // TS puede editar solo las que siguen pendientes (cambiar tipo, archivar).
       // ESDOMED puede marcar como procesada (también solo si está pendiente).
       allow update: if (isTrabajoSocial() || isEsdomed() || isAdmin())
-                    && resource.data.estado == 'pendiente';
+                    && (resource.data.estado == 'pendiente' || resource.data.estado == 'observada');
       allow delete: if isAdmin();
     }
 

@@ -46,6 +46,7 @@ export default function EnfermeriaAltasPage() {
         tipoAlta,
         notas: notas.trim() || null,
         estado: "pendiente",
+        rectificacionUsada: false,
         creadoEn: Timestamp.now(),
       });
       const nombre = `${selectedPaciente.apellidos}, ${selectedPaciente.nombres}`;

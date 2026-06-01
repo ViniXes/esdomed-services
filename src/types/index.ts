@@ -204,7 +204,12 @@ export interface SolicitudIncapacidad {
 // ============================================================================
 
 export type TipoAltaVivo = "domicilio" | "exigida" | "referido" | "fuga" | "in_extremis";
-export type EstadoNotificacionAlta = "pendiente" | "deposito" | "suspendida" | "procesada";
+export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada";
+export type MotivoObservacionAlta =
+  | "cama_expediente"
+  | "expediente_duplicado"
+  | "no_subido_sis"
+  | "otro";
 
 export interface NotificacionAltaVivo {
   id?: string;
@@ -225,10 +230,35 @@ export interface NotificacionAltaVivo {
   estado: EstadoNotificacionAlta;
   creadoEn: Date;
 
+  // Observacion de ESDOMED para correccion por Enfermeria/TS
+  observacionEsdomedMotivo?: MotivoObservacionAlta;
+  observacionEsdomedDetalle?: string | null;
+  observadoPorId?: string;
+  observadoPorNombre?: string;
+  observadoEn?: Date;
+  observacionAtendidaPorId?: string;
+  observacionAtendidaPorNombre?: string;
+  observacionAtendidaEn?: Date;
+
   // Modificado por TS
   modificadoPorId?: string;
   modificadoPorNombre?: string;
   modificadoEn?: Date;
+
+  // Rectificacion por Enfermeria antes del alta efectiva
+  rectificacionUsada?: boolean;
+  rectificadoPorId?: string;
+  rectificadoPorNombre?: string;
+  rectificadoEn?: Date;
+  rectificacionAnterior?: {
+    pacienteId: string;
+    pacienteExpediente: string;
+    pacienteNombre: string;
+    servicio: string;
+    cama: string;
+    tipoAlta: TipoAltaVivo;
+    notas?: string | null;
+  };
 
   // Procesado por ESDOMED
   procesadoPorId?: string;
