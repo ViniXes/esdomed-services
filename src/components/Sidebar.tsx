@@ -110,7 +110,7 @@ function SidebarBody({
           />
         </div>
         <div className="flex items-center gap-2.5 w-full">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-institutional-accent)] dark:bg-[var(--color-institutional-warm)] flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-[var(--color-institutional-navy)] dark:bg-[var(--color-institutional-warm)] flex items-center justify-center flex-shrink-0 shadow-sm">
             <span className="text-white dark:text-[var(--color-institutional-dark)] text-[10px] font-bold tracking-wide">ES</span>
           </div>
           <div className="min-w-0">
@@ -136,7 +136,7 @@ function SidebarBody({
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-[#9d7c69] dark:text-[#c9a892]/70 hover:text-[#7d5f4f] dark:hover:text-[#f0ece8] hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/70 transition-colors"
+                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892]/70 hover:text-[#2f48aa] dark:hover:text-[#f0ece8] hover:bg-[#1c1e4d]/5 dark:hover:bg-slate-800/70 transition-colors"
               >
                 <ChevronDown
                   size={12}
