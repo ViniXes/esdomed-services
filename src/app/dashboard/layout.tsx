@@ -76,7 +76,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
       : []),
-<<<<<<< HEAD
+    ...(verBusquedaTelefono
+      ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
+      : []),
     ...(!esTS
       ? [{
           href: "/dashboard/traslados",
@@ -86,18 +88,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           group: G_PACIENTES,
         }]
       : []),
-=======
-    ...(verBusquedaTelefono
-      ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
-      : []),
-    {
-      href: "/dashboard/traslados",
-      label: "Traslados",
-      icon: ArrowRightLeft,
-      badge: pendientes.traslados,
-      group: G_PACIENTES,
-    },
->>>>>>> 68775bb3f4f8ce4cf0ebf8123efab273f5c71199
     ...(verAltasVivos
       ? [{
           href: "/dashboard/altas-vivos",
