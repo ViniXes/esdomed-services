@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import {
   collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, doc, Timestamp,
+  addDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LogIn, Plus, X, CheckCircle2, AlertCircle, Search,
-  Archive, ChevronDown, Check, MessageSquareWarning,
+  Check, MessageSquareWarning, Pencil,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
 import type {
@@ -28,6 +28,8 @@ const TIPOS_ALTA: { value: TipoAltaVivo; label: string }[] = [
   { value: "referido",    label: "Referido" },
   { value: "fuga",        label: "Fuga" },
   { value: "in_extremis", label: "In extremis" },
+  { value: "deposito",    label: "En deposito" },
+  { value: "suspendida",  label: "Suspendida" },
 ];
 
 const TIPO_LABEL: Record<TipoAltaVivo, string> = {
@@ -36,6 +38,8 @@ const TIPO_LABEL: Record<TipoAltaVivo, string> = {
   referido:    "Referido",
   fuga:        "Fuga",
   in_extremis: "In extremis",
+  deposito:    "En deposito",
+  suspendida:  "Suspendida",
 };
 
 const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
@@ -274,7 +278,7 @@ function ObservacionModal({
           <div>
             <p className="text-base font-bold text-slate-900 dark:text-slate-100">Marcar con observacion</p>
             <p className="text-sm text-slate-500 mt-1">
-              Enfermeria vera el motivo para corregir la notificacion de {notificacion.pacienteNombre}.
+              El equipo que notifico vera el motivo para corregir la notificacion de {notificacion.pacienteNombre}.
             </p>
           </div>
         </div>
@@ -330,6 +334,157 @@ function ObservacionModal({
   );
 }
 
+function RectificacionModal({
+  notificacion,
+  onClose,
+  onSaved,
+}: {
+  notificacion: NotificacionAltaVivo;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { user } = useAuth();
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
+  const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">(notificacion.tipoAlta);
+  const [notas, setNotas] = useState(notificacion.notas ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const guardarRectificacion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !notificacion.id || !tipoAlta) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/altas/${notificacion.id}/rectificar`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          paciente: selectedPaciente
+            ? {
+                id: selectedPaciente.id,
+                expediente: selectedPaciente.expediente,
+                apellidos: selectedPaciente.apellidos,
+                nombres: selectedPaciente.nombres,
+                servicioActual: selectedPaciente.servicioActual,
+                camaActual: selectedPaciente.camaActual ?? "",
+              }
+            : null,
+          tipoAlta,
+          notas: notas.trim() || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "No se pudo guardar la rectificacion.");
+      }
+
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la rectificacion.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 pt-16 backdrop-blur-sm overflow-y-auto">
+      <form onSubmit={guardarRectificacion} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+          aria-label="Cerrar"
+        >
+          <X size={15} />
+        </button>
+
+        <div>
+          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Rectificacion unica</p>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Actualizar notificacion</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Puedes corregir paciente, tipo de alta o nota antes de que ESDOMED cierre el caso.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">Paciente actual</label>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{notificacion.pacienteNombre}</p>
+            <p className="text-xs text-slate-500">Exp. {notificacion.pacienteExpediente} - {notificacion.servicio}</p>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">
+            Cambiar paciente <span className="font-normal text-slate-400">(opcional)</span>
+          </label>
+          <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="blue" />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de alta</label>
+          <div className="grid grid-cols-2 gap-2">
+            {TIPOS_ALTA.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTipoAlta(t.value)}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                  tipoAlta === t.value
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30"
+                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-blue-300"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">
+            Notas <span className="font-normal text-slate-400">(opcional)</span>
+          </label>
+          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className={`${inputCls} resize-none`} />
+        </div>
+
+        {error && (
+          <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+            <AlertCircle size={14} className="mt-0.5" />
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !tipoAlta}
+            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Guardando..." : "Guardar rectificacion"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function AltasVivosPage() {
   const { user, profile } = useAuth();
   const isTS = profile?.role === "trabajo_social";
@@ -344,21 +499,13 @@ export default function AltasVivosPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createdBanner, setCreatedBanner] = useState(false);
 
-  // Per-card state: archiving, editing tipo
-  const [archivingId, setArchivingId] = useState<string | null>(null);
-  const [archivingTarget, setArchivingTarget] = useState<"deposito" | "suspendida" | null>(null);
-  const [archivingLoading, setArchivingLoading] = useState(false);
-
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const [procesandoLoading, setProcesandoLoading] = useState(false);
 
   const [observandoId, setObservandoId] = useState<string | null>(null);
   const [observandoLoading, setObservandoLoading] = useState(false);
   const [quitandoObservacionId, setQuitandoObservacionId] = useState<string | null>(null);
-
-  const [editingTipoId, setEditingTipoId] = useState<string | null>(null);
-  const [editingTipoLoading, setEditingTipoLoading] = useState(false);
-  const [openArchiveMenuId, setOpenArchiveMenuId] = useState<string | null>(null);
+  const [rectificando, setRectificando] = useState<NotificacionAltaVivo | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"));
@@ -381,23 +528,6 @@ export default function AltasVivosPage() {
     }
     return true;
   });
-
-  const archivarNotificacion = async (estado: "deposito" | "suspendida") => {
-    if (!archivingId || !user || !profile) return;
-    setArchivingLoading(true);
-    try {
-      await updateDoc(doc(db, "notificaciones_altas", archivingId), {
-        estado,
-        modificadoPorId: user.uid,
-        modificadoPorNombre: profile.nombre,
-        modificadoEn: Timestamp.now(),
-      });
-    } finally {
-      setArchivingLoading(false);
-      setArchivingId(null);
-      setArchivingTarget(null);
-    }
-  };
 
   const procesarNotificacion = async () => {
     if (!procesandoId || !user || !profile) return;
@@ -458,24 +588,6 @@ export default function AltasVivosPage() {
     }
   };
 
-  const cambiarTipoAlta = async (id: string, tipo: TipoAltaVivo) => {
-    if (!user || !profile) return;
-    setEditingTipoId(id);
-    setEditingTipoLoading(true);
-    try {
-      await updateDoc(doc(db, "notificaciones_altas", id), {
-        tipoAlta: tipo,
-        modificadoPorId: user.uid,
-        modificadoPorNombre: profile.nombre,
-        modificadoEn: Timestamp.now(),
-      });
-    } finally {
-      setEditingTipoLoading(false);
-      setEditingTipoId(null);
-    }
-  };
-
-  const archivingNot = archivingId ? notificaciones.find(n => n.id === archivingId) : null;
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
   const observandoNot = observandoId ? notificaciones.find(n => n.id === observandoId) : null;
 
@@ -504,7 +616,7 @@ export default function AltasVivosPage() {
       {createdBanner && (
         <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 rounded-xl text-sm text-green-700 dark:text-green-400">
           <CheckCircle2 size={16} />
-          Notificación registrada correctamente.
+          Cambio guardado correctamente.
         </div>
       )}
 
@@ -553,7 +665,12 @@ export default function AltasVivosPage() {
 
         {displayList.map(n => {
           const isLocked = n.estado === "procesada" || n.estado === "deposito" || n.estado === "suspendida";
-          const editingTipo = editingTipoId === n.id && editingTipoLoading;
+          const puedeRectificarTS =
+            isTS &&
+            (n.estado === "pendiente" || n.estado === "observada") &&
+            !n.rectificacionUsada &&
+            n.notificadoPorId === user?.uid &&
+            n.notificadoPorRol === "trabajo_social";
 
           return (
             <div key={n.id}
@@ -650,60 +767,15 @@ export default function AltasVivosPage() {
                     </>
                   )}
 
-                  {/* TS: editar tipo + archivar */}
-                  {isTS && (
-                    <>
-                      {/* Editar tipo */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setEditingTipoId(editingTipoId === n.id ? null : n.id!)}
-                          disabled={editingTipo}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
-                        >
-                          Editar tipo
-                          <ChevronDown size={12} />
-                        </button>
-                        {editingTipoId === n.id && !editingTipoLoading && (
-                          <div className="absolute top-full left-0 mt-1 z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden w-44">
-                            {TIPOS_ALTA.map(t => (
-                              <button key={t.value} type="button"
-                                onClick={() => { cambiarTipoAlta(n.id!, t.value); setEditingTipoId(null); }}
-                                className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
-                                  n.tipoAlta === t.value ? "font-semibold text-blue-600 dark:text-blue-400" : "text-slate-700 dark:text-slate-300"
-                                }`}>
-                                {t.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Archivar */}
-                      <div className="relative">
-                        <button
-                          onClick={() => setOpenArchiveMenuId(openArchiveMenuId === n.id ? null : n.id!)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          <Archive size={12} />
-                          Archivar
-                          <ChevronDown size={12} />
-                        </button>
-                        {openArchiveMenuId === n.id && (
-                          <div className="absolute top-full left-0 mt-1 z-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden w-44">
-                            <button type="button"
-                              onClick={() => { setArchivingId(n.id!); setArchivingTarget("deposito"); setOpenArchiveMenuId(null); }}
-                              className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                              En depósito
-                            </button>
-                            <button type="button"
-                              onClick={() => { setArchivingId(n.id!); setArchivingTarget("suspendida"); setOpenArchiveMenuId(null); }}
-                              className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                              Suspendida
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </>
+                  {puedeRectificarTS && (
+                    <button
+                      type="button"
+                      onClick={() => setRectificando(n)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
+                    >
+                      <Pencil size={12} />
+                      {n.estado === "observada" ? "Corregir observacion" : "Rectificar una vez"}
+                    </button>
                   )}
                 </div>
               )}
@@ -720,19 +792,6 @@ export default function AltasVivosPage() {
             setCreatedBanner(true);
             setTimeout(() => setCreatedBanner(false), 4000);
           }}
-        />
-      )}
-
-      {/* Archivar confirm */}
-      {archivingId && archivingTarget && archivingNot && (
-        <ConfirmModal
-          title={archivingTarget === "deposito" ? "Archivar como En depósito" : "Suspender notificación"}
-          message={`La notificación de ${archivingNot.pacienteNombre} quedará archivada y no podrá editarse más.`}
-          confirmLabel={archivingTarget === "deposito" ? "Archivar" : "Suspender"}
-          confirmCls="bg-slate-700 hover:bg-slate-600"
-          onConfirm={() => archivarNotificacion(archivingTarget)}
-          onCancel={() => { setArchivingId(null); setArchivingTarget(null); }}
-          loading={archivingLoading}
         />
       )}
 
@@ -758,10 +817,15 @@ export default function AltasVivosPage() {
         />
       )}
 
-      {/* Click outside to close dropdowns */}
-      {(editingTipoId || openArchiveMenuId) && (
-        <div className="fixed inset-0 z-[5]"
-          onClick={() => { setEditingTipoId(null); setOpenArchiveMenuId(null); }} />
+      {rectificando && (
+        <RectificacionModal
+          notificacion={rectificando}
+          onClose={() => setRectificando(null)}
+          onSaved={() => {
+            setCreatedBanner(true);
+            setTimeout(() => setCreatedBanner(false), 4000);
+          }}
+        />
       )}
     </div>
   );

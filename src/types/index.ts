@@ -203,7 +203,7 @@ export interface SolicitudIncapacidad {
 // Altas Vivos — notificaciones de egreso de pacientes vivos
 // ============================================================================
 
-export type TipoAltaVivo = "domicilio" | "exigida" | "referido" | "fuga" | "in_extremis";
+export type TipoAltaVivo = "domicilio" | "exigida" | "referido" | "fuga" | "in_extremis" | "deposito" | "suspendida";
 export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada";
 export type MotivoObservacionAlta =
   | "cama_expediente"

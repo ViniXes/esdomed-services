@@ -42,6 +42,8 @@ const TIPO_LABEL: Record<TipoAltaVivo, string> = {
   referido: "Referido",
   fuga: "Fuga",
   in_extremis: "In extremis",
+  deposito: "En deposito",
+  suspendida: "Suspendida",
 };
 
 const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
