@@ -52,6 +52,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   deposito: "En deposito",
   suspendida: "Suspendida",
   procesada: "Alta efectiva",
+  recibida: "Acusada de recibido",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -60,6 +61,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   deposito: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   suspendida: "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
   procesada: "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900",
+  recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
@@ -71,6 +73,19 @@ const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition";
+
+const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
+
+const estadoBadgeLabel = (n: NotificacionAltaVivo) =>
+  n.estado === "recibida" && esSoloAcuseRecibido(n.tipoAlta)
+    ? TIPO_LABEL[n.tipoAlta]
+    : ESTADO_LABEL[n.estado];
+
+const estadoBadgeColor = (n: NotificacionAltaVivo) => {
+  if (n.estado === "recibida" && n.tipoAlta === "deposito") return ESTADO_COLOR.deposito;
+  if (n.estado === "recibida" && n.tipoAlta === "suspendida") return ESTADO_COLOR.suspendida;
+  return ESTADO_COLOR[n.estado];
+};
 
 function toDate(v: unknown): Date | null {
   if (!v) return null;
@@ -234,6 +249,7 @@ export default function EnfermeriaMovimientosPage() {
           <option value="pendiente">Pendiente ESDOMED</option>
           <option value="observada">Requiere correccion</option>
           <option value="procesada">Alta efectiva</option>
+          <option value="recibida">Acusada de recibido</option>
           <option value="deposito">En deposito</option>
           <option value="suspendida">Suspendida</option>
         </select>
@@ -269,9 +285,9 @@ export default function EnfermeriaMovimientosPage() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ESTADO_COLOR[n.estado]}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${estadoBadgeColor(n)}`}>
                     {n.estado === "procesada" && <CheckCircle2 size={11} className="mr-1" />}
-                    {ESTADO_LABEL[n.estado]}
+                    {estadoBadgeLabel(n)}
                   </span>
                 </div>
               </div>
@@ -290,6 +306,11 @@ export default function EnfermeriaMovimientosPage() {
                 {n.estado === "procesada" && n.procesadoPorNombre && (
                   <p className="text-xs text-green-600 dark:text-green-500 font-medium">
                     Alta efectiva por {n.procesadoPorNombre} - {formatFecha(n.procesadoEn)}
+                  </p>
+                )}
+                {n.estado === "recibida" && n.procesadoPorNombre && (
+                  <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
+                    Acusada de recibido por {n.procesadoPorNombre} - {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.observacionEsdomedMotivo && (
@@ -326,7 +347,7 @@ export default function EnfermeriaMovimientosPage() {
                     <Clock3 size={13} />
                     Rectificacion utilizada
                   </span>
-                ) : n.estado !== "procesada" ? (
+                ) : n.estado !== "procesada" && n.estado !== "recibida" ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock3 size={13} />
                     En seguimiento

@@ -48,6 +48,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   deposito:   "En depósito",
   suspendida: "Suspendida",
   procesada:  "Alta efectiva",
+  recibida:   "Acusada de recibido",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -56,6 +57,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   deposito:   "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
   suspendida: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
   procesada:  "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
+  recibida:   "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
@@ -89,6 +91,19 @@ const formatFecha = (v: unknown) => {
 };
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
+
+const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
+
+const estadoBadgeLabel = (n: NotificacionAltaVivo) =>
+  n.estado === "recibida" && esSoloAcuseRecibido(n.tipoAlta)
+    ? TIPO_LABEL[n.tipoAlta]
+    : ESTADO_LABEL[n.estado];
+
+const estadoBadgeColor = (n: NotificacionAltaVivo) => {
+  if (n.estado === "recibida" && n.tipoAlta === "deposito") return ESTADO_COLOR.deposito;
+  if (n.estado === "recibida" && n.tipoAlta === "suspendida") return ESTADO_COLOR.suspendida;
+  return ESTADO_COLOR[n.estado];
+};
 
 // ── Create Modal (TS) ─────────────────────────────────────────────────────────
 
@@ -634,6 +649,7 @@ export default function AltasVivosPage() {
           <option value="pendiente">Pendiente</option>
           <option value="observada">Requiere correccion</option>
           <option value="procesada">Alta efectiva</option>
+          <option value="recibida">Acusada de recibido</option>
           <option value="deposito">En depósito</option>
           <option value="suspendida">Suspendida</option>
         </select>
@@ -664,7 +680,8 @@ export default function AltasVivosPage() {
         )}
 
         {displayList.map(n => {
-          const isLocked = n.estado === "procesada" || n.estado === "deposito" || n.estado === "suspendida";
+          const requiereSoloAcuse = esSoloAcuseRecibido(n.tipoAlta);
+          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida";
           const puedeRectificarTS =
             isTS &&
             (n.estado === "pendiente" || n.estado === "observada") &&
@@ -688,8 +705,8 @@ export default function AltasVivosPage() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ESTADO_COLOR[n.estado]}`}>
-                    {ESTADO_LABEL[n.estado]}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${estadoBadgeColor(n)}`}>
+                    {estadoBadgeLabel(n)}
                   </span>
                 </div>
               </div>
@@ -710,6 +727,11 @@ export default function AltasVivosPage() {
                 {n.estado === "procesada" && n.procesadoPorNombre && (
                   <p className="text-xs text-green-600 dark:text-green-500 font-medium">
                     Alta efectiva por {n.procesadoPorNombre} · {formatFecha(n.procesadoEn)}
+                  </p>
+                )}
+                {n.estado === "recibida" && n.procesadoPorNombre && (
+                  <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
+                    Acusada de recibido por {n.procesadoPorNombre} · {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.observacionEsdomedMotivo && (
@@ -746,7 +768,7 @@ export default function AltasVivosPage() {
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
                       >
                         <Check size={13} />
-                        Acusar de recibido y dar alta en SIS
+                        {requiereSoloAcuse ? "Acusar de recibido" : "Acusar de recibido y dar alta en SIS"}
                       </button>
                       <button
                         onClick={() => setObservandoId(n.id!)}
@@ -798,8 +820,12 @@ export default function AltasVivosPage() {
       {/* Procesar confirm */}
       {procesandoId && procesandoNot && (
         <ConfirmModal
-          title="Acusar de recibido y dar alta en SIS"
-          message={`Confirma que recibiste la notificación de ${procesandoNot.pacienteNombre} y que se dio de alta en el SIS. Esta acción no se puede deshacer.`}
+          title={esSoloAcuseRecibido(procesandoNot.tipoAlta) ? "Acusar de recibido" : "Acusar de recibido y dar alta en SIS"}
+          message={
+            esSoloAcuseRecibido(procesandoNot.tipoAlta)
+              ? `Confirma que recibiste la notificación de ${procesandoNot.pacienteNombre}. Quedará cerrada como acuse de recibido, sin alta efectiva.`
+              : `Confirma que recibiste la notificación de ${procesandoNot.pacienteNombre} y que se dio de alta en el SIS. Esta acción no se puede deshacer.`
+          }
           confirmLabel="Confirmar"
           confirmCls="bg-teal-600 hover:bg-teal-500"
           onConfirm={procesarNotificacion}
