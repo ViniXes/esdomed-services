@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Save, AlertTriangle, Plus, Trash2 } from "lucide-react";
@@ -168,6 +168,25 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
       if (procsLimpios.length) update.procedimientos = procsLimpios;
 
       await updateDoc(doc(db, "pacientes", paciente.id), update);
+
+      // El paciente egresa: anular sus tarjetas de visita activas (conserva el
+      // historial; solo deja de estar "activa"). No bloquea el egreso si falla.
+      try {
+        const snap = await getDocs(
+          query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente))
+        );
+        await Promise.all(
+          snap.docs
+            .filter((d) => (d.data() as { estado?: string }).estado === "activa")
+            .map((d) => updateDoc(doc(db, "tarjetas_visita", d.id), {
+              estado: "anulada",
+              actualizadoEn: Timestamp.now(),
+            }))
+        );
+      } catch {
+        /* las tarjetas de visita no son críticas para el egreso */
+      }
+
       router.push(`/dashboard/pacientes/${paciente.id}`);
     } catch (e) {
       setError(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);

@@ -54,7 +54,8 @@
       "Bash(npx eslint *)",
       "Bash(echo \"exit: $?\")",
       "Bash(sed -n '19,30p' src/app/dashboard/fallecidos/page.tsx)",
-      "Bash(sed -n '230,260p' src/components/pacientes/PacienteForm.tsx)"
+      "Bash(sed -n '230,260p' src/components/pacientes/PacienteForm.tsx)",
+      "Bash(xargs grep -ln \"egreso\\\\|estado\")"
     ]
   }
 }

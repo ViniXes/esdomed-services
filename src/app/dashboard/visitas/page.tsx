@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, createContext, useContext } from "react";
 import {
   collection, query, where, orderBy, onSnapshot, getDocs, getDoc,
   addDoc, updateDoc, doc, Timestamp,
@@ -13,6 +13,7 @@ import type { Paciente, TarjetaVisita, Visita, VisitanteInfo } from "@/types";
 import {
   DoorOpen, Plus, X, LogIn, LogOut, Star, UserPlus, IdCard,
   Search, CheckCircle2, CalendarDays, MessageSquare, CreditCard, Ban, Trash2,
+  AlertTriangle, ArrowLeft, ArrowRight,
 } from "lucide-react";
 
 // ── Estilos compartidos ───────────────────────────────────────────────────────
@@ -91,6 +92,43 @@ async function cargarTarjeta(id: string): Promise<TarjetaVisita | null> {
 
 type TabId = "hoy" | "agenda" | "tarjetas" | "historial";
 
+// ── Feedback (toasts de éxito / error) ────────────────────────────────────────
+
+type Feedback = { id: number; tipo: "success" | "error"; mensaje: string };
+const FeedbackCtx = createContext<(tipo: "success" | "error", mensaje: string) => void>(() => {});
+const useFeedback = () => useContext(FeedbackCtx);
+
+function FeedbackStack({ items, onDismiss }: { items: Feedback[]; onDismiss: (id: number) => void }) {
+  if (!items.length) return null;
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[210] flex flex-col gap-2 items-center pointer-events-none">
+      {items.map(f => <FeedbackToast key={f.id} f={f} onDismiss={() => onDismiss(f.id)} />)}
+    </div>
+  );
+}
+
+function FeedbackToast({ f, onDismiss }: { f: Feedback; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+  const ok = f.tipo === "success";
+  return (
+    <div
+      className={`pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-3 shadow-xl text-sm font-medium ${
+        ok
+          ? "bg-white dark:bg-slate-800 border-l-4 border-l-emerald-500 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+          : "bg-white dark:bg-slate-800 border-l-4 border-l-rose-500 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+      }`}
+      style={{ animation: "notif-in 0.25s ease-out" }}
+    >
+      {ok ? <CheckCircle2 size={16} className="text-emerald-500 flex-shrink-0" /> : <AlertTriangle size={16} className="text-rose-500 flex-shrink-0" />}
+      <span>{f.mensaje}</span>
+      <button onClick={onDismiss} className="ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Cerrar"><X size={13} /></button>
+    </div>
+  );
+}
+
 // ── Página ──────────────────────────────────────────────────────────────────
 
 export default function VisitasPage() {
@@ -113,7 +151,25 @@ export default function VisitasPage() {
   const [detalle, setDetalle] = useState<Visita | null>(null);
   const [tarjetaSel, setTarjetaSel] = useState<TarjetaVisita | null>(null);
 
+  // Feedback de éxito / error
+  const feedbackId = useRef(0);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const notify = useCallback((tipo: "success" | "error", mensaje: string) => {
+    const id = ++feedbackId.current;
+    setFeedbacks(f => [...f, { id, tipo, mensaje }]);
+  }, []);
+  const dismiss = useCallback((id: number) => setFeedbacks(f => f.filter(x => x.id !== id)), []);
+
   const hoy = hoyStr();
+
+  const handleSalida = async (v: Visita) => {
+    try {
+      await registrarSalida(v);
+      notify("success", "Salida registrada");
+    } catch {
+      notify("error", "No se pudo registrar la salida");
+    }
+  };
 
   // Cierre automático de fin de día: cualquier visita "en_curso" que quedó abierta
   // de un día anterior se finaliza al 23:59 de su propia fecha. Barrido perezoso al cargar.
@@ -210,6 +266,7 @@ export default function VisitasPage() {
   };
 
   return (
+    <FeedbackCtx.Provider value={notify}>
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
 
       {/* Header */}
@@ -237,16 +294,16 @@ export default function VisitasPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
+      {/* Tabs — control segmentado, sin scroll (envuelve en pantallas chicas) */}
+      <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl">
         {([["hoy", "Hoy"], ["agenda", "Agenda"], ["tarjetas", "Tarjetas"], ["historial", "Historial"]] as [TabId, string][]).map(([val, label]) => (
           <button
             key={val}
             onClick={() => setTab(val)}
-            className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 whitespace-nowrap transition-colors ${
+            className={`flex-1 min-w-[78px] px-3 py-2 rounded-lg text-sm font-medium text-center transition-colors ${
               tab === val
-                ? "border-teal-600 text-teal-700 dark:text-teal-400"
-                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                ? "bg-white dark:bg-slate-900 shadow-sm text-teal-700 dark:text-teal-400"
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             }`}
           >
             {label}
@@ -269,7 +326,7 @@ export default function VisitasPage() {
             <div className="space-y-6">
               {enCurso.length > 0 && (
                 <Seccion titulo="En curso">
-                  <Grid>{enCurso.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} onSalida={() => registrarSalida(v)} />)}</Grid>
+                  <Grid>{enCurso.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} onSalida={() => handleSalida(v)} />)}</Grid>
                 </Seccion>
               )}
               {programadas.length > 0 && (
@@ -423,7 +480,10 @@ export default function VisitasPage() {
           onClose={() => setTarjetaSel(null)}
         />
       )}
+
+      <FeedbackStack items={feedbacks} onDismiss={dismiss} />
     </div>
+    </FeedbackCtx.Provider>
   );
 }
 
@@ -569,13 +629,38 @@ function ParentescoSelect({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-// ── Modal: Nueva visita (agendar fecha o entrada ahora) ───────────────────────
+// ── Indicador de pasos (wizard) ───────────────────────────────────────────────
+
+function Pasos({ actual, labels }: { actual: number; labels: string[] }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      {labels.map((l, i) => {
+        const n = i + 1;
+        const activo = n === actual;
+        const hecho = n < actual;
+        return (
+          <div key={l} className="flex items-center gap-2">
+            <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+              activo ? "bg-teal-600 text-white" : hecho ? "bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+            }`}>{hecho ? <CheckCircle2 size={14} /> : n}</span>
+            <span className={`text-xs font-medium ${activo ? "text-slate-800 dark:text-slate-200" : "text-slate-400"}`}>{l}</span>
+            {n < labels.length && <span className="w-5 h-px bg-slate-200 dark:bg-slate-700" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Modal: Nueva visita (wizard: paciente → detalles) ─────────────────────────
 
 function NuevaVisitaModal({ onClose, onEntradaAhora }: {
   onClose: () => void;
   onEntradaAhora: (tarjeta: TarjetaVisita) => void;
 }) {
   const { profile } = useAuth();
+  const notify = useFeedback();
+  const [paso, setPaso] = useState<1 | 2>(1);
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [tarjeta, setTarjeta] = useState<TarjetaVisita | null>(null);
   const [buscando, setBuscando] = useState(false);
@@ -594,7 +679,6 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
       const snap = await getDocs(query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente)));
       if (cancel) return;
       const todas = snap.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita));
-      // Tarjeta del internamiento ACTUAL (mismo pacienteId) — preferir la activa.
       const actual =
         todas.find(t => t.pacienteId === paciente.id && t.estado === "activa") ??
         todas.find(t => t.pacienteId === paciente.id) ??
@@ -634,7 +718,6 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
     };
   };
 
-  /** Garantiza una tarjeta (crea si hace falta y los datos del titular son válidos). */
   const resolverTarjeta = async (): Promise<TarjetaVisita | null> => {
     if (tarjeta) return tarjeta;
     if (!titular.nombre.trim() || !titular.parentesco.trim()) return null;
@@ -644,98 +727,118 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
   const agendar = async () => {
     if (!profile) return;
     setGuardando(true);
-    const tj = await resolverTarjeta();
-    if (!tj) { setGuardando(false); return; }
-    await addDoc(collection(db, "visitas"), {
-      fecha,
-      tarjetaId: tj.id,
-      pacienteId: tj.pacienteId,
-      expediente: tj.expediente,
-      pacienteNombre: tj.pacienteNombre,
-      servicio: tj.servicio,
-      cama: tj.cama ?? "",
-      estado: "programada",
-      programada: true,
-      registradoPorId: profile.uid,
-      registradoPorNombre: profile.nombre,
-      creadoEn: Timestamp.now(),
-    });
-    setGuardando(false);
-    onClose();
+    try {
+      const tj = await resolverTarjeta();
+      if (!tj) { notify("error", "Faltan datos del titular"); return; }
+      await addDoc(collection(db, "visitas"), {
+        fecha,
+        tarjetaId: tj.id,
+        pacienteId: tj.pacienteId,
+        expediente: tj.expediente,
+        pacienteNombre: tj.pacienteNombre,
+        servicio: tj.servicio,
+        cama: tj.cama ?? "",
+        estado: "programada",
+        programada: true,
+        registradoPorId: profile.uid,
+        registradoPorNombre: profile.nombre,
+        creadoEn: Timestamp.now(),
+      });
+      notify("success", `Visita agendada · ${fmtFechaStr(fecha)}`);
+      onClose();
+    } catch {
+      notify("error", "No se pudo agendar la visita");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const entradaAhora = async () => {
     setGuardando(true);
-    const tj = await resolverTarjeta();
-    setGuardando(false);
-    if (tj) onEntradaAhora(tj);
+    try {
+      const tj = await resolverTarjeta();
+      if (tj) onEntradaAhora(tj);
+      else notify("error", "Faltan datos del titular");
+    } catch {
+      notify("error", "No se pudo continuar");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const esHoy = fecha === hoyStr();
   const titularValido = !!tarjeta || (titular.nombre.trim() && titular.parentesco.trim());
 
   return (
-    <ModalShell onClose={onClose} titulo="Nueva visita" icon={UserPlus} ancho="max-w-2xl">
-      <div className="space-y-4">
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">1 · Paciente internado</p>
+    <ModalShell onClose={onClose} titulo="Nueva visita" icon={UserPlus} ancho="max-w-lg">
+      <Pasos actual={paso} labels={["Paciente", "Detalles"]} />
+
+      {/* Paso 1 — Paciente */}
+      {paso === 1 && (
+        <div className="space-y-4">
           <BuscadorPacienteActivo value={paciente} onSelect={setPaciente} accent="teal" />
+          <button onClick={() => setPaso(2)} disabled={!paciente || buscando}
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+            {buscando ? "Verificando tarjeta…" : <>Siguiente <ArrowRight size={16} /></>}
+          </button>
         </div>
+      )}
 
-        {paciente && (
-          <div className="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-4">
-            {buscando ? (
-              <p className="text-sm text-slate-500">Verificando tarjeta…</p>
-            ) : tarjeta ? (
-              <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 rounded-xl p-3 text-sm">
-                <p className="flex items-center gap-1.5 text-teal-800 dark:text-teal-300 font-medium">
-                  <IdCard size={15} /> Tarjeta {tarjeta.codigo} · titular {tarjeta.titular.nombre}
-                </p>
-                <p className="text-xs text-teal-700/80 dark:text-teal-400/80 mt-0.5">{tarjeta.listaBlanca.length} persona(s) en la lista blanca</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">2 · Titular (responsable principal)</p>
-                <p className="text-[11px] text-slate-400">
-                  Se creará la tarjeta {codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1)}
-                  {previasCount > 0 && ` · internamiento #${previasCount + 1} de este expediente`}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input className={inputCls} placeholder="Nombre completo *" value={titular.nombre}
-                    onChange={e => setTitular({ ...titular, nombre: e.target.value.toUpperCase() })} />
-                  <ParentescoSelect value={titular.parentesco} onChange={p => setTitular({ ...titular, parentesco: p })} />
-                  <input className={inputCls} placeholder="DUI / documento" value={titular.dui}
-                    onChange={e => setTitular({ ...titular, dui: e.target.value })} />
-                  <input className={inputCls} placeholder="Teléfono" value={titular.telefono}
-                    onChange={e => setTitular({ ...titular, telefono: e.target.value })} />
-                </div>
-              </div>
-            )}
+      {/* Paso 2 — Detalles */}
+      {paso === 2 && paciente && (
+        <div className="space-y-4">
+          <button onClick={() => setPaso(1)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            <ArrowLeft size={14} /> {paciente.apellidos}, {paciente.nombres} · Exp. {paciente.expediente} (cambiar)
+          </button>
 
-            {/* Fecha + acciones */}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha de la visita</label>
-                <input type="date" min={hoyStr()} value={fecha} onChange={e => setFecha(e.target.value)}
-                  className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button onClick={agendar} disabled={guardando || !titularValido}
-                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl border border-teal-600 text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 disabled:opacity-50 transition-colors">
-                  <CalendarDays size={16} /> Agendar para esta fecha
-                </button>
-                {esHoy && (
-                  <button onClick={entradaAhora} disabled={guardando || !titularValido}
-                    className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
-                    <LogIn size={16} /> Registrar entrada ahora
-                  </button>
-                )}
-              </div>
-              {!esHoy && <p className="text-[11px] text-slate-400 text-center">La entrada se registra el día de la visita desde la pestaña “Hoy”.</p>}
+          {tarjeta ? (
+            <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 rounded-xl p-3 text-sm">
+              <p className="flex items-center gap-1.5 text-teal-800 dark:text-teal-300 font-medium">
+                <IdCard size={15} /> Tarjeta {tarjeta.codigo} · titular {tarjeta.titular.nombre}
+              </p>
+              <p className="text-xs text-teal-700/80 dark:text-teal-400/80 mt-0.5">{tarjeta.listaBlanca.length} persona(s) en la lista blanca</p>
             </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Titular (responsable principal)</p>
+              <p className="text-[11px] text-slate-400">
+                Se creará la tarjeta {codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1)}
+                {previasCount > 0 && ` · internamiento #${previasCount + 1} de este expediente`}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input className={inputCls} placeholder="Nombre completo *" value={titular.nombre}
+                  onChange={e => setTitular({ ...titular, nombre: e.target.value.toUpperCase() })} />
+                <ParentescoSelect value={titular.parentesco} onChange={p => setTitular({ ...titular, parentesco: p })} />
+                <input className={inputCls} placeholder="DUI / documento" value={titular.dui}
+                  onChange={e => setTitular({ ...titular, dui: e.target.value })} />
+                <input className={inputCls} placeholder="Teléfono" value={titular.telefono}
+                  onChange={e => setTitular({ ...titular, telefono: e.target.value })} />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha de la visita</label>
+            <input type="date" min={hoyStr()} value={fecha} onChange={e => setFecha(e.target.value)}
+              className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" />
           </div>
-        )}
-      </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button onClick={agendar} disabled={guardando || !titularValido}
+              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl border border-teal-600 text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 disabled:opacity-50 transition-colors">
+              <CalendarDays size={16} /> Agendar
+            </button>
+            {esHoy && (
+              <button onClick={entradaAhora} disabled={guardando || !titularValido}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+                <LogIn size={16} /> Entrada ahora
+              </button>
+            )}
+          </div>
+          {!esHoy && <p className="text-[11px] text-slate-400 text-center">La entrada se registra el día de la visita desde la pestaña “Hoy”.</p>}
+        </div>
+      )}
     </ModalShell>
   );
 }
@@ -746,6 +849,7 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
   tarjeta: TarjetaVisita; visitaProgramadaId?: string; onClose: () => void;
 }) {
   const { profile } = useAuth();
+  const notify = useFeedback();
   const [guardando, setGuardando] = useState(false);
   const [modoNuevo, setModoNuevo] = useState(false);
   const [nuevo, setNuevo] = useState<VisitanteInfo>({ nombre: "", parentesco: "", dui: "", telefono: "" });
@@ -772,32 +876,36 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
     if (!profile) return;
     setGuardando(true);
     const limpio = limpiarVisitante(visitante);
+    try {
+      if (agregarALista && tarjeta.id) {
+        const yaEsta = tarjeta.listaBlanca.some(v => claveVisitante(v) === claveVisitante(limpio));
+        if (!yaEsta) {
+          await updateDoc(doc(db, "tarjetas_visita", tarjeta.id), {
+            listaBlanca: [...tarjeta.listaBlanca, limpio],
+            actualizadoEn: Timestamp.now(),
+          });
+        }
+      }
 
-    if (agregarALista && tarjeta.id) {
-      const yaEsta = tarjeta.listaBlanca.some(v => claveVisitante(v) === claveVisitante(limpio));
-      if (!yaEsta) {
-        await updateDoc(doc(db, "tarjetas_visita", tarjeta.id), {
-          listaBlanca: [...tarjeta.listaBlanca, limpio],
-          actualizadoEn: Timestamp.now(),
+      const base = { visitante: limpio, esTitular: esTitular(limpio), estado: "en_curso" as const, entradaEn: Timestamp.now() };
+
+      if (visitaProgramadaId) {
+        await updateDoc(doc(db, "visitas", visitaProgramadaId), base);
+      } else {
+        await addDoc(collection(db, "visitas"), {
+          fecha: hoyStr(), tarjetaId: tarjeta.id, pacienteId: tarjeta.pacienteId,
+          expediente: tarjeta.expediente, pacienteNombre: tarjeta.pacienteNombre,
+          servicio: tarjeta.servicio, cama: tarjeta.cama ?? "", programada: false,
+          registradoPorId: profile.uid, registradoPorNombre: profile.nombre,
+          creadoEn: Timestamp.now(), ...base,
         });
       }
+      notify("success", `Entrada registrada · ${limpio.nombre}`);
+      onClose();
+    } catch {
+      notify("error", "No se pudo registrar la entrada");
+      setGuardando(false);
     }
-
-    const base = { visitante: limpio, esTitular: esTitular(limpio), estado: "en_curso" as const, entradaEn: Timestamp.now() };
-
-    if (visitaProgramadaId) {
-      await updateDoc(doc(db, "visitas", visitaProgramadaId), base);
-    } else {
-      await addDoc(collection(db, "visitas"), {
-        fecha: hoyStr(), tarjetaId: tarjeta.id, pacienteId: tarjeta.pacienteId,
-        expediente: tarjeta.expediente, pacienteNombre: tarjeta.pacienteNombre,
-        servicio: tarjeta.servicio, cama: tarjeta.cama ?? "", programada: false,
-        registradoPorId: profile.uid, registradoPorNombre: profile.nombre,
-        creadoEn: Timestamp.now(), ...base,
-      });
-    }
-    setGuardando(false);
-    onClose();
   };
 
   const nuevoValido = nuevo.nombre.trim() && nuevo.parentesco.trim();
@@ -827,7 +935,11 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Nuevo familiar</p>
+          <button onClick={() => setModoNuevo(false)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            <ArrowLeft size={14} /> Volver a la lista
+          </button>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Registrar nuevo familiar</p>
           <div className="relative">
             <input className={inputCls} placeholder="DUI / documento (autollena si ya visitó antes)"
               value={nuevo.dui} onChange={e => setNuevo({ ...nuevo, dui: e.target.value })}
@@ -841,16 +953,10 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
             <input className={inputCls + " sm:col-span-2"} placeholder="Teléfono" value={nuevo.telefono}
               onChange={e => setNuevo({ ...nuevo, telefono: e.target.value })} />
           </div>
-          <div className="flex gap-2 pt-1">
-            <button onClick={() => setModoNuevo(false)}
-              className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              Volver
-            </button>
-            <button onClick={() => registrarEntrada(nuevo, true)} disabled={guardando || !nuevoValido}
-              className="flex-1 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
-              {guardando ? "Registrando…" : "Registrar entrada"}
-            </button>
-          </div>
+          <button onClick={() => registrarEntrada(nuevo, true)} disabled={guardando || !nuevoValido}
+            className="w-full py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+            {guardando ? "Registrando…" : "Registrar entrada"}
+          </button>
         </div>
       )}
     </ModalShell>
@@ -862,6 +968,7 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
 function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
   visita: Visita; onClose: () => void; onRegistrarEntrada: () => void;
 }) {
+  const notify = useFeedback();
   const [comentarios, setComentarios] = useState(visita.comentarios ?? "");
   const [guardando, setGuardando] = useState(false);
   const [guardado, setGuardado] = useState(false);
@@ -869,17 +976,31 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
   const guardarComentario = async () => {
     if (!visita.id) return;
     setGuardando(true);
-    await updateDoc(doc(db, "visitas", visita.id), { comentarios: comentarios.trim() });
-    setGuardando(false);
-    setGuardado(true);
-    setTimeout(() => setGuardado(false), 2000);
+    try {
+      await updateDoc(doc(db, "visitas", visita.id), { comentarios: comentarios.trim() });
+      setGuardado(true);
+      setTimeout(() => setGuardado(false), 2000);
+      notify("success", "Comentario guardado");
+    } catch {
+      notify("error", "No se pudo guardar el comentario");
+    } finally {
+      setGuardando(false);
+    }
   };
 
-  const salida = async () => { await registrarSalida(visita); onClose(); };
+  const salida = async () => {
+    try { await registrarSalida(visita); notify("success", "Salida registrada"); onClose(); }
+    catch { notify("error", "No se pudo registrar la salida"); }
+  };
   const cancelar = async () => {
     if (!visita.id) return;
-    await updateDoc(doc(db, "visitas", visita.id), { estado: "cancelada" });
-    onClose();
+    try {
+      await updateDoc(doc(db, "visitas", visita.id), { estado: "cancelada" });
+      notify("success", "Visita cancelada");
+      onClose();
+    } catch {
+      notify("error", "No se pudo cancelar la visita");
+    }
   };
 
   const esHoy = visita.fecha === hoyStr();
@@ -959,6 +1080,7 @@ function Info({ label, value }: { label: string; value: string }) {
 // ── Modal: Detalle de tarjeta (+ gestión de lista blanca) ─────────────────────
 
 function TarjetaDetalleModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onClose: () => void }) {
+  const notify = useFeedback();
   const [lista, setLista] = useState<VisitanteInfo[]>(tarjeta.listaBlanca);
   const [modoNuevo, setModoNuevo] = useState(false);
   const [nuevo, setNuevo] = useState<VisitanteInfo>({ nombre: "", parentesco: "", dui: "", telefono: "" });
@@ -983,25 +1105,41 @@ function TarjetaDetalleModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onC
   };
 
   const persistir = async (nueva: VisitanteInfo[]) => {
-    if (!tarjeta.id) return;
+    if (!tarjeta.id) return false;
     setGuardando(true);
-    await updateDoc(doc(db, "tarjetas_visita", tarjeta.id), { listaBlanca: nueva, actualizadoEn: Timestamp.now() });
-    setLista(nueva);
-    setGuardando(false);
+    try {
+      await updateDoc(doc(db, "tarjetas_visita", tarjeta.id), { listaBlanca: nueva, actualizadoEn: Timestamp.now() });
+      setLista(nueva);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const agregar = async () => {
     const limpio = limpiarVisitante(nuevo);
     if (!limpio.nombre || !limpio.parentesco) return;
-    if (lista.some(v => claveVisitante(v) === claveVisitante(limpio))) { setModoNuevo(false); return; }
-    await persistir([...lista, limpio]);
-    setNuevo({ nombre: "", parentesco: "", dui: "", telefono: "" });
-    setModoNuevo(false);
+    if (lista.some(v => claveVisitante(v) === claveVisitante(limpio))) {
+      notify("error", "Esa persona ya está en la lista");
+      setModoNuevo(false);
+      return;
+    }
+    const ok = await persistir([...lista, limpio]);
+    if (ok) {
+      notify("success", `${limpio.nombre} agregada a la lista`);
+      setNuevo({ nombre: "", parentesco: "", dui: "", telefono: "" });
+      setModoNuevo(false);
+    } else {
+      notify("error", "No se pudo agregar");
+    }
   };
 
   const quitar = async (v: VisitanteInfo) => {
     if (esTitular(v)) return;
-    await persistir(lista.filter(x => claveVisitante(x) !== claveVisitante(v)));
+    const ok = await persistir(lista.filter(x => claveVisitante(x) !== claveVisitante(v)));
+    notify(ok ? "success" : "error", ok ? "Persona quitada de la lista" : "No se pudo quitar");
   };
 
   const nuevoValido = nuevo.nombre.trim() && nuevo.parentesco.trim();
