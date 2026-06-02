@@ -52,7 +52,9 @@
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/**)",
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/app/**)",
       "Bash(npx eslint *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(sed -n '19,30p' src/app/dashboard/fallecidos/page.tsx)",
+      "Bash(sed -n '230,260p' src/components/pacientes/PacienteForm.tsx)"
     ]
   }
 }

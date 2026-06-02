@@ -489,7 +489,7 @@ export interface TarjetaVisita {
   actualizadoEn?: Date;
 }
 
-export type EstadoVisita = "programada" | "en_curso" | "finalizada";
+export type EstadoVisita = "programada" | "en_curso" | "finalizada" | "cancelada";
 
 export interface Visita {
   id?: string;
@@ -510,6 +510,8 @@ export interface Visita {
   programada: boolean;            // true = vino de la lista diaria; false = espontánea
   entradaEn?: Date;
   salidaEn?: Date;
+
+  comentarios?: string;           // notas de Trabajo Social sobre la visita
 
   registradoPorId: string;        // uid TS
   registradoPorNombre: string;
