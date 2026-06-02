@@ -16,6 +16,7 @@ import {
   Printer,
   Settings,
   Users,
+  DoorOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -107,6 +108,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     },
     ...(profile?.role === "trabajo_social"
       ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
+      : []),
+    ...(esTS
+      ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_PACIENTES }]
       : []),
 
     // ── Documentos ──

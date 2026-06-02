@@ -51,7 +51,8 @@
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/**)",
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/**)",
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/app/**)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

@@ -452,3 +452,66 @@ export interface BusquedaTelefono {
 
   creadoEn: Date;
 }
+
+// ============================================================================
+// Visitas de familiares — gestión por Trabajo Social
+// ============================================================================
+// Modelo centrado en la TARJETA de visita: cada paciente internado tiene una
+// tarjeta (un titular) que puede prestarse a otros familiares. La lista blanca
+// es el roster de personas autorizadas/recordadas y SOLO acelera el registro
+// (no bloquea). Las visitas del día se arman como una lista diaria por TS.
+
+export interface VisitanteInfo {
+  nombre: string;
+  parentesco: string;
+  dui?: string;
+  telefono?: string;
+}
+
+export type EstadoTarjetaVisita = "activa" | "anulada";
+
+export interface TarjetaVisita {
+  id?: string;
+  codigo: string;                 // identificador único de la tarjeta
+  pacienteId: string;
+  expediente: string;             // llave del paciente; también localiza la tarjeta
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+
+  titular: VisitanteInfo;         // responsable principal que recibe la tarjeta
+  listaBlanca: VisitanteInfo[];   // autorizados/recordados (incluye al titular)
+
+  estado: EstadoTarjetaVisita;
+  creadoEn: Date;
+  creadoPor: string;              // uid TS
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}
+
+export type EstadoVisita = "programada" | "en_curso" | "finalizada";
+
+export interface Visita {
+  id?: string;
+  fecha: string;                  // YYYY-MM-DD (día de la visita)
+
+  tarjetaId: string;
+  pacienteId: string;
+  expediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+
+  // Quién visita — se llena en el check-in.
+  visitante?: VisitanteInfo;
+  esTitular?: boolean;
+
+  estado: EstadoVisita;
+  programada: boolean;            // true = vino de la lista diaria; false = espontánea
+  entradaEn?: Date;
+  salidaEn?: Date;
+
+  registradoPorId: string;        // uid TS
+  registradoPorNombre: string;
+  creadoEn: Date;
+}
