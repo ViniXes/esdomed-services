@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -54,6 +55,13 @@ function greeting(): string {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const router = useRouter();
+
+  // Trabajo Social no tiene panel de inicio: va directo a sus defunciones.
+  useEffect(() => {
+    if (profile?.role === "trabajo_social") router.replace("/dashboard/defunciones");
+  }, [profile, router]);
+
   const [traslados, setTraslados] = useState<SolicitudTraslado[]>([]);
   const [fallecidos, setFallecidos] = useState<NotificacionFallecido[]>([]);
   const [impresiones, setImpresiones] = useState<SolicitudImpresion[]>([]);

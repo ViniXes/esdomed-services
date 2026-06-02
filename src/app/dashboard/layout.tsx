@@ -45,6 +45,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         ? "Administración"
         : "ESDOMED";
 
+  const esTS = profile?.role === "trabajo_social";
   const verControlIngresos = profile?.role === "esdomed" || profile?.role === "admin";
   const verPacientes       = profile?.role === "esdomed" || profile?.role === "admin";
   const verIncapacidades   = profile?.role === "esdomed" || profile?.role === "admin";
@@ -61,7 +62,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const G_ADMIN = "Administración";
 
   const navItems: NavItem[] = [
-    { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true },
+    // Trabajo Social no usa el inicio (panel de ESDOMED); entra directo a sus vistas.
+    ...(!esTS
+      ? [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }]
+      : []),
 
     // ── Gestión de pacientes ──
     ...(verControlIngresos
@@ -70,13 +74,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
       : []),
-    {
-      href: "/dashboard/traslados",
-      label: "Traslados",
-      icon: ArrowRightLeft,
-      badge: pendientes.traslados,
-      group: G_PACIENTES,
-    },
+    ...(!esTS
+      ? [{
+          href: "/dashboard/traslados",
+          label: "Traslados",
+          icon: ArrowRightLeft,
+          badge: pendientes.traslados,
+          group: G_PACIENTES,
+        }]
+      : []),
     ...(verAltasVivos
       ? [{
           href: "/dashboard/altas-vivos",
@@ -87,8 +93,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         }]
       : []),
     {
-      href: "/dashboard/fallecidos",
-      label: "Fallecidos",
+      // Trabajo Social usa la vista de revisión (estilo Psicología), no la de ESDOMED.
+      href: esTS ? "/dashboard/defunciones" : "/dashboard/fallecidos",
+      label: esTS ? "Defunciones" : "Fallecidos",
       icon: HeartPulse,
       badge: pendientes.fallecidos,
       group: G_PACIENTES,
@@ -98,7 +105,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
 
     // ── Documentos ──
-    { href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, group: G_DOCUMENTOS },
+    ...(!esTS
+      ? [{ href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, group: G_DOCUMENTOS }]
+      : []),
     ...(verIncapacidades
       ? [
           { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, group: G_DOCUMENTOS },

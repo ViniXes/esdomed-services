@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ESDOMED Services — Herramientas DevOps</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --ink:#0c1b2a;
+    --slate:#1f3a52;
+    --teal:#0e7c7b;
+    --teal-bright:#16b3a6;
+    --amber:#f5a623;
+    --coral:#ff6b5e;
+    --paper:#f4f7f8;
+    --paper-2:#e9eff1;
+    --line:#cfdbde;
+    --muted:#6b8190;
+    --white:#ffffff;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  @page{ size:1280px 720px; margin:0; }
+
+  html,body{ background:#22323c; font-family:'Inter',sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+
+  .slide{
+    width:1280px; height:720px; position:relative; overflow:hidden;
+    background:var(--paper); color:var(--ink);
+    page-break-after:always; display:flex; flex-direction:column;
+  }
+  .slide:last-child{ page-break-after:auto; }
+
+  /* ---------- shared chrome ---------- */
+  .pad{ padding:54px 70px; flex:1; display:flex; flex-direction:column; }
+  .kicker{
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--teal);
+    display:flex; align-items:center; gap:12px;
+  }
+  .kicker::before{ content:''; width:34px; height:3px; background:var(--teal); border-radius:2px;}
+  h1.title{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:46px; line-height:1.05; color:var(--ink); margin-top:14px;}
+  h2.sub{ font-weight:500; font-size:19px; color:var(--muted); margin-top:10px; max-width:900px; line-height:1.45;}
+
+  .footer{
+    position:absolute; bottom:0; left:0; right:0; height:42px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 70px; font-size:12.5px; color:var(--muted);
+    border-top:1px solid var(--line); background:var(--paper-2);
+    font-family:'Space Grotesk',sans-serif; letter-spacing:.04em;
+  }
+  .footer b{ color:var(--slate); font-weight:600;}
+  .pagenum{ font-family:'JetBrains Mono',monospace; font-weight:500;}
+
+  /* ---------- cards / grids ---------- */
+  .grid{ display:grid; gap:18px; margin-top:26px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g3{grid-template-columns:1fr 1fr 1fr;}
+  .g4{grid-template-columns:repeat(4,1fr);}
+
+  .card{
+    background:var(--white); border:1px solid var(--line); border-radius:14px;
+    padding:22px 22px; position:relative; box-shadow:0 1px 0 rgba(12,27,42,.03);
+  }
+  .card .ico{ font-size:26px; }
+  .card h3{ font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:600; color:var(--ink); margin:10px 0 7px;}
+  .card p{ font-size:14px; line-height:1.5; color:var(--slate);}
+  .card .tag{ position:absolute; top:18px; right:18px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--teal); background:rgba(14,124,123,.1); padding:3px 9px; border-radius:20px; font-weight:500;}
+
+  .accent-l{ border-left:4px solid var(--teal); }
+
+  code,.mono{ font-family:'JetBrains Mono',monospace;}
+
+  .codeblock{
+    background:var(--ink); color:#d7e6e6; border-radius:12px; padding:20px 22px;
+    font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.7;
+    overflow:hidden; box-shadow:0 8px 24px rgba(12,27,42,.18);
+  }
+  .codeblock .c{ color:#5f7d86;}
+  .codeblock .k{ color:#16b3a6;}
+  .codeblock .s{ color:#f5a623;}
+  .codeblock .p{ color:#ff8f85;}
+  .codeblock .badge{ display:inline-block; font-size:11px; color:#9fb6bd; letter-spacing:.1em; text-transform:uppercase; margin-bottom:10px;}
+
+  ul.clean{ list-style:none; margin-top:10px;}
+  ul.clean li{ font-size:15px; line-height:1.55; color:var(--slate); padding:7px 0 7px 28px; position:relative;}
+  ul.clean li::before{ content:'▹'; position:absolute; left:0; color:var(--teal); font-weight:700;}
+
+  .pill{ display:inline-flex; align-items:center; gap:7px; background:var(--white); border:1px solid var(--line); border-radius:30px; padding:8px 15px; font-size:13.5px; font-weight:500; color:var(--slate); font-family:'Space Grotesk',sans-serif;}
+  .pill .d{ width:9px;height:9px;border-radius:50%;}
+
+  /* ---------- COVER ---------- */
+  .cover{ background:radial-gradient(120% 120% at 80% 10%, #15303f 0%, #0c1b2a 55%, #081320 100%); color:#eaf4f4;}
+  .cover .pad{ justify-content:center;}
+  .cover .badge-top{ font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:.3em; text-transform:uppercase; color:var(--teal-bright);}
+  .cover h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:74px; line-height:1; margin:22px 0 0; color:#fff; letter-spacing:-.5px;}
+  .cover .lead{ font-size:22px; color:#9fc3c4; margin-top:22px; max-width:760px; line-height:1.5;}
+  .cover .chips{ display:flex; gap:12px; flex-wrap:wrap; margin-top:40px;}
+  .cover .chip{ background:rgba(22,179,166,.12); border:1px solid rgba(22,179,166,.35); color:#bfeae6; padding:9px 16px; border-radius:30px; font-size:13.5px; font-family:'Space Grotesk',sans-serif; font-weight:500;}
+  .cover .meta{ position:absolute; bottom:48px; left:70px; right:70px; display:flex; justify-content:space-between; align-items:flex-end; color:#6f9698; font-size:13px; font-family:'Space Grotesk',sans-serif;}
+  .infinity{ position:absolute; right:-40px; top:60px; opacity:.10; width:560px;}
+
+  .deco-dots{ position:absolute; top:48px; right:70px; display:flex; gap:8px;}
+  .deco-dots i{ width:11px;height:11px;border-radius:50%; display:block;}
+
+  /* ---------- section divider ---------- */
+  .divider{ background:linear-gradient(135deg,#0e7c7b,#0c1b2a); color:#fff; }
+  .divider .pad{ justify-content:center;}
+  .divider .num{ font-family:'JetBrains Mono',monospace; font-size:20px; color:var(--teal-bright); letter-spacing:.2em;}
+  .divider h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:58px; line-height:1.04; margin-top:14px; max-width:900px;}
+  .divider p{ font-size:19px; color:#bfe3e1; margin-top:18px; max-width:760px; line-height:1.5;}
+
+  /* loop diagram */
+  .loop{ display:flex; gap:0; margin-top:30px; align-items:stretch; }
+  .loop .step{ flex:1; background:var(--white); border:1px solid var(--line); padding:16px 14px; text-align:center; position:relative;}
+  .loop .step:first-child{ border-radius:12px 0 0 12px;}
+  .loop .step:last-child{ border-radius:0 12px 12px 0;}
+  .loop .step .n{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--teal); }
+  .loop .step .t{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; margin-top:6px; color:var(--ink);}
+  .loop .step .tool{ font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.35;}
+
+  table.map{ width:100%; border-collapse:collapse; margin-top:22px; font-size:14px;}
+  table.map th{ text-align:left; font-family:'Space Grotesk',sans-serif; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); padding:10px 14px; border-bottom:2px solid var(--line);}
+  table.map td{ padding:11px 14px; border-bottom:1px solid var(--line); color:var(--slate); vertical-align:top;}
+  table.map td b{ color:var(--ink); font-family:'Space Grotesk',sans-serif;}
+  table.map tr:nth-child(even) td{ background:rgba(14,124,123,.035);}
+  .yes{ color:var(--teal); font-weight:700;}
+  .no{ color:var(--coral); font-weight:700;}
+
+  .splitcard{ display:flex; gap:0; border-radius:14px; overflow:hidden; border:1px solid var(--line); margin-top:24px;}
+  .splitcard .half{ flex:1; padding:26px 28px; background:var(--white);}
+  .splitcard .half.has{ border-right:1px solid var(--line);}
+  .splitcard h4{ font-family:'Space Grotesk',sans-serif; font-size:17px; display:flex; align-items:center; gap:9px; margin-bottom:6px;}
+  .splitcard .half.has h4{ color:var(--teal);}
+  .splitcard .half.miss h4{ color:var(--coral);}
+
+  .bignum{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:40px; color:var(--teal); line-height:1;}
+  .statline{ display:flex; gap:40px; margin-top:auto; padding-top:20px;}
+  .statline .s small{ display:block; font-size:13px; color:var(--muted); margin-top:6px; font-family:'Inter',sans-serif; font-weight:500;}
+
+  .twocol{ display:grid; grid-template-columns:1.05fr .95fr; gap:34px; margin-top:24px; align-items:start;}
+  .note{ background:rgba(245,166,35,.1); border-left:4px solid var(--amber); padding:14px 18px; border-radius:0 10px 10px 0; font-size:13.5px; color:var(--slate); line-height:1.5; margin-top:18px;}
+  .note b{ color:#9a6810;}
+</style>
+</head>
+<body>
+
+<!-- ============ 1. COVER ============ -->
+<section class="slide cover">
+  <svg class="infinity" viewBox="0 0 200 100"><path d="M50 50 C50 25 25 25 25 50 C25 75 50 75 50 50 C50 25 75 25 100 50 C125 75 150 75 150 50 C150 25 125 25 100 50" fill="none" stroke="#16b3a6" stroke-width="10" stroke-linecap="round"/></svg>
+  <div class="pad">
+    <div class="badge-top">Caso de estudio · DevOps en la práctica</div>
+    <h1>ESDOMED<br>Services</h1>
+    <p class="lead">Cómo un portal hospitalario real combina contenedores, infraestructura como código y despliegue continuo.</p>
+    <div class="chips">
+      <span class="chip">🐳 Docker</span>
+      <span class="chip">🧩 Docker Compose</span>
+      <span class="chip">🔥 Firebase</span>
+      <span class="chip">▲ Vercel</span>
+      <span class="chip">🌿 Git / GitHub</span>
+      <span class="chip">📜 IaC</span>
+    </div>
+  </div>
+  <div class="meta">
+    <span>Servicio de Estadística y Documentos Médicos</span>
+    <span>Herramientas de DevOps · Exposición de clase</span>
+  </div>
+</section>
+
+<!-- ============ 2. AGENDA / QUÉ ES DEVOPS ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="deco-dots"><i style="background:var(--coral)"></i><i style="background:var(--amber)"></i><i style="background:var(--teal)"></i></div>
+    <div class="kicker">Marco conceptual</div>
+    <h1 class="title">¿Qué es DevOps?</h1>
+    <h2 class="sub">No es una herramienta ni un puesto: es una <b>cultura + prácticas + herramientas</b> que unen Desarrollo (Dev) y Operaciones (Ops) para entregar software rápido, seguro y repetible.</h2>
+
+    <div class="grid g3">
+      <div class="card accent-l">
+        <div class="ico">🤝</div>
+        <h3>Cultura</h3>
+        <p>Colaboración entre quien programa y quien opera. Responsabilidad compartida del ciclo completo.</p>
+      </div>
+      <div class="card accent-l">
+        <div class="ico">⚙️</div>
+        <h3>Automatización</h3>
+        <p>Construir, probar, desplegar y configurar sin pasos manuales: menos error humano, más velocidad.</p>
+      </div>
+      <div class="card accent-l">
+        <div class="ico">🔁</div>
+        <h3>Mejora continua</h3>
+        <p>Ciclos cortos, feedback constante y entornos reproducibles de desarrollo a producción.</p>
+      </div>
+    </div>
+
+    <div class="loop">
+      <div class="step"><div class="n">01</div><div class="t">Plan</div><div class="tool">Git Issues / tablero</div></div>
+      <div class="step"><div class="n">02</div><div class="t">Code</div><div class="tool">TypeScript · ESLint</div></div>
+      <div class="step"><div class="n">03</div><div class="t">Build</div><div class="tool">Docker · npm build</div></div>
+      <div class="step"><div class="n">04</div><div class="t">Release</div><div class="tool">Vercel</div></div>
+      <div class="step"><div class="n">05</div><div class="t">Deploy</div><div class="tool">Vercel · Firebase</div></div>
+      <div class="step"><div class="n">06</div><div class="t">Operate</div><div class="tool">Firebase BaaS</div></div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">02</span></div>
+</section>
+
+<!-- ============ 3. EL PROYECTO ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">El proyecto</div>
+    <h1 class="title">¿Qué es ESDOMED Services?</h1>
+    <h2 class="sub">Portal operativo interno del servicio de Estadística y Documentos Médicos de un hospital. Conecta a médicos y personal administrativo en flujos de trabajo clínicos.</h2>
+
+    <div class="grid g4">
+      <div class="card"><div class="ico">🛏️</div><h3>Traslados</h3><p>Solicitud y confirmación de traslados de servicio o cama.</p></div>
+      <div class="card"><div class="ico">📋</div><h3>Fallecidos</h3><p>Notificación y registro de pacientes fallecidos.</p></div>
+      <div class="card"><div class="ico">🖨️</div><h3>Impresiones</h3><p>Carga de PDFs y control de impresión de documentos.</p></div>
+      <div class="card"><div class="ico">🗂️</div><h3>Expedientes</h3><p>Gestión de pacientes, ingresos, altas e incapacidades.</p></div>
+    </div>
+
+    <div class="twocol">
+      <div>
+        <ul class="clean">
+          <li><b>6 roles</b> distintos: médico, esdomed, admin, enfermería, psicología, trabajo social.</li>
+          <li><b>Acceso por rol</b> validado en el frontend y en reglas de servidor.</li>
+          <li>Datos sensibles de salud → la <b>seguridad como código</b> es central.</li>
+        </ul>
+      </div>
+      <div class="codeblock">
+        <span class="badge">Stack principal</span>
+<span class="k">Next.js</span> 16 · App Router  <span class="c">// framework full-stack</span>
+<span class="k">React</span> 19 + <span class="k">TypeScript</span> 5
+<span class="k">Tailwind</span> CSS 4
+<span class="k">Firebase</span>  <span class="c">// Auth · Firestore · Storage</span>
+<span class="k">Docker</span> + Compose  <span class="c">// entorno local</span>
+<span class="k">Vercel</span>  <span class="c">// hosting + deploy continuo</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">03</span></div>
+</section>
+
+<!-- ============ 4. DIVIDER: LAS HERRAMIENTAS ============ -->
+<section class="slide divider">
+  <div class="pad">
+    <div class="num">PARTE 02</div>
+    <h1>Las herramientas DevOps<br>del proyecto, una a una</h1>
+    <p>Control de versiones · Contenedores · Orquestación · Infraestructura como código · Paridad de entornos · Cloud · Despliegue continuo · Calidad · Secretos.</p>
+  </div>
+</section>
+
+<!-- ============ 5. GIT / GITHUB ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Control de versiones · 🌿</div>
+    <h1 class="title">Git &amp; GitHub</h1>
+    <h2 class="sub">La base de todo flujo DevOps: historia del código, colaboración y el disparador del despliegue automático.</h2>
+    <div class="twocol">
+      <div>
+        <ul class="clean">
+          <li><b>Git</b> versiona cada cambio; ramas para trabajar en paralelo.</li>
+          <li><b>GitHub</b> aloja el repositorio remoto y centraliza la colaboración.</li>
+          <li>Cada <code>push</code> a la rama principal <b>dispara un despliegue</b> en Vercel (la "C" de CI/CD).</li>
+          <li><code>.gitignore</code> protege secretos y artefactos: <code>service-account.json</code>, <code>.env*</code>, <code>node_modules</code>.</li>
+        </ul>
+        <div class="note"><b>Por qué importa:</b> sin control de versiones no hay automatización confiable. Git es el "contrato" que el resto de las herramientas observan.</div>
+      </div>
+      <div class="codeblock">
+        <span class="badge">.gitignore — extracto</span>
+<span class="c"># env files</span>
+.env*
+
+<span class="c"># Firebase service account — NUNCA commitear</span>
+service-account.json
+*-service-account.json
+
+<span class="c"># vercel / next / typescript</span>
+.vercel
+/.next/
+*.tsbuildinfo
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">04</span></div>
+</section>
+
+<!-- ============ 6. DOCKER ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Contenedores · 🐳</div>
+    <h1 class="title">Docker</h1>
+    <h2 class="sub">Empaqueta la app y sus dependencias en imágenes reproducibles. "Funciona en mi máquina" deja de ser un problema: funciona igual en cualquier máquina.</h2>
+    <div class="twocol">
+      <div>
+        <ul class="clean">
+          <li>Imagen ligera basada en <code>node:20-alpine</code>.</li>
+          <li>Una imagen aparte para los <b>emuladores de Firebase</b> (requieren Java → <code>eclipse-temurin</code>).</li>
+          <li><code>.dockerignore</code> evita copiar <code>node_modules</code>, <code>.next</code> o secretos a la imagen.</li>
+          <li>Entorno idéntico para todo el equipo, sin instalar nada local salvo Docker.</li>
+        </ul>
+        <div class="note"><b>Patrón clave:</b> multi-stage build — copia el JRE de una imagen Java a la imagen Node solo para correr los emuladores. Imagen más pequeña y enfocada.</div>
+      </div>
+      <div class="codeblock">
+        <span class="badge">Dockerfile.dev</span>
+<span class="k">FROM</span> node:20-alpine
+<span class="k">WORKDIR</span> /app
+<span class="k">COPY</span> package*.json ./
+<span class="k">RUN</span> npm install
+<span class="k">EXPOSE</span> 3000
+<span class="k">CMD</span> [<span class="s">"npm"</span>, <span class="s">"run"</span>, <span class="s">"dev:docker"</span>]
+
+<span class="badge" style="margin-top:14px">Dockerfile.emulators (multi-stage)</span>
+<span class="k">FROM</span> eclipse-temurin:21-jre <span class="k">AS</span> jre
+<span class="k">FROM</span> node:20-slim
+<span class="k">COPY</span> --from=jre $JAVA_HOME $JAVA_HOME
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">05</span></div>
+</section>
+
+<!-- ============ 7. DOCKER COMPOSE ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Orquestación local · 🧩</div>
+    <h1 class="title">Docker Compose</h1>
+    <h2 class="sub">Levanta todo el entorno de desarrollo con <b>un solo comando</b>: la app web y los emuladores de Firebase, conectados y coordinados entre sí.</h2>
+    <div class="twocol">
+      <div>
+        <ul class="clean">
+          <li><b>2 servicios</b>: <code>app</code> (Next.js) + <code>emulators</code> (Firebase).</li>
+          <li><code>healthcheck</code>: comprueba que los emuladores estén vivos antes de arrancar la app.</li>
+          <li><code>depends_on: condition: service_healthy</code> → <b>orden de arranque garantizado</b>.</li>
+          <li><code>volumes</code> montan el código → <b>hot reload</b>, y cachean los binarios de emuladores.</li>
+          <li>Variables de entorno inyectadas por servicio.</li>
+        </ul>
+        <div class="note"><b>Un comando:</b> <code>docker compose up</code> reproduce el entorno completo en cualquier equipo, sin pasos manuales.</div>
+      </div>
+      <div class="codeblock">
+        <span class="badge">docker-compose.yml — extracto</span>
+<span class="k">services:</span>
+  <span class="p">emulators:</span>
+    <span class="k">build:</span> { dockerfile: Dockerfile.emulators }
+    <span class="k">ports:</span> [<span class="s">"4000:4000"</span>, <span class="s">"8080:8080"</span>]
+    <span class="k">healthcheck:</span>
+      <span class="k">test:</span> [<span class="s">"CMD"</span>,<span class="s">"curl"</span>,<span class="s">"-f"</span>,<span class="s">"localhost:4000"</span>]
+  <span class="p">app:</span>
+    <span class="k">ports:</span> [<span class="s">"3000:3000"</span>]
+    <span class="k">depends_on:</span>
+      emulators: { condition: service_healthy }
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">06</span></div>
+</section>
+
+<!-- ============ 8. IaC ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Infraestructura como código · 📜</div>
+    <h1 class="title">Seguridad como código (IaC)</h1>
+    <h2 class="sub">Las reglas de acceso a la base de datos y al almacenamiento <b>viven en el repositorio</b>, versionadas junto al código. Cambiar permisos = un commit revisable, no un clic en una consola web.</h2>
+    <div class="twocol">
+      <div>
+        <ul class="clean">
+          <li><code>firestore.rules</code> — quién lee/escribe cada colección según su rol.</li>
+          <li><code>storage.rules</code> — acceso a archivos subidos.</li>
+          <li><code>firebase.json</code> — configuración declarativa de emuladores y reglas.</li>
+          <li>Funciones reutilizables: <code>isEsdomed()</code>, <code>isMedico()</code>, <code>isAdmin()</code>…</li>
+        </ul>
+        <div class="note"><b>Ventaja DevOps:</b> la infraestructura es <b>auditable y reproducible</b>. El historial de Git muestra quién cambió qué permiso y cuándo.</div>
+      </div>
+      <div class="codeblock">
+        <span class="badge">firestore.rules — extracto</span>
+<span class="k">function</span> getRole() {
+  <span class="k">return</span> get(/databases/$(db)/documents/
+    usuarios/$(uid())).data.role;
+}
+<span class="k">function</span> isEsdomed() {
+  <span class="k">return</span> isAuth() &amp;&amp; getRole() == <span class="s">'esdomed'</span>;
+}
+<span class="k">match</span> /traslados/{id} {
+  <span class="k">allow</span> create: <span class="k">if</span> isMedico();
+  <span class="k">allow</span> update: <span class="k">if</span> isStaff();
+}
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">07</span></div>
+</section>
+
+<!-- ============ 9. EMULADORES / PARIDAD ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Paridad de entornos · 🔁</div>
+    <h1 class="title">Emuladores de Firebase</h1>
+    <h2 class="sub">Una copia local y completa de la nube — Auth, Firestore y Storage — corriendo en contenedor. Se desarrolla y prueba <b>sin tocar datos reales de producción</b>.</h2>
+    <div class="grid g3">
+      <div class="card"><div class="ico">🔐</div><h3>Auth · 9099</h3><p>Login y usuarios de prueba sin afectar cuentas reales.</p></div>
+      <div class="card"><div class="ico">🗃️</div><h3>Firestore · 8080</h3><p>Base de datos local con las mismas reglas que producción.</p></div>
+      <div class="card"><div class="ico">📦</div><h3>Storage · 9199</h3><p>Subida de PDFs simulada localmente.</p></div>
+    </div>
+    <div class="twocol" style="margin-top:20px;">
+      <div>
+        <ul class="clean">
+          <li><b>Dev/prod parity</b> — principio clave de DevOps (12-Factor App).</li>
+          <li>El código detecta <code>NEXT_PUBLIC_USE_EMULATORS</code> y se conecta a local automáticamente.</li>
+          <li>UI de emuladores en <code>:4000</code> para inspeccionar datos.</li>
+        </ul>
+      </div>
+      <div class="codeblock">
+        <span class="badge">src/lib/firebase.ts</span>
+<span class="k">if</span> (process.env.NEXT_PUBLIC_USE_EMULATORS === <span class="s">"true"</span>) {
+  connectAuthEmulator(auth, <span class="s">"http://localhost:9099"</span>);
+  connectFirestoreEmulator(db, <span class="s">"localhost"</span>, 8080);
+  connectStorageEmulator(storage, <span class="s">"localhost"</span>, 9199);
+}
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">08</span></div>
+</section>
+
+<!-- ============ 10. FIREBASE BaaS ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Cloud · Backend como servicio · 🔥</div>
+    <h1 class="title">Firebase (BaaS)</h1>
+    <h2 class="sub">La nube de Google que provee backend listo para usar: autenticación, base de datos en tiempo real y almacenamiento — sin administrar servidores (modelo serverless).</h2>
+    <div class="grid g3">
+      <div class="card accent-l"><span class="tag">Auth</span><div class="ico">🔑</div><h3>Authentication</h3><p>Login por email/contraseña; el rol se carga desde Firestore al iniciar sesión.</p></div>
+      <div class="card accent-l"><span class="tag">DB</span><div class="ico">⚡</div><h3>Firestore</h3><p>Base NoSQL en tiempo real: traslados, fallecidos, pacientes, usuarios.</p></div>
+      <div class="card accent-l"><span class="tag">Files</span><div class="ico">🗄️</div><h3>Storage</h3><p>Almacenamiento de los PDFs que suben los médicos.</p></div>
+    </div>
+    <div class="twocol" style="margin-top:18px;">
+      <div>
+        <ul class="clean">
+          <li><b>Serverless / Ops gestionadas:</b> Google opera, escala y respalda. El equipo no administra infraestructura.</li>
+          <li><b>Firebase Admin SDK</b> en rutas API para operaciones privilegiadas (gestión de usuarios).</li>
+        </ul>
+      </div>
+      <div>
+        <ul class="clean">
+          <li>Misma configuración para emulador y nube → <b>cambiar de entorno es una variable.</b></li>
+          <li>Las reglas IaC protegen los datos en ambos.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">09</span></div>
+</section>
+
+<!-- ============ 11. VERCEL CI/CD ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Despliegue continuo · ▲</div>
+    <h1 class="title">Vercel — CI/CD &amp; Hosting</h1>
+    <h2 class="sub">Plataforma conectada al repositorio de GitHub. Cada cambio en el código se construye y se publica <b>automáticamente</b>, sin intervención manual.</h2>
+    <div class="loop" style="margin-top:24px;">
+      <div class="step"><div class="n">1</div><div class="t">git push</div><div class="tool">Desarrollador sube código a GitHub</div></div>
+      <div class="step"><div class="n">2</div><div class="t">Build</div><div class="tool">Vercel ejecuta <code>next build</code></div></div>
+      <div class="step"><div class="n">3</div><div class="t">Preview</div><div class="tool">URL temporal por cada rama / PR</div></div>
+      <div class="step"><div class="n">4</div><div class="t">Deploy</div><div class="tool">Publicación a producción (CDN global)</div></div>
+    </div>
+    <div class="twocol" style="margin-top:22px;">
+      <div>
+        <ul class="clean">
+          <li><b>Despliegue continuo (CD):</b> de <code>push</code> a producción sin pasos manuales.</li>
+          <li><b>Preview deployments:</b> cada rama obtiene su propia URL para revisar antes de fusionar.</li>
+          <li><b>Rollback</b> instantáneo a cualquier despliegue anterior.</li>
+        </ul>
+      </div>
+      <div class="codeblock">
+        <span class="badge">.vercel/project.json</span>
+{
+  <span class="p">"projectId"</span>: <span class="s">"prj_R4Ae…teiro4A"</span>,
+  <span class="p">"orgId"</span>: <span class="s">"team_Qffao…2p1Mns"</span>,
+  <span class="p">"projectName"</span>: <span class="s">"esdomed-services"</span>
+}
+<span class="c">// vincula el repo con el proyecto Vercel</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">10</span></div>
+</section>
+
+<!-- ============ 12. CALIDAD + SECRETOS + AUTOMATIZACION ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Calidad, configuración y automatización · ✅</div>
+    <h1 class="title">Quality gates &amp; "shift-left"</h1>
+    <h2 class="sub">Detectar errores lo antes posible — al escribir código, no en producción — y mantener la configuración fuera del código.</h2>
+    <div class="grid g3">
+      <div class="card"><div class="ico">🟦</div><h3>TypeScript</h3><p>Tipado estático: errores detectados al compilar, antes de desplegar. Bloquea el build si algo no encaja.</p></div>
+      <div class="card"><div class="ico">🔍</div><h3>ESLint</h3><p>Análisis estático de estilo y errores comunes. Estándar de calidad consistente para todo el equipo.</p></div>
+      <div class="card"><div class="ico">🔐</div><h3>Gestión de secretos</h3><p>Variables en <code>.env.local</code> y credenciales fuera de Git. Config separada del código (12-Factor).</p></div>
+    </div>
+    <div class="twocol" style="margin-top:20px;">
+      <div>
+        <ul class="clean">
+          <li><b>Automatización de tareas</b> — scripts versionados de import y limpieza de datos.</li>
+          <li>Modo <code>--dry-run</code>: simula antes de ejecutar cambios reales.</li>
+        </ul>
+      </div>
+      <div class="codeblock">
+        <span class="badge">package.json — scripts</span>
+<span class="p">"build"</span>: <span class="s">"next build"</span>,
+<span class="p">"lint"</span>:  <span class="s">"eslint"</span>,
+<span class="p">"importar:dry"</span>: <span class="s">"node …importar.mjs --dry-run"</span>,
+<span class="p">"importar"</span>:     <span class="s">"node …importar.mjs"</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">11</span></div>
+</section>
+
+<!-- ============ 13. MAPA AL CICLO DEVOPS ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Síntesis</div>
+    <h1 class="title">Cada herramienta, en su fase DevOps</h1>
+    <table class="map">
+      <tr><th>Fase del ciclo</th><th>Herramienta en el proyecto</th><th>Qué resuelve</th></tr>
+      <tr><td><b>Plan / Code</b></td><td>Git · GitHub · TypeScript · ESLint</td><td>Versionado, colaboración y calidad antes de desplegar</td></tr>
+      <tr><td><b>Build</b></td><td>Docker · Docker Compose · npm</td><td>Empaquetado reproducible y entorno local de un comando</td></tr>
+      <tr><td><b>Test (local)</b></td><td>Emuladores Firebase</td><td>Probar contra una nube local, sin datos reales</td></tr>
+      <tr><td><b>Release / Deploy</b></td><td>Vercel (conectado a GitHub)</td><td>Despliegue continuo automático + previews + rollback</td></tr>
+      <tr><td><b>Operate</b></td><td>Firebase (Auth · Firestore · Storage)</td><td>Backend serverless gestionado y escalable</td></tr>
+      <tr><td><b>Secure (transversal)</b></td><td>firestore.rules · storage.rules (IaC)</td><td>Seguridad versionada y auditable como código</td></tr>
+    </table>
+    <div class="note"><b>Lectura:</b> el proyecto cubre de forma real las fases <b>Code → Build → Test → Release → Deploy → Operate</b>, con la seguridad tratada como código de forma transversal.</div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">12</span></div>
+</section>
+
+<!-- ============ 14. VEREDICTO HONESTO ============ -->
+<section class="slide">
+  <div class="pad">
+    <div class="kicker">Evaluación honesta</div>
+    <h1 class="title">¿Cumple como caso DevOps?</h1>
+    <h2 class="sub">Sí — aplica varios pilares reales de DevOps con herramientas modernas. Pero un buen análisis también reconoce lo que falta.</h2>
+    <div class="splitcard">
+      <div class="half has">
+        <h4>✓ Lo que SÍ implementa</h4>
+        <ul class="clean" style="margin-top:4px;">
+          <li>Contenedores y orquestación local (Docker + Compose)</li>
+          <li>Infraestructura/seguridad como código (rules versionadas)</li>
+          <li>Despliegue continuo automático (Vercel ← GitHub)</li>
+          <li>Paridad dev/prod con emuladores</li>
+          <li>Quality gates: TypeScript + ESLint</li>
+          <li>Gestión de secretos y configuración</li>
+        </ul>
+      </div>
+      <div class="half miss">
+        <h4>✗ Lo que aún falta (próximos pasos)</h4>
+        <ul class="clean" style="margin-top:4px;">
+          <li>Pipeline de CI explícito (GitHub Actions)</li>
+          <li>Pruebas automatizadas (unitarias / e2e)</li>
+          <li>Monitorización y observabilidad (logs, alertas, métricas)</li>
+          <li>IaC de infraestructura (Terraform / contenedores en prod)</li>
+          <li>Gestión de secretos centralizada (vault)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><b>Conclusión:</b> es un <b>caso de estudio válido y honesto</b> de DevOps aplicado a un proyecto real de tamaño mediano. No es una plataforma DevOps "de manual completo", y precisamente eso lo hace ideal para discutir <b>qué herramientas hay y qué seguiría faltando.</b></div>
+  </div>
+  <div class="footer"><span><b>ESDOMED Services</b> · Herramientas DevOps</span><span class="pagenum">13</span></div>
+</section>
+
+<!-- ============ 15. CIERRE ============ -->
+<section class="slide cover">
+  <svg class="infinity" viewBox="0 0 200 100"><path d="M50 50 C50 25 25 25 25 50 C25 75 50 75 50 50 C50 25 75 25 100 50 C125 75 150 75 150 50 C150 25 125 25 100 50" fill="none" stroke="#16b3a6" stroke-width="10" stroke-linecap="round"/></svg>
+  <div class="pad">
+    <div class="badge-top">Para llevarse de la clase</div>
+    <h1 style="font-size:54px; margin-top:18px;">3 ideas clave</h1>
+    <div class="grid g3" style="margin-top:34px;">
+      <div class="card" style="background:rgba(255,255,255,.05); border-color:rgba(22,179,166,.3); color:#dff1f0;">
+        <div class="bignum">01</div>
+        <h3 style="color:#fff;">DevOps es flujo</h3>
+        <p style="color:#a9cccc;">El valor no está en una herramienta suelta, sino en cómo Git, Docker, IaC y Vercel se encadenan sin pasos manuales.</p>
+      </div>
+      <div class="card" style="background:rgba(255,255,255,.05); border-color:rgba(22,179,166,.3); color:#dff1f0;">
+        <div class="bignum">02</div>
+        <h3 style="color:#fff;">Reproducibilidad</h3>
+        <p style="color:#a9cccc;">Contenedores + emuladores + reglas como código = el mismo entorno para todos, de local a producción.</p>
+      </div>
+      <div class="card" style="background:rgba(255,255,255,.05); border-color:rgba(22,179,166,.3); color:#dff1f0;">
+        <div class="bignum">03</div>
+        <h3 style="color:#fff;">Automatización</h3>
+        <p style="color:#a9cccc;">De <code>git push</code> a producción en minutos, con calidad verificada antes de desplegar.</p>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:40px; font-size:20px;">¿Preguntas? — Gracias.</p>
+  </div>
+  <div class="meta">
+    <span>ESDOMED Services · Caso de estudio DevOps</span>
+    <span>Stack: Next.js · Firebase · Docker · Vercel</span>
+  </div>
+</section>
+
+</body>
+</html>
