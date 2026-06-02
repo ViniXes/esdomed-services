@@ -44,7 +44,14 @@
       "Bash(npm list *)",
       "Bash(node scripts/importar-pacientes.mjs --dry-run)",
       "Bash(node -e \"const t = require\\('./tsconfig.json'\\); console.log\\(JSON.stringify\\(t.compilerOptions, null, 2\\)\\)\")",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf=\"ESDOMED-DevOps.pdf\" --no-margins \"esdomed-devops.html\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --no-sandbox --user-data-dir=\"/c/Users/Usuario/AppData/Local/Temp/chrome-pdf-prof\" --no-pdf-header-footer --print-to-pdf=\"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\presentacion\\\\ESDOMED-DevOps.pdf\" \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\presentacion\\\\esdomed-devops.html\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --no-sandbox --user-data-dir=\"/c/Users/Usuario/AppData/Local/Temp/chrome-shot\" --window-size=1280,720 --screenshot=\"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\presentacion\\\\_check.png\" \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\presentacion\\\\esdomed-devops.html\")",
+      "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/**)",
+      "Read(//c/c/Users/Usuario/desktop/esdomed-services/**)",
+      "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/app/**)",
+      "Bash(npx eslint *)"
     ]
   }
 }
