@@ -204,7 +204,7 @@ export interface SolicitudIncapacidad {
 // ============================================================================
 
 export type TipoAltaVivo = "domicilio" | "exigida" | "referido" | "fuga" | "in_extremis" | "deposito" | "suspendida";
-export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada";
+export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada" | "recibida";
 export type MotivoObservacionAlta =
   | "cama_expediente"
   | "expediente_duplicado"

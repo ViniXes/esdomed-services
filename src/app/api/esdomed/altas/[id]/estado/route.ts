@@ -10,6 +10,8 @@ const MOTIVOS = new Set<MotivoObservacionAlta>([
   "otro",
 ]);
 
+const TIPOS_SOLO_RECIBIDO = new Set(["deposito", "suspendida"]);
+
 type Caller = {
   uid: string;
   nombre: string;
@@ -63,8 +65,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (body.action === "procesar") {
+    const estadoCierre = TIPOS_SOLO_RECIBIDO.has(String(actual.tipoAlta)) ? "recibida" : "procesada";
+
     await ref.update({
-      estado: "procesada",
+      estado: estadoCierre,
       procesadoPorId: caller.uid,
       procesadoPorNombre: caller.nombre,
       procesadoEn: FieldValue.serverTimestamp(),
