@@ -38,14 +38,6 @@ const TIPO_LABEL: Record<TipoAltaVivo, string> = {
   in_extremis: "In extremis",
 };
 
-const TIPO_COLOR: Record<TipoAltaVivo, string> = {
-  domicilio:   "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  exigida:     "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  referido:    "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  fuga:        "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  in_extremis: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-};
-
 const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   pendiente:  "Pendiente",
   observada:  "Requiere correccion",
@@ -574,14 +566,13 @@ export default function AltasVivosPage() {
                     Exp. {n.pacienteExpediente}
                     {n.cama && <> · Cama {n.cama}</>}
                     {" · "}{n.servicio}
+                    <span className="mx-1.5 text-slate-300">|</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">{TIPO_LABEL[n.tipoAlta]}</span>
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ESTADO_COLOR[n.estado]}`}>
                     {ESTADO_LABEL[n.estado]}
-                  </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${TIPO_COLOR[n.tipoAlta]}`}>
-                    {TIPO_LABEL[n.tipoAlta]}
                   </span>
                 </div>
               </div>

@@ -67,14 +67,6 @@ const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
   otro: "Otra observacion",
 };
 
-const TIPO_COLOR: Record<TipoAltaVivo, string> = {
-  domicilio: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  exigida: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  referido: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  fuga: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-  in_extremis: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700",
-};
-
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition";
 
@@ -270,15 +262,14 @@ export default function EnfermeriaMovimientosPage() {
                     Exp. {n.pacienteExpediente}
                     {n.cama && <> - Cama {n.cama}</>}
                     {" - "}{n.servicio}
+                    <span className="mx-1.5 text-slate-300">|</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-300">{TIPO_LABEL[n.tipoAlta]}</span>
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ESTADO_COLOR[n.estado]}`}>
                     {n.estado === "procesada" && <CheckCircle2 size={11} className="mr-1" />}
                     {ESTADO_LABEL[n.estado]}
-                  </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${TIPO_COLOR[n.tipoAlta]}`}>
-                    {TIPO_LABEL[n.tipoAlta]}
                   </span>
                 </div>
               </div>
@@ -316,7 +307,6 @@ export default function EnfermeriaMovimientosPage() {
                     )}
                   </details>
                 )}
-                {n.notas && <p className="text-xs text-slate-400 italic">Nota: {n.notas}</p>}
               </div>
 
               <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2 items-center">
@@ -329,22 +319,17 @@ export default function EnfermeriaMovimientosPage() {
                     <Pencil size={12} />
                     {n.estado === "observada" ? "Corregir observacion" : "Rectificar una vez"}
                   </button>
-                ) : n.estado === "procesada" ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-300">
-                    <CheckCircle2 size={13} />
-                    Alta efectiva
-                  </span>
                 ) : n.rectificacionUsada ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock3 size={13} />
                     Rectificacion utilizada
                   </span>
-                ) : (
+                ) : n.estado !== "procesada" ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock3 size={13} />
                     En seguimiento
                   </span>
-                )}
+                ) : null}
               </div>
             </div>
           );
