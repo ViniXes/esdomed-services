@@ -512,6 +512,7 @@ export interface Visita {
   salidaEn?: Date;
 
   comentarios?: string;           // notas de Trabajo Social sobre la visita
+  cierreAutomatico?: boolean;     // salida marcada por el cierre automático de fin de día
 
   registradoPorId: string;        // uid TS
   registradoPorNombre: string;

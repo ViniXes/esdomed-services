@@ -12,7 +12,7 @@ import { PARENTESCOS } from "@/lib/parentescos";
 import type { Paciente, TarjetaVisita, Visita, VisitanteInfo } from "@/types";
 import {
   DoorOpen, Plus, X, LogIn, LogOut, Star, UserPlus, IdCard,
-  Search, CheckCircle2, CalendarDays, MessageSquare, CreditCard, Ban,
+  Search, CheckCircle2, CalendarDays, MessageSquare, CreditCard, Ban, Trash2,
 } from "lucide-react";
 
 // ── Estilos compartidos ───────────────────────────────────────────────────────
@@ -24,9 +24,18 @@ const selectCls =
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
-function hoyStr(): string {
-  const d = new Date();
+function fechaStr(d: Date): string {
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
+}
+
+function hoyStr(): string {
+  return fechaStr(new Date());
+}
+
+function mananaStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return fechaStr(d);
 }
 
 function toDate(ts: unknown): Date | null {
@@ -50,10 +59,15 @@ function iniciales(nombres = "", apellidos = ""): string {
   return `${nombres} ${apellidos}`.trim().split(/\s+/).filter(Boolean).map(w => w[0]!.toUpperCase()).join("");
 }
 
-/** Código de tarjeta: expediente del paciente + iniciales de su nombre. */
-function codigoTarjeta(expediente: string, nombres: string, apellidos: string): string {
+/**
+ * Código de tarjeta: expediente del paciente + iniciales de su nombre.
+ * En reingresos (mismo expediente) se agrega un sufijo de secuencia para
+ * distinguir la tarjeta de cada internamiento: 1-26-JCP, 1-26-JCP-2, …
+ */
+function codigoTarjeta(expediente: string, nombres: string, apellidos: string, secuencia = 1): string {
   const ini = iniciales(nombres, apellidos);
-  return ini ? `${expediente}-${ini}` : expediente;
+  const base = ini ? `${expediente}-${ini}` : expediente;
+  return secuencia > 1 ? `${base}-${secuencia}` : base;
 }
 
 /** Clave para deduplicar visitantes: DUI si existe, si no el nombre normalizado. */
@@ -86,7 +100,9 @@ export default function VisitasPage() {
 
   const [visitasHoy, setVisitasHoy] = useState<Visita[]>([]);
   const [agenda, setAgenda] = useState<Visita[]>([]);
+  const [agendaFecha, setAgendaFecha] = useState(mananaStr());
   const [tarjetas, setTarjetas] = useState<TarjetaVisita[]>([]);
+  const [tarjetaTexto, setTarjetaTexto] = useState("");
   const [histFecha, setHistFecha] = useState(hoyStr());
   const [histTexto, setHistTexto] = useState("");
   const [histVisitas, setHistVisitas] = useState<Visita[]>([]);
@@ -95,8 +111,29 @@ export default function VisitasPage() {
   const [adding, setAdding] = useState(false);
   const [picker, setPicker] = useState<{ tarjeta: TarjetaVisita; visitaProgramadaId?: string } | null>(null);
   const [detalle, setDetalle] = useState<Visita | null>(null);
+  const [tarjetaSel, setTarjetaSel] = useState<TarjetaVisita | null>(null);
 
   const hoy = hoyStr();
+
+  // Cierre automático de fin de día: cualquier visita "en_curso" que quedó abierta
+  // de un día anterior se finaliza al 23:59 de su propia fecha. Barrido perezoso al cargar.
+  useEffect(() => {
+    (async () => {
+      const snap = await getDocs(query(collection(db, "visitas"), where("estado", "==", "en_curso")));
+      const ahora = hoyStr();
+      await Promise.all(snap.docs.map(d => {
+        const v = d.data() as Visita;
+        if (!v.fecha || v.fecha >= ahora) return null;
+        const [y, m, dd] = v.fecha.split("-").map(Number);
+        const fin = new Date(y, (m ?? 1) - 1, dd ?? 1, 23, 59, 59);
+        return updateDoc(doc(db, "visitas", d.id), {
+          estado: "finalizada",
+          salidaEn: Timestamp.fromDate(fin),
+          cierreAutomatico: true,
+        });
+      }).filter(Boolean));
+    })().catch(() => { /* sin permisos o sin pendientes: ignorar */ });
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, "visitas"), where("fecha", "==", hoy));
@@ -114,9 +151,9 @@ export default function VisitasPage() {
 
   useEffect(() => {
     if (tab !== "agenda") return;
-    const q = query(collection(db, "visitas"), where("fecha", ">", hoy), orderBy("fecha"));
+    const q = query(collection(db, "visitas"), where("fecha", "==", agendaFecha));
     return onSnapshot(q, s => setAgenda(s.docs.map(d => ({ id: d.id, ...d.data() } as Visita))));
-  }, [tab, hoy]);
+  }, [tab, agendaFecha]);
 
   useEffect(() => {
     if (tab !== "tarjetas") return;
@@ -138,17 +175,23 @@ export default function VisitasPage() {
   const enCurso     = visitasHoy.filter(v => v.estado === "en_curso");
   const finalizadas = visitasHoy.filter(v => v.estado === "finalizada");
 
-  // Agenda agrupada por fecha
-  const agendaPorFecha = useMemo(() => {
-    const map = new Map<string, Visita[]>();
-    for (const v of agenda) {
-      if (v.estado !== "programada") continue;
-      const arr = map.get(v.fecha) ?? [];
-      arr.push(v);
-      map.set(v.fecha, arr);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [agenda]);
+  // Visitas programadas de la fecha elegida en la Agenda
+  const agendaProgramadas = useMemo(
+    () => agenda.filter(v => v.estado === "programada"),
+    [agenda]
+  );
+
+  const tarjetasFiltradas = useMemo(() => {
+    const t = tarjetaTexto.trim().toLowerCase();
+    if (!t) return tarjetas;
+    return tarjetas.filter(tj =>
+      tj.expediente.toLowerCase().includes(t) ||
+      tj.pacienteNombre.toLowerCase().includes(t) ||
+      tj.codigo.toLowerCase().includes(t) ||
+      (tj.titular.dui ?? "").toLowerCase().includes(t) ||
+      tj.listaBlanca.some(v => (v.dui ?? "").toLowerCase().includes(t) || v.nombre.toLowerCase().includes(t))
+    );
+  }, [tarjetas, tarjetaTexto]);
 
   const histFiltradas = useMemo(() => {
     const t = histTexto.trim().toLowerCase();
@@ -246,28 +289,47 @@ export default function VisitasPage() {
 
       {/* ── AGENDA ── */}
       {tab === "agenda" && (
-        agendaPorFecha.length === 0 ? (
-          <EmptyState texto="No hay visitas agendadas para próximos días." sub="Al crear una visita puedes elegir una fecha futura." />
-        ) : (
-          <div className="space-y-6">
-            {agendaPorFecha.map(([fecha, vs]) => (
-              <Seccion key={fecha} titulo={`${fmtFechaStr(fecha)} · ${vs.length} visita(s)`}>
-                <Grid>{vs.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} />)}</Grid>
-              </Seccion>
-            ))}
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <CalendarDays size={15} />
+              <input type="date" value={agendaFecha} onChange={e => setAgendaFecha(e.target.value)}
+                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            </label>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{fmtFechaStr(agendaFecha)}</span>
+            <button onClick={() => setAgendaFecha(mananaStr())}
+              className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-500">Mañana</button>
+            <span className="ml-auto text-sm text-slate-500">{agendaProgramadas.length} programada(s)</span>
           </div>
-        )
+
+          {agendaProgramadas.length === 0 ? (
+            <EmptyState texto="No hay visitas programadas para esta fecha." sub="Al crear una visita puedes elegir la fecha." />
+          ) : (
+            <Grid>{agendaProgramadas.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} />)}</Grid>
+          )}
+        </>
       )}
 
       {/* ── TARJETAS ── */}
       {tab === "tarjetas" && (
-        tarjetas.length === 0 ? (
-          <EmptyState texto="Aún no hay tarjetas creadas." sub="Se crean automáticamente al registrar la primera visita de un paciente." />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {tarjetas.map(t => <TarjetaCard key={t.id} t={t} />)}
+        <>
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={tarjetaTexto} onChange={e => setTarjetaTexto(e.target.value)}
+              placeholder="Buscar por nombre del paciente, expediente, DUI o código…"
+              className={inputCls + " pl-9"} />
           </div>
-        )
+
+          {tarjetas.length === 0 ? (
+            <EmptyState texto="Aún no hay tarjetas creadas." sub="Se crean automáticamente al registrar la primera visita de un paciente." />
+          ) : tarjetasFiltradas.length === 0 ? (
+            <p className="text-sm text-slate-400 py-10 text-center">Ningún paciente coincide con la búsqueda — aún no tiene tarjeta creada.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tarjetasFiltradas.map(t => <TarjetaCard key={t.id} t={t} onClick={() => setTarjetaSel(t)} />)}
+            </div>
+          )}
+        </>
       )}
 
       {/* ── HISTORIAL ── */}
@@ -352,6 +414,13 @@ export default function VisitasPage() {
           visita={detalle}
           onClose={() => setDetalle(null)}
           onRegistrarEntrada={() => abrirEntrada(detalle)}
+        />
+      )}
+
+      {tarjetaSel && (
+        <TarjetaDetalleModal
+          tarjeta={tarjetaSel}
+          onClose={() => setTarjetaSel(null)}
         />
       )}
     </div>
@@ -458,9 +527,10 @@ function VisitaCard({ v, onClick, onEntrada, onSalida }: {
   );
 }
 
-function TarjetaCard({ t }: { t: TarjetaVisita }) {
+function TarjetaCard({ t, onClick }: { t: TarjetaVisita; onClick: () => void }) {
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5">
+    <div onClick={onClick}
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5 cursor-pointer hover:border-teal-300 dark:hover:border-teal-800 transition-colors">
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 font-mono text-sm font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-900 px-2 py-1 rounded-lg">
           <CreditCard size={13} /> {t.codigo}
@@ -512,16 +582,25 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
   const [guardando, setGuardando] = useState(false);
   const [titular, setTitular] = useState<VisitanteInfo>({ nombre: "", parentesco: "", dui: "", telefono: "" });
   const [fecha, setFecha] = useState(hoyStr());
+  // Cuántas tarjetas existen ya para este expediente (de internamientos previos),
+  // para numerar la secuencia del código en reingresos.
+  const [previasCount, setPreviasCount] = useState(0);
 
   useEffect(() => {
     let cancel = false;
     (async () => {
-      if (!paciente) { if (!cancel) setTarjeta(null); return; }
+      if (!paciente) { if (!cancel) { setTarjeta(null); setPreviasCount(0); } return; }
       setBuscando(true);
       const snap = await getDocs(query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente)));
       if (cancel) return;
-      const activa = snap.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita)).find(t => t.estado === "activa");
-      setTarjeta(activa ?? null);
+      const todas = snap.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita));
+      // Tarjeta del internamiento ACTUAL (mismo pacienteId) — preferir la activa.
+      const actual =
+        todas.find(t => t.pacienteId === paciente.id && t.estado === "activa") ??
+        todas.find(t => t.pacienteId === paciente.id) ??
+        null;
+      setTarjeta(actual);
+      setPreviasCount(todas.length);
       setBuscando(false);
     })();
     return () => { cancel = true; };
@@ -531,8 +610,9 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
     if (!paciente || !paciente.id || !profile) return null;
     const limpio = limpiarVisitante(titular);
     const nombreCompleto = `${paciente.apellidos}, ${paciente.nombres}`;
+    const codigo = codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1);
     const ref = await addDoc(collection(db, "tarjetas_visita"), {
-      codigo: codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos),
+      codigo,
       pacienteId: paciente.id,
       expediente: paciente.expediente,
       pacienteNombre: nombreCompleto,
@@ -546,7 +626,7 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
       creadoPorNombre: profile.nombre,
     });
     return {
-      id: ref.id, codigo: codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos),
+      id: ref.id, codigo,
       pacienteId: paciente.id, expediente: paciente.expediente, pacienteNombre: nombreCompleto,
       servicio: paciente.servicioActual, cama: paciente.camaActual ?? "", titular: limpio,
       listaBlanca: [limpio], estado: "activa", creadoEn: new Date(),
@@ -616,7 +696,10 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">2 · Titular (responsable principal)</p>
-                <p className="text-[11px] text-slate-400">Se creará la tarjeta {codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos)}</p>
+                <p className="text-[11px] text-slate-400">
+                  Se creará la tarjeta {codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1)}
+                  {previasCount > 0 && ` · internamiento #${previasCount + 1} de este expediente`}
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input className={inputCls} placeholder="Nombre completo *" value={titular.nombre}
                     onChange={e => setTitular({ ...titular, nombre: e.target.value.toUpperCase() })} />
@@ -818,7 +901,7 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
           {visita.visitante?.dui && <Info label="Documento" value={visita.visitante.dui} />}
           {visita.visitante?.telefono && <Info label="Teléfono" value={visita.visitante.telefono} />}
           {visita.entradaEn && <Info label="Entrada" value={fmtHora(visita.entradaEn)} />}
-          {visita.salidaEn && <Info label="Salida" value={fmtHora(visita.salidaEn)} />}
+          {visita.salidaEn && <Info label="Salida" value={fmtHora(visita.salidaEn) + (visita.cierreAutomatico ? " (cierre automático)" : "")} />}
           <Info label="Registró" value={visita.registradoPorNombre} />
         </div>
 
@@ -870,6 +953,132 @@ function Info({ label, value }: { label: string; value: string }) {
       <span className="text-slate-500">{label}</span>
       <span className="text-slate-800 dark:text-slate-200 font-medium text-right">{value}</span>
     </div>
+  );
+}
+
+// ── Modal: Detalle de tarjeta (+ gestión de lista blanca) ─────────────────────
+
+function TarjetaDetalleModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onClose: () => void }) {
+  const [lista, setLista] = useState<VisitanteInfo[]>(tarjeta.listaBlanca);
+  const [modoNuevo, setModoNuevo] = useState(false);
+  const [nuevo, setNuevo] = useState<VisitanteInfo>({ nombre: "", parentesco: "", dui: "", telefono: "" });
+  const [guardando, setGuardando] = useState(false);
+  const [buscandoDui, setBuscandoDui] = useState(false);
+
+  const esTitular = (v: VisitanteInfo) => claveVisitante(v) === claveVisitante(tarjeta.titular);
+
+  const buscarPorDui = async (dui: string) => {
+    const d = dui.trim();
+    if (!d) return;
+    setBuscandoDui(true);
+    try {
+      const snap = await getDocs(query(collection(db, "visitas"), where("visitante.dui", "==", d)));
+      const docs = snap.docs.map(x => x.data() as Visita).filter(x => x.visitante);
+      docs.sort((a, b) => (toDate(b.creadoEn)?.getTime() ?? 0) - (toDate(a.creadoEn)?.getTime() ?? 0));
+      const prev = docs[0]?.visitante;
+      if (prev) setNuevo(n => ({ ...n, nombre: prev.nombre, parentesco: prev.parentesco, dui: d, telefono: prev.telefono ?? n.telefono }));
+    } finally {
+      setBuscandoDui(false);
+    }
+  };
+
+  const persistir = async (nueva: VisitanteInfo[]) => {
+    if (!tarjeta.id) return;
+    setGuardando(true);
+    await updateDoc(doc(db, "tarjetas_visita", tarjeta.id), { listaBlanca: nueva, actualizadoEn: Timestamp.now() });
+    setLista(nueva);
+    setGuardando(false);
+  };
+
+  const agregar = async () => {
+    const limpio = limpiarVisitante(nuevo);
+    if (!limpio.nombre || !limpio.parentesco) return;
+    if (lista.some(v => claveVisitante(v) === claveVisitante(limpio))) { setModoNuevo(false); return; }
+    await persistir([...lista, limpio]);
+    setNuevo({ nombre: "", parentesco: "", dui: "", telefono: "" });
+    setModoNuevo(false);
+  };
+
+  const quitar = async (v: VisitanteInfo) => {
+    if (esTitular(v)) return;
+    await persistir(lista.filter(x => claveVisitante(x) !== claveVisitante(v)));
+  };
+
+  const nuevoValido = nuevo.nombre.trim() && nuevo.parentesco.trim();
+
+  return (
+    <ModalShell onClose={onClose} titulo={`Tarjeta ${tarjeta.codigo}`} icon={CreditCard} ancho="max-w-lg">
+      <div className="space-y-4">
+        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{tarjeta.pacienteNombre}</p>
+          <p className="text-xs text-slate-500 mt-0.5">Exp. {tarjeta.expediente} · {tarjeta.servicio} · Cama {tarjeta.cama || "—"}</p>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Lista blanca · {lista.length}</p>
+            {!modoNuevo && (
+              <button onClick={() => setModoNuevo(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:text-teal-500 transition-colors">
+                <Plus size={14} /> Agregar persona
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {lista.map((v, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-200">
+                    {esTitular(v) && <Star size={13} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
+                    <span className="truncate">{v.nombre}</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {v.parentesco}{esTitular(v) ? " · titular" : ""}{v.dui ? ` · ${v.dui}` : ""}{v.telefono ? ` · ${v.telefono}` : ""}
+                  </p>
+                </div>
+                {!esTitular(v) && (
+                  <button onClick={() => quitar(v)} disabled={guardando}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors flex-shrink-0"
+                    aria-label="Quitar de la lista blanca">
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {modoNuevo && (
+          <div className="space-y-3 border-t border-slate-200 dark:border-slate-800 pt-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Nueva persona autorizada</p>
+            <div className="relative">
+              <input className={inputCls} placeholder="DUI / documento (autollena si ya visitó antes)"
+                value={nuevo.dui} onChange={e => setNuevo({ ...nuevo, dui: e.target.value })}
+                onBlur={e => buscarPorDui(e.target.value)} />
+              {buscandoDui && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">buscando…</span>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input className={inputCls} placeholder="Nombre completo *" value={nuevo.nombre}
+                onChange={e => setNuevo({ ...nuevo, nombre: e.target.value.toUpperCase() })} />
+              <ParentescoSelect value={nuevo.parentesco} onChange={p => setNuevo({ ...nuevo, parentesco: p })} />
+              <input className={inputCls + " sm:col-span-2"} placeholder="Teléfono" value={nuevo.telefono}
+                onChange={e => setNuevo({ ...nuevo, telefono: e.target.value })} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setModoNuevo(false); setNuevo({ nombre: "", parentesco: "", dui: "", telefono: "" }); }}
+                className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={agregar} disabled={guardando || !nuevoValido}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+                {guardando ? "Guardando…" : "Agregar a la lista"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ModalShell>
   );
 }
 
