@@ -152,6 +152,22 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Visitas de familiares (Trabajo Social) ───────────────────────────────
+    // Tarjeta por paciente (con lista blanca) y registro de entradas/salidas.
+    // Gestionado por Trabajo Social; ESDOMED/admin con acceso de supervisión.
+    match /tarjetas_visita/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow update: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /visitas/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow update: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Anexo 5 ──────────────────────────────────────────────────────────────
     match /anexo5/{id} {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
