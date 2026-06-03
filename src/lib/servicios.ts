@@ -132,3 +132,51 @@ export const CAMAS_POR_SERVICIO: Record<ServicioHospitalario, string[]> = {
     ...Array.from({ length: 12 }, (_, i) => `R${i + 1}`),
   ],
 };
+
+// ── Abreviaturas de servicio ────────────────────────────────────────────────────
+// Sigla corta por servicio. Se antepone a la cama SOLO cuando la cama es un número
+// "pelón" (sin letras) que no identifica el servicio — ej. "17" → "CH-17", "3" → "BM-3".
+// Las camas que ya traen letras (MH1-04, 1P, 10N) se muestran tal cual.
+// EDITABLE: corregir/agregar siglas aquí. (A futuro podría moverse a configuracion/servicios.)
+export const ABREVIATURA_SERVICIO: Partial<Record<string, string>> = {
+  // Servicios con cama NUMÉRICA (aquí la sigla es indispensable):
+  "Bienestar Magisterial": "BM",
+  "Cirugía Hombres 1": "CH",
+  "Cirugía Mujeres 1": "CM",
+  "Unidad de Cuidados Intensivos Adultos BM": "UCI-BM",
+  "Unidad de Cuidados Intermedios Adultos BM": "UCIM-BM",
+  "Unidad de Cuidados Intermedios Adultos MINSAL": "UCIM",
+  "Dialisis Peritoneal": "DP",
+  "Terapias Sanguíneas Extracorpórea": "TSE",
+  // Servicios con cama codificada (no se usa salvo que llegue una cama numérica suelta):
+  "Cirugía Cardiovascular": "CCV",
+  "Neurocirugia": "NEU",
+  "Unidad de Cuidados Intermedios Aislados Adultos": "AI",
+  "Unidad de Cuidados Intermedios Crónicos Adultos": "CR",
+  "Medicina Interna Hombres 1": "MH1",
+  "Medicina Interna Hombres 2": "MH2",
+  "Medicina Interna Hombres 3": "MH3",
+  "Medicina Interna Mujeres 1": "MM1",
+  "Medicina Interna Mujeres 2": "MM2",
+  "Medicina Interna Mujeres 3": "MM3",
+  "Servicio de Cardiologia": "CAR",
+  "Servicio de Hematologia": "HEM",
+  "Servicio de Aislados": "MAI",
+  "Servicio de Oncologia": "ONC",
+  "Unidad de Evaluacion y Observación Medica": "EOM",
+  "Quimioterapia Ambulatoria": "QTA",
+  "Unidad de Terapia Intervencionista Endovascular": "UTE",
+};
+
+/** Etiqueta de ubicación inequívoca para mostrar/imprimir.
+ *  - Cama con letras (MH1-04, 1P, 10N) → se muestra tal cual (ya identifica el servicio).
+ *  - Cama solo numérica (17, 04) → se antepone la sigla del servicio: "CH-04".
+ *  - Sin sigla mapeada → cae al nombre del servicio + cama para no perder contexto. */
+export function ubicacionLabel(servicio?: string, cama?: string): string {
+  const s = (servicio ?? "").trim();
+  const c = (cama ?? "").trim();
+  if (!c) return s || "—";
+  if (/[a-zA-Z]/.test(c)) return c;
+  const abbr = servicio ? ABREVIATURA_SERVICIO[servicio] : undefined;
+  return abbr ? `${abbr}-${c}` : s ? `${s} ${c}` : c;
+}

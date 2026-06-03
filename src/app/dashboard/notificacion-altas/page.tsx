@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
+import { ubicacionLabel } from "@/lib/servicios";
 import { toDate } from "@/lib/pacientes/helpers";
 import type { Paciente, NotificacionPrealta, EstadoPrealta, TarjetaVisita } from "@/types";
 import {
@@ -197,7 +198,7 @@ export default function NotificacionAltasPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                  {["N°", "Servicio", "Exp.", "Gén.", "Paciente", "Familiar", "Edad", "Hora", "Estado", ""].map((h, i) => (
+                  {["N°", "Servicio", "Exp.", "Gén.", "Paciente", "Familiar", "Edad", "Hora", "Estado", "Registró", ""].map((h, i) => (
                     <th key={i} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -206,7 +207,7 @@ export default function NotificacionAltasPage() {
                 {filtrados.map((r, i) => (
                   <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 align-top">
                     <td className="px-3 py-3 text-slate-500">{i + 1}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{r.cama || r.servicio || "—"}</td>
+                    <td className="px-3 py-3 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap" title={r.servicio}>{ubicacionLabel(r.servicio, r.cama)}</td>
                     <td className="px-3 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">{r.pacienteExpediente}</td>
                     <td className="px-3 py-3 text-slate-600 dark:text-slate-400">{generoLetra(r.genero)}</td>
                     <td className="px-3 py-3 min-w-[180px]">
@@ -224,6 +225,7 @@ export default function NotificacionAltasPage() {
                         {ESTADO_CFG[r.estado].label}
                       </span>
                     </td>
+                    <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">{r.creadoPorNombre || "—"}</td>
                     <td className="px-3 py-3 text-right whitespace-nowrap">
                       {esTS && (
                         <div className="flex items-center gap-1.5 justify-end">
@@ -514,7 +516,7 @@ function ReportePrealtaPrint({ fecha, registros, onClose }: {
               {registros.map((r, i) => (
                 <tr key={r.id} style={{ pageBreakInside: "avoid" }}>
                   <td className="border border-slate-400 px-1.5 py-1 text-center">{i + 1}</td>
-                  <td className="border border-slate-400 px-1.5 py-1 whitespace-nowrap font-semibold">{r.cama || r.servicio || "—"}</td>
+                  <td className="border border-slate-400 px-1.5 py-1 whitespace-nowrap font-semibold">{ubicacionLabel(r.servicio, r.cama)}</td>
                   <td className="border border-slate-400 px-1.5 py-1 whitespace-nowrap">{r.pacienteExpediente}</td>
                   <td className="border border-slate-400 px-1.5 py-1 text-center">{generoLetra(r.genero)}</td>
                   <td className="border border-slate-400 px-1.5 py-1">
