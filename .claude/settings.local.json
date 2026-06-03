@@ -55,7 +55,11 @@
       "Bash(echo \"exit: $?\")",
       "Bash(sed -n '19,30p' src/app/dashboard/fallecidos/page.tsx)",
       "Bash(sed -n '230,260p' src/components/pacientes/PacienteForm.tsx)",
-      "Bash(xargs grep -ln \"egreso\\\\|estado\")"
+      "Bash(xargs grep -ln \"egreso\\\\|estado\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\src\" -Recurse -Directory | Where-Object { $_.Name -match 'visita|trabajo|social' } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\src\\\\components\" -Recurse | Where-Object { $_.Name -match 'visita|Visita' })",
+      "Bash(xargs grep -l \"trabajo_social\")",
+      "Bash(xargs grep -l \"BuscadorPacienteActivo\")"
     ]
   }
 }

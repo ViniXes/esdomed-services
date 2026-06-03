@@ -20,6 +20,8 @@ import {
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition";
+// Cuántas tarjetas se muestran por página antes de "Cargar más".
+const TARJETAS_PAGINA = 12;
 const selectCls =
   "w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 transition cursor-pointer";
 
@@ -141,8 +143,10 @@ export default function VisitasPage() {
   const [agendaFecha, setAgendaFecha] = useState(mananaStr());
   const [tarjetas, setTarjetas] = useState<TarjetaVisita[]>([]);
   const [tarjetaTexto, setTarjetaTexto] = useState("");
+  const [tarjetasVisibles, setTarjetasVisibles] = useState(TARJETAS_PAGINA);
   const [histFecha, setHistFecha] = useState(hoyStr());
   const [histTexto, setHistTexto] = useState("");
+  const [histEstado, setHistEstado] = useState<Visita["estado"] | "todos">("todos");
   const [histVisitas, setHistVisitas] = useState<Visita[]>([]);
 
   // Modales
@@ -252,14 +256,21 @@ export default function VisitasPage() {
 
   const histFiltradas = useMemo(() => {
     const t = histTexto.trim().toLowerCase();
-    if (!t) return histVisitas;
-    return histVisitas.filter(v =>
-      v.expediente?.toLowerCase().includes(t) ||
-      v.pacienteNombre?.toLowerCase().includes(t) ||
-      v.servicio?.toLowerCase().includes(t) ||
-      v.visitante?.nombre?.toLowerCase().includes(t)
-    );
-  }, [histVisitas, histTexto]);
+    return histVisitas.filter(v => {
+      if (histEstado !== "todos" && v.estado !== histEstado) return false;
+      if (!t) return true;
+      return (
+        v.expediente?.toLowerCase().includes(t) ||
+        v.pacienteNombre?.toLowerCase().includes(t) ||
+        v.servicio?.toLowerCase().includes(t) ||
+        v.visitante?.nombre?.toLowerCase().includes(t)
+      );
+    });
+  }, [histVisitas, histTexto, histEstado]);
+
+  // Al cambiar la búsqueda o el tab, volver a la primera página de tarjetas.
+  useEffect(() => { setTarjetasVisibles(TARJETAS_PAGINA); }, [tarjetaTexto, tab]);
+  const tarjetasPagina = tarjetasFiltradas.slice(0, tarjetasVisibles);
 
   const abrirEntrada = async (v: Visita) => {
     const tarjeta = await cargarTarjeta(v.tarjetaId);
@@ -383,9 +394,24 @@ export default function VisitasPage() {
           ) : tarjetasFiltradas.length === 0 ? (
             <p className="text-sm text-slate-400 py-10 text-center">Ningún paciente coincide con la búsqueda — aún no tiene tarjeta creada.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {tarjetasFiltradas.map(t => <TarjetaCard key={t.id} t={t} onClick={() => setTarjetaSel(t)} onVerCarnet={() => setCarnet(t)} />)}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {tarjetasPagina.map(t => <TarjetaCard key={t.id} t={t} onClick={() => setTarjetaSel(t)} onVerCarnet={() => setCarnet(t)} />)}
+              </div>
+              {tarjetasFiltradas.length > tarjetasVisibles && (
+                <div className="flex flex-col items-center gap-1.5 pt-2">
+                  <button
+                    onClick={() => setTarjetasVisibles(n => n + TARJETAS_PAGINA)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900 transition"
+                  >
+                    Cargar más
+                  </button>
+                  <span className="text-xs text-slate-400">
+                    Mostrando {tarjetasPagina.length} de {tarjetasFiltradas.length}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -406,6 +432,34 @@ export default function VisitasPage() {
                 className={inputCls + " pl-9"} />
             </div>
             <span className="text-sm text-slate-500">{histFiltradas.length} registros</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              ["todos", "Todos"],
+              ["programada", "Programada"],
+              ["en_curso", "En curso"],
+              ["finalizada", "Finalizada"],
+              ["cancelada", "Cancelada"],
+            ] as const).map(([val, label]) => {
+              const activo = histEstado === val;
+              const cuenta = val === "todos"
+                ? histVisitas.length
+                : histVisitas.filter(v => v.estado === val).length;
+              return (
+                <button
+                  key={val}
+                  onClick={() => setHistEstado(val)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                    activo
+                      ? "bg-amber-500 border-amber-500 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400 dark:hover:border-amber-700"
+                  }`}
+                >
+                  {label} <span className={activo ? "text-white/80" : "text-slate-400"}>({cuenta})</span>
+                </button>
+              );
+            })}
           </div>
 
           {histFiltradas.length === 0 ? (
