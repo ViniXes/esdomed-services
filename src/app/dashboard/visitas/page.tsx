@@ -19,9 +19,9 @@ import {
 // ── Estilos compartidos ───────────────────────────────────────────────────────
 
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition";
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition";
 const selectCls =
-  "w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500 transition cursor-pointer";
+  "w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 transition cursor-pointer";
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 
@@ -272,8 +272,8 @@ export default function VisitasPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950 rounded-xl flex items-center justify-center border border-teal-200 dark:border-teal-900">
-            <DoorOpen size={17} className="text-teal-600 dark:text-teal-400" />
+          <div className="w-9 h-9 bg-blue-50 dark:bg-blue-900 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-800">
+            <DoorOpen size={17} className="text-blue-700 dark:text-blue-400" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Visitas de familiares</h1>
@@ -282,7 +282,7 @@ export default function VisitasPage() {
         </div>
         <button
           onClick={() => setAdding(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl transition-colors"
         >
           <Plus size={16} /> Nueva visita
         </button>
@@ -302,7 +302,7 @@ export default function VisitasPage() {
             onClick={() => setTab(val)}
             className={`flex-1 min-w-[78px] px-3 py-2 rounded-lg text-sm font-medium text-center transition-colors ${
               tab === val
-                ? "bg-white dark:bg-slate-900 shadow-sm text-teal-700 dark:text-teal-400"
+                ? "bg-white dark:bg-slate-900 shadow-sm text-blue-800 dark:text-blue-300"
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             }`}
           >
@@ -316,7 +316,7 @@ export default function VisitasPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             <Contador label="Programadas" valor={programadas.length} color="text-slate-700 dark:text-slate-300" icon={CalendarDays} />
-            <Contador label="En curso" valor={enCurso.length} color="text-teal-600 dark:text-teal-400" icon={LogIn} />
+            <Contador label="En curso" valor={enCurso.length} color="text-blue-700 dark:text-blue-400" icon={LogIn} />
             <Contador label="Finalizadas" valor={finalizadas.length} color="text-slate-500" icon={CheckCircle2} />
           </div>
 
@@ -351,11 +351,11 @@ export default function VisitasPage() {
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <CalendarDays size={15} />
               <input type="date" value={agendaFecha} onChange={e => setAgendaFecha(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
             </label>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{fmtFechaStr(agendaFecha)}</span>
             <button onClick={() => setAgendaFecha(mananaStr())}
-              className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-500">Mañana</button>
+              className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-amber-500">Mañana</button>
             <span className="ml-auto text-sm text-slate-500">{agendaProgramadas.length} programada(s)</span>
           </div>
 
@@ -396,7 +396,7 @@ export default function VisitasPage() {
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <CalendarDays size={15} />
               <input type="date" value={histFecha} onChange={e => setHistFecha(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
             </label>
             <div className="relative flex-1 min-w-[220px]">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -439,7 +439,7 @@ export default function VisitasPage() {
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{v.salidaEn ? fmtHora(v.salidaEn) : "—"}</td>
                         <td className="px-4 py-3"><EstadoBadge estado={v.estado} /></td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => setDetalle(v)} className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-500">Detalle</button>
+                          <button onClick={() => setDetalle(v)} className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-amber-500">Detalle</button>
                         </td>
                       </tr>
                     ))}
@@ -534,7 +534,7 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
 function EstadoBadge({ estado }: { estado: Visita["estado"] }) {
   const cfg = {
     programada: { t: "Programada", c: "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700" },
-    en_curso:   { t: "En curso",   c: "text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950 border-teal-200 dark:border-teal-900" },
+    en_curso:   { t: "En curso",   c: "text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800" },
     finalizada: { t: "Finalizada", c: "text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" },
     cancelada:  { t: "Cancelada",  c: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900" },
   }[estado];
@@ -546,7 +546,7 @@ function VisitaCard({ v, onClick, onEntrada, onSalida }: {
 }) {
   return (
     <div onClick={onClick}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start justify-between gap-3 cursor-pointer hover:border-teal-300 dark:hover:border-teal-800 transition-colors">
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start justify-between gap-3 cursor-pointer hover:border-amber-400 dark:hover:border-amber-700 transition-colors">
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-sm">{v.expediente}</p>
@@ -572,7 +572,7 @@ function VisitaCard({ v, onClick, onEntrada, onSalida }: {
       <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
         {onEntrada && (
           <button onClick={onEntrada}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors">
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-lg transition-colors">
             <LogIn size={14} /> Entrada
           </button>
         )}
@@ -590,9 +590,9 @@ function VisitaCard({ v, onClick, onEntrada, onSalida }: {
 function TarjetaCard({ t, onClick }: { t: TarjetaVisita; onClick: () => void }) {
   return (
     <div onClick={onClick}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5 cursor-pointer hover:border-teal-300 dark:hover:border-teal-800 transition-colors">
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5 cursor-pointer hover:border-amber-400 dark:hover:border-amber-700 transition-colors">
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 font-mono text-sm font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-900 px-2 py-1 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 font-mono text-sm font-bold text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-800 px-2 py-1 rounded-lg">
           <CreditCard size={13} /> {t.codigo}
         </span>
         {t.estado !== "activa" && <span className="text-[11px] font-semibold text-slate-400">{t.estado}</span>}
@@ -641,7 +641,7 @@ function Pasos({ actual, labels }: { actual: number; labels: string[] }) {
         return (
           <div key={l} className="flex items-center gap-2">
             <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-              activo ? "bg-teal-600 text-white" : hecho ? "bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+              activo ? "bg-blue-800 text-white" : hecho ? "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300" : "bg-slate-100 dark:bg-slate-800 text-slate-400"
             }`}>{hecho ? <CheckCircle2 size={14} /> : n}</span>
             <span className={`text-xs font-medium ${activo ? "text-slate-800 dark:text-slate-200" : "text-slate-400"}`}>{l}</span>
             {n < labels.length && <span className="w-5 h-px bg-slate-200 dark:bg-slate-700" />}
@@ -776,9 +776,9 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
       {/* Paso 1 — Paciente */}
       {paso === 1 && (
         <div className="space-y-4">
-          <BuscadorPacienteActivo value={paciente} onSelect={setPaciente} accent="teal" />
+          <BuscadorPacienteActivo value={paciente} onSelect={setPaciente} accent="amber" />
           <button onClick={() => setPaso(2)} disabled={!paciente || buscando}
-            className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors">
             {buscando ? "Verificando tarjeta…" : <>Siguiente <ArrowRight size={16} /></>}
           </button>
         </div>
@@ -793,11 +793,11 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
           </button>
 
           {tarjeta ? (
-            <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 rounded-xl p-3 text-sm">
-              <p className="flex items-center gap-1.5 text-teal-800 dark:text-teal-300 font-medium">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-blue-200 dark:border-blue-800 rounded-xl p-3 text-sm">
+              <p className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-medium">
                 <IdCard size={15} /> Tarjeta {tarjeta.codigo} · titular {tarjeta.titular.nombre}
               </p>
-              <p className="text-xs text-teal-700/80 dark:text-teal-400/80 mt-0.5">{tarjeta.listaBlanca.length} persona(s) en la lista blanca</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">{tarjeta.listaBlanca.length} persona(s) en la lista blanca</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -821,17 +821,17 @@ function NuevaVisitaModal({ onClose, onEntradaAhora }: {
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha de la visita</label>
             <input type="date" min={hoyStr()} value={fecha} onChange={e => setFecha(e.target.value)}
-              className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
             <button onClick={agendar} disabled={guardando || !titularValido}
-              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl border border-teal-600 text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 disabled:opacity-50 transition-colors">
+              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl border border-amber-600 text-blue-800 dark:text-blue-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 disabled:opacity-50 transition-colors">
               <CalendarDays size={16} /> Agendar
             </button>
             {esHoy && (
               <button onClick={entradaAhora} disabled={guardando || !titularValido}
-                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors">
                 <LogIn size={16} /> Entrada ahora
               </button>
             )}
@@ -919,7 +919,7 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">¿Quién está usando la tarjeta?</p>
           {tarjeta.listaBlanca.map((v, i) => (
             <button key={i} onClick={() => registrarEntrada(v, false)} disabled={guardando}
-              className="w-full text-left px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-teal-400 dark:hover:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-all disabled:opacity-50">
+              className="w-full text-left px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all disabled:opacity-50">
               <span className="flex items-center gap-2">
                 {esTitular(v) && <Star size={14} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
                 <span className="font-medium text-slate-800 dark:text-slate-200">{v.nombre}</span>
@@ -929,7 +929,7 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
             </button>
           ))}
           <button onClick={() => setModoNuevo(true)}
-            className="w-full flex items-center justify-center gap-2 px-3.5 py-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-400 hover:border-teal-400 hover:text-teal-700 dark:hover:text-teal-400 transition-all">
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-400 hover:border-amber-400 hover:text-amber-700 dark:hover:text-amber-400 transition-all">
             <UserPlus size={16} /> Registrar otro familiar
           </button>
         </div>
@@ -954,7 +954,7 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
               onChange={e => setNuevo({ ...nuevo, telefono: e.target.value })} />
           </div>
           <button onClick={() => registrarEntrada(nuevo, true)} disabled={guardando || !nuevoValido}
-            className="w-full py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+            className="w-full py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors">
             {guardando ? "Registrando…" : "Registrar entrada"}
           </button>
         </div>
@@ -1035,7 +1035,7 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
             placeholder="Agregar notas sobre la visita…" className={inputCls + " resize-none"} />
           <div className="flex items-center gap-2 mt-2">
             <button onClick={guardarComentario} disabled={guardando || comentarios.trim() === (visita.comentarios ?? "").trim()}
-              className="px-3 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg disabled:opacity-50 transition-colors">
+              className="px-3 py-2 text-xs font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors">
               {guardando ? "Guardando…" : "Guardar comentario"}
             </button>
             {guardado && <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"><CheckCircle2 size={13} /> Guardado</span>}
@@ -1046,7 +1046,7 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
         <div className="flex flex-col sm:flex-row gap-2 border-t border-slate-200 dark:border-slate-800 mt-1 pt-4">
           {visita.estado === "programada" && esHoy && (
             <button onClick={onRegistrarEntrada}
-              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors">
+              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl transition-colors">
               <LogIn size={16} /> Registrar entrada
             </button>
           )}
@@ -1157,7 +1157,7 @@ function TarjetaDetalleModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onC
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Lista blanca · {lista.length}</p>
             {!modoNuevo && (
               <button onClick={() => setModoNuevo(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:text-teal-500 transition-colors">
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-800 dark:text-blue-300 hover:text-amber-500 transition-colors">
                 <Plus size={14} /> Agregar persona
               </button>
             )}
@@ -1209,7 +1209,7 @@ function TarjetaDetalleModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onC
                 Cancelar
               </button>
               <button onClick={agregar} disabled={guardando || !nuevoValido}
-                className="flex-1 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors">
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors">
                 {guardando ? "Guardando…" : "Agregar a la lista"}
               </button>
             </div>
@@ -1230,7 +1230,7 @@ function ModalShell({ titulo, icon: Icon, onClose, children, ancho = "max-w-md" 
       <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-[95vw] ${ancho} max-h-[90vh] flex flex-col`}>
         <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-shrink-0">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 min-w-0">
-            <Icon size={18} className="text-teal-600 dark:text-teal-400 flex-shrink-0" /> <span className="truncate">{titulo}</span>
+            <Icon size={18} className="text-blue-700 dark:text-blue-400 flex-shrink-0" /> <span className="truncate">{titulo}</span>
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0">
             <X size={16} />
