@@ -492,7 +492,7 @@ function ReportePrealtaPrint({ fecha, registros, onClose }: {
 
       {/* Hoja */}
       <div className="py-6 px-4 print:p-0">
-        <div className="bg-white shadow-lg max-w-[27cm] mx-auto p-6 print:shadow-none print:max-w-none print:p-3" style={{ color: "#0f172a" }}>
+        <div id="reporte-print" className="bg-white shadow-lg max-w-[27cm] mx-auto p-6 print:shadow-none print:max-w-none print:p-3" style={{ color: "#0f172a" }}>
           {/* Encabezado */}
           <div className="flex items-center justify-between gap-4 border-b-2 border-slate-300 pb-3 mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -538,15 +538,21 @@ function ReportePrealtaPrint({ fecha, registros, onClose }: {
         </div>
       </div>
 
-      {/* Oculta sidebar/barras del dashboard al imprimir */}
+      {/* Impresión: ocultar TODA la app y dejar solo la hoja del reporte. */}
       <style jsx global>{`
         @media print {
-          aside,
-          [class*="md:hidden fixed top-0"] {
-            display: none !important;
+          body * { visibility: hidden !important; }
+          #reporte-print, #reporte-print * { visibility: visible !important; }
+          #reporte-print {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            box-shadow: none !important;
           }
-          main { padding: 0 !important; overflow: visible !important; }
-          html, body { background: white !important; }
+          html, body { background: #fff !important; }
           @page { size: landscape; margin: 8mm; }
         }
       `}</style>
