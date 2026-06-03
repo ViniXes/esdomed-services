@@ -15,6 +15,8 @@ const TIPOS_ALTA = new Set<TipoAltaVivo>([
 
 const ROLES_RECTIFICAN = new Set(["enfermeria", "trabajo_social"]);
 
+const esCierreDeTrabajoSocial = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
+
 type Caller = {
   uid: string;
   nombre: string;
@@ -74,7 +76,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const actual = snap.data()!;
   const puedeRectificar = actual.estado === "pendiente" || actual.estado === "observada";
-  if (actual.notificadoPorId !== caller.uid || actual.notificadoPorRol !== caller.role || !puedeRectificar) {
+  const puedeRectificarPorEquipo =
+    actual.notificadoPorRol === caller.role &&
+    (caller.role === "trabajo_social" || actual.notificadoPorId === caller.uid);
+
+  if (!puedeRectificarPorEquipo || !puedeRectificar) {
     return NextResponse.json({ error: "Esta notificacion ya no puede rectificarse" }, { status: 403 });
   }
 
@@ -83,7 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const update: Record<string, unknown> = {
-    estado: "pendiente",
+    estado: caller.role === "trabajo_social" && esCierreDeTrabajoSocial(tipoAlta) ? tipoAlta : "pendiente",
     tipoAlta,
     notas: typeof body.notas === "string" && body.notas.trim() ? body.notas.trim() : null,
     rectificacionUsada: true,

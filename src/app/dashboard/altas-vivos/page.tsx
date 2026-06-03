@@ -94,6 +94,12 @@ const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 
 
 const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
 
+const estadoInicialPorTipo = (tipo: TipoAltaVivo): EstadoNotificacionAlta => {
+  if (tipo === "deposito") return "deposito";
+  if (tipo === "suspendida") return "suspendida";
+  return "pendiente";
+};
+
 const estadoBadgeLabel = (n: NotificacionAltaVivo) =>
   n.estado === "recibida" && esSoloAcuseRecibido(n.tipoAlta)
     ? TIPO_LABEL[n.tipoAlta]
@@ -138,7 +144,7 @@ function CreateModal({
         cama: selectedPaciente.camaActual ?? "",
         tipoAlta,
         notas: notas.trim() || null,
-        estado: "pendiente",
+        estado: estadoInicialPorTipo(tipoAlta),
         rectificacionUsada: false,
         creadoEn: Timestamp.now(),
       });
@@ -686,7 +692,6 @@ export default function AltasVivosPage() {
             isTS &&
             (n.estado === "pendiente" || n.estado === "observada") &&
             !n.rectificacionUsada &&
-            n.notificadoPorId === user?.uid &&
             n.notificadoPorRol === "trabajo_social";
 
           return (
@@ -761,7 +766,11 @@ export default function AltasVivosPage() {
                 <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2">
 
                   {/* ESDOMED: procesar */}
-                  {isEsdomed && (
+                  {isEsdomed && requiereSoloAcuse ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                      No requiere gestion adicional de ESDOMED
+                    </span>
+                  ) : isEsdomed && (
                     <>
                       <button
                         onClick={() => setProcesandoId(n.id!)}

@@ -80,6 +80,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (body.action === "observar") {
+    if (TIPOS_SOLO_RECIBIDO.has(String(actual.tipoAlta))) {
+      return NextResponse.json({ error: "Esta notificacion no requiere observacion de ESDOMED" }, { status: 409 });
+    }
+
     if (!MOTIVOS.has(body.motivo) || !body.detalle.trim()) {
       return NextResponse.json({ error: "Observacion invalida" }, { status: 400 });
     }
