@@ -224,13 +224,27 @@ export default function VisitasPage() {
 
   useEffect(() => {
     if (tab !== "historial") return;
-    const q = query(collection(db, "visitas"), where("fecha", "==", histFecha));
-    return onSnapshot(q, s => {
-      const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as Visita));
-      docs.sort((a, b) => (toDate(b.entradaEn ?? b.creadoEn)?.getTime() ?? 0) - (toDate(a.entradaEn ?? a.creadoEn)?.getTime() ?? 0));
-      setHistVisitas(docs);
-    });
-  }, [tab, histFecha]);
+    // El filtro de estado se resuelve en el servidor. Combinar where("fecha")
+    // con where("estado") exige un índice compuesto (visitas: fecha + estado);
+    // si falta, Firestore lanza un error con el link para crearlo (ver consola).
+    const constraints = [where("fecha", "==", histFecha)];
+    if (histEstado !== "todos") constraints.push(where("estado", "==", histEstado));
+    const q = query(collection(db, "visitas"), ...constraints);
+    return onSnapshot(
+      q,
+      s => {
+        const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as Visita));
+        docs.sort((a, b) => (toDate(b.entradaEn ?? b.creadoEn)?.getTime() ?? 0) - (toDate(a.entradaEn ?? a.creadoEn)?.getTime() ?? 0));
+        setHistVisitas(docs);
+      },
+      err => {
+        if (err.code === "failed-precondition")
+          notify("error", "Falta crear el índice de Firestore — abre la consola del navegador (F12) y usa el link del error.");
+        else if (err.code === "permission-denied")
+          setPermissionError(true);
+      }
+    );
+  }, [tab, histFecha, histEstado, notify]);
 
   const programadas = visitasHoy.filter(v => v.estado === "programada");
   const enCurso     = visitasHoy.filter(v => v.estado === "en_curso");
@@ -254,19 +268,17 @@ export default function VisitasPage() {
     );
   }, [tarjetas, tarjetaTexto]);
 
+  // El estado ya se filtra en el servidor; aquí solo queda la búsqueda por texto.
   const histFiltradas = useMemo(() => {
     const t = histTexto.trim().toLowerCase();
-    return histVisitas.filter(v => {
-      if (histEstado !== "todos" && v.estado !== histEstado) return false;
-      if (!t) return true;
-      return (
-        v.expediente?.toLowerCase().includes(t) ||
-        v.pacienteNombre?.toLowerCase().includes(t) ||
-        v.servicio?.toLowerCase().includes(t) ||
-        v.visitante?.nombre?.toLowerCase().includes(t)
-      );
-    });
-  }, [histVisitas, histTexto, histEstado]);
+    if (!t) return histVisitas;
+    return histVisitas.filter(v =>
+      v.expediente?.toLowerCase().includes(t) ||
+      v.pacienteNombre?.toLowerCase().includes(t) ||
+      v.servicio?.toLowerCase().includes(t) ||
+      v.visitante?.nombre?.toLowerCase().includes(t)
+    );
+  }, [histVisitas, histTexto]);
 
   // Al cambiar la búsqueda o el tab, volver a la primera página de tarjetas.
   useEffect(() => { setTarjetasVisibles(TARJETAS_PAGINA); }, [tarjetaTexto, tab]);
@@ -443,9 +455,6 @@ export default function VisitasPage() {
               ["cancelada", "Cancelada"],
             ] as const).map(([val, label]) => {
               const activo = histEstado === val;
-              const cuenta = val === "todos"
-                ? histVisitas.length
-                : histVisitas.filter(v => v.estado === val).length;
               return (
                 <button
                   key={val}
@@ -456,7 +465,7 @@ export default function VisitasPage() {
                       : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400 dark:hover:border-amber-700"
                   }`}
                 >
-                  {label} <span className={activo ? "text-white/80" : "text-slate-400"}>({cuenta})</span>
+                  {label}
                 </button>
               );
             })}
