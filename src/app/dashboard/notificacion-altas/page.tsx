@@ -105,6 +105,7 @@ export default function NotificacionAltasPage() {
           id: d.id, ...data,
           horaNotificacion: toDate(data.horaNotificacion),
           creadoEn: toDate(data.creadoEn) ?? new Date(),
+          actualizadoEn: toDate(data.actualizadoEn),
         } as NotificacionPrealta;
       });
       docs.sort((a, b) => (a.creadoEn?.getTime() ?? 0) - (b.creadoEn?.getTime() ?? 0));
@@ -233,6 +234,11 @@ export default function NotificacionAltasPage() {
                       </span>
                       <p className="text-[11px] text-slate-500 mt-1 whitespace-nowrap">{fmtHora(r.horaNotificacion)}</p>
                       {r.creadoPorNombre && <p className="text-[10px] text-slate-400 truncate" title={r.creadoPorNombre}>por {r.creadoPorNombre}</p>}
+                      {r.actualizadoPorNombre && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate flex items-center gap-1" title={`Actualizado por ${r.actualizadoPorNombre} · ${fmtHora(r.actualizadoEn)}`}>
+                          <Pencil size={9} className="flex-shrink-0" /> {r.actualizadoPorNombre} · {fmtHora(r.actualizadoEn)}
+                        </p>
+                      )}
                     </td>
                     {esTS && (
                       <td className="px-3 py-3 text-right">
@@ -337,6 +343,8 @@ function RegistroModal({ fecha, registro, profile, onClose, notify }: {
           edad: edadNum ?? null,
           horaNotificacion: Timestamp.fromDate(horaADate()),
           actualizadoEn: Timestamp.now(),
+          actualizadoPorId: profile.uid,
+          actualizadoPorNombre: profile.nombre,
         });
         notify("success", "Registro actualizado");
       } else {

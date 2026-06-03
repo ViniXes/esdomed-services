@@ -302,6 +302,8 @@ export interface NotificacionPrealta {
   creadoPorId: string;
   creadoPorNombre: string;
   actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
 }
 
 // ============================================================================
