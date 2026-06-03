@@ -1258,55 +1258,100 @@ function ModalShell({ titulo, icon: Icon, onClose, children, ancho = "max-w-md" 
 // ── Modal: Tarjeta Oficial (Carnet) ──────────────────────────────────────────
 
 function TarjetaCarnetModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onClose: () => void }) {
+  const [flipped, setFlipped] = useState(false);
+
   return (
-    <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose} style={{ perspective: '1000px' }}>
       <div 
-        className="relative w-[340px] h-[520px] bg-slate-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}
+        className="relative w-[340px] h-[520px] cursor-pointer"
+        onClick={e => { e.stopPropagation(); setFlipped(!flipped); }}
         style={{ animation: 'notif-in 0.25s ease-out' }}
       >
-        {/* Header - Navy Blue */}
-        <div className="bg-[#001A33] px-4 py-5 flex items-center justify-center border-b-[6px] border-[#C2A14D]">
-          <img src="/logo_hnes_sidebar.png" alt="Hospital Logo" className="h-16 object-contain brightness-0 invert opacity-90" />
-        </div>
-        
-        {/* Body */}
-        <div className="flex-1 flex flex-col items-center p-6 text-center relative z-10">
-          <div className="text-[#001A33] font-bold text-[22px] tracking-tight leading-tight mb-2">
-            TARJETA DE VISITA
-          </div>
-          <div className="w-16 h-1.5 bg-[#C2A14D] rounded-full mb-6"></div>
-
-          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 w-full mb-4 relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-1.5 h-full bg-[#001A33]"></div>
-             <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-1">Paciente</p>
-             <p className="text-base font-bold text-slate-800 leading-snug">{tarjeta.pacienteNombre}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 w-full">
-            <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center">
-               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Expediente</p>
-               <p className="text-lg font-black text-[#001A33]">{tarjeta.expediente}</p>
+        <div 
+          className="w-full h-full relative transition-transform duration-700"
+          style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+        >
+          {/* FRONT FACE */}
+          <div 
+            className="absolute inset-0 bg-slate-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ backfaceVisibility: 'hidden' }}
+          >
+            {/* Header - Navy Blue */}
+            <div className="bg-[#001A33] px-4 py-5 flex items-center justify-center border-b-[6px] border-[#C2A14D]">
+              <img src="/logo_hnes_sidebar.png" alt="Hospital Logo" className="h-16 object-contain brightness-0 invert opacity-90" />
             </div>
-            <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center">
-               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Identificador</p>
-               <p className="text-lg font-black text-[#C2A14D]">{tarjeta.codigo}</p>
+            
+            {/* Body */}
+            <div className="flex-1 flex flex-col items-center p-6 text-center relative z-10">
+              <div className="text-[#001A33] font-bold text-[22px] tracking-tight leading-tight mb-2">
+                TARJETA DE VISITA
+              </div>
+              <div className="w-16 h-1.5 bg-[#C2A14D] rounded-full mb-6"></div>
+
+              <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 w-full mb-4 relative overflow-hidden">
+                 <div className="absolute top-0 left-0 w-1.5 h-full bg-[#001A33]"></div>
+                 <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-1">Paciente</p>
+                 <p className="text-base font-bold text-slate-800 leading-snug">{tarjeta.pacienteNombre}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center">
+                   <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Expediente</p>
+                   <p className="text-lg font-black text-[#001A33]">{tarjeta.expediente}</p>
+                </div>
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center">
+                   <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Identificador</p>
+                   <p className="text-lg font-black text-[#C2A14D]">{tarjeta.codigo}</p>
+                </div>
+              </div>
+
+              <div className="mt-auto pt-6 w-full text-center space-y-2">
+                <p className="text-sm text-slate-600 font-medium uppercase tracking-wide">{tarjeta.servicio}</p>
+                {tarjeta.cama && <p className="text-sm font-bold text-slate-700 bg-slate-200 inline-block px-4 py-1.5 rounded-full border border-slate-300 shadow-sm">Cama {tarjeta.cama}</p>}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-[#001A33] h-10 flex items-center justify-center">
+               <p className="text-[10px] text-white/50 uppercase">Toca para girar</p>
             </div>
           </div>
 
-          <div className="mt-auto pt-6 w-full text-center space-y-2">
-            <p className="text-sm text-slate-600 font-medium uppercase tracking-wide">{tarjeta.servicio}</p>
-            {tarjeta.cama && <p className="text-sm font-bold text-slate-700 bg-slate-200 inline-block px-4 py-1.5 rounded-full border border-slate-300 shadow-sm">Cama {tarjeta.cama}</p>}
-          </div>
-        </div>
+          {/* BACK FACE */}
+          <div 
+            className="absolute inset-0 bg-slate-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+          >
+            {/* Header */}
+            <div className="bg-[#001A33] px-4 py-4 flex items-center justify-center border-b-[6px] border-[#C2A14D]">
+              <p className="text-white font-bold text-sm tracking-widest uppercase">Autorizados</p>
+            </div>
 
-        {/* Footer */}
-        <div className="bg-[#001A33] py-3 text-center">
-          <p className="text-[10px] text-white/80 uppercase tracking-[0.25em] font-semibold">Uso Oficial</p>
+            {/* Body */}
+            <div className="flex-1 flex flex-col p-5 overflow-y-auto bg-white">
+              {tarjeta.listaBlanca.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center mt-10">Sin autorizados registrados.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {tarjeta.listaBlanca.map((v, i) => (
+                    <li key={i} className="pb-3 border-b border-slate-100 last:border-0">
+                      <p className="text-sm font-bold text-[#001A33]">{v.nombre}</p>
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">{v.dui || "Sin documento"} • {v.parentesco}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-[#001A33] h-10 flex items-center justify-center">
+              <p className="text-[10px] text-white/50 uppercase">Toca para girar</p>
+            </div>
+          </div>
         </div>
         
         {/* Close Button */}
-        <button onClick={onClose} className="absolute top-3 right-3 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full transition-colors z-20">
+        <button onClick={e => { e.stopPropagation(); onClose(); }} className="absolute -top-3 -right-3 p-2 bg-slate-800 hover:bg-slate-900 text-white rounded-full transition-colors z-[70] shadow-lg">
           <X size={16} />
         </button>
       </div>
