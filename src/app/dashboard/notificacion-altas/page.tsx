@@ -195,11 +195,19 @@ export default function NotificacionAltasPage() {
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-10" />
+                <col className="w-24" />
+                <col />
+                <col />
+                <col className="w-32" />
+                {esTS && <col className="w-16" />}
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                  {["N°", "Servicio", "Exp.", "Gén.", "Paciente", "Familiar", "Edad paciente", "Hora", "Estado", "Registró", ""].map((h, i) => (
-                    <th key={i} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {["N°", "Ubicación", "Paciente", "Familiar", "Estado", ...(esTS ? [""] : [])].map((h, i) => (
+                    <th key={i} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -207,27 +215,27 @@ export default function NotificacionAltasPage() {
                 {filtrados.map((r, i) => (
                   <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 align-top">
                     <td className="px-3 py-3 text-slate-500">{i + 1}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap" title={r.servicio}>{ubicacionLabel(r.servicio, r.cama)}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">{r.pacienteExpediente}</td>
-                    <td className="px-3 py-3 text-slate-600 dark:text-slate-400">{generoLetra(r.genero)}</td>
-                    <td className="px-3 py-3 min-w-[180px]">
+                    <td className="px-3 py-3 font-mono text-xs font-semibold text-slate-600 dark:text-slate-400 break-words" title={r.servicio}>{ubicacionLabel(r.servicio, r.cama)}</td>
+                    <td className="px-3 py-3">
                       <p className="font-medium text-slate-800 dark:text-slate-200">{r.pacienteNombre}</p>
-                      {r.observacionesPaciente && <p className="text-xs text-slate-500 whitespace-pre-line">{r.observacionesPaciente}</p>}
+                      <p className="text-xs text-slate-500">
+                        Exp. {r.pacienteExpediente} · {generoLetra(r.genero)}{r.edad != null ? ` · ${r.edad} años` : ""}
+                      </p>
+                      {r.observacionesPaciente && <p className="text-xs text-slate-500 whitespace-pre-line mt-0.5">{r.observacionesPaciente}</p>}
                     </td>
-                    <td className="px-3 py-3 min-w-[180px]">
+                    <td className="px-3 py-3">
                       <p className="text-slate-800 dark:text-slate-200">{r.familiarNombre || "—"}</p>
-                      {r.observacionesFamiliar && <p className="text-xs text-slate-500 whitespace-pre-line">{r.observacionesFamiliar}</p>}
+                      {r.observacionesFamiliar && <p className="text-xs text-slate-500 whitespace-pre-line mt-0.5">{r.observacionesFamiliar}</p>}
                     </td>
-                    <td className="px-3 py-3 text-slate-600 dark:text-slate-400">{r.edad ?? "—"}</td>
-                    <td className="px-3 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{fmtHora(r.horaNotificacion)}</td>
                     <td className="px-3 py-3">
                       <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-1 rounded-lg border whitespace-nowrap ${ESTADO_CFG[r.estado].c}`}>
                         {ESTADO_CFG[r.estado].label}
                       </span>
+                      <p className="text-[11px] text-slate-500 mt-1 whitespace-nowrap">{fmtHora(r.horaNotificacion)}</p>
+                      {r.creadoPorNombre && <p className="text-[10px] text-slate-400 truncate" title={r.creadoPorNombre}>por {r.creadoPorNombre}</p>}
                     </td>
-                    <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">{r.creadoPorNombre || "—"}</td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                      {esTS && (
+                    {esTS && (
+                      <td className="px-3 py-3 text-right">
                         <div className="flex items-center gap-1.5 justify-end">
                           <button onClick={() => setEditando(r)} className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="Editar">
                             <Pencil size={15} />
@@ -236,8 +244,8 @@ export default function NotificacionAltasPage() {
                             <Trash2 size={15} />
                           </button>
                         </div>
-                      )}
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -610,7 +610,21 @@ export default function VisitasPage() {
         <PrimeraVisitaModal
           paciente={nuevaTarjetaPaciente}
           onClose={() => setNuevaTarjetaPaciente(null)}
-          onCreada={(tarjeta) => { setNuevaTarjetaPaciente(null); setPicker({ tarjeta }); }}
+          onCreada={async (tarjeta, titular) => {
+            setNuevaTarjetaPaciente(null);
+            // Primera vez: el titular recién capturado es quien entra → entrada directa, sin picker.
+            if (titular && profile) {
+              try {
+                await crearVisitaEntrada(tarjeta, titular, { id: profile.uid, nombre: profile.nombre });
+                notify("success", `Entrada registrada · ${titular.nombre}`);
+              } catch {
+                notify("error", "Tarjeta creada, pero no se pudo registrar la entrada");
+              }
+            } else {
+              // La tarjeta ya existía: elegir quién está usándola.
+              setPicker({ tarjeta });
+            }
+          }}
         />
       )}
 
@@ -659,6 +673,31 @@ async function registrarSalida(v: Visita, por: { id: string; nombre: string }) {
     estado: "finalizada",
     salidaPorId: por.id,
     salidaPorNombre: por.nombre,
+  });
+}
+
+// Crea una visita en curso (entrada espontánea) para un visitante ya elegido. Graba la
+// ubicación VIGENTE del paciente y quién hizo la entrada. `visitante` debe venir limpio.
+async function crearVisitaEntrada(tarjeta: TarjetaVisita, visitante: VisitanteInfo, por: { id: string; nombre: string }) {
+  const ubic = await ubicacionPaciente(tarjeta.pacienteId);
+  await addDoc(collection(db, "visitas"), {
+    fecha: hoyStr(),
+    tarjetaId: tarjeta.id,
+    pacienteId: tarjeta.pacienteId,
+    expediente: tarjeta.expediente,
+    pacienteNombre: tarjeta.pacienteNombre,
+    servicio: ubic?.servicio ?? tarjeta.servicio,
+    cama: ubic?.cama ?? tarjeta.cama ?? "",
+    programada: false,
+    visitante,
+    esTitular: claveVisitante(visitante) === claveVisitante(tarjeta.titular),
+    estado: "en_curso",
+    entradaEn: Timestamp.now(),
+    entradaPorId: por.id,
+    entradaPorNombre: por.nombre,
+    registradoPorId: por.id,
+    registradoPorNombre: por.nombre,
+    creadoEn: Timestamp.now(),
   });
 }
 
@@ -844,7 +883,9 @@ function PacienteRosterCard({ paciente, tarjeta, visitaEnCurso, visitoHoy, onEnt
 function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
   paciente: Paciente;
   onClose: () => void;
-  onCreada: (tarjeta: TarjetaVisita) => void;
+  // titular presente = tarjeta recién creada → registrar su entrada directa.
+  // titular ausente = ya existía una tarjeta activa → elegir quién entra (picker).
+  onCreada: (tarjeta: TarjetaVisita, titular?: VisitanteInfo) => void;
 }) {
   const { profile } = useAuth();
   const notify = useFeedback();
@@ -889,7 +930,7 @@ function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
         servicio: paciente.servicioActual, cama: paciente.camaActual ?? "", titular: limpio,
         listaBlanca: [limpio], estado: "activa", creadoEn: new Date(),
         creadoPor: profile.uid, creadoPorNombre: profile.nombre,
-      });
+      }, limpio);
     } catch {
       notify("error", "No se pudo crear la tarjeta");
       setGuardando(false);
@@ -981,27 +1022,16 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
         }
       }
 
-      // La visita registra la ubicación VIGENTE del paciente (no el snapshot de la
-      // tarjeta), por si fue trasladado: así el TS sabe a dónde mandar al visitante.
-      const ubic = await ubicacionPaciente(tarjeta.pacienteId);
-      const servicio = ubic?.servicio ?? tarjeta.servicio;
-      const cama = ubic?.cama ?? tarjeta.cama ?? "";
-
-      const base = {
-        visitante: limpio, esTitular: esTitular(limpio), estado: "en_curso" as const,
-        entradaEn: Timestamp.now(), entradaPorId: profile.uid, entradaPorNombre: profile.nombre,
-      };
-
       if (visitaProgramadaId) {
-        await updateDoc(doc(db, "visitas", visitaProgramadaId), { ...base, servicio, cama });
-      } else {
-        await addDoc(collection(db, "visitas"), {
-          fecha: hoyStr(), tarjetaId: tarjeta.id, pacienteId: tarjeta.pacienteId,
-          expediente: tarjeta.expediente, pacienteNombre: tarjeta.pacienteNombre,
-          servicio, cama, programada: false,
-          registradoPorId: profile.uid, registradoPorNombre: profile.nombre,
-          creadoEn: Timestamp.now(), ...base,
+        // Convierte una visita programada en "en curso" con la ubicación vigente del paciente.
+        const ubic = await ubicacionPaciente(tarjeta.pacienteId);
+        await updateDoc(doc(db, "visitas", visitaProgramadaId), {
+          visitante: limpio, esTitular: esTitular(limpio), estado: "en_curso",
+          entradaEn: Timestamp.now(), entradaPorId: profile.uid, entradaPorNombre: profile.nombre,
+          servicio: ubic?.servicio ?? tarjeta.servicio, cama: ubic?.cama ?? tarjeta.cama ?? "",
         });
+      } else {
+        await crearVisitaEntrada(tarjeta, limpio, { id: profile.uid, nombre: profile.nombre });
       }
       notify("success", `Entrada registrada · ${limpio.nombre}`);
       onClose();
