@@ -13,7 +13,7 @@ import type { Paciente, TarjetaVisita, Visita, VisitanteInfo } from "@/types";
 import {
   DoorOpen, Plus, X, LogIn, LogOut, Star, UserPlus, IdCard,
   Search, CheckCircle2, CalendarDays, MessageSquare, CreditCard, Ban, Trash2,
-  AlertTriangle, ArrowLeft, ArrowRight,
+  AlertTriangle, ArrowLeft, ArrowRight, Eye,
 } from "lucide-react";
 
 // ── Estilos compartidos ───────────────────────────────────────────────────────
@@ -150,6 +150,7 @@ export default function VisitasPage() {
   const [picker, setPicker] = useState<{ tarjeta: TarjetaVisita; visitaProgramadaId?: string } | null>(null);
   const [detalle, setDetalle] = useState<Visita | null>(null);
   const [tarjetaSel, setTarjetaSel] = useState<TarjetaVisita | null>(null);
+  const [carnet, setCarnet] = useState<TarjetaVisita | null>(null);
 
   // Feedback de éxito / error
   const feedbackId = useRef(0);
@@ -383,7 +384,7 @@ export default function VisitasPage() {
             <p className="text-sm text-slate-400 py-10 text-center">Ningún paciente coincide con la búsqueda — aún no tiene tarjeta creada.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {tarjetasFiltradas.map(t => <TarjetaCard key={t.id} t={t} onClick={() => setTarjetaSel(t)} />)}
+              {tarjetasFiltradas.map(t => <TarjetaCard key={t.id} t={t} onClick={() => setTarjetaSel(t)} onVerCarnet={() => setCarnet(t)} />)}
             </div>
           )}
         </>
@@ -471,6 +472,13 @@ export default function VisitasPage() {
           visita={detalle}
           onClose={() => setDetalle(null)}
           onRegistrarEntrada={() => abrirEntrada(detalle)}
+        />
+      )}
+
+      {carnet && (
+        <TarjetaCarnetModal
+          tarjeta={carnet}
+          onClose={() => setCarnet(null)}
         />
       )}
 
@@ -587,7 +595,7 @@ function VisitaCard({ v, onClick, onEntrada, onSalida }: {
   );
 }
 
-function TarjetaCard({ t, onClick }: { t: TarjetaVisita; onClick: () => void }) {
+function TarjetaCard({ t, onClick, onVerCarnet }: { t: TarjetaVisita; onClick: () => void; onVerCarnet: () => void }) {
   return (
     <div onClick={onClick}
       className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5 cursor-pointer hover:border-amber-400 dark:hover:border-amber-700 transition-colors">
@@ -595,7 +603,12 @@ function TarjetaCard({ t, onClick }: { t: TarjetaVisita; onClick: () => void }) 
         <span className="inline-flex items-center gap-1.5 font-mono text-sm font-bold text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-800 px-2 py-1 rounded-lg">
           <CreditCard size={13} /> {t.codigo}
         </span>
-        {t.estado !== "activa" && <span className="text-[11px] font-semibold text-slate-400">{t.estado}</span>}
+        <div className="flex items-center gap-3">
+          {t.estado !== "activa" && <span className="text-[11px] font-semibold text-slate-400">{t.estado}</span>}
+          <button onClick={e => { e.stopPropagation(); onVerCarnet(); }} className="text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 transition-colors" title="Ver carnet oficial">
+            <Eye size={18} />
+          </button>
+        </div>
       </div>
       <div>
         <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{t.pacienteNombre}</p>
@@ -1237,6 +1250,65 @@ function ModalShell({ titulo, icon: Icon, onClose, children, ancho = "max-w-md" 
           </button>
         </div>
         <div className="overflow-y-auto flex-1 p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: Tarjeta Oficial (Carnet) ──────────────────────────────────────────
+
+function TarjetaCarnetModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+      <div 
+        className="relative w-[340px] h-[520px] bg-slate-50 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
+        style={{ animation: 'notif-in 0.25s ease-out' }}
+      >
+        {/* Header - Navy Blue */}
+        <div className="bg-[#001A33] px-4 py-5 flex items-center justify-center border-b-[6px] border-[#C2A14D]">
+          <img src="/logo_hnes_sidebar.png" alt="Hospital Logo" className="h-16 object-contain brightness-0 invert opacity-90" />
+        </div>
+        
+        {/* Body */}
+        <div className="flex-1 flex flex-col items-center p-6 text-center relative z-10">
+          <div className="text-[#001A33] font-bold text-[22px] tracking-tight leading-tight mb-2">
+            TARJETA DE VISITA
+          </div>
+          <div className="w-16 h-1.5 bg-[#C2A14D] rounded-full mb-6"></div>
+
+          <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-4 w-full mb-4 relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-1.5 h-full bg-[#001A33]"></div>
+             <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-1">Paciente</p>
+             <p className="text-base font-bold text-slate-800 leading-snug">{tarjeta.pacienteNombre}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center">
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Expediente</p>
+               <p className="text-lg font-black text-[#001A33]">{tarjeta.expediente}</p>
+            </div>
+            <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-3 flex flex-col items-center justify-center">
+               <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Identificador</p>
+               <p className="text-lg font-black text-[#C2A14D]">{tarjeta.codigo}</p>
+            </div>
+          </div>
+
+          <div className="mt-auto pt-6 w-full text-center space-y-2">
+            <p className="text-sm text-slate-600 font-medium uppercase tracking-wide">{tarjeta.servicio}</p>
+            {tarjeta.cama && <p className="text-sm font-bold text-slate-700 bg-slate-200 inline-block px-4 py-1.5 rounded-full border border-slate-300 shadow-sm">Cama {tarjeta.cama}</p>}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="bg-[#001A33] py-3 text-center">
+          <p className="text-[10px] text-white/80 uppercase tracking-[0.25em] font-semibold">Uso Oficial</p>
+        </div>
+        
+        {/* Close Button */}
+        <button onClick={onClose} className="absolute top-3 right-3 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full transition-colors z-20">
+          <X size={16} />
+        </button>
       </div>
     </div>
   );
