@@ -905,7 +905,14 @@ function PrimeraVisitaModal({ paciente, onClose }: {
 }) {
   const { profile } = useAuth();
   const notify = useFeedback();
-  const [titular, setTitular] = useState<VisitanteInfo>({ nombre: "", parentesco: "", dui: "", telefono: "" });
+  // Pre-llenar el titular desde el responsable que ESDOMED ya capturó en el paciente.
+  const prefillResponsable = useMemo<VisitanteInfo | null>(() => {
+    const r = paciente.responsable;
+    if (!r?.nombre) return null;
+    const parentesco = PARENTESCOS.find(p => p.toLowerCase() === (r.parentesco ?? "").trim().toLowerCase()) ?? "";
+    return { nombre: r.nombre.toUpperCase(), parentesco, dui: r.documento ?? "", telefono: r.telefono ?? "" };
+  }, [paciente.responsable]);
+  const [titular, setTitular] = useState<VisitanteInfo>(prefillResponsable ?? { nombre: "", parentesco: "", dui: "", telefono: "" });
   // Cuántas tarjetas existen ya para este expediente (reingresos), para numerar el código.
   const [previasCount, setPreviasCount] = useState(0);
   const [tarjetaExistente, setTarjetaExistente] = useState<TarjetaVisita | null>(null);
@@ -993,6 +1000,11 @@ function PrimeraVisitaModal({ paciente, onClose }: {
                   ? `Ya existe la tarjeta ${tarjetaExistente.codigo} · se registrará la entrada`
                   : `Se creará la tarjeta ${codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1)}${previasCount > 0 ? ` · internamiento #${previasCount + 1} de este expediente` : ""}`}
               </p>
+              {prefillResponsable && (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 size={12} /> Pre-cargado del responsable registrado por ESDOMED · verificá los datos
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input className={inputCls} placeholder="Nombre completo *" value={titular.nombre}
                   onChange={e => setTitular({ ...titular, nombre: e.target.value.toUpperCase() })} />

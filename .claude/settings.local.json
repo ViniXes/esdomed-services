@@ -65,7 +65,9 @@
       "Bash(findstr -i \"traslado\")",
       "Bash(Find-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\" -Name \"*Servicio*\" -o -Name \"*servicio*\" -o -Name \"*cama*\" -o -Name \"*Cama*\")",
       "Bash(Select-Object -First 30)",
-      "Bash(xargs grep -l \"camaActual\\\\|servicioActual\")"
+      "Bash(xargs grep -l \"camaActual\\\\|servicioActual\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\" -Hidden | Where-Object {$_.Name -match \"env|service|firebase\"} | Select-Object Name)",
+      "Bash(node scripts/limpiar-colecciones.mjs --dry-run)"
     ]
   }
 }
