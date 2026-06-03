@@ -11,7 +11,7 @@ import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteA
 import { PARENTESCOS } from "@/lib/parentescos";
 import type { Paciente, TarjetaVisita, Visita, VisitanteInfo } from "@/types";
 import {
-  DoorOpen, Plus, X, LogIn, LogOut, Star, UserPlus, IdCard,
+  DoorOpen, Plus, X, LogIn, LogOut, User, UserPlus, IdCard,
   Search, CheckCircle2, CalendarDays, MessageSquare, CreditCard, Ban, Trash2,
   AlertTriangle, ArrowLeft, ArrowRight, Eye,
 } from "lucide-react";
@@ -431,7 +431,7 @@ export default function VisitasPage() {
                         </td>
                         <td className="px-4 py-3">
                           <p className="text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                            {v.esTitular && <Star size={12} className="text-amber-500 fill-amber-500" />}
+                            {v.esTitular && <User size={12} className="text-amber-500 fill-amber-500" />}
                             {v.visitante?.nombre ?? "—"}
                           </p>
                           <p className="text-xs text-slate-500">{v.visitante?.parentesco}{v.visitante?.dui ? ` · ${v.visitante.dui}` : ""}</p>
@@ -564,7 +564,7 @@ function VisitaCard({ v, onClick, onEntrada, onSalida }: {
         <p className="text-xs text-slate-500 mt-0.5">{v.servicio} · Cama {v.cama || "—"}</p>
         {v.visitante && (
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 flex items-center gap-1 flex-wrap">
-            {v.esTitular && <Star size={12} className="text-amber-500 fill-amber-500" />}
+            {v.esTitular && <User size={12} className="text-amber-500 fill-amber-500" />}
             <span className="font-medium">{v.visitante.nombre}</span>
             <span className="text-slate-400">· {v.visitante.parentesco}</span>
             {v.entradaEn && <span className="text-slate-400">· entró {fmtHora(v.entradaEn)}</span>}
@@ -621,7 +621,7 @@ function TarjetaCard({ t, onClick, onVerCarnet }: { t: TarjetaVisita; onClick: (
         <div className="flex flex-wrap gap-1.5">
           {t.listaBlanca.map((v, i) => (
             <span key={i} className="inline-flex items-center gap-1 text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-lg">
-              {claveVisitante(v) === claveVisitante(t.titular) && <Star size={10} className="text-amber-500 fill-amber-500" />}
+              {claveVisitante(v) === claveVisitante(t.titular) && <User size={10} className="text-amber-500 fill-amber-500" />}
               {v.nombre}
             </span>
           ))}
@@ -934,7 +934,7 @@ function ElegirVisitanteModal({ tarjeta, visitaProgramadaId, onClose }: {
             <button key={i} onClick={() => registrarEntrada(v, false)} disabled={guardando}
               className="w-full text-left px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-all disabled:opacity-50">
               <span className="flex items-center gap-2">
-                {esTitular(v) && <Star size={14} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
+                {esTitular(v) && <User size={14} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
                 <span className="font-medium text-slate-800 dark:text-slate-200">{v.nombre}</span>
                 <span className="text-xs text-slate-500">· {v.parentesco}{esTitular(v) ? " · titular" : ""}</span>
               </span>
@@ -1181,7 +1181,7 @@ function TarjetaDetalleModal({ tarjeta, onClose }: { tarjeta: TarjetaVisita; onC
               <div key={i} className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-200">
-                    {esTitular(v) && <Star size={13} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
+                    {esTitular(v) && <User size={13} className="text-amber-500 fill-amber-500 flex-shrink-0" />}
                     <span className="truncate">{v.nombre}</span>
                   </p>
                   <p className="text-xs text-slate-500">
