@@ -22,6 +22,12 @@ const ACENTOS = {
     on: "bg-blue-600 text-white border-blue-600",
     spin: "border-blue-500",
   },
+  amber: {
+    sel: "border-amber-500 bg-amber-50 dark:bg-amber-950 ring-1 ring-amber-500/30",
+    hover: "hover:border-amber-300 dark:hover:border-amber-800",
+    on: "bg-amber-600 text-white border-amber-600",
+    spin: "border-amber-500",
+  },
 } as const;
 
 const inputCls =
