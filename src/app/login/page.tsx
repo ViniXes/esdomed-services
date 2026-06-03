@@ -56,7 +56,7 @@ export default function LoginPage() {
         {/* Card */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/10 dark:shadow-black/40 p-7">
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading mb-1">Iniciar sesión</h1>
-          <p className="text-xs text-slate-500 mb-6">Portal ESDOMED — acceso restringido</p>
+          <p className="text-xs text-slate-500 mb-6">Portal ESDOMED</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
