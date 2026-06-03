@@ -51,3 +51,6 @@ next-env.d.ts
 
 # ejemplos / archivos de referencia internos
 /examples
+
+# presentaciones
+/presentacion
