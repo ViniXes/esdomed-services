@@ -985,6 +985,7 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
   const [comentarios, setComentarios] = useState(visita.comentarios ?? "");
   const [guardando, setGuardando] = useState(false);
   const [guardado, setGuardado] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const guardarComentario = async () => {
     if (!visita.id) return;
@@ -1018,12 +1019,39 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
 
   const esHoy = visita.fecha === hoyStr();
 
+  if (confirmCancel) {
+    return (
+      <ModalShell onClose={() => setConfirmCancel(false)} titulo="Cancelar Visita" icon={AlertTriangle} ancho="max-w-sm">
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            ¿Estás seguro que deseas cancelar esta visita programada?
+          </p>
+          <div className="flex gap-2 pt-2">
+            <button onClick={() => setConfirmCancel(false)} className="flex-1 py-2 text-sm font-semibold rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors">
+              No, volver
+            </button>
+            <button onClick={cancelar} className="flex-1 py-2 text-sm font-semibold rounded-xl text-white bg-rose-600 hover:bg-rose-500 transition-colors">
+              Sí, cancelar
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+    );
+  }
+
   return (
     <ModalShell onClose={onClose} titulo={`Visita · ${visita.expediente}`} icon={DoorOpen} ancho="max-w-lg">
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <EstadoBadge estado={visita.estado} />
-          <span className="text-xs text-slate-500 flex items-center gap-1"><CalendarDays size={13} /> {fmtFechaStr(visita.fecha)}</span>
+          <div className="flex items-center gap-3">
+             <span className="text-xs text-slate-500 flex items-center gap-1"><CalendarDays size={13} /> {fmtFechaStr(visita.fecha)}</span>
+             {visita.estado === "programada" && (
+                <button onClick={() => setConfirmCancel(true)} className="text-xs font-semibold text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 transition-colors bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-2.5 py-1 rounded-md" title="Cancelar visita">
+                  <Ban size={12} /> Cancelar
+                </button>
+             )}
+          </div>
         </div>
 
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-2.5">
@@ -1056,26 +1084,22 @@ function DetalleVisitaModal({ visita, onClose, onRegistrarEntrada }: {
         </div>
 
         {/* Acciones según estado */}
-        <div className="flex flex-col sm:flex-row gap-2 border-t border-slate-200 dark:border-slate-800 mt-1 pt-4">
-          {visita.estado === "programada" && esHoy && (
-            <button onClick={onRegistrarEntrada}
-              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl transition-colors">
-              <LogIn size={16} /> Registrar entrada
-            </button>
-          )}
-          {visita.estado === "en_curso" && (
-            <button onClick={salida}
-              className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-900 hover:bg-rose-100 rounded-xl transition-colors">
-              <LogOut size={16} /> Registrar salida
-            </button>
-          )}
-          {visita.estado === "programada" && (
-            <button onClick={cancelar}
-              className="inline-flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-medium text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-300 dark:border-slate-700 rounded-xl transition-colors">
-              <Ban size={15} /> Cancelar
-            </button>
-          )}
-        </div>
+        {(visita.estado === "programada" && esHoy || visita.estado === "en_curso") && (
+          <div className="flex flex-col sm:flex-row gap-2 border-t border-slate-200 dark:border-slate-800 mt-1 pt-4">
+            {visita.estado === "programada" && esHoy && (
+              <button onClick={onRegistrarEntrada}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl transition-colors">
+                <LogIn size={16} /> Registrar entrada
+              </button>
+            )}
+            {visita.estado === "en_curso" && (
+              <button onClick={salida}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-900 hover:bg-rose-100 rounded-xl transition-colors">
+                <LogOut size={16} /> Registrar salida
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </ModalShell>
   );
