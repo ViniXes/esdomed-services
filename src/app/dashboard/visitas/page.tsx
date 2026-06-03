@@ -155,6 +155,7 @@ export default function VisitasPage() {
 
   const [visitasHoy, setVisitasHoy] = useState<Visita[]>([]);
   const [hoyTexto, setHoyTexto] = useState("");
+  const [hoyEstado, setHoyEstado] = useState<Visita["estado"] | "todos">("todos");
   const [tarjetas, setTarjetas] = useState<TarjetaVisita[]>([]);
   // Roster de pacientes activos (pestaña "Pacientes activos").
   const [pacientesActivos, setPacientesActivos] = useState<Paciente[]>([]);
@@ -280,8 +281,8 @@ export default function VisitasPage() {
   const enCurso     = visitasHoy.filter(v => v.estado === "en_curso");
   const finalizadas = visitasHoy.filter(v => v.estado === "finalizada");
   const canceladas  = visitasHoy.filter(v => v.estado === "cancelada");
-  // "Efectivas" = visitas donde el familiar sí entró (en curso + finalizadas); excluye canceladas.
-  const efectivas   = enCurso.length + finalizadas.length;
+  // "Efectivas" = visitas ya completadas (finalizadas). Las en curso van en su propio contador.
+  const efectivas   = finalizadas.length;
 
   // Buscador rápido del tab Hoy (no afecta los contadores, que reflejan el día completo).
   const coincideHoy = useMemo(() => {
@@ -296,6 +297,14 @@ export default function VisitasPage() {
   const programadasHoy = programadas.filter(coincideHoy);
   const finalizadasHoy = finalizadas.filter(coincideHoy);
   const canceladasHoy  = canceladas.filter(coincideHoy);
+
+  // Filtro por estado del tab Hoy (chips). "todos" muestra todas las secciones.
+  const verHoy = (e: Visita["estado"]) => hoyEstado === "todos" || hoyEstado === e;
+  const verEnCursoHoy    = verHoy("en_curso")  && enCursoHoy.length > 0;
+  const verProgramadasHoy = hoyEstado === "todos" && programadasHoy.length > 0;
+  const verFinalizadasHoy = verHoy("finalizada") && finalizadasHoy.length > 0;
+  const verCanceladasHoy  = verHoy("cancelada")  && canceladasHoy.length > 0;
+  const hayVisiblesHoy = verEnCursoHoy || verProgramadasHoy || verFinalizadasHoy || verCanceladasHoy;
 
   // Mapas para enriquecer cada paciente del roster: su tarjeta activa y su visita en curso de hoy.
   const tarjetaPorPaciente = new Map<string, TarjetaVisita>();
@@ -402,36 +411,61 @@ export default function VisitasPage() {
           </div>
 
           {visitasHoy.length > 0 && (
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={hoyTexto} onChange={e => setHoyTexto(e.target.value)}
-                placeholder="Buscar en las visitas de hoy por paciente, expediente, visitante o servicio…"
-                className={inputCls + " pl-9"} />
-            </div>
+            <>
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={hoyTexto} onChange={e => setHoyTexto(e.target.value)}
+                  placeholder="Buscar en las visitas de hoy por paciente, expediente, visitante o servicio…"
+                  className={inputCls + " pl-9"} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {([
+                  ["todos", "Todas"],
+                  ["en_curso", "En curso"],
+                  ["finalizada", "Finalizadas"],
+                  ["cancelada", "Canceladas"],
+                ] as const).map(([val, label]) => {
+                  const activo = hoyEstado === val;
+                  return (
+                    <button
+                      key={val}
+                      onClick={() => setHoyEstado(val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                        activo
+                          ? "bg-amber-500 border-amber-500 text-white"
+                          : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400 dark:hover:border-amber-700"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {visitasHoy.length === 0 && !permissionError ? (
             <EmptyState texto="No hay visitas registradas hoy." sub="Registra una entrada desde “Pacientes activos”." />
-          ) : enCursoHoy.length === 0 && programadasHoy.length === 0 && finalizadasHoy.length === 0 && canceladasHoy.length === 0 ? (
-            <p className="text-sm text-slate-400 py-10 text-center">Ninguna visita de hoy coincide con la búsqueda.</p>
+          ) : !hayVisiblesHoy ? (
+            <p className="text-sm text-slate-400 py-10 text-center">Ninguna visita de hoy coincide con el filtro.</p>
           ) : (
             <div className="space-y-6">
-              {enCursoHoy.length > 0 && (
+              {verEnCursoHoy && (
                 <Seccion titulo="En curso">
                   <Grid>{enCursoHoy.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} onSalida={() => handleSalida(v)} />)}</Grid>
                 </Seccion>
               )}
-              {programadasHoy.length > 0 && (
+              {verProgramadasHoy && (
                 <Seccion titulo="Programadas · por ingresar">
                   <Grid>{programadasHoy.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} onEntrada={() => abrirEntrada(v)} />)}</Grid>
                 </Seccion>
               )}
-              {finalizadasHoy.length > 0 && (
+              {verFinalizadasHoy && (
                 <Seccion titulo="Finalizadas">
                   <Grid>{finalizadasHoy.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} />)}</Grid>
                 </Seccion>
               )}
-              {canceladasHoy.length > 0 && (
+              {verCanceladasHoy && (
                 <Seccion titulo="Canceladas">
                   <Grid>{canceladasHoy.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} />)}</Grid>
                 </Seccion>
@@ -610,21 +644,6 @@ export default function VisitasPage() {
         <PrimeraVisitaModal
           paciente={nuevaTarjetaPaciente}
           onClose={() => setNuevaTarjetaPaciente(null)}
-          onCreada={async (tarjeta, titular) => {
-            setNuevaTarjetaPaciente(null);
-            // Primera vez: el titular recién capturado es quien entra → entrada directa, sin picker.
-            if (titular && profile) {
-              try {
-                await crearVisitaEntrada(tarjeta, titular, { id: profile.uid, nombre: profile.nombre });
-                notify("success", `Entrada registrada · ${titular.nombre}`);
-              } catch {
-                notify("error", "Tarjeta creada, pero no se pudo registrar la entrada");
-              }
-            } else {
-              // La tarjeta ya existía: elegir quién está usándola.
-              setPicker({ tarjeta });
-            }
-          }}
         />
       )}
 
@@ -880,63 +899,73 @@ function PacienteRosterCard({ paciente, tarjeta, visitaEnCurso, visitoHoy, onEnt
 
 // ── Modal: Primera visita (crea la tarjeta + titular para un paciente sin tarjeta) ──
 
-function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
+function PrimeraVisitaModal({ paciente, onClose }: {
   paciente: Paciente;
   onClose: () => void;
-  // titular presente = tarjeta recién creada → registrar su entrada directa.
-  // titular ausente = ya existía una tarjeta activa → elegir quién entra (picker).
-  onCreada: (tarjeta: TarjetaVisita, titular?: VisitanteInfo) => void;
 }) {
   const { profile } = useAuth();
   const notify = useFeedback();
   const [titular, setTitular] = useState<VisitanteInfo>({ nombre: "", parentesco: "", dui: "", telefono: "" });
   // Cuántas tarjetas existen ya para este expediente (reingresos), para numerar el código.
   const [previasCount, setPreviasCount] = useState(0);
+  const [tarjetaExistente, setTarjetaExistente] = useState<TarjetaVisita | null>(null);
   const [verificando, setVerificando] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  // onCreada se llama UNA sola vez (sea por carrera o por creación). Sin este guard, el
-  // re-render del padre tras crear la tarjeta re-dispara el efecto y abriría el picker.
-  const resueltoRef = useRef(false);
 
-  // Contar tarjetas previas del expediente; si ya hay una activa (carrera con el roster),
-  // saltar el formulario y continuar directo al picker de entrada.
+  // Detectar si ya hay una tarjeta activa (carrera con el roster) y contar previas del
+  // expediente. Solo depende del paciente — no dispara navegación.
   useEffect(() => {
     let cancel = false;
     (async () => {
       const snap = await getDocs(query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente)));
-      if (cancel || resueltoRef.current) return;
+      if (cancel) return;
       const todas = snap.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita));
-      const activa = todas.find(t => t.pacienteId === paciente.id && t.estado === "activa");
-      if (activa) { resueltoRef.current = true; onCreada(activa); return; }
+      setTarjetaExistente(todas.find(t => t.pacienteId === paciente.id && t.estado === "activa") ?? null);
       setPreviasCount(todas.length);
       setVerificando(false);
     })();
     return () => { cancel = true; };
-  }, [paciente, onCreada]);
+  }, [paciente]);
 
+  // Crea (o reutiliza) la tarjeta y registra DE UNA la entrada del responsable capturado;
+  // luego cierra. No abre el picker: el responsable que se acaba de capturar es quien entra.
   const crear = async () => {
     if (!paciente.id || !profile) return;
     if (!titular.nombre.trim() || !titular.parentesco.trim()) { notify("error", "Faltan datos del titular"); return; }
     setGuardando(true);
     try {
       const limpio = limpiarVisitante(titular);
-      const nombreCompleto = `${paciente.apellidos}, ${paciente.nombres}`;
-      const codigo = codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1);
-      const ref = await addDoc(collection(db, "tarjetas_visita"), {
-        codigo, pacienteId: paciente.id, expediente: paciente.expediente, pacienteNombre: nombreCompleto,
-        servicio: paciente.servicioActual, cama: paciente.camaActual ?? "",
-        titular: limpio, listaBlanca: [limpio], estado: "activa",
-        creadoEn: Timestamp.now(), creadoPor: profile.uid, creadoPorNombre: profile.nombre,
-      });
-      resueltoRef.current = true; // evita que el efecto de verificación también dispare onCreada
-      onCreada({
-        id: ref.id, codigo, pacienteId: paciente.id, expediente: paciente.expediente, pacienteNombre: nombreCompleto,
-        servicio: paciente.servicioActual, cama: paciente.camaActual ?? "", titular: limpio,
-        listaBlanca: [limpio], estado: "activa", creadoEn: new Date(),
-        creadoPor: profile.uid, creadoPorNombre: profile.nombre,
-      }, limpio);
+      let tarjeta: TarjetaVisita;
+      if (tarjetaExistente?.id) {
+        // Caso raro: ya existía tarjeta activa. Reutilizarla y sumar al visitante a la lista blanca.
+        tarjeta = tarjetaExistente;
+        const yaEsta = tarjeta.listaBlanca.some(v => claveVisitante(v) === claveVisitante(limpio));
+        if (!yaEsta) {
+          await updateDoc(doc(db, "tarjetas_visita", tarjetaExistente.id), {
+            listaBlanca: [...tarjeta.listaBlanca, limpio], actualizadoEn: Timestamp.now(),
+          });
+        }
+      } else {
+        const nombreCompleto = `${paciente.apellidos}, ${paciente.nombres}`;
+        const codigo = codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1);
+        const ref = await addDoc(collection(db, "tarjetas_visita"), {
+          codigo, pacienteId: paciente.id, expediente: paciente.expediente, pacienteNombre: nombreCompleto,
+          servicio: paciente.servicioActual, cama: paciente.camaActual ?? "",
+          titular: limpio, listaBlanca: [limpio], estado: "activa",
+          creadoEn: Timestamp.now(), creadoPor: profile.uid, creadoPorNombre: profile.nombre,
+        });
+        tarjeta = {
+          id: ref.id, codigo, pacienteId: paciente.id, expediente: paciente.expediente, pacienteNombre: nombreCompleto,
+          servicio: paciente.servicioActual, cama: paciente.camaActual ?? "", titular: limpio,
+          listaBlanca: [limpio], estado: "activa", creadoEn: new Date(),
+          creadoPor: profile.uid, creadoPorNombre: profile.nombre,
+        };
+      }
+      await crearVisitaEntrada(tarjeta, limpio, { id: profile.uid, nombre: profile.nombre });
+      notify("success", `Entrada registrada · ${limpio.nombre}`);
+      onClose();
     } catch {
-      notify("error", "No se pudo crear la tarjeta");
+      notify("error", "No se pudo registrar la entrada");
       setGuardando(false);
     }
   };
@@ -956,10 +985,13 @@ function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
         ) : (
           <>
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Titular (responsable principal)</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                {tarjetaExistente ? "Responsable que ingresa" : "Titular (responsable principal)"}
+              </p>
               <p className="text-[11px] text-slate-400">
-                Se creará la tarjeta {codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1)}
-                {previasCount > 0 && ` · internamiento #${previasCount + 1} de este expediente`}
+                {tarjetaExistente
+                  ? `Ya existe la tarjeta ${tarjetaExistente.codigo} · se registrará la entrada`
+                  : `Se creará la tarjeta ${codigoTarjeta(paciente.expediente, paciente.nombres, paciente.apellidos, previasCount + 1)}${previasCount > 0 ? ` · internamiento #${previasCount + 1} de este expediente` : ""}`}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input className={inputCls} placeholder="Nombre completo *" value={titular.nombre}
@@ -973,7 +1005,7 @@ function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
             </div>
             <button onClick={crear} disabled={guardando || !valido}
               className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors">
-              <LogIn size={16} /> {guardando ? "Creando…" : "Crear tarjeta y registrar entrada"}
+              <LogIn size={16} /> {guardando ? "Registrando…" : "Crear tarjeta y registrar entrada"}
             </button>
           </>
         )}
