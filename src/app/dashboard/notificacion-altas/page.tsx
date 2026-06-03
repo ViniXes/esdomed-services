@@ -198,7 +198,7 @@ export default function NotificacionAltasPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                  {["N°", "Servicio", "Exp.", "Gén.", "Paciente", "Familiar", "Edad", "Hora", "Estado", "Registró", ""].map((h, i) => (
+                  {["N°", "Servicio", "Exp.", "Gén.", "Paciente", "Familiar", "Edad paciente", "Hora", "Estado", "Registró", ""].map((h, i) => (
                     <th key={i} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -423,7 +423,7 @@ function RegistroModal({ fecha, registro, profile, onClose, notify }: {
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad paciente</label>
                   <input type="number" min={0} max={130} className={inputCls} value={edad} onChange={e => setEdad(e.target.value)} />
                 </div>
                 <div>
@@ -507,7 +507,7 @@ function ReportePrealtaPrint({ fecha, registros, onClose }: {
           <table className="w-full border-collapse" style={{ fontSize: "10px" }}>
             <thead>
               <tr style={{ background: "#dbeafe" }}>
-                {["N°", "Servicio", "Exp.", "Género", "Paciente", "Familiar", "Edad", "Hora", "Estado"].map((h, i) => (
+                {["N°", "Servicio", "Exp.", "Género", "Paciente", "Familiar", "Edad paciente", "Hora", "Estado"].map((h, i) => (
                   <th key={i} className="border border-slate-400 px-1.5 py-1 text-left font-bold uppercase" style={{ fontSize: "9px" }}>{h}</th>
                 ))}
               </tr>
