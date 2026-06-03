@@ -150,7 +150,7 @@ function FeedbackToast({ f, onDismiss }: { f: Feedback; onDismiss: () => void })
 
 export default function VisitasPage() {
   const { profile } = useAuth();
-  const [tab, setTab] = useState<TabId>("hoy");
+  const [tab, setTab] = useState<TabId>("activos");
   const [permissionError, setPermissionError] = useState(false);
 
   const [visitasHoy, setVisitasHoy] = useState<Visita[]>([]);
@@ -160,6 +160,7 @@ export default function VisitasPage() {
   const [pacientesActivos, setPacientesActivos] = useState<Paciente[]>([]);
   const [rosterTexto, setRosterTexto] = useState("");
   const [rosterServicio, setRosterServicio] = useState("todos");
+  const [rosterSoloSinVisita, setRosterSoloSinVisita] = useState(false);
   const [rosterVisibles, setRosterVisibles] = useState(ROSTER_PAGINA);
   const [histFecha, setHistFecha] = useState(hoyStr());
   const [histTexto, setHistTexto] = useState("");
@@ -278,6 +279,9 @@ export default function VisitasPage() {
   const programadas = visitasHoy.filter(v => v.estado === "programada");
   const enCurso     = visitasHoy.filter(v => v.estado === "en_curso");
   const finalizadas = visitasHoy.filter(v => v.estado === "finalizada");
+  const canceladas  = visitasHoy.filter(v => v.estado === "cancelada");
+  // "Efectivas" = visitas donde el familiar sí entró (en curso + finalizadas); excluye canceladas.
+  const efectivas   = enCurso.length + finalizadas.length;
 
   // Buscador rápido del tab Hoy (no afecta los contadores, que reflejan el día completo).
   const coincideHoy = useMemo(() => {
@@ -291,31 +295,36 @@ export default function VisitasPage() {
   const enCursoHoy    = enCurso.filter(coincideHoy);
   const programadasHoy = programadas.filter(coincideHoy);
   const finalizadasHoy = finalizadas.filter(coincideHoy);
+  const canceladasHoy  = canceladas.filter(coincideHoy);
 
   // Mapas para enriquecer cada paciente del roster: su tarjeta activa y su visita en curso de hoy.
   const tarjetaPorPaciente = new Map<string, TarjetaVisita>();
   for (const t of tarjetas) if (t.pacienteId) tarjetaPorPaciente.set(t.pacienteId, t);
   const enCursoPorPaciente = new Map<string, Visita>();
   for (const v of enCurso) if (v.pacienteId) enCursoPorPaciente.set(v.pacienteId, v);
+  // Pacientes con visita EFECTIVA hoy (entró alguien: en curso o finalizada). Para el seguimiento
+  // "sin visita hoy" — las canceladas no cuentan como visita recibida.
+  const visitadosHoy = new Set<string>();
+  for (const v of visitasHoy) if ((v.estado === "en_curso" || v.estado === "finalizada") && v.pacienteId) visitadosHoy.add(v.pacienteId);
 
   const rosterServicios = useMemo(
     () => Array.from(new Set(pacientesActivos.map(p => p.servicioActual).filter(Boolean))).sort(),
     [pacientesActivos]
   );
 
-  const rosterFiltrado = useMemo(() => {
+  // Cálculo plano (no useMemo): depende de `visitadosHoy`, un Set derivado que se recrea cada render.
+  const rosterFiltrado = pacientesActivos.filter(p => {
+    if (rosterServicio !== "todos" && p.servicioActual !== rosterServicio) return false;
+    if (rosterSoloSinVisita && p.id && visitadosHoy.has(p.id)) return false;
     const t = rosterTexto.trim().toLowerCase();
-    return pacientesActivos.filter(p => {
-      if (rosterServicio !== "todos" && p.servicioActual !== rosterServicio) return false;
-      if (!t) return true;
-      return (
-        p.expediente?.toLowerCase().includes(t) ||
-        `${p.apellidos} ${p.nombres}`.toLowerCase().includes(t) ||
-        (p.camaActual ?? "").toLowerCase().includes(t) ||
-        (p.servicioActual ?? "").toLowerCase().includes(t)
-      );
-    });
-  }, [pacientesActivos, rosterTexto, rosterServicio]);
+    if (!t) return true;
+    return (
+      p.expediente?.toLowerCase().includes(t) ||
+      `${p.apellidos} ${p.nombres}`.toLowerCase().includes(t) ||
+      (p.camaActual ?? "").toLowerCase().includes(t) ||
+      (p.servicioActual ?? "").toLowerCase().includes(t)
+    );
+  });
 
   // El estado ya se filtra en el servidor; aquí solo queda la búsqueda por texto.
   const histFiltradas = useMemo(() => {
@@ -368,7 +377,7 @@ export default function VisitasPage() {
 
       {/* Tabs — control segmentado, sin scroll (envuelve en pantallas chicas) */}
       <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl">
-        {([["hoy", "Hoy"], ["activos", "Pacientes activos"], ["historial", "Historial"]] as [TabId, string][]).map(([val, label]) => (
+        {([["activos", "Pacientes activos"], ["hoy", "Hoy"], ["historial", "Historial"]] as [TabId, string][]).map(([val, label]) => (
           <button
             key={val}
             onClick={() => setTabReset(val)}
@@ -387,9 +396,9 @@ export default function VisitasPage() {
       {tab === "hoy" && (
         <>
           <div className="grid grid-cols-3 gap-3">
-            <Contador label="Visitas hoy" valor={visitasHoy.length} color="text-slate-700 dark:text-slate-300" icon={CalendarDays} />
+            <Contador label="Efectivas" valor={efectivas} color="text-emerald-600 dark:text-emerald-400" icon={CheckCircle2} />
             <Contador label="En curso" valor={enCurso.length} color="text-blue-700 dark:text-blue-400" icon={LogIn} />
-            <Contador label="Finalizadas" valor={finalizadas.length} color="text-slate-500" icon={CheckCircle2} />
+            <Contador label="Canceladas" valor={canceladas.length} color="text-rose-600 dark:text-rose-400" icon={Ban} />
           </div>
 
           {visitasHoy.length > 0 && (
@@ -403,7 +412,7 @@ export default function VisitasPage() {
 
           {visitasHoy.length === 0 && !permissionError ? (
             <EmptyState texto="No hay visitas registradas hoy." sub="Registra una entrada desde “Pacientes activos”." />
-          ) : enCursoHoy.length === 0 && programadasHoy.length === 0 && finalizadasHoy.length === 0 ? (
+          ) : enCursoHoy.length === 0 && programadasHoy.length === 0 && finalizadasHoy.length === 0 && canceladasHoy.length === 0 ? (
             <p className="text-sm text-slate-400 py-10 text-center">Ninguna visita de hoy coincide con la búsqueda.</p>
           ) : (
             <div className="space-y-6">
@@ -420,6 +429,11 @@ export default function VisitasPage() {
               {finalizadasHoy.length > 0 && (
                 <Seccion titulo="Finalizadas">
                   <Grid>{finalizadasHoy.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} />)}</Grid>
+                </Seccion>
+              )}
+              {canceladasHoy.length > 0 && (
+                <Seccion titulo="Canceladas">
+                  <Grid>{canceladasHoy.map(v => <VisitaCard key={v.id} v={v} onClick={() => setDetalle(v)} />)}</Grid>
                 </Seccion>
               )}
             </div>
@@ -441,6 +455,16 @@ export default function VisitasPage() {
               <option value="todos">Todos los servicios</option>
               {rosterServicios.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            <button
+              onClick={() => { setRosterSoloSinVisita(v => !v); setRosterVisibles(ROSTER_PAGINA); }}
+              className={`px-3 py-2 rounded-lg text-sm font-medium border transition ${
+                rosterSoloSinVisita
+                  ? "bg-amber-500 border-amber-500 text-white"
+                  : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400 dark:hover:border-amber-700"
+              }`}
+            >
+              Solo sin visita hoy
+            </button>
             <span className="text-sm text-slate-500">{rosterFiltrado.length} paciente(s)</span>
           </div>
 
@@ -457,6 +481,7 @@ export default function VisitasPage() {
                     paciente={p}
                     tarjeta={p.id ? tarjetaPorPaciente.get(p.id) : undefined}
                     visitaEnCurso={p.id ? enCursoPorPaciente.get(p.id) : undefined}
+                    visitoHoy={p.id ? visitadosHoy.has(p.id) : false}
                     onEntrada={() => {
                       const tj = p.id ? tarjetaPorPaciente.get(p.id) : undefined;
                       if (tj) setPicker({ tarjeta: tj });
@@ -743,10 +768,11 @@ function ParentescoSelect({ value, onChange }: { value: string; onChange: (v: st
 
 // ── Card: paciente activo en el roster diario ─────────────────────────────────
 
-function PacienteRosterCard({ paciente, tarjeta, visitaEnCurso, onEntrada, onSalida, onListaBlanca, onCarnet }: {
+function PacienteRosterCard({ paciente, tarjeta, visitaEnCurso, visitoHoy, onEntrada, onSalida, onListaBlanca, onCarnet }: {
   paciente: Paciente;
   tarjeta?: TarjetaVisita;
   visitaEnCurso?: Visita;
+  visitoHoy: boolean;
   onEntrada: () => void;
   onSalida: (v: Visita) => void;
   onListaBlanca: (t: TarjetaVisita) => void;
@@ -760,13 +786,22 @@ function PacienteRosterCard({ paciente, tarjeta, visitaEnCurso, onEntrada, onSal
           <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{paciente.apellidos}, {paciente.nombres}</p>
           <p className="text-xs text-slate-500">{paciente.servicioActual} · Cama {paciente.camaActual || "—"}</p>
         </div>
-        {visitaEnCurso ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800 flex-shrink-0"><LogIn size={11} /> En curso</span>
-        ) : tarjeta ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 flex-shrink-0"><IdCard size={11} /> Con tarjeta</span>
-        ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900 flex-shrink-0">Sin tarjeta</span>
-        )}
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          {visitaEnCurso ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800"><LogIn size={11} /> En curso</span>
+          ) : tarjeta ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700"><IdCard size={11} /> Con tarjeta</span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900">Sin tarjeta</span>
+          )}
+          {!visitaEnCurso && (
+            visitoHoy ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={10} /> Visitó hoy</span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-500 dark:text-rose-400">Sin visita hoy</span>
+            )
+          )}
+        </div>
       </div>
 
       {visitaEnCurso?.visitante && (
