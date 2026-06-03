@@ -266,6 +266,44 @@ export interface NotificacionAltaVivo {
   procesadoEn?: Date;
 }
 
+// ── Notificación de Altas (pre-alta) — log interno de Trabajo Social ──────────
+// Registro diario de pacientes activos cuyo familiar fue notificado de que se
+// irán de alta. Control interno de TS; no involucra a otros roles.
+
+export type EstadoPrealta =
+  | "notificado"
+  | "pendiente"
+  | "no_responde"   // N/R
+  | "suspendida"
+  | "deposito";
+
+export interface NotificacionPrealta {
+  id?: string;
+  fecha: string;                  // YYYY-MM-DD (día del reporte)
+
+  // Paciente (snapshot del paciente activo)
+  pacienteId: string;
+  pacienteExpediente: string;
+  pacienteNombre: string;         // "apellidos, nombres"
+  genero: Genero;
+  servicio: string;
+  cama?: string;
+  edad?: number;                  // calculada de fechaNacimiento o capturada
+  observacionesPaciente?: string; // notas tipo "8° reingreso", "cuenta con teléfono"
+
+  // Familiar notificado
+  familiarNombre?: string;
+  observacionesFamiliar?: string; // autorizaciones, contactos de emergencia, etc.
+
+  estado: EstadoPrealta;
+  horaNotificacion?: Date;        // hora a la que se notificó (default: creadoEn)
+
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}
+
 // ============================================================================
 // Pacientes — gestión de pacientes hospitalizados
 // ============================================================================

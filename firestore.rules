@@ -152,6 +152,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Notificación de Altas / pre-altas (log interno de Trabajo Social) ────
+    // Registro diario de pacientes notificados de alta. Control interno de TS.
+    match /notificaciones_prealta/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if isTrabajoSocial();
+      allow update: if isTrabajoSocial() || isAdmin();
+      allow delete: if isTrabajoSocial() || isAdmin();
+    }
+
     // ─── Visitas de familiares (Trabajo Social) ───────────────────────────────
     // Tarjeta por paciente (con lista blanca) y registro de entradas/salidas.
     // Gestionado por Trabajo Social; ESDOMED/admin con acceso de supervisión.

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
   BedDouble,
+  ClipboardCheck,
   ClipboardList,
   FileText,
   HeartPulse,
@@ -61,6 +62,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
+  const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
   const G_ADMIN = "Administración";
 
@@ -89,13 +91,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           group: G_PACIENTES,
         }]
       : []),
+    // ── Gestiones de Altas (TS agrupa Notificación + Verificación) ──
+    ...(esTS
+      ? [{
+          href: "/dashboard/notificacion-altas",
+          label: "Notificación de Altas",
+          icon: ClipboardCheck,
+          group: G_GESTIONES_ALTAS,
+        }]
+      : []),
     ...(verAltasVivos
       ? [{
           href: "/dashboard/altas-vivos",
           label: "Verificación de Altas",
           icon: LogIn,
           badge: pendientes.altas,
-          group: G_PACIENTES,
+          // Para TS se agrupa con Notificación; para ESDOMED/admin queda en Gestión de pacientes.
+          group: esTS ? G_GESTIONES_ALTAS : G_PACIENTES,
         }]
       : []),
     {
