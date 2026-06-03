@@ -894,6 +894,9 @@ function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
   const [previasCount, setPreviasCount] = useState(0);
   const [verificando, setVerificando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  // onCreada se llama UNA sola vez (sea por carrera o por creación). Sin este guard, el
+  // re-render del padre tras crear la tarjeta re-dispara el efecto y abriría el picker.
+  const resueltoRef = useRef(false);
 
   // Contar tarjetas previas del expediente; si ya hay una activa (carrera con el roster),
   // saltar el formulario y continuar directo al picker de entrada.
@@ -901,10 +904,10 @@ function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
     let cancel = false;
     (async () => {
       const snap = await getDocs(query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente)));
-      if (cancel) return;
+      if (cancel || resueltoRef.current) return;
       const todas = snap.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita));
       const activa = todas.find(t => t.pacienteId === paciente.id && t.estado === "activa");
-      if (activa) { onCreada(activa); return; }
+      if (activa) { resueltoRef.current = true; onCreada(activa); return; }
       setPreviasCount(todas.length);
       setVerificando(false);
     })();
@@ -925,6 +928,7 @@ function PrimeraVisitaModal({ paciente, onClose, onCreada }: {
         titular: limpio, listaBlanca: [limpio], estado: "activa",
         creadoEn: Timestamp.now(), creadoPor: profile.uid, creadoPorNombre: profile.nombre,
       });
+      resueltoRef.current = true; // evita que el efecto de verificación también dispare onCreada
       onCreada({
         id: ref.id, codigo, pacienteId: paciente.id, expediente: paciente.expediente, pacienteNombre: nombreCompleto,
         servicio: paciente.servicioActual, cama: paciente.camaActual ?? "", titular: limpio,
