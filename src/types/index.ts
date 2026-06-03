@@ -514,7 +514,13 @@ export interface Visita {
   comentarios?: string;           // notas de Trabajo Social sobre la visita
   cierreAutomatico?: boolean;     // salida marcada por el cierre automático de fin de día
 
-  registradoPorId: string;        // uid TS
+  // Responsables de cada movimiento (pueden ser TS distintos entre turnos).
+  entradaPorId?: string;          // uid TS que registró la entrada (check-in)
+  entradaPorNombre?: string;
+  salidaPorId?: string;           // uid TS que registró la salida (check-out); "Sistema" si fue cierre automático
+  salidaPorNombre?: string;
+
+  registradoPorId: string;        // uid TS que creó el registro (compat. registros previos)
   registradoPorNombre: string;
   creadoEn: Date;
 }

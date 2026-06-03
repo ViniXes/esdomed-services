@@ -60,7 +60,9 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\src\\\\components\" -Recurse | Where-Object { $_.Name -match 'visita|Visita' })",
       "Bash(xargs grep -l \"trabajo_social\")",
       "Bash(xargs grep -l \"BuscadorPacienteActivo\")",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(Find src *)",
+      "Bash(findstr -i \"traslado\")"
     ]
   }
 }
