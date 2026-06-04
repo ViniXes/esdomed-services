@@ -4,11 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FileText, Clock, CheckCircle2, Search, X } from "lucide-react";
+import { FileText, Clock, CheckCircle2, Search, X, AlertTriangle } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { formatFecha, toDate } from "@/lib/pacientes/helpers";
 
 type Filtro = EstadoIncapacidad | "todos";
+
+/** Clave de día local (sin hora) para agrupar/contar por fecha. */
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+/** Clave de posible duplicado: mismo expediente el mismo día de creación. */
+const dupKey = (s: SolicitudIncapacidad) => `${s.pacienteExpediente}|${dayKey(s.creadoEn)}`;
 
 const FILTROS: { value: Filtro; label: string }[] = [
   { value: "pendiente", label: "Pendientes" },
@@ -66,6 +71,18 @@ export default function IncapacidadesPage() {
 
   const pendientes = solicitudes.filter((s) => s.estado === "pendiente").length;
 
+  // Total creadas hoy + claves de posibles duplicados (mismo paciente, mismo día).
+  // Se calcula sobre TODAS las solicitudes para no perder la marca al filtrar.
+  const { totalHoy, duplicadoKeys } = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of solicitudes) counts.set(dupKey(s), (counts.get(dupKey(s)) ?? 0) + 1);
+    const dup = new Set<string>();
+    counts.forEach((n, k) => { if (n >= 2) dup.add(k); });
+    const hoy = dayKey(new Date());
+    const total = solicitudes.filter((s) => dayKey(s.creadoEn) === hoy).length;
+    return { totalHoy: total, duplicadoKeys: dup };
+  }, [solicitudes]);
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
       {/* Header */}
@@ -78,12 +95,18 @@ export default function IncapacidadesPage() {
             Incapacidades
           </h1>
         </div>
-        {pendientes > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
-            <Clock size={14} />
-            {pendientes} pendientes de emitir
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl">
+            <FileText size={14} className="text-slate-400" />
+            {totalHoy} {totalHoy === 1 ? "incapacidad" : "incapacidades"} hoy
           </div>
-        )}
+          {pendientes > 0 && (
+            <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
+              <Clock size={14} />
+              {pendientes} pendientes de emitir
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
@@ -143,6 +166,14 @@ export default function IncapacidadesPage() {
         )}
       </div>
 
+      {/* Leyenda de duplicados */}
+      {duplicadoKeys.size > 0 && (
+        <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-400">
+          <AlertTriangle size={13} className="flex-shrink-0" />
+          <span>Las filas en rojo son posibles duplicados: mismo paciente con más de una solicitud el mismo día.</span>
+        </div>
+      )}
+
       {/* Tabla */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -173,16 +204,27 @@ export default function IncapacidadesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filtradas.map((s) => (
+                {filtradas.map((s) => {
+                  const esDuplicado = duplicadoKeys.has(dupKey(s));
+                  return (
                   <tr
                     key={s.id}
                     onClick={() => router.push(`/dashboard/incapacidades/${s.id}`)}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
+                    className={`cursor-pointer transition-colors ${
+                      esDuplicado
+                        ? "bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    }`}
                   >
                     <td className="px-4 py-3">
                       <p className="font-semibold font-mono text-slate-900 dark:text-slate-100">
                         {s.pacienteExpediente}
                       </p>
+                      {esDuplicado && (
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-950 border border-red-200 dark:border-red-900 px-1.5 py-0.5 rounded-full">
+                          <AlertTriangle size={9} /> Duplicado
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-800 dark:text-slate-200">{s.pacienteNombre}</p>
@@ -216,7 +258,8 @@ export default function IncapacidadesPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

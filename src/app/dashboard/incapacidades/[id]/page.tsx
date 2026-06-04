@@ -221,7 +221,16 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
             <Row label="Nº Afiliación" value={paciente.numeroAfiliacion} mono />
             <Row label="Edad" value={calcularEdad(paciente.fechaNacimiento) !== null ? `${calcularEdad(paciente.fechaNacimiento)} años` : undefined} />
             <Row label="Género" value={paciente.genero === "masculino" ? "Masculino" : paciente.genero === "femenino" ? "Femenino" : "Otro"} />
-            <Row label="Teléfono" value={paciente.telefono} mono />
+            <Row
+              label="Teléfono"
+              value={
+                paciente.telefono || paciente.otrosNumeros ||
+                (paciente.responsable?.telefono
+                  ? `${paciente.responsable.telefono} (${paciente.responsable.parentesco || "responsable"})`
+                  : undefined)
+              }
+              mono
+            />
             <Row label="Ocupación" value={paciente.ocupacion} />
             <Row label="Departamento" value={paciente.departamento} />
             <Row label="Municipio" value={paciente.municipio} />

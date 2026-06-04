@@ -169,8 +169,8 @@ function parsearIdentificacion(texto: string): CamposExtraidos {
   const nacionalidad = extraer(datosPaciente, "Nacionalidad", ["Documento Identidad", "Tel"]);
   if (nacionalidad) out.nacionalidad = nacionalidad;
 
-  const tel = datosPaciente.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
-  if (tel) out.telefono = tel[1];
+  const tel = datosPaciente.match(new RegExp(`Tel(?:é|e)fono\\s*:?\\s*${RE_TEL}`));
+  if (tel) out.telefono = limpiarTelefono(tel[1]);
 
   const ocupacion = extraer(datosPaciente, "Ocupación", ["Dirección", "Lugar Trabajo"]);
   if (ocupacion) out.ocupacion = ocupacion;
@@ -210,8 +210,8 @@ function parsearIdentificacion(texto: string): CamposExtraidos {
   const respDir = extraer(respBlock, "Dirección", ["Teléfono", "C. Datos"]);
   if (respDir) responsable.direccion = respDir;
 
-  const respTel = respBlock.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
-  if (respTel) responsable.telefono = respTel[1];
+  const respTel = respBlock.match(new RegExp(`Tel(?:é|e)fono\\s*:?\\s*${RE_TEL}`));
+  if (respTel) responsable.telefono = limpiarTelefono(respTel[1]);
 
   if (responsable.nombre) out.responsable = responsable;
 
@@ -272,8 +272,8 @@ function parsearIngresoEgreso(texto: string): CamposExtraidos {
   const nacionalidad = extraer(datosPaciente, "Nacionalidad", ["Teléfono", "Responsable"]);
   if (nacionalidad) out.nacionalidad = nacionalidad;
 
-  const tel = datosPaciente.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
-  if (tel) out.telefono = tel[1];
+  const tel = datosPaciente.match(new RegExp(`Tel(?:é|e)fono\\s*:?\\s*${RE_TEL}`));
+  if (tel) out.telefono = limpiarTelefono(tel[1]);
 
   // Responsable
   const responsable: ResponsablePaciente = { nombre: "" };
@@ -287,8 +287,8 @@ function parsearIngresoEgreso(texto: string): CamposExtraidos {
   ]);
   if (respDoc) responsable.documento = respDoc;
 
-  const respTel = datosPaciente.match(/Tel(?:é|e)fono\s+responsable\s*:?\s*(\d{4}-\d{4})/i);
-  if (respTel) responsable.telefono = respTel[1];
+  const respTel = datosPaciente.match(new RegExp(`Tel(?:é|e)fono\\s+responsable\\s*:?\\s*${RE_TEL}`, "i"));
+  if (respTel) responsable.telefono = limpiarTelefono(respTel[1]);
 
   const respPar = extraer(datosPaciente, "Parentesco responsable", [
     "Nombre del establecimiento", "Código UCSF", "B. DATOS",
@@ -366,6 +366,21 @@ function limpiarNombre(raw: string): string {
 function limpiarMunicipio(raw: string): string | undefined {
   return raw.trim().replace(/\s+[A-Z]{2,3}$/, "").trim() || undefined;
 }
+
+/**
+ * Normaliza un teléfono salvadoreño (8 dígitos) al formato "xxxx-xxxx".
+ * Acepta el número con guion, con espacio o pegado; si no son 8 dígitos
+ * devuelve lo que venga limpio (o undefined si queda vacío).
+ */
+function limpiarTelefono(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const dig = raw.replace(/\D/g, "");
+  if (dig.length === 8) return `${dig.slice(0, 4)}-${dig.slice(4)}`;
+  return raw.trim() || undefined;
+}
+
+// Teléfono salvadoreño: 8 dígitos con guion, espacio o pegados.
+const RE_TEL = "(\\d{4}[-\\s]?\\d{4})";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Parser: Certificado de Defunción — numeral 13 (causas de muerte)

@@ -23,7 +23,14 @@ interface Props {
 export function ConstanciaPrintLayout({ incapacidad, paciente }: Props) {
   const sexoMasc = paciente.genero === "masculino";
   const sexoFem  = paciente.genero === "femenino";
-  const telefonos = [paciente.telefono, paciente.otrosNumeros].filter(Boolean).join(" / ");
+  // Teléfonos del paciente; si no tiene ninguno, usar el del responsable.
+  const telPaciente = [paciente.telefono, paciente.otrosNumeros].filter(Boolean).join(" / ");
+  const telResponsable = paciente.responsable?.telefono;
+  const telefonos =
+    telPaciente ||
+    (telResponsable
+      ? `${telResponsable} (${paciente.responsable?.parentesco || "responsable"})`
+      : "");
   const fechaExp = incapacidad.fechaExpedicion ?? incapacidad.emitidaEn ?? new Date();
 
   return (
