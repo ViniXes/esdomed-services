@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, CheckCircle2, Clock, Pencil } from "lucide-react";
+import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2 } from "lucide-react";
 import type { SolicitudIncapacidad } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 
@@ -13,6 +13,21 @@ export default function MedicoIncapacidadesPage() {
   const { user } = useAuth();
   const [solicitudes, setSolicitudes] = useState<SolicitudIncapacidad[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+
+  const eliminar = async (id: string) => {
+    setEliminandoId(id);
+    try {
+      await deleteDoc(doc(db, "incapacidades", id));
+      // onSnapshot refresca la lista automáticamente.
+    } catch (e) {
+      alert(`No se pudo eliminar: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setEliminandoId(null);
+      setConfirmandoId(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -119,13 +134,42 @@ export default function MedicoIncapacidadesPage() {
                   )}
                 </div>
                 {s.estado === "pendiente" && (
-                  <Link
-                    href={`/medico/incapacidades/${s.id}/editar`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    <Pencil size={12} />
-                    Editar
-                  </Link>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link
+                      href={`/medico/incapacidades/${s.id}/editar`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
+                    >
+                      <Pencil size={12} />
+                      Editar
+                    </Link>
+                    {confirmandoId === s.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => eliminar(s.id!)}
+                          disabled={eliminandoId === s.id}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {eliminandoId === s.id ? "Eliminando..." : "Sí, eliminar"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmandoId(null)}
+                          disabled={eliminandoId === s.id}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmandoId(s.id!)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
+                        title="Eliminar solicitud"
+                      >
+                        <Trash2 size={12} />
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

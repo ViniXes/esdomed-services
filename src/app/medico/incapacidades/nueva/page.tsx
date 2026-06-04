@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,9 +9,9 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  ArrowLeft, Search, AlertTriangle, Save, CheckCircle2, User2,
+  ArrowLeft, Search, AlertTriangle, Save, CheckCircle2, User2, Pencil,
 } from "lucide-react";
-import type { Paciente } from "@/types";
+import type { Paciente, SolicitudIncapacidad } from "@/types";
 import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
@@ -47,6 +47,48 @@ export default function NuevaIncapacidadPage() {
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Detección de duplicados: solicitudes de ESTE médico para ESTE paciente
+  // creadas hoy. (Las reglas de Firestore solo dejan al médico leer las suyas,
+  // así que cubre el caso de doble-envío del mismo médico.)
+  const [duplicadosHoy, setDuplicadosHoy] = useState<SolicitudIncapacidad[]>([]);
+  const [confirmandoDuplicado, setConfirmandoDuplicado] = useState(false);
+
+  useEffect(() => {
+    const pid = paciente?.id;
+    let cancelado = false;
+    (async () => {
+      if (!pid || !user) { if (!cancelado) setDuplicadosHoy([]); return; }
+      try {
+        const q = query(
+          collection(db, "incapacidades"),
+          where("pacienteId", "==", pid),
+          where("medicoId", "==", user.uid),
+        );
+        const snap = await getDocs(q);
+        if (cancelado) return;
+        const inicioHoy = new Date(); inicioHoy.setHours(0, 0, 0, 0);
+        const finHoy = new Date(); finHoy.setHours(23, 59, 59, 999);
+        const hoy = snap.docs
+          .map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              ...data,
+              fechaAlta: toDate(data.fechaAlta) ?? new Date(),
+              creadoEn: toDate(data.creadoEn) ?? new Date(),
+            } as SolicitudIncapacidad;
+          })
+          .filter((s) => s.creadoEn >= inicioHoy && s.creadoEn <= finHoy)
+          .sort((a, b) => b.creadoEn.getTime() - a.creadoEn.getTime());
+        setDuplicadosHoy(hoy);
+        setConfirmandoDuplicado(false);
+      } catch {
+        /* el chequeo de duplicados no es crítico: no bloquea la creación */
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [paciente?.id, user]);
 
   const buscarPaciente = async () => {
     const exp = expedienteBusqueda.trim();
@@ -89,6 +131,13 @@ export default function NuevaIncapacidadPage() {
     if (form.diasExtras === "" || isNaN(diasExtras) || diasExtras < 0) { setError("Los días adicionales deben ser 0 o mayor."); return; }
     if (!form.diagnosticoEgreso.trim()) { setError("El diagnóstico de egreso es obligatorio."); return; }
     if (!form.tratamientoAlta.trim())   { setError("El tratamiento al alta es obligatorio."); return; }
+
+    // Hay una solicitud de hoy para este paciente: pedir confirmación antes de duplicar.
+    if (duplicadosHoy.length > 0 && !confirmandoDuplicado) {
+      setError(null);
+      setConfirmandoDuplicado(true);
+      return;
+    }
 
     setError(null);
     setGuardando(true);
@@ -207,6 +256,41 @@ export default function NuevaIncapacidadPage() {
         )}
       </section>
 
+      {/* Advertencia de duplicado: ya hay solicitud(es) de hoy para este paciente */}
+      {paciente && duplicadosHoy.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-2xl px-4 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Ya solicitaste {duplicadosHoy.length === 1 ? "una incapacidad" : `${duplicadosHoy.length} incapacidades`} para este paciente hoy
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {duplicadosHoy.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-400">
+                    <span>
+                      {s.diasIncapacidad} {s.diasIncapacidad === 1 ? "día" : "días"} · Alta {formatFecha(s.fechaAlta)}
+                      {s.estado === "emitida" ? " · ya emitida" : " · pendiente"}
+                    </span>
+                    {s.estado === "pendiente" && (
+                      <Link
+                        href={`/medico/incapacidades/${s.id}/editar`}
+                        className="flex items-center gap-1 font-medium text-amber-800 dark:text-amber-300 hover:underline flex-shrink-0"
+                      >
+                        <Pencil size={11} /> Ver / editar
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
+                Si es un duplicado, edita o elimina la anterior en lugar de crear otra.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Paso 2: Datos de incapacidad */}
       {paciente && (
         <IncapacidadFormFields
@@ -225,14 +309,39 @@ export default function NuevaIncapacidadPage() {
               <span>{error}</span>
             </div>
           )}
-          <button
-            onClick={guardar}
-            disabled={guardando}
-            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl disabled:opacity-50 transition-colors"
-          >
-            <Save size={15} />
-            {guardando ? "Enviando..." : "Enviar solicitud a ESDOMED"}
-          </button>
+          {confirmandoDuplicado ? (
+            <div className="space-y-2">
+              <p className="text-sm text-amber-700 dark:text-amber-400 text-center">
+                Ya hay una solicitud de hoy para este paciente. ¿Crear otra de todos modos?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmandoDuplicado(false)}
+                  disabled={guardando}
+                  className="flex-1 py-3 text-sm font-medium text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={guardar}
+                  disabled={guardando}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors"
+                >
+                  <Save size={15} />
+                  {guardando ? "Enviando..." : "Sí, crear otra"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={guardar}
+              disabled={guardando}
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl disabled:opacity-50 transition-colors"
+            >
+              <Save size={15} />
+              {guardando ? "Enviando..." : "Enviar solicitud a ESDOMED"}
+            </button>
+          )}
         </div>
       )}
     </div>

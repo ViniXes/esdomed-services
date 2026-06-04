@@ -3,12 +3,12 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, onSnapshot, Timestamp, updateDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, Timestamp, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, CheckCircle2, Clock, FileText, Printer, AlertTriangle,
-  User2, Stethoscope,
+  User2, Stethoscope, Trash2,
 } from "lucide-react";
 import type {
   BancoDeposito, InstitucionProvisional, Paciente, SolicitudIncapacidad,
@@ -34,6 +34,10 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   const [banco, setBanco] = useState<BancoDeposito | "">("");
   const [emitiendo, setEmitiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+
+  const puedeEliminar = profile?.role === "esdomed" || profile?.role === "admin";
 
   // Suscripción a la incapacidad
   useEffect(() => {
@@ -134,6 +138,19 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
 
   const abrirImprimir = () => {
     window.open(`/dashboard/incapacidades/${incapacidad.id}/imprimir`, "_blank");
+  };
+
+  const eliminar = async () => {
+    if (!incapacidad.id) return;
+    setEliminando(true);
+    setError(null);
+    try {
+      await deleteDoc(doc(db, "incapacidades", incapacidad.id));
+      router.push("/dashboard/incapacidades");
+    } catch (e) {
+      setError(`Error al eliminar: ${e instanceof Error ? e.message : "desconocido"}`);
+      setEliminando(false);
+    }
   };
 
   const yaEmitida = incapacidad.estado === "emitida";
@@ -327,6 +344,45 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
           </p>
         )}
       </div>
+
+      {/* Eliminar solicitud (ESDOMED/admin) */}
+      {puedeEliminar && (
+        <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+          {confirmandoEliminar ? (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <span className="text-xs text-slate-600 dark:text-slate-400">
+                {yaEmitida
+                  ? "Esta incapacidad ya fue emitida. ¿Eliminarla de todos modos? No se puede deshacer."
+                  : "¿Eliminar esta solicitud? Esta acción no se puede deshacer."}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={eliminar}
+                  disabled={eliminando}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {eliminando ? "Eliminando..." : "Sí, eliminar"}
+                </button>
+                <button
+                  onClick={() => setConfirmandoEliminar(false)}
+                  disabled={eliminando}
+                  className="px-4 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmandoEliminar(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+            >
+              <Trash2 size={13} />
+              Eliminar solicitud
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

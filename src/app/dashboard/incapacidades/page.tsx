@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FileText, Clock, CheckCircle2, Search } from "lucide-react";
+import { FileText, Clock, CheckCircle2, Search, X } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { formatFecha, toDate } from "@/lib/pacientes/helpers";
 
@@ -21,6 +21,8 @@ export default function IncapacidadesPage() {
   const [solicitudes, setSolicitudes] = useState<SolicitudIncapacidad[]>([]);
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
   const [busqueda, setBusqueda] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,8 +47,14 @@ export default function IncapacidadesPage() {
 
   const filtradas = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
+    // Rango por Fecha de alta. Se parsea como hora local (sin sufijo Z) para no
+    // correr el día en El Salvador (UTC-6).
+    const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
+    const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return solicitudes.filter((s) => {
       if (filtro !== "todos" && s.estado !== filtro) return false;
+      if (desde && s.fechaAlta < desde) return false;
+      if (hasta && s.fechaAlta > hasta) return false;
       if (!term) return true;
       return (
         s.pacienteExpediente.toLowerCase().includes(term) ||
@@ -54,7 +62,7 @@ export default function IncapacidadesPage() {
         s.medicoNombre.toLowerCase().includes(term)
       );
     });
-  }, [solicitudes, filtro, busqueda]);
+  }, [solicitudes, filtro, busqueda, fechaDesde, fechaHasta]);
 
   const pendientes = solicitudes.filter((s) => s.estado === "pendiente").length;
 
@@ -95,16 +103,44 @@ export default function IncapacidadesPage() {
         ))}
       </div>
 
-      {/* Buscador */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por expediente, paciente o médico..."
-          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-        />
+      {/* Buscador y filtro por fecha de alta */}
+      <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por expediente, paciente o médico..."
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Alta desde</span>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        {(busqueda || fechaDesde || fechaHasta) && (
+          <button
+            onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
 
       {/* Tabla */}
