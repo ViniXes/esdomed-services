@@ -34,7 +34,7 @@ export function SoporteGlobo() {
 
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-16 h-16 rounded-full bg-white dark:bg-slate-800 shadow-2xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center hover:scale-105 hover:shadow-blue-500/20 active:scale-95 transition-all"
+        className="w-20 h-20 rounded-full bg-white dark:bg-slate-800 shadow-2xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center hover:scale-105 hover:shadow-blue-500/20 active:scale-95 transition-all"
         title="Soporte"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
