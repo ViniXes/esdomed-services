@@ -183,6 +183,11 @@ export default function DashboardTrasladosPage() {
                         Procesado por: {t.revisadoPorNombre}
                       </span>
                     )}
+                    {t.respuestaMedico && t.estado === "pendiente" && (
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        Médico respondió
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Badge estado={t.estado} />
@@ -235,7 +240,14 @@ export default function DashboardTrasladosPage() {
               {selected.revisadoPorNombre && (
                 <Row label="Procesado por" value={selected.revisadoPorNombre} />
               )}
-              
+
+              {selected.respuestaMedico && (
+                <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-3 border border-blue-200 dark:border-blue-900/50">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-1">Respuesta del médico</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">{selected.respuestaMedico}</p>
+                </div>
+              )}
+
               <div className="pt-2">
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Notas ESDOMED</label>
                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}

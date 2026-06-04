@@ -38,6 +38,7 @@ export interface SolicitudTraslado {
   revisadoPor?: string;       // uid del personal esdomed
   revisadoPorNombre?: string;
   notasEsdomed?: string;
+  respuestaMedico?: string;   // respuesta del médico a una observación (estado en_revision)
 }
 
 export type EstadoFallecido = "pendiente" | "confirmado";
