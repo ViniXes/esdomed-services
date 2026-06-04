@@ -8,7 +8,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload } from "lucide-react";
+import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload, X } from "lucide-react";
 import type { EstadoPaciente, Paciente } from "@/types";
 import {
   ESTADO_BADGE, ESTADO_LABEL, calcularEdad, diasEstancia, formatFecha,
@@ -38,7 +38,13 @@ export default function PacientesPage() {
   const [filtro, setFiltro] = useState<FiltroEstado>("activo");
   const [servicioFiltro, setServicioFiltro] = useState<string>("");
   const [busqueda, setBusqueda] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [page, setPage] = useState(1);
+
+  // Para estados de egreso, el rango filtra por fecha de egreso; si no, por ingreso.
+  const usaFechaEgreso = filtro !== "activo" && filtro !== "todos";
+  const labelFecha = usaFechaEgreso ? "Egreso" : "Ingreso";
 
   useEffect(() => {
     if (!profile) return;
@@ -77,8 +83,18 @@ export default function PacientesPage() {
 
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
+    const usaEgreso = filtro !== "activo" && filtro !== "todos";
+    // Rango en hora local para no correr el día (UTC-6).
+    const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
+    const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return pacientes.filter((p) => {
       if (servicioFiltro && p.servicioActual !== servicioFiltro) return false;
+      if (desde || hasta) {
+        const fecha = usaEgreso ? p.fechaEgreso : p.fechaIngreso;
+        if (!fecha) return false;
+        if (desde && fecha < desde) return false;
+        if (hasta && fecha > hasta) return false;
+      }
       if (!term) return true;
       const hay =
         p.expediente?.toLowerCase().includes(term) ||
@@ -86,10 +102,15 @@ export default function PacientesPage() {
         nombreCompleto(p).toLowerCase().includes(term);
       return !!hay;
     });
-  }, [pacientes, busqueda, servicioFiltro]);
+  }, [pacientes, busqueda, servicioFiltro, filtro, fechaDesde, fechaHasta]);
 
-  // Resetear página al cambiar cualquier filtro
-  useEffect(() => setPage(1), [filtro, servicioFiltro, busqueda]);
+  // Al cambiar cualquier filtro, volver a la página 1 (ajuste de estado en render).
+  const filtrosKey = `${filtro}|${servicioFiltro}|${busqueda}|${fechaDesde}|${fechaHasta}`;
+  const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
+  if (filtrosPrevios !== filtrosKey) {
+    setFiltrosPrevios(filtrosKey);
+    setPage(1);
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const paginados = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -152,9 +173,9 @@ export default function PacientesPage() {
         ))}
       </div>
 
-      {/* Buscador + filtro servicio */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      {/* Buscador + filtro servicio + rango de fecha */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
           <Search
             size={15}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
@@ -167,7 +188,7 @@ export default function PacientesPage() {
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           />
         </div>
-        <div className="relative sm:w-64">
+        <div className="relative sm:w-56">
           <Filter
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
@@ -187,6 +208,32 @@ export default function PacientesPage() {
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
           />
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">{labelFecha} desde</span>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        {(busqueda || servicioFiltro || fechaDesde || fechaHasta) && (
+          <button
+            onClick={() => { setBusqueda(""); setServicioFiltro(""); setFechaDesde(""); setFechaHasta(""); }}
+            className="flex items-center gap-1 px-3 py-2 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors shadow-sm"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
 
       {/* Tabla */}

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
+  BarChart3,
   BedDouble,
   ClipboardCheck,
   ClipboardList,
@@ -59,11 +60,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verConfiguracion = profile?.role === "admin";
   const verUsuarios = profile?.role === "admin";
   const verBusquedaTelefono = profile?.role === "admin";
+  const verReportes = profile?.role === "esdomed" || profile?.role === "admin";
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
   const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
+  const G_REPORTES = "Reportes";
   const G_ADMIN = "Administración";
 
   const navItems: NavItem[] = [
@@ -134,6 +137,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS },
           { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, badge: pendientes.anexo5, group: G_DOCUMENTOS },
         ]
+      : []),
+
+    // ── Reportes ──
+    ...(verReportes
+      ? [{ href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES }]
       : []),
 
     // ── Administración ──

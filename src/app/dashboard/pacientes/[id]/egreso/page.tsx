@@ -71,15 +71,17 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
       }
       if (r.medicoEgresoNombre) setMedicoNombre(r.medicoEgresoNombre);
       if (r.medicoEgresoJvpm) setMedicoJvpm(r.medicoEgresoJvpm);
+      if (r.fechaEgreso) setFechaHora(toDatetimeLocalInput(r.fechaEgreso));
 
       const extras = [
         r.causaExterna ? "la causa externa" : null,
         r.medicoEgresoNombre ? "el médico responsable" : null,
+        r.fechaEgreso ? "la fecha de egreso" : null,
       ].filter(Boolean).join(" y ");
 
       if (!r.esFormularioEgreso) {
         setPdfMsg({ tipo: "warn", texto: "El PDF no parece un Formulario de Ingreso y Egreso. Revisa los campos antes de guardar." });
-      } else if (n === 0 && !r.causaExterna && !r.medicoEgresoNombre) {
+      } else if (n === 0 && !r.causaExterna && !r.medicoEgresoNombre && !r.fechaEgreso) {
         // Útil para afinar las regex contra las etiquetas reales de la hoja.
         console.warn("[egreso] No se detectaron datos de egreso. Texto crudo del PDF:\n", r.textoCrudo);
         setPdfMsg({ tipo: "warn", texto: "No se detectaron datos de egreso en el formulario (revisa la consola del navegador). Complétalos manualmente." });

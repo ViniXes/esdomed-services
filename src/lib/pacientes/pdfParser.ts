@@ -470,6 +470,7 @@ export interface DatosEgresoExtraidos {
   causaExterna?: DiagnosticoCIE;
   medicoEgresoNombre?: string;
   medicoEgresoJvpm?: string;
+  fechaEgreso?: Date;
 }
 
 // Aísla la sección "D. DATOS DEL EGRESO O DEFUNCIÓN" hasta donde empiezan los
@@ -579,6 +580,17 @@ export function parsearDatosEgreso(texto: string): DatosEgresoExtraidos {
     const jvpm = (med[2] || "").replace(/\s+/g, "").replace(/[.,;]+$/, "");
     if (nombre) out.medicoEgresoNombre = nombre;
     if (jvpm) out.medicoEgresoJvpm = jvpm.toUpperCase();
+  }
+
+  // Fecha y hora de egreso ("Fecha de egreso:04/06/2026 Hora de egreso: 13:21 PM").
+  // Está al final de la sección D, fuera del bloque de diagnósticos.
+  const fEgr = texto.match(/Fecha\s+de\s+egreso\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (fEgr) {
+    const f = parseFechaEs(fEgr[1]);
+    if (f) {
+      const hEgr = texto.match(/Hora\s+de\s+egreso\s*:?\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)/i);
+      out.fechaEgreso = hEgr ? combinarFechaHora(f, hEgr[1].trim()) : f;
+    }
   }
 
   return out;

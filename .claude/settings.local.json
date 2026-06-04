@@ -69,7 +69,8 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\" -Hidden | Where-Object {$_.Name -match \"env|service|firebase\"} | Select-Object Name)",
       "Bash(node scripts/limpiar-colecciones.mjs --dry-run)",
       "Bash(node *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(npx next *)"
     ]
   }
 }
