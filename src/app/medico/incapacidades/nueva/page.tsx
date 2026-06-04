@@ -15,7 +15,7 @@ import type { Paciente } from "@/types";
 import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { calcularDiasHospitalizacion, calcularFechaHasta } from "@/lib/incapacidades/helpers";
+import { calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput } from "@/lib/incapacidades/helpers";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -93,7 +93,7 @@ export default function NuevaIncapacidadPage() {
     setError(null);
     setGuardando(true);
     try {
-      const fAlta  = new Date(form.fechaAlta);
+      const fAlta  = parseDateInput(form.fechaAlta);
       const fDesde = paciente!.fechaIngreso;
       if (fAlta < fDesde) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
       const diasHosp  = calcularDiasHospitalizacion(fDesde, fAlta);
