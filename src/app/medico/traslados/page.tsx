@@ -148,7 +148,7 @@ export default function MedicoTrasladosPage() {
                           <div />
                         )}
                         {t.revisadoPorNombre && (
-                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded uppercase tracking-wider">
                             Procesado por: {t.revisadoPorNombre}
                           </span>
                         )}

@@ -174,10 +174,16 @@ export default function DashboardTrasladosPage() {
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-500 mt-2">
-                    Dr. {t.medicoNombre} · {t.medicoServicio}
-                    {t.revisadoPorNombre && ` · Procesado por: ${t.revisadoPorNombre}`}
-                  </p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <p className="text-xs text-slate-500">
+                      Dr. {t.medicoNombre} · {t.medicoServicio}
+                    </p>
+                    {t.revisadoPorNombre && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        Procesado por: {t.revisadoPorNombre}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Badge estado={t.estado} />
               </div>
