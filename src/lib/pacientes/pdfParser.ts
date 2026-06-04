@@ -468,6 +468,8 @@ export interface DatosEgresoExtraidos {
   diagnosticoEgreso?: DiagnosticoCIE;
   diagnosticosComplementarios: DiagnosticoCIE[];
   causaExterna?: DiagnosticoCIE;
+  medicoEgresoNombre?: string;
+  medicoEgresoJvpm?: string;
 }
 
 // Aísla la sección "D. DATOS DEL EGRESO O DEFUNCIÓN" hasta donde empiezan los
@@ -519,6 +521,16 @@ const RE_DX_COMPLEMENTARIO = new RegExp(
   "gi"
 );
 
+// Sección E (seguimiento): "Nombre del médico responsable del alta <nombre>
+// No. JVPM: <jvpm> Sello ...". El nombre puede traer salto de línea y el JVPM
+// venir partido ("HEM-011- 1"), por eso se limpian los espacios internos.
+const RE_MEDICO_ALTA = new RegExp(
+  `Nombre\\s+del\\s+m(?:é|e)dico\\s+responsable\\s+del\\s+alta\\s*:?\\s*` +
+    `([\\s\\S]*?)\\s*(?:No\\.?\\s*)?JVPM\\s*:?\\s*` +
+    `([\\s\\S]*?)\\s*(?:Sello|Nombre\\s+de\\s+ESDOMED|Fecha\\s+de\\s+digitaci)`,
+  "i"
+);
+
 /** Extrae los diagnósticos de egreso y la causa externa del texto del formulario. */
 export function parsearDatosEgreso(texto: string): DatosEgresoExtraidos {
   const esFormularioEgreso = detectarTipoHoja(texto) === "ingreso_egreso";
@@ -558,6 +570,15 @@ export function parsearDatosEgreso(texto: string): DatosEgresoExtraidos {
       vistos.add(codigo);
       out.diagnosticosComplementarios.push({ codigo, descripcion });
     }
+  }
+
+  // Médico responsable del alta + JVPM (sección E, fuera del bloque de diagnósticos).
+  const med = texto.match(RE_MEDICO_ALTA);
+  if (med) {
+    const nombre = limpiarNombre(med[1]);
+    const jvpm = (med[2] || "").replace(/\s+/g, "").replace(/[.,;]+$/, "");
+    if (nombre) out.medicoEgresoNombre = nombre;
+    if (jvpm) out.medicoEgresoJvpm = jvpm.toUpperCase();
   }
 
   return out;

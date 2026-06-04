@@ -69,17 +69,24 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
         setCausaExtCodigo(r.causaExterna.codigo);
         setCausaExtDescripcion(r.causaExterna.descripcion);
       }
+      if (r.medicoEgresoNombre) setMedicoNombre(r.medicoEgresoNombre);
+      if (r.medicoEgresoJvpm) setMedicoJvpm(r.medicoEgresoJvpm);
+
+      const extras = [
+        r.causaExterna ? "la causa externa" : null,
+        r.medicoEgresoNombre ? "el médico responsable" : null,
+      ].filter(Boolean).join(" y ");
 
       if (!r.esFormularioEgreso) {
         setPdfMsg({ tipo: "warn", texto: "El PDF no parece un Formulario de Ingreso y Egreso. Revisa los campos antes de guardar." });
-      } else if (n === 0 && !r.causaExterna) {
+      } else if (n === 0 && !r.causaExterna && !r.medicoEgresoNombre) {
         // Útil para afinar las regex contra las etiquetas reales de la hoja.
-        console.warn("[egreso] No se detectaron diagnósticos. Texto crudo del PDF:\n", r.textoCrudo);
-        setPdfMsg({ tipo: "warn", texto: "No se detectaron diagnósticos de egreso en el formulario (revisa la consola del navegador). Complétalos manualmente." });
+        console.warn("[egreso] No se detectaron datos de egreso. Texto crudo del PDF:\n", r.textoCrudo);
+        setPdfMsg({ tipo: "warn", texto: "No se detectaron datos de egreso en el formulario (revisa la consola del navegador). Complétalos manualmente." });
       } else {
         setPdfMsg({
           tipo: "ok",
-          texto: `Se cargaron ${n} diagnóstico(s)${r.causaExterna ? " y la causa externa" : ""}. Revisa que coincidan con la hoja antes de guardar.`,
+          texto: `Se cargaron ${n} diagnóstico(s)${extras ? ` y ${extras}` : ""}. Revisa que coincidan con la hoja antes de guardar.`,
         });
       }
     } catch (e) {
