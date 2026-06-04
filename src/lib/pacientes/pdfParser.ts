@@ -444,6 +444,111 @@ export function parsearCausasDefuncion(texto: string): CausasDefuncionExtraidas 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Parser: sección de EGRESO del Formulario de Ingreso y Egreso
+// (diagnóstico principal de egreso, complementarios/asociados y causa externa)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DatosEgresoExtraidos {
+  esFormularioEgreso: boolean;
+  diagnosticoEgreso?: DiagnosticoCIE;
+  diagnosticosComplementarios: DiagnosticoCIE[];
+  causaExterna?: DiagnosticoCIE;
+}
+
+// Aísla la sección "D. DATOS DEL EGRESO O DEFUNCIÓN" hasta donde empiezan los
+// procedimientos / discapacidad (todo lo que sigue ya no son diagnósticos).
+function seccionEgreso(texto: string): string {
+  let inicio = -1;
+  for (const marker of [
+    "DATOS DEL EGRESO", "D. DATOS DEL EGRESO", "EGRESO O DEFUNCI",
+    "DATOS DE EGRESO", "EGRESO HOSPITALARIO",
+  ]) {
+    inicio = texto.search(new RegExp(escapar(marker), "i"));
+    if (inicio !== -1) break;
+  }
+  // Fallback: todo lo posterior a la ruta de movimiento.
+  if (inicio === -1) inicio = texto.search(/RUTA\s+DE\s+MOVIMIENTO/i);
+  const blk = inicio === -1 ? texto : texto.slice(inicio);
+
+  // Acotar el final a antes de discapacidad / procedimientos / seguimiento.
+  const fin = blk.search(
+    /Discapacidad\s+principal|Procedimientos\s+o\s+intervenciones|E\.\s*SEGUIMIENTO/i
+  );
+  return fin === -1 ? blk : blk.slice(0, fin);
+}
+
+const RE_CODE = "([A-Z]\\d{2,3}(?:\\.\\d+)?)";
+
+// "Diagnóstico principal (d): <desc> Código CIE-10: <code>"
+// El lookahead negativo evita que la descripción se trague la siguiente etiqueta
+// (clave para que en una hoja sin diagnóstico no haya falsos positivos).
+const RE_DX_PRINCIPAL = new RegExp(
+  `Diagn(?:ó|o)stico\\s+principal\\s*\\(?\\s*d\\s*\\)?\\s*:?\\s*` +
+    `((?:(?!C(?:ó|o)digo|Diagn(?:ó|o)stico)[\\s\\S])*?)\\s*` +
+    `C(?:ó|o)digo\\s+C(?:IE|FI?)-?\\s*10?\\s*:?\\s*${RE_CODE}`,
+  "i"
+);
+
+// "Diagnóstico de causa externa: <desc> Código CIE-10: <code>"
+const RE_CAUSA_EXTERNA = new RegExp(
+  `Diagn(?:ó|o)stico\\s+de\\s+causa\\s+externa\\s*:?\\s*` +
+    `((?:(?!C(?:ó|o)digo|Diagn(?:ó|o)stico|Discapacidad)[\\s\\S])*?)\\s*` +
+    `C(?:ó|o)digo\\s+CIE-?\\s*10?\\s*:?\\s*${RE_CODE}`,
+  "i"
+);
+
+// Filas de complementarios: "c) <desc> <code>" / "b) ..." / "a) ..." / "II) ..."
+const RE_DX_COMPLEMENTARIO = new RegExp(
+  `(?:^|\\s)(I{1,2}|[abc])\\)\\s*` +
+    `((?:(?!C(?:ó|o)digo|(?:I{1,2}|[abc])\\)|Diagn)[\\s\\S])*?)\\s+${RE_CODE}`,
+  "gi"
+);
+
+/** Extrae los diagnósticos de egreso y la causa externa del texto del formulario. */
+export function parsearDatosEgreso(texto: string): DatosEgresoExtraidos {
+  const esFormularioEgreso = detectarTipoHoja(texto) === "ingreso_egreso";
+  const out: DatosEgresoExtraidos = { esFormularioEgreso, diagnosticosComplementarios: [] };
+
+  const blk = seccionEgreso(texto);
+
+  // Diagnóstico principal (d)
+  const pr = blk.match(RE_DX_PRINCIPAL);
+  if (pr) {
+    const descripcion = limpiarNombre(pr[1]);
+    if (descripcion) out.diagnosticoEgreso = { codigo: pr[2].trim().toUpperCase(), descripcion };
+  }
+
+  // Causa externa (opcional)
+  const ce = blk.match(RE_CAUSA_EXTERNA);
+  if (ce) {
+    const descripcion = limpiarNombre(ce[1]);
+    if (descripcion) out.causaExterna = { codigo: ce[2].trim().toUpperCase(), descripcion };
+  }
+
+  // Complementarios — entre el encabezado de complementarios y la causa externa.
+  const iComp = blk.search(/Diagn(?:ó|o)stico\s+complementarios/i);
+  if (iComp !== -1) {
+    const iCe = blk.search(/Diagn(?:ó|o)stico\s+de\s+causa\s+externa/i);
+    const compBlk = blk.slice(iComp, iCe === -1 ? undefined : iCe);
+    const codigoPrincipal = out.diagnosticoEgreso?.codigo;
+    const vistos = new Set<string>();
+    RE_DX_COMPLEMENTARIO.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = RE_DX_COMPLEMENTARIO.exec(compBlk)) !== null) {
+      const descripcion = limpiarNombre(m[2]);
+      const codigo = m[3].trim().toUpperCase();
+      if (!descripcion) continue;
+      if (codigo === codigoPrincipal) continue;
+      if (vistos.has(codigo)) continue;
+      vistos.add(codigo);
+      out.diagnosticosComplementarios.push({ codigo, descripcion });
+    }
+  }
+
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // API pública
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -460,6 +565,18 @@ export async function parsearPDF(file: File): Promise<ResultadoParser> {
 export async function parsearCertificadoDefuncion(file: File): Promise<CausasDefuncionExtraidas> {
   const textoCrudo = await extraerTextoPDF(file);
   return parsearCausasDefuncion(textoCrudo);
+}
+
+/**
+ * Lee un Formulario de Ingreso y Egreso y extrae los diagnósticos de egreso
+ * (principal + complementarios) y la causa externa. Devuelve también el texto
+ * crudo para diagnosticar el parseo si algún campo no se detecta.
+ */
+export async function parsearFormularioEgreso(
+  file: File
+): Promise<DatosEgresoExtraidos & { textoCrudo: string }> {
+  const textoCrudo = await extraerTextoPDF(file);
+  return { ...parsearDatosEgreso(textoCrudo), textoCrudo };
 }
 
 /**

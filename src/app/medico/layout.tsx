@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
+import { SoporteGlobo } from "@/components/SoporteGlobo";
 
 const navItems = [
   { href: "/medico",                 label: "Inicio",          icon: LayoutDashboard, exact: true },
@@ -33,7 +34,12 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center justify-center h-full">
             <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : children}
+        ) : (
+          <>
+            {children}
+            <SoporteGlobo />
+          </>
+        )}
       </main>
     </div>
   );

@@ -1,14 +1,15 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, AlertTriangle, Plus, Trash2, FileUp, Loader2, X as XIcon } from "lucide-react";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import type { DiagnosticoCIE, EstadoPaciente, Paciente } from "@/types";
+import { parsearFormularioEgreso } from "@/lib/pacientes/pdfParser";
 import {
   ESTADO_LABEL, diasEstancia, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
@@ -43,6 +44,50 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
   const [procedimientos, setProcedimientos] = useState<string[]>([]);
   const [medicoNombre, setMedicoNombre] = useState("");
   const [medicoJvpm, setMedicoJvpm] = useState("");
+
+  // Carga desde el Formulario de Ingreso y Egreso (PDF)
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [cargandoPdf, setCargandoPdf] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState<{ tipo: "ok" | "warn" | "error"; texto: string } | null>(null);
+
+  const cargarFormulario = async (file: File) => {
+    setPdfMsg(null);
+    setCargandoPdf(true);
+    try {
+      const r = await parsearFormularioEgreso(file);
+      let n = 0;
+      if (r.diagnosticoEgreso) {
+        setDxCodigo(r.diagnosticoEgreso.codigo);
+        setDxDescripcion(r.diagnosticoEgreso.descripcion);
+        n++;
+      }
+      if (r.diagnosticosComplementarios.length) {
+        setComplementarios(r.diagnosticosComplementarios);
+        n += r.diagnosticosComplementarios.length;
+      }
+      if (r.causaExterna) {
+        setCausaExtCodigo(r.causaExterna.codigo);
+        setCausaExtDescripcion(r.causaExterna.descripcion);
+      }
+
+      if (!r.esFormularioEgreso) {
+        setPdfMsg({ tipo: "warn", texto: "El PDF no parece un Formulario de Ingreso y Egreso. Revisa los campos antes de guardar." });
+      } else if (n === 0 && !r.causaExterna) {
+        // Útil para afinar las regex contra las etiquetas reales de la hoja.
+        console.warn("[egreso] No se detectaron diagnósticos. Texto crudo del PDF:\n", r.textoCrudo);
+        setPdfMsg({ tipo: "warn", texto: "No se detectaron diagnósticos de egreso en el formulario (revisa la consola del navegador). Complétalos manualmente." });
+      } else {
+        setPdfMsg({
+          tipo: "ok",
+          texto: `Se cargaron ${n} diagnóstico(s)${r.causaExterna ? " y la causa externa" : ""}. Revisa que coincidan con la hoja antes de guardar.`,
+        });
+      }
+    } catch (e) {
+      setPdfMsg({ tipo: "error", texto: `No se pudo leer el PDF: ${e instanceof Error ? e.message : "error"}` });
+    } finally {
+      setCargandoPdf(false);
+    }
+  };
 
   useEffect(() => {
     let cancelado = false;
@@ -243,7 +288,41 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
 
       {/* Datos clínicos */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">Datos clínicos del egreso</h3>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">Datos clínicos del egreso</h3>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) cargarFormulario(f); e.target.value = ""; }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={cargandoPdf}
+            className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-50"
+          >
+            {cargandoPdf ? <Loader2 size={12} className="animate-spin" /> : <FileUp size={12} />}
+            {cargandoPdf ? "Leyendo..." : "Cargar formulario de egreso (PDF)"}
+          </button>
+        </div>
+
+        {pdfMsg && (
+          <div
+            className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${
+              pdfMsg.tipo === "ok"
+                ? "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400"
+                : pdfMsg.tipo === "warn"
+                  ? "bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400"
+                  : "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400"
+            }`}
+          >
+            <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+            <span className="flex-1">{pdfMsg.texto}</span>
+            <button onClick={() => setPdfMsg(null)} className="flex-shrink-0 opacity-60 hover:opacity-100"><XIcon size={12} /></button>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-3">
           <div>

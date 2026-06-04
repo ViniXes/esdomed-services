@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, X } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -27,6 +27,21 @@ const CONFIG: Record<
     icon: BookCheck,
     borderColor: "border-l-violet-500",
     iconColor: "text-violet-400",
+  },
+  incapacidad: {
+    icon: FileText,
+    borderColor: "border-l-amber-500",
+    iconColor: "text-amber-400",
+  },
+  anexo5: {
+    icon: ClipboardList,
+    borderColor: "border-l-teal-500",
+    iconColor: "text-teal-400",
+  },
+  impresion: {
+    icon: Printer,
+    borderColor: "border-l-indigo-500",
+    iconColor: "text-indigo-400",
   },
 };
 

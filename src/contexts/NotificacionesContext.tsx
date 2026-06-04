@@ -13,7 +13,9 @@ import { collection, onSnapshot, query, where, orderBy, limit } from "firebase/f
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type TipoNotif = "fallecido" | "traslado" | "alta" | "psicologia";
+export type TipoNotif =
+  | "fallecido" | "traslado" | "alta" | "psicologia"
+  | "incapacidad" | "anexo5" | "impresion";
 
 export interface NotifToast {
   id: string;
@@ -26,6 +28,9 @@ interface Pendientes {
   fallecidos: number;
   traslados: number;
   altas: number;
+  incapacidades: number;
+  anexo5: number;
+  impresiones: number;
   total: number;
 }
 
@@ -36,7 +41,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, altas: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -47,12 +52,18 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const [countFallecidos, setCountFallecidos] = useState(0);
   const [countTraslados, setCountTraslados]   = useState(0);
   const [countAltas, setCountAltas]           = useState(0);
+  const [countIncapacidades, setCountIncapacidades] = useState(0);
+  const [countAnexo5, setCountAnexo5]         = useState(0);
+  const [countImpresiones, setCountImpresiones] = useState(0);
   const [toasts, setToasts]                   = useState<NotifToast[]>([]);
 
   const knownFallecidos = useRef<Set<string> | null>(null);
   const knownTraslados  = useRef<Set<string> | null>(null);
   const knownAltas      = useRef<Set<string> | null>(null);
   const knownPsConfirm  = useRef<Set<string> | null>(null);
+  const knownIncapacidades = useRef<Set<string> | null>(null);
+  const knownAnexo5     = useRef<Set<string> | null>(null);
+  const knownImpresiones = useRef<Set<string> | null>(null);
 
   const esEsdomed   = profile?.role === "esdomed" || profile?.role === "admin";
   const puedeAltas  = esEsdomed || profile?.role === "trabajo_social";
@@ -193,11 +204,107 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [puedeAltas, addToast]);
 
+  // Incapacidades — solo esdomed/admin
+  useEffect(() => {
+    if (!esEsdomed) return;
+    knownIncapacidades.current = null;
+
+    const q = query(
+      collection(db, "incapacidades"),
+      where("estado", "==", "pendiente"),
+    );
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+
+      if (knownIncapacidades.current === null) {
+        knownIncapacidades.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownIncapacidades.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "incapacidad",
+              titulo: "Nueva solicitud de incapacidad",
+              mensaje: `${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""} · ${d.diasIncapacidad ?? "—"} días`,
+            });
+          }
+        });
+        knownIncapacidades.current = ids;
+      }
+      setCountIncapacidades(snap.size);
+    });
+  }, [esEsdomed, addToast]);
+
+  // Anexo 5 — solo esdomed/admin
+  useEffect(() => {
+    if (!esEsdomed) return;
+    knownAnexo5.current = null;
+
+    const q = query(
+      collection(db, "anexo5"),
+      where("estado", "==", "pendiente"),
+    );
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+
+      if (knownAnexo5.current === null) {
+        knownAnexo5.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownAnexo5.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "anexo5",
+              titulo: "Nueva solicitud de Anexo 5",
+              mensaje: `${d.nombrePaciente ?? ""}${d.especialidad ? ` · ${d.especialidad}` : ""}`,
+            });
+          }
+        });
+        knownAnexo5.current = ids;
+      }
+      setCountAnexo5(snap.size);
+    });
+  }, [esEsdomed, addToast]);
+
+  // Impresiones — solo esdomed/admin
+  useEffect(() => {
+    if (!esEsdomed) return;
+    knownImpresiones.current = null;
+
+    const q = query(
+      collection(db, "solicitudes_impresion"),
+      where("estado", "==", "pendiente"),
+    );
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+
+      if (knownImpresiones.current === null) {
+        knownImpresiones.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownImpresiones.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "impresion",
+              titulo: "Nueva solicitud de impresión",
+              mensaje: `${d.descripcion ?? "Documento"}${d.pacienteExpediente ? ` · Exp. ${d.pacienteExpediente}` : ""} · ${d.copias ?? 1} copia(s)`,
+            });
+          }
+        });
+        knownImpresiones.current = ids;
+      }
+      setCountImpresiones(snap.size);
+    });
+  }, [esEsdomed, addToast]);
+
   const pendientes: Pendientes = {
-    fallecidos: countFallecidos,
-    traslados:  countTraslados,
-    altas:      countAltas,
-    total:      countFallecidos + countTraslados + countAltas,
+    fallecidos:    countFallecidos,
+    traslados:     countTraslados,
+    altas:         countAltas,
+    incapacidades: countIncapacidades,
+    anexo5:        countAnexo5,
+    impresiones:   countImpresiones,
+    total:         countFallecidos + countTraslados + countAltas + countIncapacidades + countAnexo5 + countImpresiones,
   };
 
   return (

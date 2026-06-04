@@ -127,12 +127,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
     // ── Documentos ──
     ...(!esTS
-      ? [{ href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, group: G_DOCUMENTOS }]
+      ? [{ href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, badge: pendientes.impresiones, group: G_DOCUMENTOS }]
       : []),
     ...(verIncapacidades
       ? [
-          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, group: G_DOCUMENTOS },
-          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, group: G_DOCUMENTOS },
+          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS },
+          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, badge: pendientes.anexo5, group: G_DOCUMENTOS },
         ]
       : []),
 
