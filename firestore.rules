@@ -36,7 +36,11 @@ service cloud.firestore {
     match /traslados/{id} {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
-      allow update: if isStaff();
+      // El staff gestiona el estado; el médico puede corregir y reenviar su propio
+      // traslado solo cuando ESDOMED lo dejó en revisión.
+      allow update: if isStaff()
+                    || (isMedico() && resource.data.medicoId == uid()
+                        && resource.data.estado == 'en_revision');
       allow delete: if isAdmin();
     }
 
