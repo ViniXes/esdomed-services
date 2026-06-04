@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2 } from "lucide-react";
+import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { SolicitudIncapacidad } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 
@@ -15,6 +15,10 @@ export default function MedicoIncapacidadesPage() {
   const [loading, setLoading] = useState(true);
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [pagina, setPagina] = useState(1);
+
+  const PAGE_SIZE = 5;
 
   const eliminar = async (id: string) => {
     setEliminandoId(id);
@@ -54,6 +58,20 @@ export default function MedicoIncapacidadesPage() {
 
   const pendientes = solicitudes.filter((s) => s.estado === "pendiente").length;
 
+  const filtradas = useMemo(() => {
+    const t = busqueda.trim().toLowerCase();
+    if (!t) return solicitudes;
+    return solicitudes.filter(
+      (s) =>
+        s.pacienteNombre.toLowerCase().includes(t) ||
+        s.pacienteExpediente.toLowerCase().includes(t),
+    );
+  }, [solicitudes, busqueda]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / PAGE_SIZE));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const visibles = filtradas.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* Header */}
@@ -81,6 +99,19 @@ export default function MedicoIncapacidadesPage() {
         </div>
       )}
 
+      {!loading && solicitudes.length > 0 && (
+        <div className="relative mb-4">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
+            placeholder="Buscar por paciente o expediente..."
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -96,9 +127,14 @@ export default function MedicoIncapacidadesPage() {
             <Plus size={14} /> Solicitar la primera
           </Link>
         </div>
+      ) : filtradas.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
+          <Search size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
+          <p className="text-sm text-slate-500">Sin coincidencias para “{busqueda}”.</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {solicitudes.map((s) => (
+          {visibles.map((s) => (
             <div
               key={s.id}
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-amber-300 dark:hover:border-amber-900 transition-all shadow-sm"
@@ -174,6 +210,33 @@ export default function MedicoIncapacidadesPage() {
               </div>
             </div>
           ))}
+
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <p className="text-xs text-slate-500">
+                {(paginaActual - 1) * PAGE_SIZE + 1}–{Math.min(paginaActual * PAGE_SIZE, filtradas.length)} de {filtradas.length}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={13} /> Anterior
+                </button>
+                <span className="text-xs text-slate-500 px-1 tabular-nums">
+                  {paginaActual} / {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Siguiente <ChevronRight size={13} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

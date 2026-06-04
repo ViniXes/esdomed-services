@@ -81,8 +81,8 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-start gap-3 flex-wrap">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-3">
+        <div className="flex items-start gap-3 min-w-0 lg:flex-1">
           <button
             onClick={() => router.push("/dashboard/pacientes")}
             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
@@ -97,7 +97,7 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
                 {ESTADO_LABEL[paciente.estado]}
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 break-all">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 break-words">
               {paciente.expediente}
             </h1>
             <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium break-words">
@@ -110,7 +110,7 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap lg:justify-end">
           <Link
             href={`/dashboard/pacientes/${paciente.id}/editar-persona`}
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
@@ -468,6 +468,7 @@ function CausasDefuncionEditor({
   const [guardando, setGuardando] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [form,      setForm]      = useState(snapshot);
+  const [sincronizadoCon, setSincronizadoCon] = useState({ paciente, editando });
 
   // ── Carga desde Certificado de Defunción (PDF, numeral 13) ──
   const fileRef = useRef<HTMLInputElement>(null);
@@ -505,9 +506,13 @@ function CausasDefuncionEditor({
     }
   };
 
-  useEffect(() => {
+  // Resincroniza el formulario con el documento del paciente cuando NO se está
+  // editando (llega una actualización por onSnapshot o se cancela la edición).
+  // Patrón "ajustar estado en render" recomendado por React, en lugar de un efecto.
+  if (sincronizadoCon.paciente !== paciente || sincronizadoCon.editando !== editando) {
+    setSincronizadoCon({ paciente, editando });
     if (!editando) setForm(snapshot());
-  }, [paciente, editando]); // eslint-disable-line
+  }
 
   const setDx = (
     k: "causaMuerteD" | "causaMuerteC" | "causaMuerteB" | "causaMuerteA" | "estadoI" | "estadoII" | "causaExterna",
