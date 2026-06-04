@@ -174,7 +174,10 @@ export default function DashboardTrasladosPage() {
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-500 mt-2">Dr. {t.medicoNombre} · {t.medicoServicio}</p>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Dr. {t.medicoNombre} · {t.medicoServicio}
+                    {t.revisadoPorNombre && ` · Procesado por: ${t.revisadoPorNombre}`}
+                  </p>
                 </div>
                 <Badge estado={t.estado} />
               </div>
@@ -223,6 +226,9 @@ export default function DashboardTrasladosPage() {
               <Row label="Motivo"      value={selected.motivoTraslado} />
               <Row label="Médico"      value={`Dr. ${selected.medicoNombre} (${selected.medicoServicio})`} />
               <Row label="Estado"      value={<Badge estado={selected.estado} />} />
+              {selected.revisadoPorNombre && (
+                <Row label="Procesado por" value={selected.revisadoPorNombre} />
+              )}
               
               <div className="pt-2">
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Notas ESDOMED</label>

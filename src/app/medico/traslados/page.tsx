@@ -139,10 +139,23 @@ export default function MedicoTrasladosPage() {
                     </div>
                   )}
 
-                  {t.notasEsdomed && (
+                  {(t.notasEsdomed || t.revisadoPorNombre) && (
                     <div className="mt-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700/50">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notas ESDOMED</p>
-                      <p className="text-sm text-slate-700 dark:text-slate-300">{t.notasEsdomed}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        {t.notasEsdomed ? (
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Notas ESDOMED</p>
+                        ) : (
+                          <div />
+                        )}
+                        {t.revisadoPorNombre && (
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            Procesado por: {t.revisadoPorNombre}
+                          </span>
+                        )}
+                      </div>
+                      {t.notasEsdomed && (
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{t.notasEsdomed}</p>
+                      )}
                     </div>
                   )}
                 </div>
