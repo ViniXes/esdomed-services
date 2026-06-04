@@ -18,7 +18,8 @@ export interface SolicitudTraslado {
   medicoId: string;
   medicoNombre: string;
   medicoServicio: string;
-  
+  medicoJvpm?: string;        // sello/firma del médico solicitante
+
   tipoTraslado?: "servicio_cama" | "interno" | "intercambio";
   
   pacienteNombre?: string;

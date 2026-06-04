@@ -371,6 +371,14 @@ function TabEgreso({ paciente, pacienteId }: { paciente: Paciente; pacienteId: s
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Link
+          href={`/dashboard/pacientes/${pacienteId}/egreso`}
+          className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+        >
+          <Pencil size={14} /> Editar datos de egreso
+        </Link>
+      </div>
       <Card icon={LogOutIcon} title="Datos de egreso">
         <Row label="Condición de egreso" value={ESTADO_LABEL[paciente.estado]} />
         <Row label="Fecha y hora" value={formatFechaHora(paciente.fechaEgreso)} />

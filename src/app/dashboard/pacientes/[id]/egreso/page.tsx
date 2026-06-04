@@ -115,6 +115,32 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
         fechaNacimiento: toDate(data.fechaNacimiento),
         creadoEn: toDate(data.creadoEn) ?? new Date(),
       } as Paciente);
+
+      // Modo edición: el paciente ya está egresado → precargar sus datos de egreso.
+      if (data.estado !== "activo") {
+        setCondicion(data.estado as EstadoPaciente);
+        const fe = toDate(data.fechaEgreso);
+        if (fe) setFechaHora(toDatetimeLocalInput(fe));
+        if (data.diagnosticoEgreso) {
+          setDxCodigo(data.diagnosticoEgreso.codigo ?? "");
+          setDxDescripcion(data.diagnosticoEgreso.descripcion ?? "");
+        }
+        if (Array.isArray(data.diagnosticosComplementarios)) {
+          setComplementarios(
+            (data.diagnosticosComplementarios as DiagnosticoCIE[]).map((d) => ({
+              codigo: d.codigo ?? "", descripcion: d.descripcion ?? "",
+            })),
+          );
+        }
+        if (data.causaExterna) {
+          setCausaExtCodigo(data.causaExterna.codigo ?? "");
+          setCausaExtDescripcion(data.causaExterna.descripcion ?? "");
+        }
+        if (Array.isArray(data.procedimientos)) setProcedimientos(data.procedimientos as string[]);
+        if (data.medicoEgresoNombre) setMedicoNombre(data.medicoEgresoNombre);
+        if (data.medicoEgresoJvpm) setMedicoJvpm(data.medicoEgresoJvpm);
+      }
+
       setLoading(false);
     })();
     return () => { cancelado = true; };
@@ -139,26 +165,8 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
     );
   }
 
-  if (paciente.estado !== "activo") {
-    return (
-      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
-        <Link
-          href={`/dashboard/pacientes/${paciente.id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-        >
-          <ArrowLeft size={14} /> Volver al paciente
-        </Link>
-        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-2xl p-5">
-          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-            Este paciente ya tiene egreso registrado
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-            Estado actual: <strong>{ESTADO_LABEL[paciente.estado]}</strong>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Activo → registrar egreso; ya egresado → editar los datos de egreso.
+  const modoEdicion = paciente.estado !== "activo";
 
   const dias = diasEstancia(paciente.fechaIngreso, new Date(fechaHora));
 
@@ -190,53 +198,52 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
     setError(null);
     setGuardando(true);
     try {
+      const compLimpios = complementarios
+        .filter((d) => d.codigo.trim() || d.descripcion.trim())
+        .map((d) => ({ codigo: d.codigo.trim().toUpperCase(), descripcion: d.descripcion.trim() }));
+      const procsLimpios = procedimientos.map((p) => p.trim()).filter(Boolean);
+
+      // Se escriben los campos siempre (null cuando van vacíos) para que al editar
+      // un egreso ya guardado, quitar un dato realmente lo borre en Firestore.
       const update: Record<string, unknown> = {
         estado: condicion,
         fechaEgreso: Timestamp.fromDate(fechaEgreso),
         diasEstancia: dias,
         medicoEgresoNombre: medicoNombre.trim(),
+        medicoEgresoJvpm: medicoJvpm.trim() || null,
+        diagnosticoEgreso: (dxCodigo.trim() || dxDescripcion.trim())
+          ? { codigo: dxCodigo.trim().toUpperCase(), descripcion: dxDescripcion.trim() }
+          : null,
+        diagnosticosComplementarios: compLimpios.length ? compLimpios : null,
+        causaExterna: (causaExtCodigo.trim() || causaExtDescripcion.trim())
+          ? { codigo: causaExtCodigo.trim().toUpperCase(), descripcion: causaExtDescripcion.trim() }
+          : null,
+        procedimientos: procsLimpios.length ? procsLimpios : null,
         actualizadoEn: Timestamp.now(),
         actualizadoPor: profile.uid,
       };
-      if (medicoJvpm.trim()) update.medicoEgresoJvpm = medicoJvpm.trim();
-      if (dxCodigo.trim() || dxDescripcion.trim()) {
-        update.diagnosticoEgreso = {
-          codigo: dxCodigo.trim().toUpperCase(),
-          descripcion: dxDescripcion.trim(),
-        };
-      }
-      const compLimpios = complementarios
-        .filter((d) => d.codigo.trim() || d.descripcion.trim())
-        .map((d) => ({ codigo: d.codigo.trim().toUpperCase(), descripcion: d.descripcion.trim() }));
-      if (compLimpios.length) update.diagnosticosComplementarios = compLimpios;
-
-      if (causaExtCodigo.trim() || causaExtDescripcion.trim()) {
-        update.causaExterna = {
-          codigo: causaExtCodigo.trim().toUpperCase(),
-          descripcion: causaExtDescripcion.trim(),
-        };
-      }
-      const procsLimpios = procedimientos.map((p) => p.trim()).filter(Boolean);
-      if (procsLimpios.length) update.procedimientos = procsLimpios;
 
       await updateDoc(doc(db, "pacientes", paciente.id), update);
 
-      // El paciente egresa: anular sus tarjetas de visita activas (conserva el
-      // historial; solo deja de estar "activa"). No bloquea el egreso si falla.
-      try {
-        const snap = await getDocs(
-          query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente))
-        );
-        await Promise.all(
-          snap.docs
-            .filter((d) => (d.data() as { estado?: string }).estado === "activa")
-            .map((d) => updateDoc(doc(db, "tarjetas_visita", d.id), {
-              estado: "anulada",
-              actualizadoEn: Timestamp.now(),
-            }))
-        );
-      } catch {
-        /* las tarjetas de visita no son críticas para el egreso */
+      // Solo al registrar el egreso por primera vez: anular las tarjetas de visita
+      // activas (conserva el historial; solo deja de estar "activa"). Al editar un
+      // egreso ya existente no aplica. No bloquea el egreso si falla.
+      if (!modoEdicion) {
+        try {
+          const snap = await getDocs(
+            query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente))
+          );
+          await Promise.all(
+            snap.docs
+              .filter((d) => (d.data() as { estado?: string }).estado === "activa")
+              .map((d) => updateDoc(doc(db, "tarjetas_visita", d.id), {
+                estado: "anulada",
+                actualizadoEn: Timestamp.now(),
+              }))
+          );
+        } catch {
+          /* las tarjetas de visita no son críticas para el egreso */
+        }
       }
 
       router.push(`/dashboard/pacientes/${paciente.id}`);
@@ -258,7 +265,9 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
           <ArrowLeft size={16} />
         </Link>
         <div className="flex-1">
-          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium">Registrar egreso</p>
+          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium">
+            {modoEdicion ? "Editar datos de egreso" : "Registrar egreso"}
+          </p>
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
             {nombreCompleto(paciente)} <span className="text-slate-400 font-mono text-sm ml-2">{paciente.expediente}</span>
           </h1>
@@ -483,7 +492,7 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
             className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
           >
             <Save size={15} />
-            {guardando ? "Guardando..." : "Registrar egreso"}
+            {guardando ? "Guardando..." : modoEdicion ? "Guardar cambios" : "Registrar egreso"}
           </button>
         </div>
       </div>

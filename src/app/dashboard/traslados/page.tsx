@@ -176,7 +176,7 @@ export default function DashboardTrasladosPage() {
 
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <p className="text-xs text-slate-500">
-                      Dr. {t.medicoNombre} · {t.medicoServicio}
+                      Dr. {t.medicoNombre}{t.medicoJvpm ? ` · JVPM ${t.medicoJvpm}` : ""}
                     </p>
                     {t.revisadoPorNombre && (
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
@@ -235,7 +235,10 @@ export default function DashboardTrasladosPage() {
               <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
 
               <Row label="Motivo"      value={selected.motivoTraslado} />
-              <Row label="Médico"      value={`Dr. ${selected.medicoNombre} (${selected.medicoServicio})`} />
+              <Row label="Médico"      value={`Dr. ${selected.medicoNombre}`} />
+              {selected.medicoJvpm && (
+                <Row label="JVPM"        value={selected.medicoJvpm} />
+              )}
               <Row label="Estado"      value={<Badge estado={selected.estado} />} />
               {selected.revisadoPorNombre && (
                 <Row label="Procesado por" value={selected.revisadoPorNombre} />
