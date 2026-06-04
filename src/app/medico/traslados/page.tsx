@@ -139,23 +139,18 @@ export default function MedicoTrasladosPage() {
                     </div>
                   )}
 
-                  {(t.notasEsdomed || t.revisadoPorNombre) && (
+                  {t.revisadoPorNombre && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        Procesado por: {t.revisadoPorNombre}
+                      </span>
+                    </div>
+                  )}
+
+                  {t.notasEsdomed && (
                     <div className="mt-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700/50">
-                      <div className="flex items-center justify-between mb-1">
-                        {t.notasEsdomed ? (
-                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Notas ESDOMED</p>
-                        ) : (
-                          <div />
-                        )}
-                        {t.revisadoPorNombre && (
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded uppercase tracking-wider">
-                            Procesado por: {t.revisadoPorNombre}
-                          </span>
-                        )}
-                      </div>
-                      {t.notasEsdomed && (
-                        <p className="text-sm text-slate-700 dark:text-slate-300">{t.notasEsdomed}</p>
-                      )}
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notas ESDOMED</p>
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{t.notasEsdomed}</p>
                     </div>
                   )}
                 </div>

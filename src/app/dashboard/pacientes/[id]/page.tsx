@@ -81,34 +81,36 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-start gap-3">
-        <button
-          onClick={() => router.push("/dashboard/pacientes")}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
-          aria-label="Volver"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Expediente</p>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${ESTADO_BADGE[paciente.estado]}`}>
-              {ESTADO_LABEL[paciente.estado]}
-            </span>
+      <div className="flex items-start gap-3 flex-wrap">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <button
+            onClick={() => router.push("/dashboard/pacientes")}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
+            aria-label="Volver"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Expediente</p>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${ESTADO_BADGE[paciente.estado]}`}>
+                {ESTADO_LABEL[paciente.estado]}
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 break-all">
+              {paciente.expediente}
+            </h1>
+            <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium break-words">
+              {nombreCompleto(paciente)}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5 break-words">
+              {edad !== null ? `${edad} años` : "Edad no registrada"}
+              {paciente.genero && <> · {GENERO_LABEL[paciente.genero]}</>}
+              {paciente.dui && <> · DUI {paciente.dui}</>}
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5">
-            {paciente.expediente}
-          </h1>
-          <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium">
-            {nombreCompleto(paciente)}
-          </p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {edad !== null ? `${edad} años` : "Edad no registrada"}
-            {paciente.genero && <> · {GENERO_LABEL[paciente.genero]}</>}
-            {paciente.dui && <> · DUI {paciente.dui}</>}
-          </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Link
             href={`/dashboard/pacientes/${paciente.id}/editar-persona`}
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
