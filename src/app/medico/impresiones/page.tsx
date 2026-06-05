@@ -101,7 +101,7 @@ export default function MedicoImpresionesPage() {
       await addDoc(collection(db, "solicitudes_impresion"), {
         medicoId: user.uid, 
         medicoNombre: profile.nombre,
-        medicoServicio: profile.servicio ?? "",
+        medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
         pacienteExpediente,
         descripcion, 
         copias: parseInt(copias), 

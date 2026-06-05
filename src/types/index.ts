@@ -1,4 +1,5 @@
 export type UserRole = "medico" | "esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh";
+export type TipoMedicoCuidadosCriticos = "uci" | "ucin";
 
 export interface UserProfile {
   uid: string;
@@ -7,8 +8,57 @@ export interface UserProfile {
   role: UserRole;
   servicio?: string;    // solo médicos — campo legacy (un servicio)
   servicios?: string[]; // solo médicos — multi-servicio (campo nuevo)
+  tipoMedico?: TipoMedicoCuidadosCriticos; // médicos de cuidados críticos
   jvpm?: string;        // solo médicos — sello/firma
   createdAt: Date;
+}
+
+export type TipoAtencionCuidadosCriticos =
+  | "evaluacion_ingreso"
+  | "seguimiento_clinico"
+  | "procedimiento"
+  | "dispositivo"
+  | "ventilacion"
+  | "infeccion_cultivo"
+  | "medicamento"
+  | "estudio"
+  | "evento_adverso"
+  | "egreso";
+
+export interface AtencionCuidadosCriticos {
+  id?: string;
+  tipoUnidad: TipoMedicoCuidadosCriticos;
+  tipoAtencion: TipoAtencionCuidadosCriticos;
+  pacienteId: string;
+  pacienteExpediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+  fechaAtencion: Date;
+  resumen: string;
+  detalle?: string;
+  medicoId: string;
+  medicoNombre: string;
+  medicoJvpm?: string;
+  creadoEn: Date;
+}
+
+export interface FichaCuidadosCriticos {
+  id?: string;
+  tipoUnidad: TipoMedicoCuidadosCriticos;
+  estadoEstancia?: "activa" | "egresada";
+  pacienteId: string;
+  pacienteExpediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+  datos: Record<string, string | number>;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  creadoEn: Date;
+  actualizadoPorId: string;
+  actualizadoPorNombre: string;
+  actualizadoEn: Date;
 }
 
 export type EstadoTraslado = "pendiente" | "en_revision" | "aprobado" | "rechazado";

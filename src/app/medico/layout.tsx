@@ -2,12 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone } from "lucide-react";
+import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
+import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { SoporteGlobo } from "@/components/SoporteGlobo";
 
-const navItems = [
+const baseNavItems = [
   { href: "/medico",                 label: "Inicio",          icon: LayoutDashboard, exact: true },
   { href: "/medico/cola-expedientes", label: "Cola de expedientes", icon: FileStack },
   { href: "/medico/busqueda-telefono", label: "Busqueda de telefono", icon: Phone },
@@ -26,9 +27,20 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
     if (!loading && profile?.role !== "medico") router.replace("/login");
   }, [loading, profile, router]);
 
+  const navItems = profile?.tipoMedico
+    ? [
+        baseNavItems[0],
+        { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity },
+        ...baseNavItems.slice(1),
+      ]
+    : baseNavItems;
+  const roleLabel = profile?.tipoMedico
+    ? TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]
+    : "Portal Médico";
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
-      <Sidebar navItems={navItems} roleLabel="Portal Médico" />
+      <Sidebar navItems={navItems} roleLabel={roleLabel} />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0 bg-slate-50 dark:bg-[var(--color-institutional-dark)]">
         {loading || !profile ? (
           <div className="flex items-center justify-center h-full">

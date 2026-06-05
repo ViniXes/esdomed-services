@@ -153,7 +153,9 @@ export default function NuevaIncapacidadPage() {
         // Médico
         medicoId: user.uid,
         medicoNombre: profile.nombre,
-        medicoServicio: profile.servicio ?? (profile.servicios?.[0] ?? ""),
+        medicoServicio: profile.tipoMedico
+          ? paciente.servicioActual
+          : profile.servicio ?? (profile.servicios?.[0] ?? ""),
         // Paciente
         pacienteId: paciente.id!,
         pacienteExpediente: paciente.expediente,

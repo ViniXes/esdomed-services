@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { UserRole } from "@/types";
+import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const DEFAULT_TEST_PASSWORD = "123456";
 const VALID_ROLES = new Set<UserRole>([
@@ -68,9 +69,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
     update.role = userRole;
   }
 
-  const targetRole = nextRole ?? (await adminDb.collection("usuarios").doc(uid).get()).data()?.role;
-  if ("servicios" in body || nextRole) {
-    const servicios = targetRole === "medico" && Array.isArray(body.servicios) ? body.servicios.map(String) : [];
+  const targetSnap = await adminDb.collection("usuarios").doc(uid).get();
+  const targetData = targetSnap.data();
+  const targetRole = nextRole ?? targetData?.role;
+  let targetTipoMedico: TipoMedicoCuidadosCriticos | undefined =
+    targetData?.tipoMedico === "uci" || targetData?.tipoMedico === "ucin"
+      ? targetData.tipoMedico
+      : undefined;
+
+  if ("tipoMedico" in body) {
+    targetTipoMedico =
+      targetRole === "medico" && (body.tipoMedico === "uci" || body.tipoMedico === "ucin")
+        ? body.tipoMedico
+        : undefined;
+  }
+  update.tipoMedico = targetRole === "medico" && targetTipoMedico
+    ? targetTipoMedico
+    : FieldValue.delete();
+
+  if ("servicios" in body || nextRole || "tipoMedico" in body) {
+    const servicios = targetRole !== "medico"
+      ? []
+      : targetTipoMedico
+        ? serviciosPorTipoMedico(targetTipoMedico)
+        : Array.isArray(body.servicios) ? body.servicios.map(String) : [];
     update.servicios = servicios;
     update.servicio = servicios[0] ?? "";
   }

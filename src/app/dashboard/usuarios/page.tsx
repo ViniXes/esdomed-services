@@ -2,15 +2,20 @@
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserProfile, UserRole } from "@/types";
+import { TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
 import { ChevronDown, KeyRound, Pencil, Trash2, Users } from "lucide-react";
 import { useServicios } from "@/contexts/ServiciosContext";
+import {
+  serviciosPorTipoMedico,
+  TIPO_MEDICO_CRITICO_LABEL,
+} from "@/lib/cuidadosCriticos";
 
 interface NuevoUsuario {
   nombre: string;
   email: string;
   password: string;
   userRole: UserRole;
+  tipoMedico: TipoMedicoCuidadosCriticos | "";
   servicios: string[];
   jvpm: string;
 }
@@ -23,6 +28,7 @@ const EMPTY_FORM: NuevoUsuario = {
   email: "",
   password: DEFAULT_PASSWORD,
   userRole: "medico",
+  tipoMedico: "",
   servicios: [],
   jvpm: "",
 };
@@ -185,6 +191,7 @@ export default function DashboardUsuariosPage() {
       nombre: u.nombre,
       email: u.email,
       userRole: u.role,
+      tipoMedico: u.tipoMedico ?? "",
       servicios: serviciosActuales,
       jvpm: u.jvpm ?? "",
     });
@@ -219,6 +226,11 @@ export default function DashboardUsuariosPage() {
     if (u.servicio) return u.servicio;
     return "-";
   };
+
+  const displayRole = (u: UserProfile) =>
+    u.role === "medico" && u.tipoMedico
+      ? TIPO_MEDICO_CRITICO_LABEL[u.tipoMedico]
+      : roleLabels[u.role] || "Medico";
 
   const renderServiciosPicker = (
     selected: string[],
@@ -297,20 +309,47 @@ export default function DashboardUsuariosPage() {
             {form.userRole === "medico" && (
               <>
                 <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de medico</label>
+                  <select
+                    value={form.tipoMedico}
+                    onChange={e => {
+                      const tipo = e.target.value as TipoMedicoCuidadosCriticos | "";
+                      setForm(prev => ({
+                        ...prev,
+                        tipoMedico: tipo,
+                        servicios: tipo ? serviciosPorTipoMedico(tipo) : prev.servicios,
+                      }));
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">Medico general / servicios manuales</option>
+                    <option value="uci">Medico UCI</option>
+                    <option value="ucin">Medico UCIN</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">JVPM (sello)</label>
                   <input type="text" value={form.jvpm} onChange={setField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                    Servicios del medico
+                    {form.tipoMedico ? "Servicios asignados automaticamente" : "Servicios del medico"}
                     {form.servicios.length > 0 && (
                       <span className="ml-2 text-blue-600 dark:text-blue-400">
                         ({form.servicios.length} seleccionado{form.servicios.length !== 1 ? "s" : ""})
                       </span>
                     )}
                   </label>
-                  {renderServiciosPicker(form.servicios, serviciosOpen, setServiciosOpen, toggleServicio)}
+                  {form.tipoMedico ? (
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      {form.servicios.map(servicio => (
+                        <p key={servicio} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+                          {servicio}
+                        </p>
+                      ))}
+                    </div>
+                  ) : renderServiciosPicker(form.servicios, serviciosOpen, setServiciosOpen, toggleServicio)}
                 </div>
               </>
             )}
@@ -356,7 +395,7 @@ export default function DashboardUsuariosPage() {
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${roleColors[u.role] || roleColors.medico}`}>
-                      {roleLabels[u.role] || "Medico"}
+                      {displayRole(u)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-500 text-xs max-w-[220px]">
@@ -417,19 +456,46 @@ export default function DashboardUsuariosPage() {
               {editForm.userRole === "medico" && (
                 <>
                   <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de medico</label>
+                    <select
+                      value={editForm.tipoMedico}
+                      onChange={e => {
+                        const tipo = e.target.value as TipoMedicoCuidadosCriticos | "";
+                        setEditForm(prev => prev ? {
+                          ...prev,
+                          tipoMedico: tipo,
+                          servicios: tipo ? serviciosPorTipoMedico(tipo) : prev.servicios,
+                        } : prev);
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">Medico general / servicios manuales</option>
+                      <option value="uci">Medico UCI</option>
+                      <option value="ucin">Medico UCIN</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">JVPM (sello)</label>
                     <input type="text" value={editForm.jvpm} onChange={setEditField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                      Servicios del medico
+                      {editForm.tipoMedico ? "Servicios asignados automaticamente" : "Servicios del medico"}
                       {editForm.servicios.length > 0 && (
                         <span className="ml-2 text-blue-600 dark:text-blue-400">
                           ({editForm.servicios.length} seleccionado{editForm.servicios.length !== 1 ? "s" : ""})
                         </span>
                       )}
                     </label>
-                    {renderServiciosPicker(editForm.servicios, editServiciosOpen, setEditServiciosOpen, toggleEditServicio)}
+                    {editForm.tipoMedico ? (
+                      <div className="grid gap-1.5 sm:grid-cols-2">
+                        {editForm.servicios.map(servicio => (
+                          <p key={servicio} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+                            {servicio}
+                          </p>
+                        ))}
+                      </div>
+                    ) : renderServiciosPicker(editForm.servicios, editServiciosOpen, setEditServiciosOpen, toggleEditServicio)}
                   </div>
                 </>
               )}
