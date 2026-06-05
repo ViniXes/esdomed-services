@@ -44,3 +44,16 @@ export function formatCantidadCorto(cantidad: number, unidad: UnidadLicencia): s
   if (unidad === "horas") return formatHoras(cantidad);
   return `${cantidad} d`;
 }
+
+// ── Equivalencia horas → días (jornada de 8 horas) ───────────────────────────
+export const HORAS_POR_DIA = 8;
+
+/** Convierte horas a su equivalente en días de 8 h: 38 → "4 días 6 h", 40 → "5 días". */
+export function horasAEquivalenteDias(horas: number): string {
+  const dias = Math.floor(horas / HORAS_POR_DIA);
+  const resto = horas - dias * HORAS_POR_DIA;
+  const partes: string[] = [];
+  if (dias) partes.push(`${dias} día${dias === 1 ? "" : "s"}`);
+  if (resto > 0) partes.push(formatHoras(resto));
+  return partes.length ? partes.join(" ") : "0 días";
+}

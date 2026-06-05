@@ -11,7 +11,7 @@ import type { Empleado, Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 import { antiguedadAnios, saldosEmpleado, type SaldoBolsa } from "@/lib/rrhh/saldos";
 import { BOLSA_LABEL, categoriaLabel } from "@/lib/rrhh/catalogo";
-import { formatCantidad, formatCantidadCorto } from "@/lib/rrhh/formato";
+import { formatCantidad, formatCantidadCorto, horasAEquivalenteDias } from "@/lib/rrhh/formato";
 import { LicenciaDetalleCard } from "@/components/rrhh/LicenciaDetalleCard";
 
 function mapLicencia(id: string, data: Record<string, unknown>): Licencia {
@@ -224,6 +224,9 @@ function SaldoCard({ saldo }: { saldo: SaldoBolsa }) {
         <div className={`h-full ${barra} rounded-full transition-all`} style={{ width: `${pct}%` }} />
       </div>
       <p className="text-[11px] text-slate-400 mt-1.5">{saldo.usado}{sufijo} usados</p>
+      {saldo.unidad === "horas" && (
+        <p className="text-[10px] text-slate-400 mt-0.5">≈ {horasAEquivalenteDias(saldo.disponible)} disponibles</p>
+      )}
     </div>
   );
 }
