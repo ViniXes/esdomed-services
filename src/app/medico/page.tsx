@@ -10,6 +10,7 @@ import {
   ArrowRightLeft, HeartPulse, Printer,
   Clock, CheckCircle2, XCircle, Plus, ChevronRight,
 } from "lucide-react";
+import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -104,8 +105,12 @@ export default function MedicoDashboardPage() {
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-heading">
           {profile?.nombre?.startsWith("Dr") ? profile.nombre : `Dr. ${profile?.nombre}`}
         </h1>
-        {profile?.servicio && (
-          <p className="text-sm text-slate-500 mt-0.5">{profile.servicio}</p>
+        {(profile?.tipoMedico || profile?.servicio) && (
+          <p className="text-sm text-slate-500 mt-0.5">
+            {profile.tipoMedico
+              ? `${TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · ${profile.servicios?.length ?? 0} unidades`
+              : profile.servicio}
+          </p>
         )}
       </div>
 

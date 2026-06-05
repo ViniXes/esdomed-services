@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
+  Activity,
   BedDouble,
   ClipboardList,
   FileText,
@@ -57,6 +58,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verConfiguracion = profile?.role === "admin";
   const verUsuarios = profile?.role === "admin";
   const verBusquedaTelefono = profile?.role === "admin";
+  const verCuidadosCriticos = profile?.role === "esdomed" || profile?.role === "admin";
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
@@ -75,6 +77,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
+      : []),
+    ...(verCuidadosCriticos
+      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_PACIENTES }]
       : []),
     ...(verBusquedaTelefono
       ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]

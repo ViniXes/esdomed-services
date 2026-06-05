@@ -18,6 +18,13 @@ service cloud.firestore {
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
+    function isMedicoCuidadosCriticos() {
+      return isMedico()
+        && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin'];
+    }
+    function serviciosAsignados() {
+      return get(/databases/$(database)/documents/usuarios/$(uid())).data.servicios;
+    }
     function isStaff() {
       return isAuth() && getRole() in ['esdomed', 'admin', 'psicologia', 'trabajo_social'];
     }
@@ -28,7 +35,100 @@ service cloud.firestore {
     match /usuarios/{userId} {
       allow read:   if isAuth();
       allow create: if isAdmin();
-      allow update: if isAdmin() || (isAuth() && uid() == userId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Registros clínicos inmutables de UCI y UCIN. Los médicos solo pueden
+    // registrar y consultar actividad de sus servicios asignados.
+    match /atenciones_cuidados_criticos/{id} {
+      allow read: if isEsdomed() || isAdmin()
+                  || (isMedicoCuidadosCriticos()
+                      && resource.data.servicio in serviciosAsignados());
+      allow create: if isMedicoCuidadosCriticos()
+                    && request.resource.data.keys().hasOnly([
+                      'tipoUnidad',
+                      'tipoAtencion',
+                      'pacienteId',
+                      'pacienteExpediente',
+                      'pacienteNombre',
+                      'servicio',
+                      'cama',
+                      'fechaAtencion',
+                      'resumen',
+                      'detalle',
+                      'medicoId',
+                      'medicoNombre',
+                      'medicoJvpm',
+                      'creadoEn'
+                    ])
+                    && request.resource.data.keys().hasAll([
+                      'tipoUnidad',
+                      'tipoAtencion',
+                      'pacienteId',
+                      'pacienteExpediente',
+                      'pacienteNombre',
+                      'servicio',
+                      'fechaAtencion',
+                      'resumen',
+                      'medicoId',
+                      'medicoNombre',
+                      'creadoEn'
+                    ])
+                    && request.resource.data.medicoId == uid()
+                    && request.resource.data.medicoNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.tipoUnidad == get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico
+                    && request.resource.data.servicio in serviciosAsignados()
+                    && request.resource.data.creadoEn == request.time;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Ficha estructurada que reemplaza la fila de la matriz en Drive. Puede
+    // completarse por partes; cada guardado conserva autor y fecha de edición.
+    match /fichas_cuidados_criticos/{id} {
+      allow read: if isEsdomed() || isAdmin()
+                  || (isMedicoCuidadosCriticos()
+                      && resource.data.servicio in serviciosAsignados());
+      allow create: if isMedicoCuidadosCriticos()
+                    && request.resource.data.keys().hasOnly([
+                      'tipoUnidad',
+                      'estadoEstancia',
+                      'pacienteId',
+                      'pacienteExpediente',
+                      'pacienteNombre',
+                      'servicio',
+                      'cama',
+                      'datos',
+                      'creadoPorId',
+                      'creadoPorNombre',
+                      'creadoEn',
+                      'actualizadoPorId',
+                      'actualizadoPorNombre',
+                      'actualizadoEn'
+                    ])
+                    && request.resource.data.tipoUnidad == get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico
+                    && request.resource.data.estadoEstancia in ['activa', 'egresada']
+                    && request.resource.data.servicio in serviciosAsignados()
+                    && request.resource.data.creadoPorId == uid()
+                    && request.resource.data.creadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.actualizadoPorId == uid()
+                    && request.resource.data.actualizadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.creadoEn == request.time
+                    && request.resource.data.actualizadoEn == request.time;
+      allow update: if isMedicoCuidadosCriticos()
+                    && resource.data.servicio in serviciosAsignados()
+                    && request.resource.data.servicio in serviciosAsignados()
+                    && request.resource.data.pacienteId == resource.data.pacienteId
+                    && request.resource.data.tipoUnidad == resource.data.tipoUnidad
+                    && request.resource.data.estadoEstancia in ['activa', 'egresada']
+                    && request.resource.data.servicio == resource.data.servicio
+                    && request.resource.data.creadoPorId == resource.data.creadoPorId
+                    && request.resource.data.creadoPorNombre == resource.data.creadoPorNombre
+                    && request.resource.data.creadoEn == resource.data.creadoEn
+                    && request.resource.data.actualizadoPorId == uid()
+                    && request.resource.data.actualizadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.actualizadoEn == request.time;
       allow delete: if isAdmin();
     }
 

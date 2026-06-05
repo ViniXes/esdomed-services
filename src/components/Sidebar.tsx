@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { UserProfile } from "@/types";
+import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 
 const SIDEBAR_LOGO_LIGHT_SRC = "/logo_hnes_sidebar.png";
 const SIDEBAR_LOGO_DARK_SRC = "/logo_hnes_sidebar.png";
@@ -152,7 +153,11 @@ function SidebarBody({
       </nav>
 
       <div className="px-2 pb-4 pt-2 border-t border-slate-200 dark:border-[#c9a892]/20 space-y-1">
-        {profile?.servicio && (
+        {profile?.tipoMedico ? (
+          <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400">
+            {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · {profile.servicios?.length ?? 0} unidades
+          </p>
+        ) : profile?.servicio && (
           <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">
             {profile.servicio}
           </p>
@@ -242,8 +247,8 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
     });
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace("/login");
   };
 

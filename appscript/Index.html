@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>FIEH SIMMOW HNES</title>
+
+  <style>
+    :root {
+      --azul: #1C1E4D;
+      --gris: #313945;
+      --oro: #C9A892;
+      --fondo: #f4f6fb;
+      --borde: #d9dee8;
+      --ok: #047857;
+      --error: #b91c1c;
+      --warning: #b45309;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--fondo);
+      color: #1f2937;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--azul), #30346f);
+      color: white;
+      padding: 18px 26px;
+      border-bottom: 5px solid var(--oro);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      font-size: 13px;
+      opacity: .92;
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 22px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      color: var(--azul);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 13px;
+      background: white;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #4b5563;
+      margin-bottom: 4px;
+    }
+
+    .acciones {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .btn-principal {
+      background: var(--azul);
+      color: white;
+    }
+
+    .btn-ok {
+      background: var(--ok);
+      color: white;
+    }
+
+    .btn-secundario {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .btn-warning {
+      background: var(--warning);
+      color: white;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .bloque {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+      margin-top: 14px;
+    }
+
+    .bloque h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      color: var(--gris);
+      border-left: 5px solid var(--oro);
+      padding-left: 8px;
+    }
+
+    .alerta {
+      padding: 11px 13px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .alerta-warning {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #9a3412;
+    }
+
+    .estado {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #4b5563;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #111827;
+      color: #e5e7eb;
+      padding: 16px;
+      border-radius: 14px;
+      max-height: 460px;
+      overflow: auto;
+      font-size: 12px;
+    }
+
+    .oculto {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(160px, 1fr));
+      }
+    }
+
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 14px;
+      }
+    }
+
+    /* === Vista tipo SIMMOW para revisión === */
+.simmow-wrap {
+  background: #003063;
+  padding: 18px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.simmow-form {
+  width: 980px;
+  margin: 0 auto;
+  font-family: Arial, Tahoma, Verdana, Helvetica, sans-serif;
+  font-size: 8pt;
+  color: #000000;
+}
+
+.simmow-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #ffffff;
+  background: #cccccc;
+}
+
+.simmow-table td {
+  border: 1px solid #ffffff;
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.simmow-title {
+  background: #cccccc;
+  color: #000000;
+  font-size: 10pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.simmow-section {
+  background: #003063;
+  color: #ffffff;
+  font-size: 8pt;
+  font-weight: bold;
+}
+
+.simmow-label {
+  background: #ffcc66;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.simmow-label-def {
+  background: #c5908e;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.simmow-cell {
+  background: #cccccc;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.simmow-cell-alt {
+  background: #cccc99;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.simmow-form input,
+.simmow-form select,
+.simmow-form textarea {
+  width: auto;
+  border-radius: 0;
+  border: 1px solid #777;
+  padding: 1px 2px;
+  font-family: Arial, Tahoma, Verdana, Helvetica, sans-serif;
+  font-size: 8pt;
+  background: #ffffff;
+}
+
+.simmow-form textarea {
+  vertical-align: middle;
+  resize: vertical;
+}
+
+.simmow-mini {
+  width: 42px !important;
+}
+
+.simmow-codigo {
+  width: 55px !important;
+}
+
+.simmow-fecha {
+  width: 85px !important;
+}
+
+.simmow-doc {
+  width: 130px !important;
+}
+
+.simmow-exp {
+  width: 120px !important;
+}
+
+.simmow-nombre {
+  width: 190px !important;
+}
+
+.simmow-dir {
+  width: 430px !important;
+}
+
+.simmow-dx {
+  width: 360px !important;
+  height: 38px;
+}
+
+.simmow-observacion {
+  width: 520px !important;
+  height: 45px;
+}
+
+.simmow-referencia {
+  width: 520px !important;
+}
+
+.simmow-tools {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.simmow-tools button {
+  margin: 4px;
+}
+
+.campo-alerta-revision {
+  border: 2px solid #f97316 !important;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.25);
+  background: #fff7ed !important;
+}
+
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>FIEH SIMMOW HNES</h1>
+    <p>Subir PDF del Formulario de Ingreso y Egreso Hospitalario, extraer datos y generar código para consola SIMMOW.</p>
+  </header>
+
+  <main>
+<section class="card">
+  <h2>1. Subir documentos</h2>
+
+  <div class="grid">
+    <div>
+      <label>Condición del paciente</label>
+      <select id="condicionManual" onchange="mostrarBloqueCertificado()">
+        <option value="VIVO">VIVO</option>
+        <option value="MUERTO">MUERTO</option>
+      </select>
+    </div>
+
+    <div>
+      <label>PDF FIEH obligatorio</label>
+      <input type="file" id="archivoFieh" accept="application/pdf">
+    </div>
+
+    <div id="bloqueCertificado" class="oculto">
+      <label>PDF Certificado de Defunción obligatorio si es fallecido</label>
+      <input type="file" id="archivoCertificado" accept="application/pdf">
+    </div>
+  </div>
+
+  <div class="acciones">
+    <button class="btn-principal" onclick="procesarDocumentos()">Subir y extraer datos</button>
+    <button class="btn-secundario" onclick="limpiarTodo()">Limpiar</button>
+  </div>
+
+  <div id="estado" class="estado"></div>
+</section>
+
+    <section id="panelAdvertencias" class="card oculto">
+      <h2>Advertencias</h2>
+      <div id="listaAdvertencias"></div>
+    </section>
+
+    <section id="panelDatos" class="card oculto">
+      <h2>2. Revisión de datos extraídos</h2>
+      <div id="contenedorDatos"></div>
+
+      <div class="acciones">
+        <button class="btn-ok" onclick="generarCodigoActualizado()">Generar código actualizado</button>
+      </div>
+    </section>
+
+    <section id="panelCodigo" class="card oculto">
+      <h2>3. Código para consola de Chrome</h2>
+
+      <div class="acciones">
+        <button class="btn-ok" onclick="copiarCodigo()">Copiar código</button>
+        <button class="btn-warning" onclick="seleccionarCodigo()">Seleccionar código</button>
+      </div>
+
+      <pre id="codigoConsola"></pre>
+    </section>
+  </main>
+
+  <script>
+    let datosActuales = {};
+    let codigoActual = '';
+
+const grupos = [
+  {
+    titulo: 'Datos del paciente',
+    campos: [
+      'NEC',
+      'TIPO_DOCUMENTO',
+      'TIPO_DOCUMENTO_VALOR',
+      'NUM_DOCUMENTO',
+      'TIPO_AFILIACION',
+      'TIPO_AFILIACION_VALOR',
+      'NUM_AFILIACION',
+      'APELLIDOS',
+      'NOMBRES',
+      'PRIMER_APELLIDO',
+      'SEGUNDO_APELLIDO',
+      'TERCER_APELLIDO',
+      'PRIMER_NOMBRE',
+      'SEGUNDO_NOMBRE',
+      'TERCER_NOMBRE',
+      'FECHA_NACIMIENTO',
+      'EDAD_ANIOS',
+      'EDAD_MESES',
+      'EDAD_DIAS',
+      'SEXO',
+      'DIRECCION',
+      'DEPARTAMENTO',
+      'DISTRITO',
+      'CANTON',
+      'AREA'
+    ]
+  },
+  {
+    titulo: 'Ingreso',
+    campos: [
+      'FECHA_INGRESO',
+      'HORA_INGRESO',
+      'DIAG_INGRESO_TEXTO',
+      'DIAG_INGRESO_CODIGO',
+      'ACCIDENTE_TRANSITO',
+      'ACCIDENTE_LABORAL',
+      'TIPO_ACCIDENTE_VALOR'
+    ]
+  },
+  {
+    titulo: 'Egreso o defunción',
+    campos: [
+      'DIAG_PRINCIPAL_TEXTO',
+      'DIAG_PRINCIPAL_CODIGO',
+
+      'DIAG_C_TEXTO',
+      'DIAG_C_CODIGO',
+
+      'DIAG_B_TEXTO',
+      'DIAG_B_CODIGO',
+
+      'DIAG_A_TEXTO',
+      'DIAG_A_CODIGO',
+
+      'DIAG_II1_TEXTO',
+      'DIAG_II1_CODIGO',
+
+      'DIAG_II2_TEXTO',
+      'DIAG_II2_CODIGO',
+
+'CAUSA_EXTERNA_TEXTO',
+'CAUSA_EXTERNA_CODIGO',
+'DISCAPACIDAD_PRINCIPAL_TEXTO',
+'DISCAPACIDAD_PRINCIPAL_CODIGO',
+
+'CIRUGIA_1_TEXTO',
+'CIRUGIA_1_CODIGO',
+'CIRUGIA_1_FECHA',
+'CIRUGIA_1_CIRUJANO',
+'CIRUGIA_1_TIPO',
+
+'CIRUGIA_2_TEXTO',
+'CIRUGIA_2_CODIGO',
+'CIRUGIA_2_FECHA',
+'CIRUGIA_2_CIRUJANO',
+'CIRUGIA_2_TIPO',
+
+'CIRUGIA_3_TEXTO',
+'CIRUGIA_3_CODIGO',
+'CIRUGIA_3_FECHA',
+'CIRUGIA_3_CIRUJANO',
+'CIRUGIA_3_TIPO',
+
+'CIRUGIA_4_TEXTO',
+'CIRUGIA_4_CODIGO',
+'CIRUGIA_4_FECHA',
+'CIRUGIA_4_CIRUJANO',
+'CIRUGIA_4_TIPO',
+'CIRUGIA_SUSPENDIDA_VALOR',
+
+'CERT_CAUSA_A_TEXTO',
+'CERT_CAUSA_A_CODIGO',
+'CERT_CAUSA_A_INTERVALO',
+'CERT_CAUSA_A_TIEMPO',
+
+'CERT_CAUSA_B_TEXTO',
+'CERT_CAUSA_B_CODIGO',
+'CERT_CAUSA_B_INTERVALO',
+'CERT_CAUSA_B_TIEMPO',
+
+'CERT_CAUSA_C_TEXTO',
+'CERT_CAUSA_C_CODIGO',
+'CERT_CAUSA_C_INTERVALO',
+'CERT_CAUSA_C_TIEMPO',
+
+'CERT_CAUSA_BASICA_D_TEXTO',
+'CERT_CAUSA_BASICA_D_CODIGO',
+'CERT_CAUSA_BASICA_D_INTERVALO',
+'CERT_CAUSA_BASICA_D_TIEMPO',
+
+'CERT_OTRO_ESTADO_1_TEXTO',
+'CERT_OTRO_ESTADO_1_CODIGO',
+'CERT_OTRO_ESTADO_1_INTERVALO',
+'CERT_OTRO_ESTADO_1_TIEMPO',
+
+'CERT_OTRO_ESTADO_2_TEXTO',
+'CERT_OTRO_ESTADO_2_CODIGO',
+'CERT_OTRO_ESTADO_2_INTERVALO',
+'CERT_OTRO_ESTADO_2_TIEMPO',
+
+'SERVICIO_HOSPITALARIO_ORIGEN',
+'SERVICIO_HOSPITALARIO_VALOR',
+'SERVICIO_HOSPITALARIO_FUENTE',
+'SERVICIO_HOSPITALARIO_DETALLE',
+
+'REFERIDO_A_ESTABLECIMIENTO',
+'REFERIDO_DEL_ESTABLECIMIENTO',
+'RETORNO_HACIA',
+
+      'CONDICION_EGRESO',
+      'FECHA_EGRESO',
+      'HORA_EGRESO',
+      'MINUTO_EGRESO',
+      'MOTIVO_ALTA_VALOR',
+      'RECOMENDACIONES',
+      'MEDICO_RESPONSABLE_ALTA',
+      'JVPM_MEDICO',
+      'JVPM_MEDICO_NUMERO',
+      'ESDOMED_DIGITA',
+      'FECHA_DIGITACION'
+    ]
+  }
+];
+
+function escHTML_(valor) {
+  return String(valor || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function selectedTipoCirugia_(valor, esperado) {
+  return String(valor || '') === String(esperado || '') ? 'selected' : '';
+}
+
+function renderCausaExternaYCirugias_(d) {
+  d = d || {};
+
+  const cirugia = (n) => ({
+    texto: d['CIRUGIA_' + n + '_TEXTO'] || '',
+    codigo: d['CIRUGIA_' + n + '_CODIGO'] || '',
+    fecha: d['CIRUGIA_' + n + '_FECHA'] || '',
+    cirujano: d['CIRUGIA_' + n + '_CIRUJANO'] || '',
+    tipo: d['CIRUGIA_' + n + '_TIPO'] || ''
+  });
+
+  const c1 = cirugia(1);
+  const c2 = cirugia(2);
+  const c3 = cirugia(3);
+  const c4 = cirugia(4);
+
+  const suspendida = String(d.CIRUGIA_SUSPENDIDA_VALOR || '').toUpperCase() === 'SI';
+  const claseSusp = suspendida ? '' : ' campo-alerta-revision';
+
+  return `
+    <tr>
+      <td style="background-color:#FFCC66;color:#000000;font-size:9pt">
+        <font style="font-size:8pt;color:#000000">
+          &nbsp;&nbsp;Causa Externa<br>
+          &nbsp;&nbsp;( Relacionada al Diagnóstico Principal )
+        </font>
+      </td>
+      <td style="background-color:#cccccc;color:#000000;font-size:8pt">
+        &nbsp;Código:
+        <input style="font-size:8pt" type="text" name="diag_cdc" maxlength="5" size="5"
+          value="${escHTML_(d.CAUSA_EXTERNA_CODIGO)}">
+        &nbsp;&nbsp;
+        <textarea style="font-size:8pt" name="ce" cols="40" rows="2" readonly>${escHTML_(d.CAUSA_EXTERNA_TEXTO)}</textarea>
+        &nbsp;
+      </td>
+    </tr>
+
+    <tr>
+      <td style="background-color:#FFCC66;color:#000000;font-size:9pt">
+        <font style="font-size:8pt;color:#000000">
+          &nbsp;&nbsp;Discapacidad Principal
+        </font>
+      </td>
+      <td style="background-color:#cccccc;color:#000000;font-size:8pt">
+        &nbsp;Código:
+        <input
+          style="font-size:8pt"
+          type="text"
+          id="campo_DISCAPACIDAD_PRINCIPAL_CODIGO"
+          name="discapacidad_codigo"
+          maxlength="10"
+          size="8"
+          value="${escHTML_(d.DISCAPACIDAD_PRINCIPAL_CODIGO)}"
+        >
+        &nbsp;&nbsp;
+        <textarea
+          style="font-size:8pt"
+          id="campo_DISCAPACIDAD_PRINCIPAL_TEXTO"
+          name="discapacidad_texto"
+          cols="40"
+          rows="2"
+        >${escHTML_(d.DISCAPACIDAD_PRINCIPAL_TEXTO)}</textarea>
+        &nbsp;
+      </td>
+    </tr>
+
+    ${renderFilaCirugia_(1, 'proce_cd1', 'pr1', 'iq1_fecha', 'iq1_cirujano', 'iq1_cir', 'iq1_tipo', c1)}
+    ${renderFilaCirugia_(2, 'proce_cd12', 'pr12', 'iq12_fecha', 'iq12_cirujano', 'iq12_cir', 'iq12_tipo', c2)}
+    ${renderFilaCirugia_(3, 'proce_cd13', 'pr13', 'iq13_fecha', 'iq13_cirujano', 'iq13_cir', 'iq13_tipo', c3)}
+    ${renderFilaCirugia_(4, 'proce_cd14', 'pr14', 'iq14_fecha', 'iq14_cirujano', 'iq14_cir', 'iq14_tipo', c4)}
+
+    <tr>
+      <td class="simmow-label">&nbsp;&nbsp;<b>Se suspendió cirugía programada</b></td>
+      <td class="simmow-cell">
+        <input
+          type="hidden"
+          id="campo_CIRUGIA_SUSPENDIDA_VALOR"
+          value="${suspendida ? 'SI' : ''}"
+        >
+
+        <input
+          type="checkbox"
+          id="check_CIRUGIA_SUSPENDIDA_VALOR"
+          class="${claseSusp}"
+          ${suspendida ? 'checked' : ''}
+          onchange="document.getElementById('campo_CIRUGIA_SUSPENDIDA_VALOR').value = this.checked ? 'SI' : ''"
+        >
+
+        &nbsp;Marcar únicamente si en el FIEH se suspendió cirugía programada.
+      </td>
+    </tr>
+  `;
+}
+
+function renderFilaCirugia_(num, nameCodigo, nameTexto, nameFecha, nameCirujano, nameCirujanoTexto, nameTipo, c) {
+  c = c || {};
+
+  return `
+    <tr>
+      <td style="background-color:#FFCC66;color:#000000;font-size:9pt">
+        <font style="font-size:8pt;color:#000000">
+          &nbsp;&nbsp;Operación / Intervención Quirúrgica (${num})
+        </font>
+      </td>
+      <td style="background-color:#cccccc;color:#000000;font-size:8pt">
+        &nbsp;Código:
+        <input style="font-size:8pt" type="text" name="${nameCodigo}" maxlength="5" size="5"
+          value="${escHTML_(c.codigo)}">
+        &nbsp;&nbsp;
+
+        <textarea style="font-size:8pt" name="${nameTexto}" cols="30" rows="2" readonly>${escHTML_(c.texto)}</textarea>
+        &nbsp;
+
+        &nbsp;Fecha&nbsp;&nbsp;
+        <input style="font-size:8pt" type="text" name="${nameFecha}" maxlength="10" size="10"
+          value="${escHTML_(c.fecha)}">
+
+        <br>
+
+        &nbsp;Cirujano
+        <input style="font-size:8pt" type="text" name="${nameCirujano}" maxlength="6" size="6"
+          value="">
+
+        <input style="font-size:8pt" type="text" name="${nameCirujanoTexto}" maxlength="40" size="40" readonly
+          value="${escHTML_(c.cirujano)}">
+
+        &nbsp;Tipo
+        <select style="font-family:Arial;font-size:8pt" name="${nameTipo}">
+          <option value="0"></option>
+          <option value="1" ${selectedTipoCirugia_(c.tipo, '1')}>1 - Mayor Emergencia Hosp.</option>
+          <option value="3" ${selectedTipoCirugia_(c.tipo, '3')}>3 - Mayor Electiva Hosp.</option>
+          <option value="5" ${selectedTipoCirugia_(c.tipo, '5')}>5 - Menor</option>
+        </select>
+      </td>
+    </tr>
+  `;
+}
+
+function mostrarBloqueCertificado() {
+  const condicion = document.getElementById('condicionManual').value;
+  const bloque = document.getElementById('bloqueCertificado');
+
+  if (condicion === 'MUERTO') {
+    bloque.classList.remove('oculto');
+  } else {
+    bloque.classList.add('oculto');
+    document.getElementById('archivoCertificado').value = '';
+  }
+}
+
+function leerArchivoPDF(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('Archivo no seleccionado.'));
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      reject(new Error('El archivo debe ser PDF.'));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      const base64 = dataUrl.split(',')[1];
+
+      resolve({
+        nombre: file.name,
+        mimeType: file.type,
+        base64: base64
+      });
+    };
+
+    reader.onerror = function() {
+      reject(new Error('No se pudo leer el archivo.'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+async function procesarDocumentos() {
+  try {
+    const condicion = document.getElementById('condicionManual').value;
+    const fiehFile = document.getElementById('archivoFieh').files[0];
+    const certFile = document.getElementById('archivoCertificado').files[0];
+
+    if (!fiehFile) {
+      mostrarEstado('Debe seleccionar el PDF FIEH.', 'error');
+      return;
+    }
+
+    if (condicion === 'MUERTO' && !certFile) {
+      mostrarEstado('Debe seleccionar el certificado de defunción para paciente fallecido.', 'error');
+      return;
+    }
+
+    mostrarEstado('Leyendo documentos...', 'info');
+
+    const fieh = await leerArchivoPDF(fiehFile);
+    let certificado = null;
+
+    if (condicion === 'MUERTO') {
+      certificado = await leerArchivoPDF(certFile);
+    }
+
+    mostrarEstado('Subiendo y procesando documentos. Espere...', 'info');
+
+    google.script.run
+      .withSuccessHandler(manejarRespuesta)
+      .withFailureHandler(err => {
+        console.error('Error completo:', err);
+        alert('ERROR CLIENTE/SERVIDOR:\n' + JSON.stringify(err, null, 2));
+        mostrarEstado('Error: ' + (err.message || JSON.stringify(err)), 'error');
+      })
+      .apiProcesarDocumentos({
+        condicionManual: condicion,
+        fieh: fieh,
+        certificado: certificado
+      });
+
+  } catch (err) {
+    mostrarEstado('Error: ' + err.message, 'error');
+  }
+}
+
+    function procesarTexto() {
+      const texto = document.getElementById('textoManual').value.trim();
+
+      if (!texto) {
+        mostrarEstado('Debe pegar texto.', 'error');
+        return;
+      }
+
+      mostrarEstado('Procesando texto...', 'info');
+
+      google.script.run
+        .withSuccessHandler(manejarRespuesta)
+        .withFailureHandler(err => {
+          mostrarEstado('Error: ' + err.message, 'error');
+        })
+        .apiProcesarTexto(texto);
+    }
+
+    function manejarRespuesta(resp) {
+if (!resp || !resp.ok) {
+  console.error('Respuesta completa del servidor:', resp);
+
+  const detalle = resp
+    ? JSON.stringify(resp, null, 2)
+    : 'Respuesta vacía del servidor';
+
+  mostrarEstado(
+    resp && resp.mensaje
+      ? resp.mensaje
+      : 'No se pudo procesar. Detalle en consola del navegador.',
+    'error'
+  );
+
+  alert(detalle);
+  return;
+}
+
+      datosActuales = resp.datos || {};
+codigoActual = resp.codigo || '';
+
+renderAdvertencias(resp.advertencias || []);
+renderDatos(datosActuales);
+
+if (codigoActual) {
+  renderCodigo(codigoActual);
+} else {
+  document.getElementById('panelCodigo').classList.add('oculto');
+}
+
+console.log('Respuesta del servidor:', resp);
+      mostrarEstado('Datos extraídos correctamente. Revise antes de copiar el código.', 'ok');
+    }
+
+    function renderAdvertencias(advertencias) {
+      const panel = document.getElementById('panelAdvertencias');
+      const lista = document.getElementById('listaAdvertencias');
+
+      lista.innerHTML = '';
+
+      if (!advertencias || !advertencias.length) {
+        panel.classList.add('oculto');
+        return;
+      }
+
+      panel.classList.remove('oculto');
+
+      advertencias.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'alerta alerta-warning';
+        div.textContent = msg;
+        lista.appendChild(div);
+      });
+    }
+
+function renderDatos(datos) {
+  const panel = document.getElementById('panelDatos');
+  const cont = document.getElementById('contenedorDatos');
+
+  panel.classList.remove('oculto');
+
+  const esc = (v) => String(v || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const v = (campo) => esc(datos[campo] || '');
+
+  const checked = (campo, valor) => {
+    return String(datos[campo] || '').toUpperCase() === valor.toUpperCase()
+      ? 'checked'
+      : '';
+  };
+
+const selected = (campo, valor) => {
+  return String(datos[campo] || '') === String(valor || '')
+    ? 'selected'
+    : '';
+};
+
+const claseRevision = (campo) => {
+  const condicion = String(datos.CONDICION_EGRESO || '').toUpperCase();
+
+  if (campo === 'MOTIVO_ALTA_VALOR' && condicion !== 'VIVO') {
+    return '';
+  }
+
+  if (
+    campo === 'SERVICIO_HOSPITALARIO_VALOR' ||
+    campo === 'MOTIVO_ALTA_VALOR'
+  ) {
+    return String(datos[campo] || '').trim()
+      ? ''
+      : ' campo-alerta-revision';
+  }
+
+  return '';
+};
+
+  cont.innerHTML = `
+    <div class="simmow-wrap">
+      <div class="simmow-form">
+        <table class="simmow-table">
+          <tr>
+            <td class="simmow-title" colspan="2">Ingreso / Edición de Egreso</td>
+          </tr>
+
+          <tr>
+            <td class="simmow-cell-alt"><b>&nbsp;&nbsp;Hospital</b></td>
+            <td class="simmow-cell">
+              <select>
+                <option>Hospital Nacional San Salvador SS El Salvador</option>
+              </select>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-section" colspan="2">&nbsp;&nbsp;Información del Paciente :</td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;Documento de Identidad</td>
+            <td class="simmow-cell">
+              <select id="campo_TIPO_DOCUMENTO_VALOR">
+                <option value=""></option>
+                <option value="1" ${datos.TIPO_DOCUMENTO_VALOR == '1' ? 'selected' : ''}>DUI del Paciente</option>
+                <option value="2" ${datos.TIPO_DOCUMENTO_VALOR == '2' ? 'selected' : ''}>Pasaporte</option>
+                <option value="3" ${datos.TIPO_DOCUMENTO_VALOR == '3' ? 'selected' : ''}>DUI del Responsable</option>
+              </select>
+              &nbsp;&nbsp;Número
+              <input class="simmow-doc" id="campo_NUM_DOCUMENTO" value="${v('NUM_DOCUMENTO')}">
+              (sin guiones)
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;Afiliación</td>
+            <td class="simmow-cell">
+              <select id="campo_TIPO_AFILIACION_VALOR">
+                <option value=""></option>
+                <option value="1" ${datos.TIPO_AFILIACION_VALOR == '1' ? 'selected' : ''}>Cotizante ISSS</option>
+                <option value="2" ${datos.TIPO_AFILIACION_VALOR == '2' ? 'selected' : ''}>Beneficiario ISSS</option>
+                <option value="3" ${datos.TIPO_AFILIACION_VALOR == '3' ? 'selected' : ''}>Veterano de Guerra</option>
+                <option value="4" ${datos.TIPO_AFILIACION_VALOR == '4' ? 'selected' : ''}>Cotizante ISBM</option>
+                <option value="5" ${datos.TIPO_AFILIACION_VALOR == '5' ? 'selected' : ''}>Beneficiario ISBM</option>
+                <option value="6" ${datos.TIPO_AFILIACION_VALOR == '6' ? 'selected' : ''}>Cotizante IPSFA</option>
+                <option value="7" ${datos.TIPO_AFILIACION_VALOR == '7' ? 'selected' : ''}>Beneficiario IPSFA</option>
+              </select>
+              &nbsp;&nbsp;Número
+              <input class="simmow-doc" id="campo_NUM_AFILIACION" value="${v('NUM_AFILIACION')}">
+              (sin guiones)
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;<b>[ Apellidos,Nombres ] [ Exped. Clínico ]</b></td>
+            <td class="simmow-cell">
+              <input class="simmow-nombre" id="campo_APELLIDOS" value="${v('APELLIDOS')}" readonly>
+              <input class="simmow-nombre" id="campo_NOMBRES" value="${v('NOMBRES')}" readonly>
+              &nbsp;&nbsp;
+              <input class="simmow-exp" id="campo_NEC" value="${v('NEC')}">
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-cell" colspan="2">
+              <input class="simmow-nombre" id="campo_PRIMER_APELLIDO" value="${v('PRIMER_APELLIDO')}" placeholder="Primer Apellido">
+              <input class="simmow-nombre" id="campo_SEGUNDO_APELLIDO" value="${v('SEGUNDO_APELLIDO')}" placeholder="Segundo Apellido">
+              <input class="simmow-nombre" id="campo_TERCER_APELLIDO" value="${v('TERCER_APELLIDO')}" placeholder="Tercer Apellido">
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-cell" colspan="2">
+              <input class="simmow-nombre" id="campo_PRIMER_NOMBRE" value="${v('PRIMER_NOMBRE')}" placeholder="Primer Nombre">
+              <input class="simmow-nombre" id="campo_SEGUNDO_NOMBRE" value="${v('SEGUNDO_NOMBRE')}" placeholder="Segundo Nombre">
+              <input class="simmow-nombre" id="campo_TERCER_NOMBRE" value="${v('TERCER_NOMBRE')}" placeholder="Tercer Nombre">
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;<b>Edad</b></td>
+            <td class="simmow-cell">
+<input class="simmow-mini" id="campo_EDAD_ANIOS" value="${v('EDAD_ANIOS')}"> años&nbsp;&nbsp;
+<input class="simmow-mini" value="0" readonly> meses&nbsp;&nbsp;
+<input class="simmow-mini" value="0" readonly> días&nbsp;&nbsp;
+<input class="simmow-mini" value="0" readonly> horas&nbsp;
+<input class="simmow-mini" value="0" readonly> minutos
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;<b>Sexo</b></td>
+            <td class="simmow-cell">
+              <input type="hidden" id="campo_SEXO" value="${v('SEXO')}">
+              <input name="sexo_ui" type="radio" ${checked('SEXO', 'Masculino')} onclick="document.getElementById('campo_SEXO').value='Masculino'"> Masculino
+              <input name="sexo_ui" type="radio" ${checked('SEXO', 'Femenino')} onclick="document.getElementById('campo_SEXO').value='Femenino'"> Femenino
+              <input name="sexo_ui" type="radio" ${checked('SEXO', 'Intersexual')} onclick="document.getElementById('campo_SEXO').value='Intersexual'"> Intersexual
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;Dirección Habitual</td>
+            <td class="simmow-cell">
+              <textarea class="simmow-dir" id="campo_DIRECCION">${v('DIRECCION')}</textarea>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;<b>[ Departamento ] [ Distrito ]</b></td>
+            <td class="simmow-cell">
+              <input class="simmow-nombre" id="campo_DEPARTAMENTO" value="${v('DEPARTAMENTO')}" placeholder="Departamento">
+              <input class="simmow-nombre" id="campo_DISTRITO" value="${v('DISTRITO')}" placeholder="Distrito">
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;Cantón</td>
+            <td class="simmow-cell">
+              <input class="simmow-nombre" id="campo_CANTON" value="${v('CANTON')}">
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;<b>Área</b></td>
+            <td class="simmow-cell">
+              <input type="hidden" id="campo_AREA" value="${v('AREA')}">
+              <input name="area_ui" type="radio" ${checked('AREA', 'Urbana')} onclick="document.getElementById('campo_AREA').value='Urbana'"> Urbano
+              <input name="area_ui" type="radio" ${checked('AREA', 'Rural')} onclick="document.getElementById('campo_AREA').value='Rural'"> Rural
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-section" colspan="2">&nbsp;&nbsp;Información del Ingreso :</td>
+          </tr>
+
+          <tr>
+            <td class="simmow-label">&nbsp;&nbsp;<b>Fecha</b></td>
+            <td class="simmow-cell">
+              <input class="simmow-fecha" id="campo_FECHA_INGRESO" value="${v('FECHA_INGRESO')}">
+              &nbsp;&nbsp;Hora
+              <input class="simmow-mini" id="campo_HORA_INGRESO" value="${v('HORA_INGRESO')}">
+              &nbsp;&nbsp;Tipo de Accidente
+              <select id="campo_TIPO_ACCIDENTE_VALOR">
+                <option value=""></option>
+                <option value="1" ${datos.TIPO_ACCIDENTE_VALOR == '1' ? 'selected' : ''}>De Tránsito</option>
+                <option value="2" ${datos.TIPO_ACCIDENTE_VALOR == '2' ? 'selected' : ''}>Laboral</option>
+              </select>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="simmow-section" colspan="2">&nbsp;&nbsp;Información del Egreso :</td>
+          </tr>
+
+${filaDx('Diagnóstico Principal', 'DIAG_PRINCIPAL_CODIGO', 'DIAG_PRINCIPAL_TEXTO')}
+${filaDx('Diagnóstico Complementario (1)', 'DIAG_C_CODIGO', 'DIAG_C_TEXTO')}
+${filaDx('Diagnóstico Complementario (2)', 'DIAG_B_CODIGO', 'DIAG_B_TEXTO')}
+${filaDx('Diagnóstico Complementario (3)', 'DIAG_A_CODIGO', 'DIAG_A_TEXTO')}
+${filaDx('Diagnóstico Complementario (4)', 'DIAG_II1_CODIGO', 'DIAG_II1_TEXTO')}
+${filaDx('Diagnóstico Complementario (5)', 'DIAG_II2_CODIGO', 'DIAG_II2_TEXTO')}
+
+${renderCausaExternaYCirugias_(datos)}
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Condición</b></td>
+  <td class="simmow-cell">
+    <input type="hidden" id="campo_CONDICION_EGRESO" value="${v('CONDICION_EGRESO')}">
+    <input name="condicion_ui" type="radio" ${checked('CONDICION_EGRESO', 'VIVO')} onclick="document.getElementById('campo_CONDICION_EGRESO').value='VIVO'"> Vivo
+    <input name="condicion_ui" type="radio" ${checked('CONDICION_EGRESO', 'MUERTO')} onclick="document.getElementById('campo_CONDICION_EGRESO').value='MUERTO'"> Muerto
+  </td>
+</tr>
+
+<tr>
+  <td colspan="2" class="simmow-cell">
+    <table style="width:100%; border-collapse:collapse;">
+      <tr>
+        <td class="simmow-title" colspan="2" style="background:#c5908e;">
+          Del Certificado de Defunción<br>Obligatorio del año 2014 en adelante
+        </td>
+      </tr>
+      ${filaDef('Causa (a)', 'CERT_CAUSA_A_CODIGO', 'CERT_CAUSA_A_TEXTO', 'CERT_CAUSA_A_INTERVALO', 'CERT_CAUSA_A_TIEMPO')}
+      ${filaDef('Causa (b)', 'CERT_CAUSA_B_CODIGO', 'CERT_CAUSA_B_TEXTO', 'CERT_CAUSA_B_INTERVALO', 'CERT_CAUSA_B_TIEMPO')}
+      ${filaDef('Causa (c)', 'CERT_CAUSA_C_CODIGO', 'CERT_CAUSA_C_TEXTO', 'CERT_CAUSA_C_INTERVALO', 'CERT_CAUSA_C_TIEMPO')}
+      ${filaDef('<b>Causa Básica (d)</b>', 'CERT_CAUSA_BASICA_D_CODIGO', 'CERT_CAUSA_BASICA_D_TEXTO', 'CERT_CAUSA_BASICA_D_INTERVALO', 'CERT_CAUSA_BASICA_D_TIEMPO')}
+      ${filaDef('Otro Estado Patológico', 'CERT_OTRO_ESTADO_1_CODIGO', 'CERT_OTRO_ESTADO_1_TEXTO', 'CERT_OTRO_ESTADO_1_INTERVALO', 'CERT_OTRO_ESTADO_1_TIEMPO')}
+      ${filaDef('Otro Estado Patológico', 'CERT_OTRO_ESTADO_2_CODIGO', 'CERT_OTRO_ESTADO_2_TEXTO', 'CERT_OTRO_ESTADO_2_INTERVALO', 'CERT_OTRO_ESTADO_2_TIEMPO')}
+    </table>
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Fecha Egreso</b></td>
+  <td class="simmow-cell">
+    <input class="simmow-fecha" id="campo_FECHA_EGRESO" value="${v('FECHA_EGRESO')}">
+    &nbsp;&nbsp;Hora
+    <input class="simmow-mini" id="campo_HORA_EGRESO" value="${v('HORA_EGRESO')}"> hrs
+    <input class="simmow-mini" id="campo_MINUTO_EGRESO" value="${v('MINUTO_EGRESO')}"> min
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Circunstancia</b></td>
+  <td class="simmow-cell">
+    <select id="campo_MOTIVO_ALTA_VALOR" class="${claseRevision('MOTIVO_ALTA_VALOR')}">
+      <option value=""></option>
+      <option value="1" ${datos.MOTIVO_ALTA_VALOR == '1' ? 'selected' : ''}>A Domicilio</option>
+      <option value="2" ${datos.MOTIVO_ALTA_VALOR == '2' ? 'selected' : ''}>A otro Hospital</option>
+      <option value="3" ${datos.MOTIVO_ALTA_VALOR == '3' ? 'selected' : ''}>A Residencia Social</option>
+      <option value="4" ${datos.MOTIVO_ALTA_VALOR == '4' ? 'selected' : ''}>Voluntaria</option>
+      <option value="5" ${datos.MOTIVO_ALTA_VALOR == '5' ? 'selected' : ''}>In Extremis</option>
+      <option value="6" ${datos.MOTIVO_ALTA_VALOR == '6' ? 'selected' : ''}>Fuga</option>
+    </select>
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Servicio Hospitalario</b></td>
+  <td class="simmow-cell">
+    <select id="campo_SERVICIO_HOSPITALARIO_VALOR" class="${claseRevision('SERVICIO_HOSPITALARIO_VALOR')}">
+      <option value=""></option>
+
+      <option value="MED.INTER.HOM.1" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MED.INTER.HOM.1')}>MED.INTER.HOM.1</option>
+      <option value="MED.INTER.HOM.2" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MED.INTER.HOM.2')}>MED.INTER.HOM.2</option>
+      <option value="MED.INTER.HOM.3" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MED.INTER.HOM.3')}>MED.INTER.HOM.3</option>
+
+      <option value="MED.INTER.MUJ.1" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MED.INTER.MUJ.1')}>MED.INTER.MUJ.1</option>
+      <option value="MED.INTER.MUJ.2" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MED.INTER.MUJ.2')}>MED.INTER.MUJ.2</option>
+      <option value="MED.INTER.MUJ.3" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MED.INTER.MUJ.3')}>MED.INTER.MUJ.3</option>
+
+      <option value="CARDIOLOGIA" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'CARDIOLOGIA')}>CARDIOLOGIA</option>
+      <option value="HEMATOLOGIA" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'HEMATOLOGIA')}>HEMATOLOGIA</option>
+      <option value="AISLAMIENTO" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'AISLAMIENTO')}>AISLAMIENTO</option>
+      <option value="ONCOLOGIA" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'ONCOLOGIA')}>ONCOLOGIA</option>
+
+      <option value="DOLOR Y CUIDADOS PALIATIVOS" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'DOLOR Y CUIDADOS PALIATIVOS')}>DOLOR Y CUIDADOS PALIATIVOS</option>
+
+      <option value="CIRUG.HOMBRES 1" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'CIRUG.HOMBRES 1')}>CIRUG.HOMBRES 1</option>
+      <option value="CIRUG.MUJERES 1" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'CIRUG.MUJERES 1')}>CIRUG.MUJERES 1</option>
+      <option value="CIRUGIA CARDIOVASCULAR" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'CIRUGIA CARDIOVASCULAR')}>CIRUGIA CARDIOVASCULAR</option>
+      <option value="NEUROCIRUGIA" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'NEUROCIRUGIA')}>NEUROCIRUGIA</option>
+
+      <option value="MEDICINA INTERNA D" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MEDICINA INTERNA D')}>MEDICINA INTERNA D</option>
+      <option value="MEDICINA INTERNA E" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'MEDICINA INTERNA E')}>MEDICINA INTERNA E</option>
+
+      <option value="HOSPITALIZACION CONVENIO" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'HOSPITALIZACION CONVENIO')}>HOSPITALIZACION CONVENIO</option>
+      <option value="Terapia Intervencionista Endovascular" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'Terapia Intervencionista Endovascular')}>Terapia Intervencionista Endovascular</option>
+      <option value="DIALISIS PERITONEAL" ${selected('SERVICIO_HOSPITALARIO_VALOR', 'DIALISIS PERITONEAL')}>DIALISIS PERITONEAL</option>
+    </select>
+
+    &nbsp;&nbsp;Origen FIEH:
+    <input class="simmow-nombre" id="campo_SERVICIO_HOSPITALARIO_ORIGEN" value="${v('SERVICIO_HOSPITALARIO_ORIGEN')}" readonly>
+
+    <input type="hidden" id="campo_SERVICIO_HOSPITALARIO_FUENTE" value="${v('SERVICIO_HOSPITALARIO_FUENTE')}">
+    <input type="hidden" id="campo_SERVICIO_HOSPITALARIO_DETALLE" value="${v('SERVICIO_HOSPITALARIO_DETALLE')}">
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Referido al Establecimiento</b></td>
+  <td class="simmow-cell">
+    <input class="simmow-referencia" id="campo_REFERIDO_A_ESTABLECIMIENTO" value="${v('REFERIDO_A_ESTABLECIMIENTO')}">
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Referido del Establecimiento</b></td>
+  <td class="simmow-cell">
+    <input class="simmow-referencia" id="campo_REFERIDO_DEL_ESTABLECIMIENTO" value="${v('REFERIDO_DEL_ESTABLECIMIENTO')}">
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;<b>Retorno hacia</b></td>
+  <td class="simmow-cell">
+    <input class="simmow-referencia" id="campo_RETORNO_HACIA" value="${v('RETORNO_HACIA')}">
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;Observaciones / Recomendaciones</td>
+  <td class="simmow-cell">
+    <textarea class="simmow-observacion" id="campo_RECOMENDACIONES">${v('RECOMENDACIONES')}</textarea>
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;Médico responsable / JVPM</td>
+  <td class="simmow-cell">
+    <input class="simmow-nombre" id="campo_MEDICO_RESPONSABLE_ALTA" value="${v('MEDICO_RESPONSABLE_ALTA')}">
+    <input class="simmow-codigo" id="campo_JVPM_MEDICO_NUMERO" value="${v('JVPM_MEDICO_NUMERO')}">
+    <input type="hidden" id="campo_JVPM_MEDICO" value="${v('JVPM_MEDICO')}">
+  </td>
+</tr>
+
+<tr>
+  <td class="simmow-label">&nbsp;&nbsp;ESDOMED digita / Fecha digitación</td>
+  <td class="simmow-cell">
+    <input class="simmow-nombre" id="campo_ESDOMED_DIGITA" value="${v('ESDOMED_DIGITA')}">
+    <input class="simmow-fecha" id="campo_FECHA_DIGITACION" value="${v('FECHA_DIGITACION')}">
+  </td>
+</tr>
+</table>
+</div>
+</div>
+`;
+
+  function filaDx(titulo, campoCodigo, campoTexto) {
+    return `
+      <tr>
+        <td class="simmow-label">&nbsp;&nbsp;${titulo}</td>
+        <td class="simmow-cell">
+          &nbsp;Código:
+          <input class="simmow-codigo" id="campo_${campoCodigo}" value="${v(campoCodigo)}">
+          &nbsp;&nbsp;
+          <textarea class="simmow-dx" id="campo_${campoTexto}">${v(campoTexto)}</textarea>
+        </td>
+      </tr>
+    `;
+  }
+
+  function filaDef(titulo, campoCodigo, campoTexto, campoIntervalo, campoTiempo) {
+    return `
+      <tr>
+        <td class="simmow-label-def">&nbsp;&nbsp;${titulo}</td>
+        <td class="simmow-cell">
+          &nbsp;Código:
+          <input class="simmow-codigo" id="campo_${campoCodigo}" value="${v(campoCodigo)}">
+          &nbsp;&nbsp;
+          <textarea class="simmow-dx" id="campo_${campoTexto}">${v(campoTexto)}</textarea>
+          &nbsp;&nbsp;Intervalo
+          <input class="simmow-mini" id="campo_${campoIntervalo}" value="${v(campoIntervalo)}">
+          <select id="campo_${campoTiempo}">
+            <option value=""></option>
+            <option value="años" ${datos[campoTiempo] == 'años' ? 'selected' : ''}>años</option>
+            <option value="meses" ${datos[campoTiempo] == 'meses' ? 'selected' : ''}>meses</option>
+            <option value="dias" ${datos[campoTiempo] == 'dias' ? 'selected' : ''}>dias</option>
+            <option value="horas" ${datos[campoTiempo] == 'horas' ? 'selected' : ''}>horas</option>
+            <option value="minutos" ${datos[campoTiempo] == 'minutos' ? 'selected' : ''}>minutos</option>
+          </select>
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function recolectarDatos() {
+  const datos = Object.assign({}, datosActuales);
+
+  grupos.forEach(grupo => {
+    grupo.campos.forEach(campo => {
+      const el = document.getElementById('campo_' + campo);
+      if (el) datos[campo] = String(el.value || '').trim();
+    });
+  });
+
+  // Refuerzo directo para EDAD: SIMMOW solo debe recibir años.
+  const campoEdad = document.getElementById('campo_EDAD_ANIOS');
+
+  datos.EDAD_ANIOS = String(
+    campoEdad ? campoEdad.value : datos.EDAD_ANIOS || ''
+  )
+    .replace(/[^\d]/g, '')
+    .trim();
+
+  // Alias de respaldo por si el servidor no recibe EDAD_ANIOS.
+  datos.edad = datos.EDAD_ANIOS;
+
+  datos.EDAD_ANIOS = String(datos.EDAD_ANIOS || '')
+    .replace(/[^\d]/g, '')
+    .trim();
+
+  // Para SIMMOW solo se enviarán años cumplidos.
+  datos.EDAD_MESES = '';
+  datos.EDAD_DIAS = '';
+
+  datos.edad = datos.EDAD_ANIOS;
+
+  console.log('Datos recolectados antes de generar código:', datos);
+  console.log('EDAD_ANIOS enviada:', datos.EDAD_ANIOS);
+
+  datosActuales = datos;
+  return datos;
+}
+
+function forzarEdadEnCodigo(codigo, edad) {
+  const campoEdad = document.getElementById('campo_EDAD_ANIOS');
+
+  const edadLimpia = String(
+    edad ||
+    (campoEdad ? campoEdad.value : '') ||
+    datosActuales.EDAD_ANIOS ||
+    datosActuales.edad ||
+    ''
+  )
+    .replace(/[^\d]/g, '')
+    .trim();
+
+  if (!codigo || !edadLimpia) {
+    return codigo;
+  }
+
+  // Reemplaza edad vacía dentro del objeto DATA generado por el GS.
+  codigo = codigo.replace(
+    /"edad"\s*:\s*""/,
+    `"edad": "${edadLimpia}"`
+  );
+
+  codigo = codigo.replace(
+    /"edad"\s*:\s*null/,
+    `"edad": "${edadLimpia}"`
+  );
+
+  return codigo;
+}
+
+function generarCodigoActualizado() {
+  const datos = recolectarDatos();
+  const campoEdad = document.getElementById('campo_EDAD_ANIOS');
+
+  const edadUI = String(
+    datos.EDAD_ANIOS ||
+    datos.edad ||
+    (campoEdad ? campoEdad.value : '') ||
+    ''
+  )
+    .replace(/[^\d]/g, '')
+    .trim();
+
+  if (!edadUI) {
+    alert('EDAD_ANIOS está vacío. Escriba la edad en años antes de generar el código.');
+    mostrarEstado('No se puede generar código sin EDAD_ANIOS.', 'error');
+    return;
+  }
+
+  mostrarEstado('Generando código actualizado...', 'info');
+
+  google.script.run
+    .withSuccessHandler(resp => {
+      if (!resp || !resp.ok) {
+        mostrarEstado('No se pudo generar código.', 'error');
+        return;
+      }
+
+      let codigo = resp.codigo || '';
+
+      // FORZAR edad directamente en el código generado.
+      codigo = forzarEdadEnCodigo(codigo, edadUI);
+
+      codigoActual = codigo;
+      renderCodigo(codigoActual);
+
+      const tieneEdad = /"edad"\s*:\s*"\d+"/.test(codigoActual);
+
+      if (!tieneEdad) {
+        alert('El código generado todavía salió sin edad. No lo copie. Revise EDAD_ANIOS.');
+        mostrarEstado('Código generado sin edad. No copiar.', 'error');
+        return;
+      }
+
+      console.log('Código generado con edad forzada:', edadUI);
+      mostrarEstado('Código actualizado correctamente con edad: ' + edadUI, 'ok');
+    })
+    .withFailureHandler(err => {
+      console.error('Error completo:', err);
+      alert('ERROR CLIENTE/SERVIDOR:\n' + JSON.stringify(err, null, 2));
+      mostrarEstado('Error: ' + (err.message || JSON.stringify(err)), 'error');
+    })
+    .apiGenerarCodigo(datos);
+}
+
+    function renderCodigo(codigo) {
+      document.getElementById('panelCodigo').classList.remove('oculto');
+      document.getElementById('codigoConsola').textContent = codigo || '';
+    }
+
+function copiarCodigo() {
+  let codigo = document.getElementById('codigoConsola').textContent;
+
+  if (!codigo) {
+    mostrarEstado('No hay código para copiar.', 'error');
+    return;
+  }
+
+  const campoEdad = document.getElementById('campo_EDAD_ANIOS');
+
+  const edadUI = String(
+    (campoEdad ? campoEdad.value : '') ||
+    datosActuales.EDAD_ANIOS ||
+    datosActuales.edad ||
+    ''
+  )
+    .replace(/[^\d]/g, '')
+    .trim();
+
+  codigo = forzarEdadEnCodigo(codigo, edadUI);
+
+  if (!/"edad"\s*:\s*"\d+"/.test(codigo)) {
+    alert('No se copiará el código porque la edad sigue vacía. Revise EDAD_ANIOS.');
+    mostrarEstado('Código sin edad. No copiado.', 'error');
+    return;
+  }
+
+  codigoActual = codigo;
+  renderCodigo(codigoActual);
+
+  navigator.clipboard.writeText(codigoActual)
+    .then(() => mostrarEstado('Código copiado con edad: ' + edadUI, 'ok'))
+    .catch(() => mostrarEstado('No se pudo copiar. Use Seleccionar código y Ctrl + C.', 'error'));
+}
+
+function seleccionarCodigo() {
+  const pre = document.getElementById('codigoConsola');
+
+  if (!pre || !pre.textContent) {
+    mostrarEstado('No hay codigo para seleccionar.', 'error');
+    return;
+  }
+
+  const range = document.createRange();
+  range.selectNodeContents(pre);
+
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  mostrarEstado('Codigo seleccionado. Presione Ctrl + C.', 'ok');
+}
+
+function limpiarTodo() {
+  const archivoFieh = document.getElementById('archivoFieh');
+  const archivoCertificado = document.getElementById('archivoCertificado');
+  const textoManual = document.getElementById('textoManual');
+
+  if (archivoFieh) archivoFieh.value = '';
+  if (archivoCertificado) archivoCertificado.value = '';
+  if (textoManual) textoManual.value = '';
+
+  document.getElementById('panelDatos').classList.add('oculto');
+  document.getElementById('panelCodigo').classList.add('oculto');
+  document.getElementById('panelAdvertencias').classList.add('oculto');
+  document.getElementById('contenedorDatos').innerHTML = '';
+  document.getElementById('codigoConsola').textContent = '';
+
+  datosActuales = {};
+  codigoActual = '';
+
+  mostrarEstado('Limpio.', 'info');
+}
+
+    function mostrarEstado(msg, tipo) {
+      const estado = document.getElementById('estado');
+      estado.textContent = msg;
+
+      if (tipo === 'ok') estado.style.color = '#047857';
+      else if (tipo === 'error') estado.style.color = '#b91c1c';
+      else estado.style.color = '#4b5563';
+    }
+  </script>
+</body>
+</html>
