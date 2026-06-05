@@ -8,6 +8,7 @@ import { Search, FilePlus2, FileText } from "lucide-react";
 import type { Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 import { categoriaLabel } from "@/lib/rrhh/catalogo";
+import { LicenciaDetalleCard } from "@/components/rrhh/LicenciaDetalleCard";
 
 const TOPE = 300;
 
@@ -15,6 +16,7 @@ export default function LicenciasPage() {
   const [licencias, setLicencias] = useState<Licencia[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState("");
+  const [seleccionada, setSeleccionada] = useState<Licencia | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -93,10 +95,10 @@ export default function LicenciasPage() {
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
           {filtradas.map((l) => (
-            <Link
+            <button
               key={l.id}
-              href={`/rrhh/empleados/${encodeURIComponent(l.empleadoCodigo)}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+              onClick={() => setSeleccionada(l)}
+              className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{l.empleadoNombre}</p>
@@ -109,12 +111,16 @@ export default function LicenciasPage() {
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{l.dias} d</p>
                 <p className="text-[11px] text-slate-400">{l.diasSinGoce > 0 ? `${l.diasConGoce} c/g · ${l.diasSinGoce} s/g` : (l.conGoce ? "con goce" : "sin goce")}</p>
               </div>
-            </Link>
+            </button>
           ))}
           {filtradas.length === 0 && (
             <p className="text-center text-sm text-slate-400 py-8">Sin coincidencias para “{busqueda}”.</p>
           )}
         </div>
+      )}
+
+      {seleccionada && (
+        <LicenciaDetalleCard licencia={seleccionada} onClose={() => setSeleccionada(null)} />
       )}
     </div>
   );

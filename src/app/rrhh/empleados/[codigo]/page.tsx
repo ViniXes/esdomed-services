@@ -11,6 +11,7 @@ import type { Empleado, Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 import { antiguedadAnios, saldosEmpleado, type SaldoBolsa } from "@/lib/rrhh/saldos";
 import { BOLSA_LABEL, categoriaLabel } from "@/lib/rrhh/catalogo";
+import { LicenciaDetalleCard } from "@/components/rrhh/LicenciaDetalleCard";
 
 function mapLicencia(id: string, data: Record<string, unknown>): Licencia {
   return {
@@ -31,6 +32,7 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [anio, setAnio] = useState(new Date().getFullYear());
+  const [seleccionada, setSeleccionada] = useState<Licencia | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -149,7 +151,11 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
         ) : (
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
             {licenciasAnio.map((l) => (
-              <div key={l.id} className="px-4 py-3 flex items-center gap-3">
+              <button
+                key={l.id}
+                onClick={() => setSeleccionada(l)}
+                className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+              >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     {categoriaLabel(l.categoria)}
@@ -167,11 +173,19 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
                     {l.diasSinGoce > 0 ? `${l.diasConGoce} c/g · ${l.diasSinGoce} s/g` : (l.conGoce ? "con goce" : "sin goce")}
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
       </section>
+
+      {seleccionada && (
+        <LicenciaDetalleCard
+          licencia={seleccionada}
+          onClose={() => setSeleccionada(null)}
+          ocultarEnlaceEmpleado
+        />
+      )}
     </div>
   );
 }
