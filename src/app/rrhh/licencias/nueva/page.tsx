@@ -91,6 +91,10 @@ export default function NuevaLicenciaPage() {
   const unidad = unidadCategoria(categoria);
   const esPorHoras = unidad === "horas";
 
+  // Categorías restringidas por género (maternidad/lactancia → solo femenino).
+  const bloqueoGenero = !!(meta.soloGenero && empleado?.genero && empleado.genero !== meta.soloGenero);
+  const generoDesconocido = !!(meta.soloGenero && empleado && !empleado.genero);
+
   // Cantidad en la unidad de la bolsa (días u horas).
   const cantidad = esPorHoras
     ? horasEntre(horaInicio, horaFin)
@@ -115,6 +119,10 @@ export default function NuevaLicenciaPage() {
     if (!user || !profile || !empleado || !evaluacion) return;
     setError(null);
 
+    if (bloqueoGenero) {
+      setError(`La licencia de ${meta.label.toLowerCase()} solo aplica a empleados de género femenino.`);
+      return;
+    }
     if (periodoInvalido) {
       setError(esPorHoras ? "La hora final debe ser posterior a la inicial." : "La fecha final no puede ser anterior a la inicial.");
       return;
@@ -238,6 +246,18 @@ export default function NuevaLicenciaPage() {
               {esPorHoras ? " · se mide en horas" : ""}
               {!meta.conGocePorDefecto && " · sin goce"}
             </p>
+            {bloqueoGenero && (
+              <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400 mt-2">
+                <Ban size={14} className="mt-0.5 flex-shrink-0" />
+                <span>{meta.label} solo aplica a empleados de género femenino. {empleado?.nombre} está registrado como masculino.</span>
+              </div>
+            )}
+            {generoDesconocido && (
+              <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 text-sm text-amber-700 dark:text-amber-400 mt-2">
+                <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                <span>{meta.label} solo aplica a mujeres, pero este empleado no tiene género registrado en el padrón. Verifícalo antes de continuar.</span>
+              </div>
+            )}
           </div>
 
           {esPorHoras ? (
@@ -300,7 +320,7 @@ export default function NuevaLicenciaPage() {
       )}
 
       {/* 3. Evaluación de saldo */}
-      {empleado && evaluacion && !periodoInvalido && evaluacion.cantidad > 0 && (
+      {empleado && evaluacion && !periodoInvalido && !bloqueoGenero && evaluacion.cantidad > 0 && (
         <EvaluacionPanel ev={evaluacion} justificacion={justificacion} setJustificacion={setJustificacion} />
       )}
 
@@ -314,7 +334,7 @@ export default function NuevaLicenciaPage() {
           )}
           <button
             onClick={guardar}
-            disabled={guardando || !!evaluacion?.bloqueado || periodoInvalido}
+            disabled={guardando || !!evaluacion?.bloqueado || periodoInvalido || bloqueoGenero}
             className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save size={15} /> {guardando ? "Guardando…" : "Registrar licencia"}

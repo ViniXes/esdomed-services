@@ -1,6 +1,7 @@
 import type {
   BolsaLicencia,
   CategoriaLicencia,
+  GeneroEmpleado,
   TipoDocumentoLicencia,
   UnidadLicencia,
 } from "@/types";
@@ -25,6 +26,8 @@ export interface MetaCategoria {
   descuentaSaldo: boolean;
   /** Por defecto se emite con goce de sueldo. */
   conGocePorDefecto: boolean;
+  /** Si se define, la categoría solo aplica a empleados de ese género. */
+  soloGenero?: GeneroEmpleado;
 }
 
 // Catálogo CERRADO — la fuente única de las categorías de licencia. Reemplaza
@@ -79,6 +82,7 @@ export const CATEGORIAS: Record<CategoriaLicencia, MetaCategoria> = {
     medica: true,
     descuentaSaldo: true,
     conGocePorDefecto: true,
+    soloGenero: "femenino",
   },
   duelo: {
     categoria: "duelo",
@@ -132,6 +136,7 @@ export const CATEGORIAS: Record<CategoriaLicencia, MetaCategoria> = {
     medica: false,
     descuentaSaldo: false,
     conGocePorDefecto: true,
+    soloGenero: "femenino",
   },
   decreto: {
     categoria: "decreto",
