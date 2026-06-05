@@ -4,11 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FileText, Clock, CheckCircle2, Search } from "lucide-react";
+import { FileText, Clock, CheckCircle2, Search, X, AlertTriangle } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { formatFecha, toDate } from "@/lib/pacientes/helpers";
 
 type Filtro = EstadoIncapacidad | "todos";
+
+/** Clave de día local (sin hora) para agrupar/contar por fecha. */
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+/** Clave de posible duplicado: mismo expediente el mismo día de creación. */
+const dupKey = (s: SolicitudIncapacidad) => `${s.pacienteExpediente}|${dayKey(s.creadoEn)}`;
 
 const FILTROS: { value: Filtro; label: string }[] = [
   { value: "pendiente", label: "Pendientes" },
@@ -21,6 +26,8 @@ export default function IncapacidadesPage() {
   const [solicitudes, setSolicitudes] = useState<SolicitudIncapacidad[]>([]);
   const [filtro, setFiltro] = useState<Filtro>("pendiente");
   const [busqueda, setBusqueda] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,8 +52,14 @@ export default function IncapacidadesPage() {
 
   const filtradas = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
+    // Rango por Fecha de alta. Se parsea como hora local (sin sufijo Z) para no
+    // correr el día en El Salvador (UTC-6).
+    const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
+    const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return solicitudes.filter((s) => {
       if (filtro !== "todos" && s.estado !== filtro) return false;
+      if (desde && s.fechaAlta < desde) return false;
+      if (hasta && s.fechaAlta > hasta) return false;
       if (!term) return true;
       return (
         s.pacienteExpediente.toLowerCase().includes(term) ||
@@ -54,9 +67,21 @@ export default function IncapacidadesPage() {
         s.medicoNombre.toLowerCase().includes(term)
       );
     });
-  }, [solicitudes, filtro, busqueda]);
+  }, [solicitudes, filtro, busqueda, fechaDesde, fechaHasta]);
 
   const pendientes = solicitudes.filter((s) => s.estado === "pendiente").length;
+
+  // Total creadas hoy + claves de posibles duplicados (mismo paciente, mismo día).
+  // Se calcula sobre TODAS las solicitudes para no perder la marca al filtrar.
+  const { totalHoy, duplicadoKeys } = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of solicitudes) counts.set(dupKey(s), (counts.get(dupKey(s)) ?? 0) + 1);
+    const dup = new Set<string>();
+    counts.forEach((n, k) => { if (n >= 2) dup.add(k); });
+    const hoy = dayKey(new Date());
+    const total = solicitudes.filter((s) => dayKey(s.creadoEn) === hoy).length;
+    return { totalHoy: total, duplicadoKeys: dup };
+  }, [solicitudes]);
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
@@ -70,12 +95,18 @@ export default function IncapacidadesPage() {
             Incapacidades
           </h1>
         </div>
-        {pendientes > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
-            <Clock size={14} />
-            {pendientes} pendientes de emitir
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl">
+            <FileText size={14} className="text-slate-400" />
+            {totalHoy} {totalHoy === 1 ? "incapacidad" : "incapacidades"} hoy
           </div>
-        )}
+          {pendientes > 0 && (
+            <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
+              <Clock size={14} />
+              {pendientes} pendientes de emitir
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
@@ -95,17 +126,53 @@ export default function IncapacidadesPage() {
         ))}
       </div>
 
-      {/* Buscador */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por expediente, paciente o médico..."
-          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-        />
+      {/* Buscador y filtro por fecha de alta */}
+      <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por expediente, paciente o médico..."
+            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Alta desde</span>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        {(busqueda || fechaDesde || fechaHasta) && (
+          <button
+            onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
+
+      {/* Leyenda de duplicados */}
+      {duplicadoKeys.size > 0 && (
+        <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-400">
+          <AlertTriangle size={13} className="flex-shrink-0" />
+          <span>Las filas en rojo son posibles duplicados: mismo paciente con más de una solicitud el mismo día.</span>
+        </div>
+      )}
 
       {/* Tabla */}
       {loading ? (
@@ -137,16 +204,27 @@ export default function IncapacidadesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filtradas.map((s) => (
+                {filtradas.map((s) => {
+                  const esDuplicado = duplicadoKeys.has(dupKey(s));
+                  return (
                   <tr
                     key={s.id}
                     onClick={() => router.push(`/dashboard/incapacidades/${s.id}`)}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors"
+                    className={`cursor-pointer transition-colors ${
+                      esDuplicado
+                        ? "bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    }`}
                   >
                     <td className="px-4 py-3">
                       <p className="font-semibold font-mono text-slate-900 dark:text-slate-100">
                         {s.pacienteExpediente}
                       </p>
+                      {esDuplicado && (
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-950 border border-red-200 dark:border-red-900 px-1.5 py-0.5 rounded-full">
+                          <AlertTriangle size={9} /> Duplicado
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-800 dark:text-slate-200">{s.pacienteNombre}</p>
@@ -180,7 +258,8 @@ export default function IncapacidadesPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

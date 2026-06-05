@@ -169,8 +169,8 @@ function parsearIdentificacion(texto: string): CamposExtraidos {
   const nacionalidad = extraer(datosPaciente, "Nacionalidad", ["Documento Identidad", "Tel"]);
   if (nacionalidad) out.nacionalidad = nacionalidad;
 
-  const tel = datosPaciente.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
-  if (tel) out.telefono = tel[1];
+  const tel = datosPaciente.match(new RegExp(`Tel(?:é|e)fono\\s*:?\\s*${RE_TEL}`));
+  if (tel) out.telefono = limpiarTelefono(tel[1]);
 
   const ocupacion = extraer(datosPaciente, "Ocupación", ["Dirección", "Lugar Trabajo"]);
   if (ocupacion) out.ocupacion = ocupacion;
@@ -210,8 +210,8 @@ function parsearIdentificacion(texto: string): CamposExtraidos {
   const respDir = extraer(respBlock, "Dirección", ["Teléfono", "C. Datos"]);
   if (respDir) responsable.direccion = respDir;
 
-  const respTel = respBlock.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
-  if (respTel) responsable.telefono = respTel[1];
+  const respTel = respBlock.match(new RegExp(`Tel(?:é|e)fono\\s*:?\\s*${RE_TEL}`));
+  if (respTel) responsable.telefono = limpiarTelefono(respTel[1]);
 
   if (responsable.nombre) out.responsable = responsable;
 
@@ -272,8 +272,8 @@ function parsearIngresoEgreso(texto: string): CamposExtraidos {
   const nacionalidad = extraer(datosPaciente, "Nacionalidad", ["Teléfono", "Responsable"]);
   if (nacionalidad) out.nacionalidad = nacionalidad;
 
-  const tel = datosPaciente.match(/Tel(?:é|e)fono\s*:?\s*(\d{4}-\d{4})/);
-  if (tel) out.telefono = tel[1];
+  const tel = datosPaciente.match(new RegExp(`Tel(?:é|e)fono\\s*:?\\s*${RE_TEL}`));
+  if (tel) out.telefono = limpiarTelefono(tel[1]);
 
   // Responsable
   const responsable: ResponsablePaciente = { nombre: "" };
@@ -287,8 +287,8 @@ function parsearIngresoEgreso(texto: string): CamposExtraidos {
   ]);
   if (respDoc) responsable.documento = respDoc;
 
-  const respTel = datosPaciente.match(/Tel(?:é|e)fono\s+responsable\s*:?\s*(\d{4}-\d{4})/i);
-  if (respTel) responsable.telefono = respTel[1];
+  const respTel = datosPaciente.match(new RegExp(`Tel(?:é|e)fono\\s+responsable\\s*:?\\s*${RE_TEL}`, "i"));
+  if (respTel) responsable.telefono = limpiarTelefono(respTel[1]);
 
   const respPar = extraer(datosPaciente, "Parentesco responsable", [
     "Nombre del establecimiento", "Código UCSF", "B. DATOS",
@@ -367,6 +367,21 @@ function limpiarMunicipio(raw: string): string | undefined {
   return raw.trim().replace(/\s+[A-Z]{2,3}$/, "").trim() || undefined;
 }
 
+/**
+ * Normaliza un teléfono salvadoreño (8 dígitos) al formato "xxxx-xxxx".
+ * Acepta el número con guion, con espacio o pegado; si no son 8 dígitos
+ * devuelve lo que venga limpio (o undefined si queda vacío).
+ */
+function limpiarTelefono(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const dig = raw.replace(/\D/g, "");
+  if (dig.length === 8) return `${dig.slice(0, 4)}-${dig.slice(4)}`;
+  return raw.trim() || undefined;
+}
+
+// Teléfono salvadoreño: 8 dígitos con guion, espacio o pegados.
+const RE_TEL = "(\\d{4}[-\\s]?\\d{4})";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Parser: Certificado de Defunción — numeral 13 (causas de muerte)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -444,6 +459,144 @@ export function parsearCausasDefuncion(texto: string): CausasDefuncionExtraidas 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Parser: sección de EGRESO del Formulario de Ingreso y Egreso
+// (diagnóstico principal de egreso, complementarios/asociados y causa externa)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DatosEgresoExtraidos {
+  esFormularioEgreso: boolean;
+  diagnosticoEgreso?: DiagnosticoCIE;
+  diagnosticosComplementarios: DiagnosticoCIE[];
+  causaExterna?: DiagnosticoCIE;
+  medicoEgresoNombre?: string;
+  medicoEgresoJvpm?: string;
+  fechaEgreso?: Date;
+}
+
+// Aísla la sección "D. DATOS DEL EGRESO O DEFUNCIÓN" hasta donde empiezan los
+// procedimientos / discapacidad (todo lo que sigue ya no son diagnósticos).
+function seccionEgreso(texto: string): string {
+  let inicio = -1;
+  for (const marker of [
+    "DATOS DEL EGRESO", "D. DATOS DEL EGRESO", "EGRESO O DEFUNCI",
+    "DATOS DE EGRESO", "EGRESO HOSPITALARIO",
+  ]) {
+    inicio = texto.search(new RegExp(escapar(marker), "i"));
+    if (inicio !== -1) break;
+  }
+  // Fallback: todo lo posterior a la ruta de movimiento.
+  if (inicio === -1) inicio = texto.search(/RUTA\s+DE\s+MOVIMIENTO/i);
+  const blk = inicio === -1 ? texto : texto.slice(inicio);
+
+  // Acotar el final a antes de discapacidad / procedimientos / seguimiento.
+  const fin = blk.search(
+    /Discapacidad\s+principal|Procedimientos\s+o\s+intervenciones|E\.\s*SEGUIMIENTO/i
+  );
+  return fin === -1 ? blk : blk.slice(0, fin);
+}
+
+const RE_CODE = "([A-Z]\\d{2,3}(?:\\.\\d+)?)";
+
+// "Diagnóstico principal (d): <desc> Código CIE-10: <code>"
+// El lookahead negativo evita que la descripción se trague la siguiente etiqueta
+// (clave para que en una hoja sin diagnóstico no haya falsos positivos).
+const RE_DX_PRINCIPAL = new RegExp(
+  `Diagn(?:ó|o)stico\\s+principal\\s*\\(?\\s*d\\s*\\)?\\s*:?\\s*` +
+    `((?:(?!C(?:ó|o)digo|Diagn(?:ó|o)stico)[\\s\\S])*?)\\s*` +
+    `C(?:ó|o)digo\\s+C(?:IE|FI?)-?\\s*10?\\s*:?\\s*${RE_CODE}`,
+  "i"
+);
+
+// "Diagnóstico de causa externa: <desc> Código CIE-10: <code>"
+const RE_CAUSA_EXTERNA = new RegExp(
+  `Diagn(?:ó|o)stico\\s+de\\s+causa\\s+externa\\s*:?\\s*` +
+    `((?:(?!C(?:ó|o)digo|Diagn(?:ó|o)stico|Discapacidad)[\\s\\S])*?)\\s*` +
+    `C(?:ó|o)digo\\s+CIE-?\\s*10?\\s*:?\\s*${RE_CODE}`,
+  "i"
+);
+
+// Filas de complementarios: "c) <desc> <code>" / "b) ..." / "a) ..." / "II) ..."
+const RE_DX_COMPLEMENTARIO = new RegExp(
+  `(?:^|\\s)(I{1,2}|[abc])\\)\\s*` +
+    `((?:(?!C(?:ó|o)digo|(?:I{1,2}|[abc])\\)|Diagn)[\\s\\S])*?)\\s+${RE_CODE}`,
+  "gi"
+);
+
+// Sección E (seguimiento): "Nombre del médico responsable del alta <nombre>
+// No. JVPM: <jvpm> Sello ...". El nombre puede traer salto de línea y el JVPM
+// venir partido ("HEM-011- 1"), por eso se limpian los espacios internos.
+const RE_MEDICO_ALTA = new RegExp(
+  `Nombre\\s+del\\s+m(?:é|e)dico\\s+responsable\\s+del\\s+alta\\s*:?\\s*` +
+    `([\\s\\S]*?)\\s*(?:No\\.?\\s*)?JVPM\\s*:?\\s*` +
+    `([\\s\\S]*?)\\s*(?:Sello|Nombre\\s+de\\s+ESDOMED|Fecha\\s+de\\s+digitaci)`,
+  "i"
+);
+
+/** Extrae los diagnósticos de egreso y la causa externa del texto del formulario. */
+export function parsearDatosEgreso(texto: string): DatosEgresoExtraidos {
+  const esFormularioEgreso = detectarTipoHoja(texto) === "ingreso_egreso";
+  const out: DatosEgresoExtraidos = { esFormularioEgreso, diagnosticosComplementarios: [] };
+
+  const blk = seccionEgreso(texto);
+
+  // Diagnóstico principal (d)
+  const pr = blk.match(RE_DX_PRINCIPAL);
+  if (pr) {
+    const descripcion = limpiarNombre(pr[1]);
+    if (descripcion) out.diagnosticoEgreso = { codigo: pr[2].trim().toUpperCase(), descripcion };
+  }
+
+  // Causa externa (opcional)
+  const ce = blk.match(RE_CAUSA_EXTERNA);
+  if (ce) {
+    const descripcion = limpiarNombre(ce[1]);
+    if (descripcion) out.causaExterna = { codigo: ce[2].trim().toUpperCase(), descripcion };
+  }
+
+  // Complementarios — entre el encabezado de complementarios y la causa externa.
+  const iComp = blk.search(/Diagn(?:ó|o)stico\s+complementarios/i);
+  if (iComp !== -1) {
+    const iCe = blk.search(/Diagn(?:ó|o)stico\s+de\s+causa\s+externa/i);
+    const compBlk = blk.slice(iComp, iCe === -1 ? undefined : iCe);
+    const codigoPrincipal = out.diagnosticoEgreso?.codigo;
+    const vistos = new Set<string>();
+    RE_DX_COMPLEMENTARIO.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = RE_DX_COMPLEMENTARIO.exec(compBlk)) !== null) {
+      const descripcion = limpiarNombre(m[2]);
+      const codigo = m[3].trim().toUpperCase();
+      if (!descripcion) continue;
+      if (codigo === codigoPrincipal) continue;
+      if (vistos.has(codigo)) continue;
+      vistos.add(codigo);
+      out.diagnosticosComplementarios.push({ codigo, descripcion });
+    }
+  }
+
+  // Médico responsable del alta + JVPM (sección E, fuera del bloque de diagnósticos).
+  const med = texto.match(RE_MEDICO_ALTA);
+  if (med) {
+    const nombre = limpiarNombre(med[1]);
+    const jvpm = (med[2] || "").replace(/\s+/g, "").replace(/[.,;]+$/, "");
+    if (nombre) out.medicoEgresoNombre = nombre;
+    if (jvpm) out.medicoEgresoJvpm = jvpm.toUpperCase();
+  }
+
+  // Fecha y hora de egreso ("Fecha de egreso:04/06/2026 Hora de egreso: 13:21 PM").
+  // Está al final de la sección D, fuera del bloque de diagnósticos.
+  const fEgr = texto.match(/Fecha\s+de\s+egreso\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (fEgr) {
+    const f = parseFechaEs(fEgr[1]);
+    if (f) {
+      const hEgr = texto.match(/Hora\s+de\s+egreso\s*:?\s*(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?)/i);
+      out.fechaEgreso = hEgr ? combinarFechaHora(f, hEgr[1].trim()) : f;
+    }
+  }
+
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // API pública
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -460,6 +613,18 @@ export async function parsearPDF(file: File): Promise<ResultadoParser> {
 export async function parsearCertificadoDefuncion(file: File): Promise<CausasDefuncionExtraidas> {
   const textoCrudo = await extraerTextoPDF(file);
   return parsearCausasDefuncion(textoCrudo);
+}
+
+/**
+ * Lee un Formulario de Ingreso y Egreso y extrae los diagnósticos de egreso
+ * (principal + complementarios) y la causa externa. Devuelve también el texto
+ * crudo para diagnosticar el parseo si algún campo no se detecta.
+ */
+export async function parsearFormularioEgreso(
+  file: File
+): Promise<DatosEgresoExtraidos & { textoCrudo: string }> {
+  const textoCrudo = await extraerTextoPDF(file);
+  return { ...parsearDatosEgreso(textoCrudo), textoCrudo };
 }
 
 /**

@@ -51,7 +51,26 @@
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/**)",
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/**)",
       "Read(//c/c/Users/Usuario/desktop/esdomed-services/src/app/**)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(sed -n '19,30p' src/app/dashboard/fallecidos/page.tsx)",
+      "Bash(sed -n '230,260p' src/components/pacientes/PacienteForm.tsx)",
+      "Bash(xargs grep -ln \"egreso\\\\|estado\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\src\" -Recurse -Directory | Where-Object { $_.Name -match 'visita|trabajo|social' } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\\\\src\\\\components\" -Recurse | Where-Object { $_.Name -match 'visita|Visita' })",
+      "Bash(xargs grep -l \"trabajo_social\")",
+      "Bash(xargs grep -l \"BuscadorPacienteActivo\")",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(Find src *)",
+      "Bash(findstr -i \"traslado\")",
+      "Bash(Find-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\" -Name \"*Servicio*\" -o -Name \"*servicio*\" -o -Name \"*cama*\" -o -Name \"*Cama*\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(xargs grep -l \"camaActual\\\\|servicioActual\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Usuario\\\\desktop\\\\esdomed-services\" -Hidden | Where-Object {$_.Name -match \"env|service|firebase\"} | Select-Object Name)",
+      "Bash(node scripts/limpiar-colecciones.mjs --dry-run)",
+      "Bash(node *)",
+      "Bash(git stash *)",
+      "Bash(npx next *)"
     ]
   }
 }

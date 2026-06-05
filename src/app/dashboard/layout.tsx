@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
   Activity,
+  BarChart3,
   BedDouble,
+  ClipboardCheck,
   ClipboardList,
   FileText,
   HeartPulse,
@@ -17,6 +19,7 @@ import {
   Printer,
   Settings,
   Users,
+  DoorOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -59,10 +62,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verUsuarios = profile?.role === "admin";
   const verBusquedaTelefono = profile?.role === "admin";
   const verCuidadosCriticos = profile?.role === "esdomed" || profile?.role === "admin";
+  const verReportes = profile?.role === "esdomed" || profile?.role === "admin";
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
+  const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
+  const G_REPORTES = "Reportes";
   const G_ADMIN = "Administración";
 
   const navItems: NavItem[] = [
@@ -93,13 +99,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           group: G_PACIENTES,
         }]
       : []),
+    // ── Gestiones de Altas (TS agrupa Notificación + Verificación) ──
+    ...(esTS
+      ? [{
+          href: "/dashboard/notificacion-altas",
+          label: "Notificación de Altas",
+          icon: ClipboardCheck,
+          group: G_GESTIONES_ALTAS,
+        }]
+      : []),
     ...(verAltasVivos
       ? [{
           href: "/dashboard/altas-vivos",
           label: "Verificación de Altas",
           icon: LogIn,
           badge: pendientes.altas,
-          group: G_PACIENTES,
+          // Para TS se agrupa con Notificación; para ESDOMED/admin queda en Gestión de pacientes.
+          group: esTS ? G_GESTIONES_ALTAS : G_PACIENTES,
         }]
       : []),
     {
@@ -113,16 +129,24 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(profile?.role === "trabajo_social"
       ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
       : []),
+    ...(esTS
+      ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_PACIENTES }]
+      : []),
 
     // ── Documentos ──
     ...(!esTS
-      ? [{ href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, group: G_DOCUMENTOS }]
+      ? [{ href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, badge: pendientes.impresiones, group: G_DOCUMENTOS }]
       : []),
     ...(verIncapacidades
       ? [
-          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, group: G_DOCUMENTOS },
-          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, group: G_DOCUMENTOS },
+          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS },
+          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, badge: pendientes.anexo5, group: G_DOCUMENTOS },
         ]
+      : []),
+
+    // ── Reportes ──
+    ...(verReportes
+      ? [{ href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES }]
       : []),
 
     // ── Administración ──

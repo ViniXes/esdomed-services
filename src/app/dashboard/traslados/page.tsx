@@ -174,7 +174,21 @@ export default function DashboardTrasladosPage() {
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-500 mt-2">Dr. {t.medicoNombre} · {t.medicoServicio}</p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <p className="text-xs text-slate-500">
+                      Dr. {t.medicoNombre}{t.medicoJvpm ? ` · JVPM ${t.medicoJvpm}` : ""}
+                    </p>
+                    {t.revisadoPorNombre && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        Procesado por: {t.revisadoPorNombre}
+                      </span>
+                    )}
+                    {t.respuestaMedico && t.estado === "pendiente" && (
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        Médico respondió
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Badge estado={t.estado} />
               </div>
@@ -221,9 +235,22 @@ export default function DashboardTrasladosPage() {
               <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
 
               <Row label="Motivo"      value={selected.motivoTraslado} />
-              <Row label="Médico"      value={`Dr. ${selected.medicoNombre} (${selected.medicoServicio})`} />
+              <Row label="Médico"      value={`Dr. ${selected.medicoNombre}`} />
+              {selected.medicoJvpm && (
+                <Row label="JVPM"        value={selected.medicoJvpm} />
+              )}
               <Row label="Estado"      value={<Badge estado={selected.estado} />} />
-              
+              {selected.revisadoPorNombre && (
+                <Row label="Procesado por" value={selected.revisadoPorNombre} />
+              )}
+
+              {selected.respuestaMedico && (
+                <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-3 border border-blue-200 dark:border-blue-900/50">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-1">Respuesta del médico</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">{selected.respuestaMedico}</p>
+                </div>
+              )}
+
               <div className="pt-2">
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Notas ESDOMED</label>
                 <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}

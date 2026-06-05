@@ -29,24 +29,30 @@ const hasFlag = (f) => args.includes(f);
 const KEY_PATH = getArg("--key") || resolve(ROOT, "service-account.json");
 const DRY_RUN  = hasFlag("--dry-run");
 
-// Colecciones operativas a vaciar. NO incluye `usuarios` (cuentas y roles).
+// Colecciones operativas a vaciar.
+// NO incluye `usuarios` (cuentas y roles) ni `configuracion` (catálogo de servicios/camas).
 const COLECCIONES = [
   "personas",
   "pacientes",
   "traslados",
   "notificaciones_fallecidos",
   "notificaciones_altas",
+  "notificaciones_prealta",
   "solicitudes_impresion",
   "control_ingresos",
   "incapacidades",
+  "anexo5",
   "busquedas_telefono",
+  "tarjetas_visita",
+  "visitas",
+  "recepciones",
 ];
 
 async function main() {
   console.log("\n" + "=".repeat(62));
   console.log("  LIMPIEZA DE COLECCIONES — ESDOMED Services");
   console.log("=".repeat(62));
-  console.log("  Se CONSERVA la colección 'usuarios'.\n");
+  console.log("  Se CONSERVAN las colecciones 'usuarios' y 'configuracion'.\n");
   if (DRY_RUN) console.log("  ⚠  SIMULACIÓN — no se borrará nada\n");
 
   if (!existsSync(KEY_PATH)) {

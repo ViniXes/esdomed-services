@@ -1,14 +1,15 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, AlertTriangle, Plus, Trash2, FileUp, Loader2, X as XIcon } from "lucide-react";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import type { DiagnosticoCIE, EstadoPaciente, Paciente } from "@/types";
+import { parsearFormularioEgreso } from "@/lib/pacientes/pdfParser";
 import {
   ESTADO_LABEL, diasEstancia, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
@@ -44,6 +45,59 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
   const [medicoNombre, setMedicoNombre] = useState("");
   const [medicoJvpm, setMedicoJvpm] = useState("");
 
+  // Carga desde el Formulario de Ingreso y Egreso (PDF)
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [cargandoPdf, setCargandoPdf] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState<{ tipo: "ok" | "warn" | "error"; texto: string } | null>(null);
+
+  const cargarFormulario = async (file: File) => {
+    setPdfMsg(null);
+    setCargandoPdf(true);
+    try {
+      const r = await parsearFormularioEgreso(file);
+      let n = 0;
+      if (r.diagnosticoEgreso) {
+        setDxCodigo(r.diagnosticoEgreso.codigo);
+        setDxDescripcion(r.diagnosticoEgreso.descripcion);
+        n++;
+      }
+      if (r.diagnosticosComplementarios.length) {
+        setComplementarios(r.diagnosticosComplementarios);
+        n += r.diagnosticosComplementarios.length;
+      }
+      if (r.causaExterna) {
+        setCausaExtCodigo(r.causaExterna.codigo);
+        setCausaExtDescripcion(r.causaExterna.descripcion);
+      }
+      if (r.medicoEgresoNombre) setMedicoNombre(r.medicoEgresoNombre);
+      if (r.medicoEgresoJvpm) setMedicoJvpm(r.medicoEgresoJvpm);
+      if (r.fechaEgreso) setFechaHora(toDatetimeLocalInput(r.fechaEgreso));
+
+      const extras = [
+        r.causaExterna ? "la causa externa" : null,
+        r.medicoEgresoNombre ? "el médico responsable" : null,
+        r.fechaEgreso ? "la fecha de egreso" : null,
+      ].filter(Boolean).join(" y ");
+
+      if (!r.esFormularioEgreso) {
+        setPdfMsg({ tipo: "warn", texto: "El PDF no parece un Formulario de Ingreso y Egreso. Revisa los campos antes de guardar." });
+      } else if (n === 0 && !r.causaExterna && !r.medicoEgresoNombre && !r.fechaEgreso) {
+        // Útil para afinar las regex contra las etiquetas reales de la hoja.
+        console.warn("[egreso] No se detectaron datos de egreso. Texto crudo del PDF:\n", r.textoCrudo);
+        setPdfMsg({ tipo: "warn", texto: "No se detectaron datos de egreso en el formulario (revisa la consola del navegador). Complétalos manualmente." });
+      } else {
+        setPdfMsg({
+          tipo: "ok",
+          texto: `Se cargaron ${n} diagnóstico(s)${extras ? ` y ${extras}` : ""}. Revisa que coincidan con la hoja antes de guardar.`,
+        });
+      }
+    } catch (e) {
+      setPdfMsg({ tipo: "error", texto: `No se pudo leer el PDF: ${e instanceof Error ? e.message : "error"}` });
+    } finally {
+      setCargandoPdf(false);
+    }
+  };
+
   useEffect(() => {
     let cancelado = false;
     (async () => {
@@ -63,6 +117,32 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
         fechaNacimiento: toDate(data.fechaNacimiento),
         creadoEn: toDate(data.creadoEn) ?? new Date(),
       } as Paciente);
+
+      // Modo edición: el paciente ya está egresado → precargar sus datos de egreso.
+      if (data.estado !== "activo") {
+        setCondicion(data.estado as EstadoPaciente);
+        const fe = toDate(data.fechaEgreso);
+        if (fe) setFechaHora(toDatetimeLocalInput(fe));
+        if (data.diagnosticoEgreso) {
+          setDxCodigo(data.diagnosticoEgreso.codigo ?? "");
+          setDxDescripcion(data.diagnosticoEgreso.descripcion ?? "");
+        }
+        if (Array.isArray(data.diagnosticosComplementarios)) {
+          setComplementarios(
+            (data.diagnosticosComplementarios as DiagnosticoCIE[]).map((d) => ({
+              codigo: d.codigo ?? "", descripcion: d.descripcion ?? "",
+            })),
+          );
+        }
+        if (data.causaExterna) {
+          setCausaExtCodigo(data.causaExterna.codigo ?? "");
+          setCausaExtDescripcion(data.causaExterna.descripcion ?? "");
+        }
+        if (Array.isArray(data.procedimientos)) setProcedimientos(data.procedimientos as string[]);
+        if (data.medicoEgresoNombre) setMedicoNombre(data.medicoEgresoNombre);
+        if (data.medicoEgresoJvpm) setMedicoJvpm(data.medicoEgresoJvpm);
+      }
+
       setLoading(false);
     })();
     return () => { cancelado = true; };
@@ -87,26 +167,8 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
     );
   }
 
-  if (paciente.estado !== "activo") {
-    return (
-      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
-        <Link
-          href={`/dashboard/pacientes/${paciente.id}`}
-          className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-        >
-          <ArrowLeft size={14} /> Volver al paciente
-        </Link>
-        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-2xl p-5">
-          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-            Este paciente ya tiene egreso registrado
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-            Estado actual: <strong>{ESTADO_LABEL[paciente.estado]}</strong>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Activo → registrar egreso; ya egresado → editar los datos de egreso.
+  const modoEdicion = paciente.estado !== "activo";
 
   const dias = diasEstancia(paciente.fechaIngreso, new Date(fechaHora));
 
@@ -138,36 +200,54 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
     setError(null);
     setGuardando(true);
     try {
+      const compLimpios = complementarios
+        .filter((d) => d.codigo.trim() || d.descripcion.trim())
+        .map((d) => ({ codigo: d.codigo.trim().toUpperCase(), descripcion: d.descripcion.trim() }));
+      const procsLimpios = procedimientos.map((p) => p.trim()).filter(Boolean);
+
+      // Se escriben los campos siempre (null cuando van vacíos) para que al editar
+      // un egreso ya guardado, quitar un dato realmente lo borre en Firestore.
       const update: Record<string, unknown> = {
         estado: condicion,
         fechaEgreso: Timestamp.fromDate(fechaEgreso),
         diasEstancia: dias,
         medicoEgresoNombre: medicoNombre.trim(),
+        medicoEgresoJvpm: medicoJvpm.trim() || null,
+        diagnosticoEgreso: (dxCodigo.trim() || dxDescripcion.trim())
+          ? { codigo: dxCodigo.trim().toUpperCase(), descripcion: dxDescripcion.trim() }
+          : null,
+        diagnosticosComplementarios: compLimpios.length ? compLimpios : null,
+        causaExterna: (causaExtCodigo.trim() || causaExtDescripcion.trim())
+          ? { codigo: causaExtCodigo.trim().toUpperCase(), descripcion: causaExtDescripcion.trim() }
+          : null,
+        procedimientos: procsLimpios.length ? procsLimpios : null,
         actualizadoEn: Timestamp.now(),
         actualizadoPor: profile.uid,
       };
-      if (medicoJvpm.trim()) update.medicoEgresoJvpm = medicoJvpm.trim();
-      if (dxCodigo.trim() || dxDescripcion.trim()) {
-        update.diagnosticoEgreso = {
-          codigo: dxCodigo.trim().toUpperCase(),
-          descripcion: dxDescripcion.trim(),
-        };
-      }
-      const compLimpios = complementarios
-        .filter((d) => d.codigo.trim() || d.descripcion.trim())
-        .map((d) => ({ codigo: d.codigo.trim().toUpperCase(), descripcion: d.descripcion.trim() }));
-      if (compLimpios.length) update.diagnosticosComplementarios = compLimpios;
-
-      if (causaExtCodigo.trim() || causaExtDescripcion.trim()) {
-        update.causaExterna = {
-          codigo: causaExtCodigo.trim().toUpperCase(),
-          descripcion: causaExtDescripcion.trim(),
-        };
-      }
-      const procsLimpios = procedimientos.map((p) => p.trim()).filter(Boolean);
-      if (procsLimpios.length) update.procedimientos = procsLimpios;
 
       await updateDoc(doc(db, "pacientes", paciente.id), update);
+
+      // Solo al registrar el egreso por primera vez: anular las tarjetas de visita
+      // activas (conserva el historial; solo deja de estar "activa"). Al editar un
+      // egreso ya existente no aplica. No bloquea el egreso si falla.
+      if (!modoEdicion) {
+        try {
+          const snap = await getDocs(
+            query(collection(db, "tarjetas_visita"), where("expediente", "==", paciente.expediente))
+          );
+          await Promise.all(
+            snap.docs
+              .filter((d) => (d.data() as { estado?: string }).estado === "activa")
+              .map((d) => updateDoc(doc(db, "tarjetas_visita", d.id), {
+                estado: "anulada",
+                actualizadoEn: Timestamp.now(),
+              }))
+          );
+        } catch {
+          /* las tarjetas de visita no son críticas para el egreso */
+        }
+      }
+
       router.push(`/dashboard/pacientes/${paciente.id}`);
     } catch (e) {
       setError(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -187,7 +267,9 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
           <ArrowLeft size={16} />
         </Link>
         <div className="flex-1">
-          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium">Registrar egreso</p>
+          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium">
+            {modoEdicion ? "Editar datos de egreso" : "Registrar egreso"}
+          </p>
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
             {nombreCompleto(paciente)} <span className="text-slate-400 font-mono text-sm ml-2">{paciente.expediente}</span>
           </h1>
@@ -224,7 +306,41 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
 
       {/* Datos clínicos */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">Datos clínicos del egreso</h3>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">Datos clínicos del egreso</h3>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,application/pdf"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) cargarFormulario(f); e.target.value = ""; }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={cargandoPdf}
+            className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-50"
+          >
+            {cargandoPdf ? <Loader2 size={12} className="animate-spin" /> : <FileUp size={12} />}
+            {cargandoPdf ? "Leyendo..." : "Cargar formulario de egreso (PDF)"}
+          </button>
+        </div>
+
+        {pdfMsg && (
+          <div
+            className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${
+              pdfMsg.tipo === "ok"
+                ? "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400"
+                : pdfMsg.tipo === "warn"
+                  ? "bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400"
+                  : "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400"
+            }`}
+          >
+            <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+            <span className="flex-1">{pdfMsg.texto}</span>
+            <button onClick={() => setPdfMsg(null)} className="flex-shrink-0 opacity-60 hover:opacity-100"><XIcon size={12} /></button>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-3">
           <div>
@@ -378,7 +494,7 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
             className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
           >
             <Save size={15} />
-            {guardando ? "Guardando..." : "Registrar egreso"}
+            {guardando ? "Guardando..." : modoEdicion ? "Guardar cambios" : "Registrar egreso"}
           </button>
         </div>
       </div>

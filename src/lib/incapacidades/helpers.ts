@@ -1,3 +1,18 @@
+// ── Conversión de fechas de <input type="date"> ──────────────────────────────
+
+/**
+ * Parsea una fecha "YYYY-MM-DD" (de un <input type="date">) como fecha LOCAL,
+ * a medianoche del huso del usuario.
+ *
+ * `new Date("YYYY-MM-DD")` interpreta el string como medianoche UTC, lo que en
+ * El Salvador (UTC-6) cae el día anterior y corre la fecha un día hacia atrás.
+ * Construir la fecha con (año, mes, día) evita ese corrimiento.
+ */
+export function parseDateInput(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
 // ── Cálculo de fechas ────────────────────────────────────────────────────────
 
 /**

@@ -139,6 +139,7 @@ export default function NuevaTrasladoPage() {
       medicoId: user.uid,
       medicoNombre: profile.nombre,
       medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
+      medicoJvpm: profile.jvpm || "",
       pacienteExpediente: form.pacienteExpediente,
       pacienteNombre: form.pacienteNombre,
       servicioOrigen: form.servicioOrigen,

@@ -6,6 +6,7 @@ import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileTex
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { SoporteGlobo } from "@/components/SoporteGlobo";
 
 const baseNavItems = [
   { href: "/medico",                 label: "Inicio",          icon: LayoutDashboard, exact: true },
@@ -45,7 +46,12 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center justify-center h-full">
             <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : children}
+        ) : (
+          <>
+            {children}
+            <SoporteGlobo />
+          </>
+        )}
       </main>
     </div>
   );

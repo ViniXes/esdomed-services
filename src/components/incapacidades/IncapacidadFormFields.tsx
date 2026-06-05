@@ -1,7 +1,7 @@
 "use client";
 
 import type { CondicionEgresoIncapacidad } from "@/types";
-import { calcularDiasHospitalizacion, calcularFechaHasta, formatFechaCorta } from "@/lib/incapacidades/helpers";
+import { calcularDiasHospitalizacion, calcularFechaHasta, formatFechaCorta, parseDateInput } from "@/lib/incapacidades/helpers";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
@@ -31,7 +31,7 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, disabled 
   const set = <K extends keyof IncapacidadFormValue>(k: K, v: IncapacidadFormValue[K]) =>
     onChange({ ...value, [k]: v });
 
-  const fAlta = value.fechaAlta ? new Date(value.fechaAlta) : null;
+  const fAlta = value.fechaAlta ? parseDateInput(value.fechaAlta) : null;
   const diasExtrasNum = parseInt(value.diasExtras, 10);
   const altaAntesDqIngreso = fAlta !== null && fAlta < fechaIngreso;
 

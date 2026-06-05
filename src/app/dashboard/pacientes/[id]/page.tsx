@@ -81,34 +81,36 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-start gap-3">
-        <button
-          onClick={() => router.push("/dashboard/pacientes")}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
-          aria-label="Volver"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Expediente</p>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${ESTADO_BADGE[paciente.estado]}`}>
-              {ESTADO_LABEL[paciente.estado]}
-            </span>
+      <div className="flex flex-col lg:flex-row lg:items-start gap-3">
+        <div className="flex items-start gap-3 min-w-0 lg:flex-1">
+          <button
+            onClick={() => router.push("/dashboard/pacientes")}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
+            aria-label="Volver"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Expediente</p>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${ESTADO_BADGE[paciente.estado]}`}>
+                {ESTADO_LABEL[paciente.estado]}
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 break-words">
+              {paciente.expediente}
+            </h1>
+            <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium break-words">
+              {nombreCompleto(paciente)}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5 break-words">
+              {edad !== null ? `${edad} años` : "Edad no registrada"}
+              {paciente.genero && <> · {GENERO_LABEL[paciente.genero]}</>}
+              {paciente.dui && <> · DUI {paciente.dui}</>}
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5">
-            {paciente.expediente}
-          </h1>
-          <p className="text-sm text-slate-700 dark:text-slate-300 mt-1 font-medium">
-            {nombreCompleto(paciente)}
-          </p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {edad !== null ? `${edad} años` : "Edad no registrada"}
-            {paciente.genero && <> · {GENERO_LABEL[paciente.genero]}</>}
-            {paciente.dui && <> · DUI {paciente.dui}</>}
-          </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap lg:justify-end">
           <Link
             href={`/dashboard/pacientes/${paciente.id}/editar-persona`}
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
@@ -369,6 +371,14 @@ function TabEgreso({ paciente, pacienteId }: { paciente: Paciente; pacienteId: s
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Link
+          href={`/dashboard/pacientes/${pacienteId}/egreso`}
+          className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+        >
+          <Pencil size={14} /> Editar datos de egreso
+        </Link>
+      </div>
       <Card icon={LogOutIcon} title="Datos de egreso">
         <Row label="Condición de egreso" value={ESTADO_LABEL[paciente.estado]} />
         <Row label="Fecha y hora" value={formatFechaHora(paciente.fechaEgreso)} />
@@ -466,6 +476,7 @@ function CausasDefuncionEditor({
   const [guardando, setGuardando] = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [form,      setForm]      = useState(snapshot);
+  const [sincronizadoCon, setSincronizadoCon] = useState({ paciente, editando });
 
   // ── Carga desde Certificado de Defunción (PDF, numeral 13) ──
   const fileRef = useRef<HTMLInputElement>(null);
@@ -503,9 +514,13 @@ function CausasDefuncionEditor({
     }
   };
 
-  useEffect(() => {
+  // Resincroniza el formulario con el documento del paciente cuando NO se está
+  // editando (llega una actualización por onSnapshot o se cancela la edición).
+  // Patrón "ajustar estado en render" recomendado por React, en lugar de un efecto.
+  if (sincronizadoCon.paciente !== paciente || sincronizadoCon.editando !== editando) {
+    setSincronizadoCon({ paciente, editando });
     if (!editando) setForm(snapshot());
-  }, [paciente, editando]); // eslint-disable-line
+  }
 
   const setDx = (
     k: "causaMuerteD" | "causaMuerteC" | "causaMuerteB" | "causaMuerteA" | "estadoI" | "estadoII" | "causaExterna",

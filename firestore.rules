@@ -136,7 +136,11 @@ service cloud.firestore {
     match /traslados/{id} {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
-      allow update: if isStaff();
+      // El staff gestiona el estado; el médico puede corregir y reenviar su propio
+      // traslado solo cuando ESDOMED lo dejó en revisión.
+      allow update: if isStaff()
+                    || (isMedico() && resource.data.medicoId == uid()
+                        && resource.data.estado == 'en_revision');
       allow delete: if isAdmin();
     }
 
@@ -228,7 +232,11 @@ service cloud.firestore {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
       allow update: if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
-      allow delete: if isAdmin();
+      // ESDOMED/admin pueden borrar cualquiera; el médico solo las propias y
+      // mientras sigan pendientes (p. ej. para quitar un duplicado).
+      allow delete: if isEsdomed() || isAdmin()
+                    || (isMedico() && resource.data.medicoId == uid()
+                        && resource.data.estado == 'pendiente');
     }
 
     // ─── Recepciones (psicología / trabajo social) ────────────────────────────
@@ -249,6 +257,31 @@ service cloud.firestore {
       // ESDOMED puede marcar como procesada (también solo si está pendiente).
       allow update: if (isTrabajoSocial() || isEsdomed() || isAdmin())
                     && (resource.data.estado == 'pendiente' || resource.data.estado == 'observada');
+      allow delete: if isAdmin();
+    }
+
+    // ─── Notificación de Altas / pre-altas (log interno de Trabajo Social) ────
+    // Registro diario de pacientes notificados de alta. Control interno de TS.
+    match /notificaciones_prealta/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if isTrabajoSocial();
+      allow update: if isTrabajoSocial() || isAdmin();
+      allow delete: if isTrabajoSocial() || isAdmin();
+    }
+
+    // ─── Visitas de familiares (Trabajo Social) ───────────────────────────────
+    // Tarjeta por paciente (con lista blanca) y registro de entradas/salidas.
+    // Gestionado por Trabajo Social; ESDOMED/admin con acceso de supervisión.
+    match /tarjetas_visita/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow update: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /visitas/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow update: if isTrabajoSocial() || isEsdomed() || isAdmin();
       allow delete: if isAdmin();
     }
 

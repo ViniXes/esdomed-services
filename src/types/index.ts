@@ -68,7 +68,8 @@ export interface SolicitudTraslado {
   medicoId: string;
   medicoNombre: string;
   medicoServicio: string;
-  
+  medicoJvpm?: string;        // sello/firma del médico solicitante
+
   tipoTraslado?: "servicio_cama" | "interno" | "intercambio";
   
   pacienteNombre?: string;
@@ -88,6 +89,7 @@ export interface SolicitudTraslado {
   revisadoPor?: string;       // uid del personal esdomed
   revisadoPorNombre?: string;
   notasEsdomed?: string;
+  respuestaMedico?: string;   // respuesta del médico a una observación (estado en_revision)
 }
 
 export type EstadoFallecido = "pendiente" | "confirmado";
@@ -316,6 +318,46 @@ export interface NotificacionAltaVivo {
   procesadoEn?: Date;
 }
 
+// ── Notificación de Altas (pre-alta) — log interno de Trabajo Social ──────────
+// Registro diario de pacientes activos cuyo familiar fue notificado de que se
+// irán de alta. Control interno de TS; no involucra a otros roles.
+
+export type EstadoPrealta =
+  | "notificado"
+  | "pendiente"
+  | "no_responde"   // N/R
+  | "suspendida"
+  | "deposito";
+
+export interface NotificacionPrealta {
+  id?: string;
+  fecha: string;                  // YYYY-MM-DD (día del reporte)
+
+  // Paciente (snapshot del paciente activo)
+  pacienteId: string;
+  pacienteExpediente: string;
+  pacienteNombre: string;         // "apellidos, nombres"
+  genero: Genero;
+  servicio: string;
+  cama?: string;
+  edad?: number;                  // calculada de fechaNacimiento o capturada
+  observacionesPaciente?: string; // notas tipo "8° reingreso", "cuenta con teléfono"
+
+  // Familiar notificado
+  familiarNombre?: string;
+  observacionesFamiliar?: string; // autorizaciones, contactos de emergencia, etc.
+
+  estado: EstadoPrealta;
+  horaNotificacion?: Date;        // hora a la que se notificó (default: creadoEn)
+
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
+}
+
 // ============================================================================
 // Pacientes — gestión de pacientes hospitalizados
 // ============================================================================
@@ -500,5 +542,77 @@ export interface BusquedaTelefono {
   pacienteServicio?: string;
   pacienteCama?: string;
 
+  creadoEn: Date;
+}
+
+// ============================================================================
+// Visitas de familiares — gestión por Trabajo Social
+// ============================================================================
+// Modelo centrado en la TARJETA de visita: cada paciente internado tiene una
+// tarjeta (un titular) que puede prestarse a otros familiares. La lista blanca
+// es el roster de personas autorizadas/recordadas y SOLO acelera el registro
+// (no bloquea). Las visitas del día se arman como una lista diaria por TS.
+
+export interface VisitanteInfo {
+  nombre: string;
+  parentesco: string;
+  dui?: string;
+  telefono?: string;
+}
+
+export type EstadoTarjetaVisita = "activa" | "anulada";
+
+export interface TarjetaVisita {
+  id?: string;
+  codigo: string;                 // identificador único de la tarjeta
+  pacienteId: string;
+  expediente: string;             // llave del paciente; también localiza la tarjeta
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+
+  titular: VisitanteInfo;         // responsable principal que recibe la tarjeta
+  listaBlanca: VisitanteInfo[];   // autorizados/recordados (incluye al titular)
+
+  estado: EstadoTarjetaVisita;
+  creadoEn: Date;
+  creadoPor: string;              // uid TS
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}
+
+export type EstadoVisita = "programada" | "en_curso" | "finalizada" | "cancelada";
+
+export interface Visita {
+  id?: string;
+  fecha: string;                  // YYYY-MM-DD (día de la visita)
+
+  tarjetaId: string;
+  pacienteId: string;
+  expediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+
+  // Quién visita — se llena en el check-in.
+  visitante?: VisitanteInfo;
+  esTitular?: boolean;
+
+  estado: EstadoVisita;
+  programada: boolean;            // true = vino de la lista diaria; false = espontánea
+  entradaEn?: Date;
+  salidaEn?: Date;
+
+  comentarios?: string;           // notas de Trabajo Social sobre la visita
+  cierreAutomatico?: boolean;     // salida marcada por el cierre automático de fin de día
+
+  // Responsables de cada movimiento (pueden ser TS distintos entre turnos).
+  entradaPorId?: string;          // uid TS que registró la entrada (check-in)
+  entradaPorNombre?: string;
+  salidaPorId?: string;           // uid TS que registró la salida (check-out); "Sistema" si fue cierre automático
+  salidaPorNombre?: string;
+
+  registradoPorId: string;        // uid TS que creó el registro (compat. registros previos)
+  registradoPorNombre: string;
   creadoEn: Date;
 }
