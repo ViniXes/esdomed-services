@@ -61,7 +61,7 @@ export default function RRHHInicioPage() {
           Bienvenido{profile?.nombre ? `, ${profile.nombre.split(" ")[0]}` : ""}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Gestión de incapacidades y licencias del personal · año {anio}
+          Gestión de incapacidades y licencias del personal
         </p>
       </div>
 

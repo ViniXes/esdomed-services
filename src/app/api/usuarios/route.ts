@@ -11,6 +11,7 @@ const VALID_ROLES = new Set<UserRole>([
   "psicologia",
   "admin",
   "enfermeria",
+  "rrhh",
 ]);
 
 async function getCallerRole(req: NextRequest): Promise<string | null> {
