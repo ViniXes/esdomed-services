@@ -36,6 +36,7 @@ const roleColors: Record<UserRole, string> = {
   psicologia: "bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-900",
   admin: "bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900",
   enfermeria: "bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-900",
+  rrhh: "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -45,6 +46,7 @@ const roleLabels: Record<UserRole, string> = {
   psicologia: "Psicologia",
   admin: "Administrador Superusuario",
   enfermeria: "Enfermeria",
+  rrhh: "Recursos Humanos",
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -53,6 +55,7 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "trabajo_social", label: "Trabajo Social" },
   { value: "psicologia", label: "Psicologia" },
   { value: "enfermeria", label: "Enfermeria" },
+  { value: "rrhh", label: "Recursos Humanos" },
   { value: "admin", label: "Administrador Superusuario" },
 ];
 

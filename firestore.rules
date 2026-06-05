@@ -18,6 +18,7 @@ service cloud.firestore {
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
+    function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
     function isStaff() {
       return isAuth() && getRole() in ['esdomed', 'admin', 'psicologia', 'trabajo_social'];
     }
@@ -191,6 +192,22 @@ service cloud.firestore {
       allow create: if isMedico();
       allow update: if isStaff();
       allow delete: if isAdmin();
+    }
+
+    // ─── Recursos Humanos: empleados y licencias ──────────────────────────────
+    // Datos sensibles del personal (NIT, ISSS, salarios, incapacidades). Acceso
+    // EXCLUSIVO de RRHH y admin; ningún otro rol (médicos, ESDOMED, etc.) los ve.
+    match /empleados/{codigo} {
+      allow read:   if isRrhh() || isAdmin();
+      allow create: if isRrhh() || isAdmin();
+      allow update: if isRrhh() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /licencias/{id} {
+      allow read:   if isRrhh() || isAdmin();
+      allow create: if isRrhh() || isAdmin();
+      allow update: if isRrhh() || isAdmin();
+      allow delete: if isRrhh() || isAdmin();
     }
 
     // ─── Configuración global ────────────────────────────────────────────────
