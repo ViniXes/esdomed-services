@@ -1,15 +1,21 @@
-import type { BolsaLicencia, CategoriaLicencia, Empleado, Licencia } from "@/types";
-import { CATEGORIAS } from "./catalogo";
+import type {
+  BolsaLicencia, CategoriaLicencia, Empleado, Licencia, UnidadLicencia,
+} from "@/types";
+import { CATEGORIAS, unidadBolsa } from "./catalogo";
+import { formatCantidad } from "./formato";
 
 // ── Topes legales (Ley de Servicio Civil) ────────────────────────────────────
-// Verificados contra la hoja TIEMPO ACUMULADO del Excel de RRHH:
-//   incapacidad por enfermedad (con goce): 15 días × años de antigüedad, máx 90.
-//   duelo / cuido de pariente: 20 días/año.   permiso personal + sin goce: 60.
-//   maternidad: 112 días por evento (16 semanas), no es bolsa anual.
+// Jornada base de 8 horas/día.
+//   Incapacidad por enfermedad (DÍAS): 15 días × años de antigüedad, máx 90.
+//   Duelo / cuido de pariente (DÍAS): 20 días/año.
+//   Permiso personal CON goce (HORAS): 40 h/año  (= 5 días de 8 h).
+//   Permiso SIN goce (HORAS): 480 h/año  (= 60 días de 8 h).
+//   Maternidad (DÍAS): 112 días por evento (16 semanas), no es bolsa anual.
 
 export const MATERNIDAD_DIAS = 112;
-const TOPE_DUELO_CUIDO = 20;
-const TOPE_PERSONAL_SINGOCE = 60;
+const TOPE_DUELO_CUIDO = 20;          // días
+const TOPE_PERSONAL_CONGOCE = 40;     // horas (5 días × 8 h)
+const TOPE_PERMISO_SINGOCE = 480;     // horas (60 días × 8 h)
 const INCAPACIDAD_POR_ANIO = 15;
 const INCAPACIDAD_MAX = 90;
 
@@ -28,19 +34,20 @@ export function topeIncapacidad(anios: number): number {
   return Math.min(INCAPACIDAD_MAX, INCAPACIDAD_POR_ANIO * Math.max(1, anios));
 }
 
-/** Tope anual de una bolsa. Para incapacidad depende de la antigüedad. */
+/** Tope anual de una bolsa (en su unidad: días u horas). */
 export function topeBolsa(bolsa: BolsaLicencia, anios: number): number {
   switch (bolsa) {
-    case "incapacidad":      return topeIncapacidad(anios);
-    case "duelo_cuido":      return TOPE_DUELO_CUIDO;
-    case "personal_singoce": return TOPE_PERSONAL_SINGOCE;
-    case "maternidad":       return MATERNIDAD_DIAS;
+    case "incapacidad":      return topeIncapacidad(anios);   // días
+    case "duelo_cuido":      return TOPE_DUELO_CUIDO;         // días
+    case "personal_congoce": return TOPE_PERSONAL_CONGOCE;    // horas
+    case "permiso_singoce":  return TOPE_PERMISO_SINGOCE;     // horas
+    case "maternidad":       return MATERNIDAD_DIAS;          // días
     case "ninguna":          return 0;
   }
 }
 
 // ── Días de un periodo (inclusivo: inicio y fin cuentan) ──────────────────────
-// Ej: 25 de enero al 7 de febrero = 14 días (confirmado en el Excel).
+// Ej: 25 de enero al 7 de febrero = 14 días.
 export function diasInclusivos(inicial: Date, final: Date): number {
   const a = new Date(inicial.getFullYear(), inicial.getMonth(), inicial.getDate());
   const b = new Date(final.getFullYear(), final.getMonth(), final.getDate());
@@ -48,51 +55,57 @@ export function diasInclusivos(inicial: Date, final: Date): number {
 }
 
 // ── Consumo de una bolsa en un año ────────────────────────────────────────────
-// La bolsa de incapacidad mide días CON GOCE (el exceso se reclasifica a sin
-// goce y no consume más). Las demás bolsas miden el total de días.
-function diasComputados(lic: Pick<Licencia, "bolsa" | "dias" | "diasConGoce">): number {
-  return lic.bolsa === "incapacidad" ? lic.diasConGoce : lic.dias;
+// La bolsa de incapacidad mide su consumo en días CON GOCE (el exceso se
+// reclasifica a sin goce y no consume más). Las demás miden la cantidad total.
+function cantidadComputada(lic: Pick<Licencia, "bolsa" | "cantidad" | "cantidadConGoce">): number {
+  return lic.bolsa === "incapacidad" ? lic.cantidadConGoce : lic.cantidad;
 }
 
 export function consumoBolsa(
   bolsa: BolsaLicencia,
-  licencias: Pick<Licencia, "bolsa" | "anio" | "dias" | "diasConGoce">[],
+  licencias: Pick<Licencia, "bolsa" | "anio" | "cantidad" | "cantidadConGoce">[],
   anio: number,
   excluirId?: string,
 ): number {
   return licencias
     .filter((l) => l.bolsa === bolsa && l.anio === anio)
     .filter((l) => !excluirId || (l as Licencia).id !== excluirId)
-    .reduce((sum, l) => sum + diasComputados(l), 0);
+    .reduce((sum, l) => sum + cantidadComputada(l), 0);
 }
 
 // ── Saldo por bolsa para la vista del empleado ────────────────────────────────
 export interface SaldoBolsa {
   bolsa: BolsaLicencia;
+  unidad: UnidadLicencia;
   tope: number;
   usado: number;
   disponible: number;
 }
 
-/** Saldos de las 3 bolsas anuales para un empleado en un año calendario. */
+// Las 4 bolsas anuales que se muestran al empleado (maternidad es por evento).
+const BOLSAS_ANUALES: BolsaLicencia[] = [
+  "incapacidad", "duelo_cuido", "personal_congoce", "permiso_singoce",
+];
+
+/** Saldos de las bolsas anuales para un empleado en un año calendario. */
 export function saldosEmpleado(
   empleado: Pick<Empleado, "fechaIngreso">,
-  licencias: Pick<Licencia, "bolsa" | "anio" | "dias" | "diasConGoce">[],
+  licencias: Pick<Licencia, "bolsa" | "anio" | "cantidad" | "cantidadConGoce">[],
   anio: number,
 ): SaldoBolsa[] {
   // Antigüedad al cierre del año en cuestión (31 de dic) — el derecho del año.
   const anios = antiguedadAnios(empleado.fechaIngreso, new Date(anio, 11, 31));
-  const bolsas: BolsaLicencia[] = ["incapacidad", "duelo_cuido", "personal_singoce"];
-  return bolsas.map((bolsa) => {
+  return BOLSAS_ANUALES.map((bolsa) => {
     const tope = topeBolsa(bolsa, anios);
     const usado = consumoBolsa(bolsa, licencias, anio);
-    return { bolsa, tope, usado, disponible: Math.max(0, tope - usado) };
+    return { bolsa, unidad: unidadBolsa(bolsa), tope, usado, disponible: Math.max(0, tope - usado) };
   });
 }
 
 // ── Evaluación de un registro nuevo (lógica híbrida al exceder) ───────────────
 export interface EvaluacionLicencia {
-  dias: number;
+  cantidad: number;
+  unidad: UnidadLicencia;
   anio: number;
   bolsa: BolsaLicencia;
   descuentaSaldo: boolean;
@@ -101,67 +114,70 @@ export interface EvaluacionLicencia {
   usadoPrevio: number;
   disponiblePrevio: number;
 
-  diasConGoce: number;
-  diasSinGoce: number;
+  cantidadConGoce: number;
+  cantidadSinGoce: number;
 
   excede: boolean;
-  exceso: number;            // días por encima del tope
+  exceso: number;            // cantidad por encima del tope
   bloqueado: boolean;        // true → no se permite guardar (bolsas discrecionales)
   requiereJustificacion: boolean;
 
-  mensaje: string | null;    // texto para mostrar en la UI
+  mensaje: string | null;
 }
 
 /**
  * Evalúa una licencia propuesta contra los saldos del empleado.
  * Médicas → advierten y permiten (exceso → sin goce). Discrecionales → bloquean.
+ * `cantidad` viene en la unidad de la bolsa (días u horas), calculada por el form.
  */
 export function evaluarLicencia(params: {
   categoria: CategoriaLicencia;
-  fechaInicial: Date;
-  fechaFinal: Date;
+  fecha: Date;               // día de referencia (fechaInicial) → año + antigüedad
+  cantidad: number;          // días u horas según la bolsa
   empleado: Pick<Empleado, "fechaIngreso">;
-  licenciasExistentes: Pick<Licencia, "id" | "bolsa" | "anio" | "dias" | "diasConGoce">[];
+  licenciasExistentes: Pick<Licencia, "id" | "bolsa" | "anio" | "cantidad" | "cantidadConGoce">[];
   excluirId?: string;        // al editar, no contar la licencia que se edita
 }): EvaluacionLicencia {
-  const { categoria, fechaInicial, fechaFinal, empleado, licenciasExistentes, excluirId } = params;
+  const { categoria, fecha, cantidad, empleado, licenciasExistentes, excluirId } = params;
   const meta = CATEGORIAS[categoria];
   const bolsa = meta.bolsa;
-  const dias = Math.max(0, diasInclusivos(fechaInicial, fechaFinal));
-  const anio = fechaInicial.getFullYear();
+  const unidad = unidadBolsa(bolsa);
+  const anio = fecha.getFullYear();
+  const cant = Math.max(0, cantidad);
 
   // Categorías que no descuentan saldo (lactancia/decreto): informativas.
   if (!meta.descuentaSaldo) {
     const conGoce = meta.conGocePorDefecto;
     return {
-      dias, anio, bolsa, descuentaSaldo: false,
+      cantidad: cant, unidad, anio, bolsa, descuentaSaldo: false,
       tope: 0, usadoPrevio: 0, disponiblePrevio: 0,
-      diasConGoce: conGoce ? dias : 0,
-      diasSinGoce: conGoce ? 0 : dias,
+      cantidadConGoce: conGoce ? cant : 0,
+      cantidadSinGoce: conGoce ? 0 : cant,
       excede: false, exceso: 0, bloqueado: false, requiereJustificacion: false,
       mensaje: null,
     };
   }
 
-  const anios = antiguedadAnios(empleado.fechaIngreso, fechaInicial);
+  const anios = antiguedadAnios(empleado.fechaIngreso, fecha);
   const tope = topeBolsa(bolsa, anios);
   const usadoPrevio = consumoBolsa(bolsa, licenciasExistentes, anio, excluirId);
   const disponiblePrevio = Math.max(0, tope - usadoPrevio);
-  const total = usadoPrevio + dias;
+  const total = usadoPrevio + cant;
   const excede = total > tope;
   const exceso = Math.max(0, total - tope);
 
   if (meta.comportamiento === "advertir") {
     // Médicas: el exceso sobre el tope con goce se reclasifica a sin goce.
-    const diasConGoce = Math.min(dias, disponiblePrevio);
-    const diasSinGoce = dias - diasConGoce;
+    const cantidadConGoce = Math.min(cant, disponiblePrevio);
+    const cantidadSinGoce = cant - cantidadConGoce;
     return {
-      dias, anio, bolsa, descuentaSaldo: true,
+      cantidad: cant, unidad, anio, bolsa, descuentaSaldo: true,
       tope, usadoPrevio, disponiblePrevio,
-      diasConGoce, diasSinGoce,
+      cantidadConGoce, cantidadSinGoce,
       excede, exceso, bloqueado: false, requiereJustificacion: excede,
       mensaje: excede
-        ? `Excede el tope anual de ${tope} días (lleva ${usadoPrevio}). Los ${exceso} día(s) sobre el tope se registrarán SIN goce de sueldo. Indica una justificación.`
+        ? `Excede el tope anual de ${formatCantidad(tope, unidad)} (lleva ${formatCantidad(usadoPrevio, unidad)}). ` +
+          `Lo que pasa del tope (${formatCantidad(exceso, unidad)}) se registrará SIN goce de sueldo. Indica una justificación.`
         : null,
     };
   }
@@ -169,13 +185,14 @@ export function evaluarLicencia(params: {
   // Discrecionales (duelo/cuido/personal/sin goce): se bloquea al exceder.
   const conGoce = meta.conGocePorDefecto;
   return {
-    dias, anio, bolsa, descuentaSaldo: true,
+    cantidad: cant, unidad, anio, bolsa, descuentaSaldo: true,
     tope, usadoPrevio, disponiblePrevio,
-    diasConGoce: conGoce ? dias : 0,
-    diasSinGoce: conGoce ? 0 : dias,
+    cantidadConGoce: conGoce ? cant : 0,
+    cantidadSinGoce: conGoce ? 0 : cant,
     excede, exceso, bloqueado: excede, requiereJustificacion: false,
     mensaje: excede
-      ? `Supera el tope legal de ${tope} días para esta licencia (lleva ${usadoPrevio}, disponible ${disponiblePrevio}). No se puede registrar.`
+      ? `Supera el tope legal de ${formatCantidad(tope, unidad)} para esta licencia ` +
+        `(lleva ${formatCantidad(usadoPrevio, unidad)}, disponible ${formatCantidad(disponiblePrevio, unidad)}). No se puede registrar.`
       : null,
   };
 }

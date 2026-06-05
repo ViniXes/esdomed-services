@@ -2,6 +2,7 @@ import type {
   BolsaLicencia,
   CategoriaLicencia,
   TipoDocumentoLicencia,
+  UnidadLicencia,
 } from "@/types";
 
 // ── Comportamiento al exceder el tope (decisión confirmada con RRHH) ─────────
@@ -101,8 +102,8 @@ export const CATEGORIAS: Record<CategoriaLicencia, MetaCategoria> = {
   },
   personal: {
     categoria: "personal",
-    label: "Permiso personal",
-    bolsa: "personal_singoce",
+    label: "Permiso personal con goce",
+    bolsa: "personal_congoce",
     comportamiento: "bloquear",
     tipoDocumento: "acuerdo",
     medica: false,
@@ -112,7 +113,7 @@ export const CATEGORIAS: Record<CategoriaLicencia, MetaCategoria> = {
   sin_goce: {
     categoria: "sin_goce",
     label: "Permiso sin goce de sueldo",
-    bolsa: "personal_singoce",
+    bolsa: "permiso_singoce",
     comportamiento: "bloquear",
     tipoDocumento: "acuerdo",
     medica: false,
@@ -159,16 +160,36 @@ export const CATEGORIAS_ORDEN: CategoriaLicencia[] = [
   "lactancia",
 ];
 
-export const BOLSA_LABEL: Record<BolsaLicencia, string> = {
-  incapacidad: "Incapacidad por enfermedad",
-  duelo_cuido: "Duelo / cuido de pariente",
-  personal_singoce: "Permiso personal / sin goce",
-  maternidad: "Maternidad",
-  ninguna: "Sin bolsa",
+// Metadatos por bolsa, incluida la UNIDAD en que se mide.
+export const BOLSAS_META: Record<BolsaLicencia, { label: string; unidad: UnidadLicencia }> = {
+  incapacidad:      { label: "Incapacidad por enfermedad", unidad: "dias" },
+  duelo_cuido:      { label: "Duelo / cuido de pariente",  unidad: "dias" },
+  personal_congoce: { label: "Permiso personal con goce",  unidad: "horas" },
+  permiso_singoce:  { label: "Permiso sin goce",           unidad: "horas" },
+  maternidad:       { label: "Maternidad",                 unidad: "dias" },
+  ninguna:          { label: "Sin bolsa",                  unidad: "dias" },
 };
+
+export const BOLSA_LABEL: Record<BolsaLicencia, string> = {
+  incapacidad: BOLSAS_META.incapacidad.label,
+  duelo_cuido: BOLSAS_META.duelo_cuido.label,
+  personal_congoce: BOLSAS_META.personal_congoce.label,
+  permiso_singoce: BOLSAS_META.permiso_singoce.label,
+  maternidad: BOLSAS_META.maternidad.label,
+  ninguna: BOLSAS_META.ninguna.label,
+};
+
+export function unidadBolsa(b: BolsaLicencia): UnidadLicencia {
+  return BOLSAS_META[b].unidad;
+}
 
 export function metaCategoria(c: CategoriaLicencia): MetaCategoria {
   return CATEGORIAS[c];
+}
+
+/** Unidad en que se mide/captura una categoría (vía su bolsa). */
+export function unidadCategoria(c: CategoriaLicencia): UnidadLicencia {
+  return unidadBolsa(CATEGORIAS[c].bolsa);
 }
 
 export function categoriaLabel(c: CategoriaLicencia): string {

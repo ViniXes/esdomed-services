@@ -11,6 +11,7 @@ import type { Empleado, Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 import { antiguedadAnios, saldosEmpleado, type SaldoBolsa } from "@/lib/rrhh/saldos";
 import { BOLSA_LABEL, categoriaLabel } from "@/lib/rrhh/catalogo";
+import { formatCantidad, formatCantidadCorto } from "@/lib/rrhh/formato";
 import { LicenciaDetalleCard } from "@/components/rrhh/LicenciaDetalleCard";
 
 function mapLicencia(id: string, data: Record<string, unknown>): Licencia {
@@ -163,14 +164,18 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
                     {l.excedeTope && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400">Excede tope</span>}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {formatFecha(l.fechaInicial)} – {formatFecha(l.fechaFinal)}
+                    {l.unidad === "horas"
+                      ? `${formatFecha(l.fechaInicial)} · ${l.horaInicio}–${l.horaFin}`
+                      : `${formatFecha(l.fechaInicial)} – ${formatFecha(l.fechaFinal)}`}
                     {l.diagnostico?.descripcion ? ` · ${l.diagnostico.descripcion}` : ""}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{l.dias} d</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{formatCantidadCorto(l.cantidad, l.unidad)}</p>
                   <p className="text-[11px] text-slate-400">
-                    {l.diasSinGoce > 0 ? `${l.diasConGoce} c/g · ${l.diasSinGoce} s/g` : (l.conGoce ? "con goce" : "sin goce")}
+                    {l.cantidadSinGoce > 0 && l.cantidadConGoce > 0
+                      ? `${formatCantidad(l.cantidadConGoce, l.unidad)} c/g · ${formatCantidad(l.cantidadSinGoce, l.unidad)} s/g`
+                      : (l.conGoce ? "con goce" : "sin goce")}
                   </p>
                 </div>
               </button>
@@ -207,17 +212,18 @@ function SaldoCard({ saldo }: { saldo: SaldoBolsa }) {
   const agotado = saldo.disponible === 0;
   const alto = pct >= 80;
   const barra = agotado ? "bg-red-500" : alto ? "bg-amber-500" : "bg-emerald-500";
+  const sufijo = saldo.unidad === "horas" ? " h" : "";
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
       <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide leading-tight h-7">{BOLSA_LABEL[saldo.bolsa]}</p>
       <div className="flex items-baseline gap-1 mt-1">
         <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">{saldo.disponible}</span>
-        <span className="text-xs text-slate-400">/ {saldo.tope} disp.</span>
+        <span className="text-xs text-slate-400">/ {saldo.tope}{sufijo} disp.</span>
       </div>
       <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
         <div className={`h-full ${barra} rounded-full transition-all`} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-[11px] text-slate-400 mt-1.5">{saldo.usado} usados</p>
+      <p className="text-[11px] text-slate-400 mt-1.5">{saldo.usado}{sufijo} usados</p>
     </div>
   );
 }

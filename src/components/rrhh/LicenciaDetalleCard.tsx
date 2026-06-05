@@ -5,6 +5,7 @@ import { X, CalendarRange, Stethoscope, FileText, ShieldAlert, User2, Clock } fr
 import type { Licencia } from "@/types";
 import { formatFecha, formatFechaHora } from "@/lib/pacientes/helpers";
 import { categoriaLabel, BOLSA_LABEL } from "@/lib/rrhh/catalogo";
+import { formatCantidad } from "@/lib/rrhh/formato";
 
 interface Props {
   licencia: Licencia;
@@ -72,19 +73,21 @@ export function LicenciaDetalleCard({ licencia: l, onClose, ocultarEnlaceEmplead
           {/* Periodo */}
           <Fila icon={CalendarRange} label="Periodo">
             <p className="text-sm text-slate-700 dark:text-slate-200">
-              {formatFecha(l.fechaInicial)} – {formatFecha(l.fechaFinal)}
+              {l.unidad === "horas"
+                ? <>{formatFecha(l.fechaInicial)} · {l.horaInicio}–{l.horaFin}</>
+                : <>{formatFecha(l.fechaInicial)} – {formatFecha(l.fechaFinal)}</>}
             </p>
             <p className="text-xs text-slate-500">
-              <strong className="text-slate-700 dark:text-slate-200">{l.dias}</strong> día{l.dias === 1 ? "" : "s"} · año {l.anio}
+              <strong className="text-slate-700 dark:text-slate-200">{formatCantidad(l.cantidad, l.unidad)}</strong> · año {l.anio}
             </p>
           </Fila>
 
           {/* Desglose de goce */}
           <Fila icon={FileText} label="Detalle">
             <div className="grid grid-cols-3 gap-2 text-center">
-              <Mini label="Con goce" value={l.diasConGoce} />
-              <Mini label="Sin goce" value={l.diasSinGoce} accent={l.diasSinGoce > 0} />
-              <Mini label="Total" value={l.dias} />
+              <Mini label="Con goce" value={formatCantidad(l.cantidadConGoce, l.unidad)} />
+              <Mini label="Sin goce" value={formatCantidad(l.cantidadSinGoce, l.unidad)} accent={l.cantidadSinGoce > 0} />
+              <Mini label="Total" value={formatCantidad(l.cantidad, l.unidad)} />
             </div>
             <p className="text-xs text-slate-500 mt-1.5">Bolsa: {BOLSA_LABEL[l.bolsa]}</p>
           </Fila>
@@ -145,10 +148,10 @@ function Fila({ icon: Icon, label, children }: { icon: typeof User2; label: stri
   );
 }
 
-function Mini({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+function Mini({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg py-1.5">
-      <p className={`text-base font-bold tabular-nums ${accent ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
+    <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg py-1.5 px-1">
+      <p className={`text-sm font-bold tabular-nums ${accent ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
       <p className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</p>
     </div>
   );

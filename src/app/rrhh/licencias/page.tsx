@@ -8,6 +8,7 @@ import { Search, FilePlus2, FileText } from "lucide-react";
 import type { Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 import { categoriaLabel } from "@/lib/rrhh/catalogo";
+import { formatCantidadCorto, formatCantidad } from "@/lib/rrhh/formato";
 import { LicenciaDetalleCard } from "@/components/rrhh/LicenciaDetalleCard";
 
 const TOPE = 300;
@@ -108,8 +109,12 @@ export default function LicenciasPage() {
               </div>
               {l.excedeTope && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 flex-shrink-0">Excede</span>}
               <div className="text-right flex-shrink-0">
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{l.dias} d</p>
-                <p className="text-[11px] text-slate-400">{l.diasSinGoce > 0 ? `${l.diasConGoce} c/g · ${l.diasSinGoce} s/g` : (l.conGoce ? "con goce" : "sin goce")}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{formatCantidadCorto(l.cantidad, l.unidad)}</p>
+                <p className="text-[11px] text-slate-400">
+                  {l.cantidadSinGoce > 0 && l.cantidadConGoce > 0
+                    ? `${formatCantidad(l.cantidadConGoce, l.unidad)} c/g · ${formatCantidad(l.cantidadSinGoce, l.unidad)} s/g`
+                    : (l.conGoce ? "con goce" : "sin goce")}
+                </p>
               </div>
             </button>
           ))}

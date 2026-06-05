@@ -664,17 +664,25 @@ export interface Empleado {
 }
 
 // Bolsas de saldo (la lógica de topes vive en src/lib/rrhh/saldos.ts).
-//  - incapacidad:      enfermedad/accidente — tope 15×años, máx 90 (con goce)
-//  - duelo_cuido:      duelo / cuido de pariente — tope 20
-//  - personal_singoce: permiso personal + permiso sin goce — tope 60
-//  - maternidad:       112 días por evento (no es bolsa anual)
-//  - ninguna:          lactancia/decreto — no descuenta saldo (informativo)
+// Cada bolsa se mide en su propia UNIDAD (días u horas):
+//  - incapacidad:       DÍAS · enfermedad/accidente — tope 15×años, máx 90 (con goce)
+//  - duelo_cuido:       DÍAS · duelo / cuido de pariente — tope 20
+//  - personal_congoce:  HORAS · permiso personal con goce — tope 40 h (= 5 días de 8 h)
+//  - permiso_singoce:   HORAS · permiso sin goce — tope 480 h (= 60 días de 8 h)
+//  - maternidad:        DÍAS · 112 días por evento (no es bolsa anual)
+//  - ninguna:           lactancia/decreto — no descuenta saldo (informativo)
 export type BolsaLicencia =
   | "incapacidad"
   | "duelo_cuido"
-  | "personal_singoce"
+  | "personal_congoce"
+  | "permiso_singoce"
   | "maternidad"
   | "ninguna";
+
+// Unidad en la que se mide y captura una licencia.
+//  - "dias":  rango de fechas (días totales, inclusivo).
+//  - "horas": un día con hora inicio→fin, en intervalos de 30 min.
+export type UnidadLicencia = "dias" | "horas";
 
 // Catálogo CERRADO de categorías (reemplaza el caos de texto libre del Excel).
 export type CategoriaLicencia =
@@ -705,6 +713,7 @@ export interface Licencia {
   // ── Clasificación ──
   categoria: CategoriaLicencia;
   bolsa: BolsaLicencia;            // derivada de la categoría (snapshot)
+  unidad: UnidadLicencia;         // "dias" | "horas" — según la bolsa
   tipoDocumento: TipoDocumentoLicencia;
   esProrroga: boolean;
   conGoce: boolean;               // false = el documento completo es sin goce
@@ -713,14 +722,18 @@ export interface Licencia {
   diagnostico?: DiagnosticoCIE;
 
   // ── Periodo ──
+  // Día-base: [fechaInicial, fechaFinal] como rango.
+  // Hora-base: fechaInicial = fechaFinal = el día; horaInicio/horaFin "HH:MM".
   fechaInicial: Date;
   fechaFinal: Date;
-  dias: number;                   // días totales (inclusivo)
+  horaInicio?: string;            // "HH:MM" — solo licencias por horas
+  horaFin?: string;               // "HH:MM" — solo licencias por horas
+  cantidad: number;               // total en la unidad de la bolsa (días u horas)
   anio: number;                   // año calendario de fechaInicial (para saldos)
 
   // ── Desglose con/sin goce (cuando el exceso del tope se reclasifica) ──
-  diasConGoce: number;
-  diasSinGoce: number;
+  cantidadConGoce: number;
+  cantidadSinGoce: number;
 
   // ── Control de tope ──
   excedeTope: boolean;            // true si superó el tope de su bolsa al emitirse
