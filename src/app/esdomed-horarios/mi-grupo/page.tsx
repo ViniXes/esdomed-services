@@ -205,8 +205,49 @@ export default function MiGrupoPage() {
             </table>
           </div>
 
+          {/* Roster — tarjetas de los miembros del grupo */}
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Roster</h2>
+              <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {miembros.map((fila) => {
+                const esYo = fila.uid && fila.uid === profile?.uid;
+                return (
+                  <div
+                    key={fila.uid || fila.codigoMarcacion || fila.nombre}
+                    className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
+                      esYo
+                        ? "border-[#c9a892] dark:border-[#c9a892]/60 bg-blue-50/40 dark:bg-[var(--color-institutional-navy)]/30"
+                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                    }`}
+                  >
+                    {/* Avatar */}
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold ${estiloGrupo?.badge ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                      {inicialesNombre(fila.nombre)}
+                    </div>
+                    {/* Datos */}
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white leading-tight">
+                        <span className="truncate" title={fila.nombre}>{fila.nombre}</span>
+                        {esYo && <span className="shrink-0 rounded-full bg-[#1c1e4d] dark:bg-[#c9a892] px-1.5 py-0.5 text-[9px] font-bold text-white dark:text-[var(--color-institutional-dark)]">TÚ</span>}
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-medium text-[#1c1e4d] dark:text-[#c9a892]">
+                        {fila.codigoMarcacion || "Sin código"}
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate" title={fila.puesto}>
+                        {fila.puesto || "Sin puesto"}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Leyenda */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-6 text-[11px] text-slate-500 dark:text-slate-400">
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500/80" /> Turno</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Vacaciones</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-rose-400" /> Incapacidad</span>
@@ -218,6 +259,13 @@ export default function MiGrupoPage() {
       )}
     </div>
   );
+}
+
+function inicialesNombre(nombre: string): string {
+  const palabras = nombre.trim().split(/\s+/).filter(Boolean);
+  if (palabras.length === 0) return "?";
+  if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase();
+  return (palabras[0][0] + palabras[palabras.length - 1][0]).toUpperCase();
 }
 
 function colorCelda(celda: string): string {
