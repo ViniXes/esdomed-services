@@ -635,6 +635,7 @@ export interface Empleado {
 
   codigo: string;           // código de plaza, ej. "A-002" — llave estable
   nombre: string;           // "NOMBRES APELLIDOS"
+  dui?: string;
   nit?: string;
   isss?: string;
   nup?: string;

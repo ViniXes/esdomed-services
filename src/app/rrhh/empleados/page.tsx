@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Search, Upload, Users, ChevronRight } from "lucide-react";
+import { Search, Upload, Users, ChevronRight, UserPlus } from "lucide-react";
 import type { Empleado } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 
@@ -56,12 +56,20 @@ export default function EmpleadosPage() {
             {cargando ? "Cargando…" : `${empleados.length} en el padrón`}
           </p>
         </div>
-        <Link
-          href="/rrhh/empleados/importar"
-          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex-shrink-0"
-        >
-          <Upload size={14} /> Importar
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/rrhh/empleados/importar"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex-shrink-0"
+          >
+            <Upload size={14} /> Importar
+          </Link>
+          <Link
+            href="/rrhh/empleados/nuevo"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors flex-shrink-0"
+          >
+            <UserPlus size={14} /> Nuevo
+          </Link>
+        </div>
       </div>
 
       <div className="relative">
