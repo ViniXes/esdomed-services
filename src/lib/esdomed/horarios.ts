@@ -162,12 +162,13 @@ export const HORARIOS: Horario[] = [
 
 // ── Marcas especiales (no son códigos de jornada) ──────────────────────────
 // Se guardan en la celda igual que un código, pero no cuentan horas trabajadas.
-export type MarcaEspecial = "VAC" | "INC" | "PER";
+export type MarcaEspecial = "VAC" | "INC" | "PER" | "ASU";
 
 export const MARCAS_ESPECIALES: { codigo: MarcaEspecial; label: string; descripcion: string }[] = [
   { codigo: "VAC", label: "Vacaciones", descripcion: "Día de vacaciones" },
   { codigo: "INC", label: "Incapacidad", descripcion: "Día de incapacidad" },
   { codigo: "PER", label: "Permiso", descripcion: "Permiso (con o sin goce)" },
+  { codigo: "ASU", label: "Asueto", descripcion: "Asueto / día festivo (Día de la Madre, del Padre, etc.)" },
 ];
 
 // El valor de una celda: código de horario, marca especial, o "" (descanso).

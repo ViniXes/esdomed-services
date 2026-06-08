@@ -21,7 +21,7 @@ import {
   periodosCercanos,
   PERIODO_ACTUAL,
 } from "@/lib/esdomed/plan";
-import { CalendarClock, Clock, LogIn, LogOut, Sun, Plane, HeartPulse, FileText } from "lucide-react";
+import { CalendarClock, Clock, LogIn, LogOut, Sun, Plane, HeartPulse, FileText, Star } from "lucide-react";
 
 const DIAS_LARGOS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -59,7 +59,7 @@ export default function MiHorarioPage() {
   const diasPer = fila ? contarMarca(fila.asignaciones, "PER") : 0;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
+    <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
       {/* Encabezado */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
@@ -102,8 +102,18 @@ export default function MiHorarioPage() {
             <ResumenCard icon={HeartPulse} label="Incap./perm." valor={diasInc + diasPer} color="rose" />
           </div>
 
-          {/* Lista de días */}
-          <div className="space-y-1.5">
+          {/* Leyenda */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500/80" /> Turno</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Vacaciones</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-rose-400" /> Incapacidad</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-slate-400" /> Permiso</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" /> Asueto</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-slate-300 dark:border-slate-600" /> Descanso</span>
+          </div>
+
+          {/* Días — fluyen en columnas para aprovechar el ancho */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2">
             {dias.map((dia) => {
               const celda = fila.asignaciones[dia - 1] ?? "";
               const dow = new Date(anio, mes - 1, dia).getDay();
@@ -207,6 +217,8 @@ function DiaRow({
               <Plane size={15} className="text-amber-500" />
             ) : celda.trim().toUpperCase() === "INC" ? (
               <HeartPulse size={15} className="text-rose-500" />
+            ) : celda.trim().toUpperCase() === "ASU" ? (
+              <Star size={15} className="text-emerald-500" />
             ) : (
               <FileText size={15} className="text-slate-500" />
             )}

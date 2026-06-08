@@ -2,7 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { X, Search, Sun } from "lucide-react";
-import { HORARIOS, MARCAS_ESPECIALES, type Horario } from "@/lib/esdomed/horarios";
+import { HORARIOS, MARCAS_ESPECIALES, type Horario, type MarcaEspecial } from "@/lib/esdomed/horarios";
+
+// Colores por marca, alineados con la cuadrícula del plan.
+const COLOR_MARCA: Record<MarcaEspecial, { activo: string; inactivo: string }> = {
+  VAC: {
+    activo: "bg-amber-500 text-white",
+    inactivo: "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900",
+  },
+  INC: {
+    activo: "bg-rose-500 text-white",
+    inactivo: "bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900",
+  },
+  PER: {
+    activo: "bg-slate-600 text-white",
+    inactivo: "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
+  },
+  ASU: {
+    activo: "bg-emerald-500 text-white",
+    inactivo: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900",
+  },
+};
 
 interface Props {
   // Texto contextual del encabezado (ej. "JUAN PÉREZ · Día 12").
@@ -76,9 +96,7 @@ export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose 
               onClick={() => onSelect(m.codigo)}
               title={m.descripcion}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                actual === m.codigo
-                  ? "bg-amber-500 text-white"
-                  : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+                actual === m.codigo ? COLOR_MARCA[m.codigo].activo : COLOR_MARCA[m.codigo].inactivo
               }`}
             >
               {m.codigo} · {m.label}

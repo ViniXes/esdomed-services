@@ -58,3 +58,5 @@ next-env.d.ts
 # datos fuente con información sensible (PII de empleados/pacientes) — NUNCA commitear
 /recursoshumanos
 /trabajosocial
+
+/esdomed
