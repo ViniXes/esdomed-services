@@ -23,18 +23,23 @@ import {
 } from "@/lib/esdomed/plan";
 import { CalendarClock, Clock, LogIn, LogOut, Sun, Plane, HeartPulse, FileText, Star } from "lucide-react";
 
-const DIAS_LARGOS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+// Encabezado de la semana — inicia en domingo, igual que el formato oficial.
+const SEMANA = ["D", "L", "M", "Mi", "J", "V", "S"];
+const SEMANA_LARGA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 export default function MiHorarioPage() {
   const { profile } = useAuth();
   const [periodo, setPeriodo] = useState(PERIODO_ACTUAL);
   const [plan, setPlan] = useState<PlanTrabajo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [diaSel, setDiaSel] = useState<number | null>(null);
 
   const periodos = useMemo(() => periodosCercanos(11, 2).reverse(), []);
 
   useEffect(() => {
     setLoading(true);
+    setDiaSel(null);
     getDoc(doc(db, "planes_trabajo", periodo))
       .then((snap) => setPlan(snap.exists() ? ({ id: snap.id, ...snap.data() } as PlanTrabajo) : null))
       .catch(() => setPlan(null))
@@ -46,20 +51,28 @@ export default function MiHorarioPage() {
   const hoy = new Date();
   const esMesActual = periodo === PERIODO_ACTUAL;
   const diaHoy = esMesActual ? hoy.getDate() : -1;
+  const primerDow = new Date(anio, mes - 1, 1).getDay(); // 0=Domingo
 
   const fila: FilaPlanTrabajo | undefined =
     plan && profile ? filaDeUsuario(plan, profile) : undefined;
 
   const totalHoras = fila ? totalHorasFila(fila.asignaciones) : 0;
-  const diasTrabajados = fila
-    ? fila.asignaciones.filter((c) => getHorario(c)).length
-    : 0;
+  const diasTrabajados = fila ? fila.asignaciones.filter((c) => getHorario(c)).length : 0;
   const diasVac = fila ? contarMarca(fila.asignaciones, "VAC") : 0;
   const diasInc = fila ? contarMarca(fila.asignaciones, "INC") : 0;
   const diasPer = fila ? contarMarca(fila.asignaciones, "PER") : 0;
 
+  // Celdas del calendario: relleno inicial + días del mes, completado a semanas.
+  const celdas: (number | null)[] = [
+    ...Array(primerDow).fill(null),
+    ...dias,
+  ];
+  while (celdas.length % 7 !== 0) celdas.push(null);
+
+  const diaDetalle = diaSel ?? (esMesActual ? diaHoy : null);
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
       {/* Encabezado */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
@@ -95,15 +108,62 @@ export default function MiHorarioPage() {
       ) : (
         <>
           {/* Resumen */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
             <ResumenCard icon={Clock} label="Horas" valor={totalHoras} color="blue" />
             <ResumenCard icon={CalendarClock} label="Días lab." valor={diasTrabajados} color="slate" />
             <ResumenCard icon={Plane} label="Vacaciones" valor={diasVac} color="amber" />
             <ResumenCard icon={HeartPulse} label="Incap./perm." valor={diasInc + diasPer} color="rose" />
           </div>
 
+          {/* Detalle del día seleccionado / hoy */}
+          {diaDetalle && (
+            <DetalleDia
+              anio={anio}
+              mes={mes}
+              dia={diaDetalle}
+              celda={fila.asignaciones[diaDetalle - 1] ?? ""}
+              esHoy={diaDetalle === diaHoy}
+            />
+          )}
+
+          {/* Calendario */}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 sm:p-3">
+            {/* Cabecera de días de la semana */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1 sm:mb-1.5">
+              {SEMANA.map((d, i) => (
+                <div
+                  key={d}
+                  className={`text-center text-[10px] sm:text-xs font-semibold uppercase tracking-wide py-1 ${
+                    i === 0 || i === 6 ? "text-rose-500 dark:text-rose-400" : "text-slate-400 dark:text-slate-500"
+                  }`}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Celdas */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+              {celdas.map((dia, idx) => {
+                if (dia === null) return <div key={`x-${idx}`} className="aspect-square sm:aspect-auto sm:min-h-[78px]" />;
+                const dow = (primerDow + dia - 1) % 7;
+                return (
+                  <CalendarCell
+                    key={dia}
+                    dia={dia}
+                    finde={dow === 0 || dow === 6}
+                    celda={fila.asignaciones[dia - 1] ?? ""}
+                    esHoy={dia === diaHoy}
+                    seleccionado={dia === diaSel}
+                    onClick={() => setDiaSel(dia === diaSel ? null : dia)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
           {/* Leyenda */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3 text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-[11px] text-slate-500 dark:text-slate-400">
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500/80" /> Turno</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Vacaciones</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-rose-400" /> Incapacidad</span>
@@ -111,28 +171,174 @@ export default function MiHorarioPage() {
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" /> Asueto</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-slate-300 dark:border-slate-600" /> Descanso</span>
           </div>
-
-          {/* Días — fluyen en columnas para aprovechar el ancho */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2">
-            {dias.map((dia) => {
-              const celda = fila.asignaciones[dia - 1] ?? "";
-              const dow = new Date(anio, mes - 1, dia).getDay();
-              const finde = dow === 0 || dow === 6;
-              const esHoy = dia === diaHoy;
-              return (
-                <DiaRow
-                  key={dia}
-                  dia={dia}
-                  dow={dow}
-                  celda={celda}
-                  finde={finde}
-                  esHoy={esHoy}
-                />
-              );
-            })}
-          </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ── Estilos de celda por tipo de asignación ──────────────────────────────────
+function tipoCelda(celda: string): "trabajo" | "VAC" | "INC" | "PER" | "ASU" | "descanso" {
+  const v = celda.trim().toUpperCase();
+  if (!v) return "descanso";
+  if (getHorario(v)) return "trabajo";
+  if (v === "VAC" || v === "INC" || v === "PER" || v === "ASU") return v;
+  return "trabajo";
+}
+
+const ESTILO_CELDA: Record<ReturnType<typeof tipoCelda>, { cell: string; code: string }> = {
+  trabajo: {
+    cell: "bg-blue-50 border-blue-200/70 dark:bg-[var(--color-institutional-navy)]/45 dark:border-[#c9a892]/20",
+    code: "text-[#1c1e4d] dark:text-[#c9a892]",
+  },
+  VAC: {
+    cell: "bg-amber-50 border-amber-200 dark:bg-amber-950/45 dark:border-amber-900/50",
+    code: "text-amber-700 dark:text-amber-300",
+  },
+  INC: {
+    cell: "bg-rose-50 border-rose-200 dark:bg-rose-950/45 dark:border-rose-900/50",
+    code: "text-rose-700 dark:text-rose-300",
+  },
+  PER: {
+    cell: "bg-slate-100 border-slate-200 dark:bg-slate-800/70 dark:border-slate-700",
+    code: "text-slate-600 dark:text-slate-300",
+  },
+  ASU: {
+    cell: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/45 dark:border-emerald-900/50",
+    code: "text-emerald-700 dark:text-emerald-300",
+  },
+  descanso: {
+    cell: "bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-800",
+    code: "text-slate-300 dark:text-slate-600",
+  },
+};
+
+function CalendarCell({
+  dia,
+  finde,
+  celda,
+  esHoy,
+  seleccionado,
+  onClick,
+}: {
+  dia: number;
+  finde: boolean;
+  celda: string;
+  esHoy: boolean;
+  seleccionado: boolean;
+  onClick: () => void;
+}) {
+  const tipo = tipoCelda(celda);
+  const estilo = ESTILO_CELDA[tipo];
+  const horario = getHorario(celda);
+  const valor = celda.trim().toUpperCase();
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center justify-center text-center rounded-lg border transition-all
+        aspect-square sm:aspect-auto sm:min-h-[78px] lg:min-h-[92px] p-0.5 sm:p-1.5
+        ${estilo.cell}
+        ${seleccionado ? "ring-2 ring-[#1c1e4d] dark:ring-[#c9a892]" : esHoy ? "ring-2 ring-blue-400 dark:ring-blue-500" : "hover:brightness-95 dark:hover:brightness-110"}`}
+    >
+      {/* Número del día */}
+      <span
+        className={`absolute top-0.5 left-1 text-[9px] sm:text-[11px] font-semibold tabular-nums leading-none
+          ${esHoy ? "text-blue-600 dark:text-blue-300" : finde ? "text-rose-400 dark:text-rose-400/80" : "text-slate-400 dark:text-slate-500"}`}
+      >
+        {dia}
+      </span>
+
+      {/* Contenido */}
+      {tipo === "descanso" ? (
+        <Sun size={13} className="text-slate-300 dark:text-slate-700 mt-1.5" />
+      ) : (
+        <div className="mt-2 sm:mt-1 flex flex-col items-center leading-tight">
+          <span className={`text-[10px] sm:text-sm font-bold tabular-nums ${estilo.code}`}>{valor}</span>
+          {horario && (
+            <span className="hidden sm:block text-[9px] lg:text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+              {horario.entrada}
+              <span className="hidden lg:inline"> – {horario.salida}</span>
+            </span>
+          )}
+        </div>
+      )}
+    </button>
+  );
+}
+
+function DetalleDia({
+  anio,
+  mes,
+  dia,
+  celda,
+  esHoy,
+}: {
+  anio: number;
+  mes: number;
+  dia: number;
+  celda: string;
+  esHoy: boolean;
+}) {
+  const dow = new Date(anio, mes - 1, dia).getDay();
+  const horario = getHorario(celda);
+  const marca = esMarcaEspecial(celda);
+  const descanso = !celda.trim();
+  const valor = celda.trim().toUpperCase();
+
+  return (
+    <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            {esHoy ? "Hoy" : "Día seleccionado"}
+          </p>
+          <p className="text-base font-bold text-slate-900 dark:text-white">
+            {SEMANA_LARGA[dow]} {dia} de {MESES[mes - 1]}
+          </p>
+        </div>
+        {(horario || marca) && (
+          <span className={`shrink-0 rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums ${
+            horario
+              ? "bg-blue-100 text-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] dark:text-[#c9a892]"
+              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+          }`}>
+            {valor}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3">
+        {horario ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
+              <LogIn size={15} className="text-blue-600 dark:text-blue-300" /> {horario.entrada}
+              <span className="text-slate-300 dark:text-slate-600">→</span>
+              <LogOut size={15} className="text-amber-600 dark:text-amber-400" /> {horario.salida}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{horario.horas} h · {horario.tipo}</span>
+          </div>
+        ) : marca ? (
+          <div className="flex items-center gap-2">
+            {valor === "VAC" ? (
+              <Plane size={16} className="text-amber-500" />
+            ) : valor === "INC" ? (
+              <HeartPulse size={16} className="text-rose-500" />
+            ) : valor === "ASU" ? (
+              <Star size={16} className="text-emerald-500" />
+            ) : (
+              <FileText size={16} className="text-slate-500" />
+            )}
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{labelMarca(celda)}</span>
+          </div>
+        ) : descanso ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400 dark:text-slate-500">
+            <Sun size={16} /> Día de descanso
+          </div>
+        ) : (
+          <span className="text-sm text-slate-600 dark:text-slate-300">{describirCelda(celda)}</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -161,88 +367,6 @@ function ResumenCard({
       </div>
       <p className="mt-2 text-lg font-bold text-slate-900 dark:text-white tabular-nums leading-none">{valor}</p>
       <p className="text-[11px] text-slate-500 dark:text-slate-400">{label}</p>
-    </div>
-  );
-}
-
-function DiaRow({
-  dia,
-  dow,
-  celda,
-  finde,
-  esHoy,
-}: {
-  dia: number;
-  dow: number;
-  celda: string;
-  finde: boolean;
-  esHoy: boolean;
-}) {
-  const horario = getHorario(celda);
-  const marca = esMarcaEspecial(celda);
-  const descanso = !celda.trim();
-
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-        esHoy
-          ? "border-blue-400 dark:border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 ring-1 ring-blue-200 dark:ring-blue-800"
-          : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
-      }`}
-    >
-      {/* Fecha */}
-      <div className={`flex w-11 flex-col items-center justify-center rounded-lg py-1 ${finde ? "bg-slate-100 dark:bg-slate-800" : "bg-slate-50 dark:bg-slate-800/50"}`}>
-        <span className="text-base font-bold leading-none text-slate-900 dark:text-white tabular-nums">{dia}</span>
-        <span className={`text-[10px] uppercase ${finde ? "text-rose-500 dark:text-rose-400" : "text-slate-400"}`}>
-          {DIAS_LARGOS[dow].slice(0, 3)}
-        </span>
-      </div>
-
-      {/* Contenido */}
-      <div className="flex-1 min-w-0">
-        {horario ? (
-          <>
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
-              <LogIn size={13} className="text-blue-600 dark:text-blue-300" /> {horario.entrada}
-              <span className="text-slate-300 dark:text-slate-600">→</span>
-              <LogOut size={13} className="text-amber-600 dark:text-amber-400" /> {horario.salida}
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {celda.trim().toUpperCase()} · {horario.horas} h · {horario.tipo}
-            </p>
-          </>
-        ) : marca ? (
-          <div className="flex items-center gap-2">
-            {celda.trim().toUpperCase() === "VAC" ? (
-              <Plane size={15} className="text-amber-500" />
-            ) : celda.trim().toUpperCase() === "INC" ? (
-              <HeartPulse size={15} className="text-rose-500" />
-            ) : celda.trim().toUpperCase() === "ASU" ? (
-              <Star size={15} className="text-emerald-500" />
-            ) : (
-              <FileText size={15} className="text-slate-500" />
-            )}
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{labelMarca(celda)}</span>
-          </div>
-        ) : descanso ? (
-          <div className="flex items-center gap-2 text-sm text-slate-400 dark:text-slate-500">
-            <Sun size={15} /> Descanso
-          </div>
-        ) : (
-          <span className="text-sm text-slate-600 dark:text-slate-300">{describirCelda(celda)}</span>
-        )}
-      </div>
-
-      {/* Código grande a la derecha */}
-      {(horario || marca) && (
-        <span className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold tabular-nums ${
-          horario
-            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-200"
-            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-        }`}>
-          {celda.trim().toUpperCase()}
-        </span>
-      )}
     </div>
   );
 }
