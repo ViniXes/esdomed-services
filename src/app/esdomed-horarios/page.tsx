@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarClock, CalendarDays, ArrowRight, Clock } from "lucide-react";
+import { CalendarClock, CalendarDays, ArrowRight, Clock, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { labelPeriodo, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
 
@@ -23,7 +23,7 @@ export default function EsdomedHorariosInicio() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           href="/esdomed-horarios/mi-horario"
           className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 transition-all hover:border-blue-300 dark:hover:border-[#c9a892]/50 hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-none"
@@ -37,6 +37,22 @@ export default function EsdomedHorariosInicio() {
           </p>
           <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#1c1e4d] dark:text-[#c9a892]">
             Ver {labelPeriodo(PERIODO_ACTUAL)} <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </Link>
+
+        <Link
+          href="/esdomed-horarios/mi-grupo"
+          className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 transition-all hover:border-blue-300 dark:hover:border-[#c9a892]/50 hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-none"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] dark:text-[#c9a892]">
+            <UsersRound size={22} />
+          </div>
+          <h2 className="mt-4 text-base font-bold text-slate-900 dark:text-white">Mi grupo</h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Mira a los compañeros de tu grupo y los turnos de todos en el mes.
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#1c1e4d] dark:text-[#c9a892]">
+            Ver mi grupo <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
           </span>
         </Link>
 
