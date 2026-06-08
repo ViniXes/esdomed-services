@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh";
+export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh";
 export type TipoMedicoCuidadosCriticos = "uci" | "ucin";
 
 export interface UserProfile {
@@ -10,6 +10,8 @@ export interface UserProfile {
   servicios?: string[]; // solo médicos — multi-servicio (campo nuevo)
   tipoMedico?: TipoMedicoCuidadosCriticos; // médicos de cuidados críticos
   jvpm?: string;        // solo médicos — sello/firma
+  codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
+  puesto?: string;          // solo personal ESDOMED — cargo que aparece en el plan (ej. "TECNICO EN ...")
   createdAt: Date;
 }
 
@@ -749,4 +751,42 @@ export interface Licencia {
   actualizadoPorNombre?: string;
 
   observaciones?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLANES DE TRABAJO ESDOMED (horarios mensuales)
+//
+// El asistente administrativo de ESDOMED arma un plan por mes: a cada empleado
+// le asigna un código de horario (ver src/lib/esdomed/horarios.ts) por cada día
+// del mes. El PDF resultante se presenta a RH con el formato oficial del Excel.
+// Los empleados con rol esdomed consultan su propia fila en "Mi horario".
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Una fila del plan = un empleado y sus asignaciones día por día.
+export interface FilaPlanTrabajo {
+  uid?: string;            // uid del usuario si está vinculado (para "Mi horario")
+  codigoMarcacion: string; // "C-043" — llave que vincula con el usuario
+  nombre: string;          // NOMBRE COMPLETO (snapshot)
+  puesto: string;          // PUESTO (snapshot)
+  // Asignación por día del mes. Índice 0 = día 1. Valor: código de horario
+  // ("MA2", "TH34"), marca especial ("VAC"|"INC"|"PER") o "" (descanso).
+  asignaciones: string[];
+  observaciones?: string;  // nota libre por persona (columna final del Excel)
+}
+
+export interface PlanTrabajo {
+  id?: string;             // == periodo, ej. "2026-06"
+  periodo: string;         // "YYYY-MM"
+  anio: number;
+  mes: number;             // 1-12
+  numeroHoras?: string;    // texto libre del encabezado, ej. "168 Administrativo / 168 operativo"
+  filas: FilaPlanTrabajo[];
+
+  // Trazabilidad
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
 }

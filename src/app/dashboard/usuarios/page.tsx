@@ -18,6 +18,8 @@ interface NuevoUsuario {
   tipoMedico: TipoMedicoCuidadosCriticos | "";
   servicios: string[];
   jvpm: string;
+  codigoMarcacion: string;
+  puesto: string;
 }
 
 type EditableUsuario = Omit<NuevoUsuario, "password">;
@@ -31,12 +33,15 @@ const EMPTY_FORM: NuevoUsuario = {
   tipoMedico: "",
   servicios: [],
   jvpm: "",
+  codigoMarcacion: "",
+  puesto: "",
 };
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 const roleColors: Record<UserRole, string> = {
   esdomed: "bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-900",
+  asistente_esdomed: "bg-fuchsia-50 dark:bg-fuchsia-950 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-900",
   trabajo_social: "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900",
   medico: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900",
   psicologia: "bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-900",
@@ -47,6 +52,7 @@ const roleColors: Record<UserRole, string> = {
 
 const roleLabels: Record<UserRole, string> = {
   esdomed: "ESDOMED",
+  asistente_esdomed: "Asistente Admin. ESDOMED",
   trabajo_social: "Trabajo Social",
   medico: "Medico",
   psicologia: "Psicologia",
@@ -58,6 +64,7 @@ const roleLabels: Record<UserRole, string> = {
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: "medico", label: "Medico" },
   { value: "esdomed", label: "Personal ESDOMED" },
+  { value: "asistente_esdomed", label: "Asistente Administrativo ESDOMED" },
   { value: "trabajo_social", label: "Trabajo Social" },
   { value: "psicologia", label: "Psicologia" },
   { value: "enfermeria", label: "Enfermeria" },
@@ -81,8 +88,17 @@ export default function DashboardUsuariosPage() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editForm, setEditForm] = useState<EditableUsuario | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  // Catálogo de códigos de marcación (nombre → código) para autocompletar.
+  const [marcacion, setMarcacion] = useState<{ nombre: string; codigo: string }[]>([]);
 
   const getToken = async () => (await user?.getIdToken()) ?? "";
+
+  useEffect(() => {
+    fetch("/esdomed/marcacion.json")
+      .then(r => (r.ok ? r.json() : []))
+      .then(setMarcacion)
+      .catch(() => setMarcacion([]));
+  }, []);
 
   const fetchUsuarios = async () => {
     const token = await getToken();
@@ -194,6 +210,8 @@ export default function DashboardUsuariosPage() {
       tipoMedico: u.tipoMedico ?? "",
       servicios: serviciosActuales,
       jvpm: u.jvpm ?? "",
+      codigoMarcacion: u.codigoMarcacion ?? "",
+      puesto: u.puesto ?? "",
     });
     setEditServiciosOpen(false);
     setError("");
@@ -353,6 +371,42 @@ export default function DashboardUsuariosPage() {
                 </div>
               </>
             )}
+
+            {(form.userRole === "esdomed" || form.userRole === "asistente_esdomed") && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Código de marcación</label>
+                  <input
+                    type="text"
+                    list="marcacion-codigos"
+                    value={form.codigoMarcacion}
+                    onChange={e => {
+                      const v = e.target.value;
+                      const match = marcacion.find(m => m.codigo === v);
+                      setForm(prev => ({
+                        ...prev,
+                        codigoMarcacion: v,
+                        // Si el código coincide con el catálogo y aún no hay nombre, lo autocompleta.
+                        nombre: match && !prev.nombre.trim() ? match.nombre : prev.nombre,
+                      }));
+                    }}
+                    placeholder="Ej: C-043"
+                    className={inputCls}
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">Vincula a esta persona con su fila en el plan de horarios.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Puesto</label>
+                  <input
+                    type="text"
+                    value={form.puesto}
+                    onChange={setField("puesto")}
+                    placeholder="Ej: TÉCNICO EN ESTADÍSTICA Y DOCUMENTOS MÉDICOS"
+                    className={inputCls}
+                  />
+                </div>
+              </>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>}
           <button type="submit" disabled={saving}
@@ -499,6 +553,32 @@ export default function DashboardUsuariosPage() {
                   </div>
                 </>
               )}
+
+              {(editForm.userRole === "esdomed" || editForm.userRole === "asistente_esdomed") && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Código de marcación</label>
+                    <input
+                      type="text"
+                      list="marcacion-codigos"
+                      value={editForm.codigoMarcacion}
+                      onChange={setEditField("codigoMarcacion")}
+                      placeholder="Ej: C-043"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Puesto</label>
+                    <input
+                      type="text"
+                      value={editForm.puesto}
+                      onChange={setEditField("puesto")}
+                      placeholder="Ej: TÉCNICO EN ESTADÍSTICA Y DOCUMENTOS MÉDICOS"
+                      className={inputCls}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-2 pt-1">
@@ -514,6 +594,13 @@ export default function DashboardUsuariosPage() {
           </form>
         </div>
       )}
+
+      {/* Catálogo de códigos de marcación para autocompletar (compartido). */}
+      <datalist id="marcacion-codigos">
+        {marcacion.map(m => (
+          <option key={m.codigo} value={m.codigo}>{m.nombre}</option>
+        ))}
+      </datalist>
     </div>
   );
 }

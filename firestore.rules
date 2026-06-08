@@ -13,6 +13,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.role;
     }
     function isEsdomed()      { return isAuth() && getRole() == 'esdomed'; }
+    function isAsistenteEsdomed() { return isAuth() && getRole() == 'asistente_esdomed'; }
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
@@ -308,6 +309,16 @@ service cloud.firestore {
       allow create: if isRrhh() || isAdmin();
       allow update: if isRrhh() || isAdmin();
       allow delete: if isRrhh() || isAdmin();
+    }
+
+    // Planes de trabajo (horarios mensuales) de ESDOMED. No son datos sensibles
+    // del personal: cualquier miembro de ESDOMED puede consultar su horario; solo
+    // el asistente administrativo y admin pueden crear/editar el plan.
+    match /planes_trabajo/{periodo} {
+      allow read:   if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      allow create: if isAsistenteEsdomed() || isAdmin();
+      allow update: if isAsistenteEsdomed() || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ─── Configuración global ────────────────────────────────────────────────

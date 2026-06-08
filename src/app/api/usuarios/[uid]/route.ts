@@ -8,12 +8,17 @@ const DEFAULT_TEST_PASSWORD = "123456";
 const VALID_ROLES = new Set<UserRole>([
   "medico",
   "esdomed",
+  "asistente_esdomed",
   "trabajo_social",
   "psicologia",
   "admin",
   "enfermeria",
   "rrhh",
 ]);
+
+function esPersonalEsdomed(role: string | undefined) {
+  return role === "esdomed" || role === "asistente_esdomed";
+}
 
 async function getCaller(req: NextRequest): Promise<{ uid: string; role: string } | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
@@ -101,6 +106,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
   if ("jvpm" in body || nextRole) {
     const jvpm = String(body.jvpm ?? "").trim();
     update.jvpm = targetRole === "medico" && jvpm ? jvpm : FieldValue.delete();
+  }
+
+  if ("codigoMarcacion" in body || nextRole) {
+    const codigo = String(body.codigoMarcacion ?? "").trim();
+    update.codigoMarcacion = esPersonalEsdomed(targetRole) && codigo ? codigo : FieldValue.delete();
+  }
+
+  if ("puesto" in body || nextRole) {
+    const puesto = String(body.puesto ?? "").trim();
+    update.puesto = esPersonalEsdomed(targetRole) && puesto ? puesto : FieldValue.delete();
   }
 
   if (Object.keys(update).length === 0) {

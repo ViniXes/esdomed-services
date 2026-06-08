@@ -110,7 +110,7 @@ export default function NuevoEmpleadoPage() {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Código de Plaza <span className="text-red-500">*</span></label>
+              <label className={labelCls}>Código de empleado <span className="text-red-500">*</span></label>
               <input type="text" value={codigo} onChange={e => setCodigo(e.target.value)} required placeholder="Ej. A-002" className={inputCls} />
             </div>
             <div>

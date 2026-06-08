@@ -7,12 +7,18 @@ import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 const VALID_ROLES = new Set<UserRole>([
   "medico",
   "esdomed",
+  "asistente_esdomed",
   "trabajo_social",
   "psicologia",
   "admin",
   "enfermeria",
   "rrhh",
 ]);
+
+// Roles del personal ESDOMED que llevan código de marcación y puesto en el plan.
+function esPersonalEsdomed(role: UserRole) {
+  return role === "esdomed" || role === "asistente_esdomed";
+}
 
 async function getCallerRole(req: NextRequest): Promise<string | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
   const role = await getCallerRole(req);
   if (!isSuperAdmin(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico } = await req.json();
+  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, codigoMarcacion, puesto } = await req.json();
 
   if (!nombre || !email || !password || !userRole) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -64,6 +70,8 @@ export async function POST(req: NextRequest) {
     ? serviciosPorTipoMedico(tipoMedicoValido)
     : Array.isArray(servicios) ? servicios.map(String) : [];
 
+  const esEsdomed = esPersonalEsdomed(userRole as UserRole);
+
   await adminDb.collection("usuarios").doc(userRecord.uid).set({
     nombre,
     email,
@@ -72,6 +80,8 @@ export async function POST(req: NextRequest) {
     servicio: serviciosArr[0] ?? "",
     ...(tipoMedicoValido ? { tipoMedico: tipoMedicoValido } : {}),
     ...(userRole === "medico" && jvpm ? { jvpm } : {}),
+    ...(esEsdomed && codigoMarcacion ? { codigoMarcacion: String(codigoMarcacion).trim() } : {}),
+    ...(esEsdomed && puesto ? { puesto: String(puesto).trim() } : {}),
     createdAt: FieldValue.serverTimestamp(),
   });
 

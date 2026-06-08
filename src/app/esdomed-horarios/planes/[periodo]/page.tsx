@@ -1,0 +1,356 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import type { FilaPlanTrabajo, PlanTrabajo, UserProfile } from "@/types";
+import {
+  contarMarca,
+  esMarcaEspecial,
+  getHorario,
+  totalHorasFila,
+} from "@/lib/esdomed/horarios";
+import {
+  diasDelMesArray,
+  inicialesDeMes,
+  labelPeriodo,
+  parsePeriodo,
+  formatPeriodo,
+  sincronizarFilas,
+} from "@/lib/esdomed/plan";
+import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Printer,
+  RefreshCw,
+  Save,
+  Users,
+} from "lucide-react";
+
+type RosterUser = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;
+
+export default function EditorPlanPage() {
+  const params = useParams();
+  const periodo = String(params.periodo);
+  const { anio, mes } = parsePeriodo(periodo);
+  const { profile } = useAuth();
+
+  const dias = useMemo(() => diasDelMesArray(anio, mes), [anio, mes]);
+  const iniciales = useMemo(() => inicialesDeMes(anio, mes), [anio, mes]);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [filas, setFilas] = useState<FilaPlanTrabajo[]>([]);
+  const [numeroHoras, setNumeroHoras] = useState("");
+  const [creadoMeta, setCreadoMeta] = useState<Pick<PlanTrabajo, "creadoEn" | "creadoPorId" | "creadoPorNombre"> | null>(null);
+  const [roster, setRoster] = useState<RosterUser[]>([]);
+  const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
+  const [mensaje, setMensaje] = useState<string>("");
+
+  const cargarRoster = useCallback(async (): Promise<RosterUser[]> => {
+    const snap = await getDocs(
+      query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed"])),
+    );
+    const lista = snap.docs
+      .map((d) => {
+        const data = d.data();
+        return {
+          uid: d.id,
+          nombre: data.nombre ?? "",
+          codigoMarcacion: data.codigoMarcacion ?? "",
+          puesto: data.puesto ?? "",
+        } as RosterUser;
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    setRoster(lista);
+    return lista;
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [snap, lista] = await Promise.all([getDoc(doc(db, "planes_trabajo", periodo)), cargarRoster()]);
+        if (snap.exists()) {
+          const plan = snap.data() as PlanTrabajo;
+          setNumeroHoras(plan.numeroHoras ?? "");
+          setCreadoMeta({
+            creadoEn: plan.creadoEn,
+            creadoPorId: plan.creadoPorId,
+            creadoPorNombre: plan.creadoPorNombre,
+          });
+          // Mezcla con el roster para incluir personal nuevo, conservando lo guardado.
+          setFilas(sincronizarFilas(lista, plan.filas ?? [], dias.length));
+        } else {
+          setCreadoMeta(null);
+          setFilas(sincronizarFilas(lista, [], dias.length));
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodo]);
+
+  const setCelda = (filaIdx: number, diaIdx: number, valor: string) => {
+    setFilas((prev) =>
+      prev.map((f, i) =>
+        i === filaIdx
+          ? { ...f, asignaciones: f.asignaciones.map((c, j) => (j === diaIdx ? valor : c)) }
+          : f,
+      ),
+    );
+    setGuardado(false);
+  };
+
+  const sincronizar = async () => {
+    const lista = await cargarRoster();
+    setFilas((prev) => sincronizarFilas(lista, prev, dias.length));
+    setMensaje("Roster actualizado con los usuarios ESDOMED.");
+    setGuardado(false);
+  };
+
+  const copiarMesAnterior = async () => {
+    const prevPeriodo = formatPeriodo(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
+    const snap = await getDoc(doc(db, "planes_trabajo", prevPeriodo));
+    if (!snap.exists()) {
+      setMensaje(`No hay plan guardado para ${labelPeriodo(prevPeriodo)}.`);
+      return;
+    }
+    const prevPlan = snap.data() as PlanTrabajo;
+    // Copia patrón: empareja por uid o código y rellena los días de este mes.
+    setFilas((prev) =>
+      prev.map((f) => {
+        const origen =
+          prevPlan.filas.find((pf) => pf.uid && pf.uid === f.uid) ||
+          prevPlan.filas.find((pf) => pf.codigoMarcacion && pf.codigoMarcacion === f.codigoMarcacion);
+        if (!origen) return f;
+        return {
+          ...f,
+          asignaciones: dias.map((_, j) => origen.asignaciones[j] ?? ""),
+          observaciones: origen.observaciones ?? f.observaciones,
+        };
+      }),
+    );
+    if (!numeroHoras && prevPlan.numeroHoras) setNumeroHoras(prevPlan.numeroHoras);
+    setMensaje(`Patrón copiado desde ${labelPeriodo(prevPeriodo)}.`);
+    setGuardado(false);
+  };
+
+  const guardar = async () => {
+    if (!profile) return;
+    setSaving(true);
+    try {
+      const ahora = new Date();
+      const payload: PlanTrabajo = {
+        periodo,
+        anio,
+        mes,
+        numeroHoras: numeroHoras.trim(),
+        filas: filas.map((f) => ({
+          uid: f.uid,
+          codigoMarcacion: f.codigoMarcacion ?? "",
+          nombre: f.nombre,
+          puesto: f.puesto ?? "",
+          asignaciones: f.asignaciones,
+          observaciones: f.observaciones ?? "",
+        })),
+        creadoEn: creadoMeta?.creadoEn ?? ahora,
+        creadoPorId: creadoMeta?.creadoPorId ?? profile.uid,
+        creadoPorNombre: creadoMeta?.creadoPorNombre ?? profile.nombre,
+        actualizadoEn: ahora,
+        actualizadoPorId: profile.uid,
+        actualizadoPorNombre: profile.nombre,
+      };
+      // Firestore no acepta `undefined`; uid puede faltar en filas sin usuario.
+      payload.filas = payload.filas.map((f) => (f.uid ? f : { ...f, uid: "" }));
+      await setDoc(doc(db, "planes_trabajo", periodo), payload);
+      if (!creadoMeta) {
+        setCreadoMeta({ creadoEn: ahora, creadoPorId: profile.uid, creadoPorNombre: profile.nombre });
+      }
+      setGuardado(true);
+      setMensaje("Plan guardado correctamente.");
+    } catch (e) {
+      setMensaje("Error al guardar: " + (e instanceof Error ? e.message : "desconocido"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!mensaje) return;
+    const t = setTimeout(() => setMensaje(""), 4000);
+    return () => clearTimeout(t);
+  }, [mensaje]);
+
+  const filaActiva = picker ? filas[picker.filaIdx] : null;
+
+  return (
+    <div className="px-3 sm:px-5 py-5">
+      {/* Encabezado + acciones */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <Link href="/esdomed-horarios/planes" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+            <ArrowLeft size={13} /> Planes
+          </Link>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading">
+            {labelPeriodo(periodo)}
+          </h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={sincronizar} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <RefreshCw size={14} /> Sincronizar
+          </button>
+          <button onClick={copiarMesAnterior} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <Copy size={14} /> Copiar mes anterior
+          </button>
+          <Link href={`/esdomed-horarios/planes/${periodo}/imprimir`} target="_blank" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <Printer size={14} /> Imprimir / PDF
+          </Link>
+          <button
+            onClick={guardar}
+            disabled={saving}
+            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white transition-colors active:scale-[0.98] disabled:opacity-50 ${
+              guardado ? "bg-emerald-600" : "bg-fuchsia-600 hover:bg-fuchsia-500"
+            }`}
+          >
+            {guardado ? <Check size={15} /> : <Save size={15} />}
+            {saving ? "Guardando..." : guardado ? "Guardado" : "Guardar"}
+          </button>
+        </div>
+      </div>
+
+      {/* Número de horas (encabezado del formato) */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Número de horas:</label>
+        <input
+          value={numeroHoras}
+          onChange={(e) => { setNumeroHoras(e.target.value); setGuardado(false); }}
+          placeholder="Ej: 168 Administrativo / 168 operativo"
+          className="flex-1 min-w-[200px] max-w-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+        />
+      </div>
+
+      {mensaje && (
+        <div className="mb-3 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium px-3 py-2 inline-block">
+          {mensaje}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filas.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 px-6 py-12 text-center">
+          <Users size={28} className="mx-auto text-slate-400" />
+          <p className="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">No hay personal ESDOMED registrado</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Crea usuarios con rol ESDOMED o Asistente Administrativo ESDOMED (con su código de marcación) y luego pulsa “Sincronizar”.
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="mb-2 text-[11px] text-slate-400">
+            Toca una celda para asignar un código de horario, vacaciones, incapacidad/permiso o descanso.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <table className="border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60">
+                  <th className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 min-w-[170px] border-r border-slate-200 dark:border-slate-700">
+                    Personal
+                  </th>
+                  {dias.map((d, i) => {
+                    const finde = iniciales[i] === "S" || iniciales[i] === "D";
+                    return (
+                      <th key={d} className={`px-0 py-1 text-center font-semibold w-9 ${finde ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500" : "text-slate-500 dark:text-slate-400"}`}>
+                        <div className="text-[9px] leading-none">{iniciales[i]}</div>
+                        <div className="text-[11px] tabular-nums">{d}</div>
+                      </th>
+                    );
+                  })}
+                  <th className="px-2 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 border-l border-slate-200 dark:border-slate-700">Hrs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map((fila, filaIdx) => {
+                  const total = totalHorasFila(fila.asignaciones);
+                  const vac = contarMarca(fila.asignaciones, "VAC");
+                  return (
+                    <tr key={fila.uid || fila.codigoMarcacion || filaIdx} className="border-t border-slate-100 dark:border-slate-800">
+                      <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-2 py-1.5 border-r border-slate-200 dark:border-slate-700 min-w-[170px] max-w-[170px]">
+                        <p className="text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight truncate" title={fila.nombre}>{fila.nombre}</p>
+                        <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>
+                          {fila.codigoMarcacion ? <span className="font-medium text-fuchsia-600 dark:text-fuchsia-400">{fila.codigoMarcacion}</span> : <span className="text-amber-500">sin código</span>}
+                          {fila.puesto ? ` · ${fila.puesto}` : ""}
+                        </p>
+                      </td>
+                      {dias.map((d, diaIdx) => {
+                        const celda = (fila.asignaciones[diaIdx] ?? "").trim();
+                        const finde = iniciales[diaIdx] === "S" || iniciales[diaIdx] === "D";
+                        return (
+                          <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
+                            <button
+                              onClick={() => setPicker({ filaIdx, diaIdx })}
+                              className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors ${colorCelda(celda)}`}
+                            >
+                              {celda.toUpperCase()}
+                            </button>
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-1.5 text-center border-l border-slate-200 dark:border-slate-700">
+                        <span className="text-[12px] font-bold tabular-nums text-slate-700 dark:text-slate-200">{total}</span>
+                        {vac > 0 && <span className="block text-[9px] text-amber-500">{vac} vac</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {picker && filaActiva && (
+        <CeldaPicker
+          titulo={filaActiva.nombre}
+          subtitulo={`${labelPeriodo(periodo)} · Día ${picker.diaIdx + 1} (${iniciales[picker.diaIdx]})`}
+          valorActual={filaActiva.asignaciones[picker.diaIdx] ?? ""}
+          onSelect={(codigo) => {
+            setCelda(picker.filaIdx, picker.diaIdx, codigo);
+            setPicker(null);
+          }}
+          onClose={() => setPicker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function colorCelda(celda: string): string {
+  const v = celda.trim().toUpperCase();
+  if (!v) return "text-slate-300 dark:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800";
+  if (getHorario(v)) return "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/60";
+  if (esMarcaEspecial(v)) {
+    if (v === "VAC") return "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300";
+    if (v === "INC") return "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300";
+    return "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300";
+  }
+  return "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300";
+}
