@@ -71,7 +71,8 @@
       "Bash(node *)",
       "Bash(git stash *)",
       "Bash(npx next *)",
-      "Bash(echo \"EXIT $?\")"
+      "Bash(echo \"EXIT $?\")",
+      "Bash(echo \"BUILD_EXIT=$?\")"
     ]
   }
 }

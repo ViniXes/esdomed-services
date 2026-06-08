@@ -32,7 +32,7 @@ export default function ImprimirPlanPage({ params }: { params: Promise<{ periodo
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#c9a892] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -57,7 +57,7 @@ export default function ImprimirPlanPage({ params }: { params: Promise<{ periodo
           <p className="text-xs text-slate-500">Rol de turnos · {labelPeriodo(periodo)}</p>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 bg-[#1c1e4d] hover:bg-[#262a66] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
           >
             <Printer size={14} /> Imprimir / Guardar PDF
           </button>

@@ -63,7 +63,7 @@ export default function MiHorarioPage() {
       {/* Encabezado */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
-          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892]">
             <CalendarClock size={13} /> Mi horario
           </div>
           <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading">
@@ -97,7 +97,7 @@ export default function MiHorarioPage() {
           {/* Resumen */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6">
             <ResumenCard icon={Clock} label="Horas" valor={totalHoras} color="blue" />
-            <ResumenCard icon={CalendarClock} label="Días lab." valor={diasTrabajados} color="emerald" />
+            <ResumenCard icon={CalendarClock} label="Días lab." valor={diasTrabajados} color="slate" />
             <ResumenCard icon={Plane} label="Vacaciones" valor={diasVac} color="amber" />
             <ResumenCard icon={HeartPulse} label="Incap./perm." valor={diasInc + diasPer} color="rose" />
           </div>
@@ -136,11 +136,11 @@ function ResumenCard({
   icon: typeof Clock;
   label: string;
   valor: number;
-  color: "blue" | "emerald" | "amber" | "rose";
+  color: "blue" | "slate" | "amber" | "rose";
 }) {
   const colors = {
-    blue: "text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60",
-    emerald: "text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60",
+    blue: "text-[#1c1e4d] dark:text-[#c9a892] bg-blue-50 dark:bg-[var(--color-institutional-navy)]",
+    slate: "text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800",
     amber: "text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60",
     rose: "text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60",
   }[color];
@@ -193,9 +193,9 @@ function DiaRow({
         {horario ? (
           <>
             <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white">
-              <LogIn size={13} className="text-emerald-500" /> {horario.entrada}
+              <LogIn size={13} className="text-blue-600 dark:text-blue-300" /> {horario.entrada}
               <span className="text-slate-300 dark:text-slate-600">→</span>
-              <LogOut size={13} className="text-rose-500" /> {horario.salida}
+              <LogOut size={13} className="text-amber-600 dark:text-amber-400" /> {horario.salida}
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               {celda.trim().toUpperCase()} · {horario.horas} h · {horario.tipo}
@@ -208,7 +208,7 @@ function DiaRow({
             ) : celda.trim().toUpperCase() === "INC" ? (
               <HeartPulse size={15} className="text-rose-500" />
             ) : (
-              <FileText size={15} className="text-violet-500" />
+              <FileText size={15} className="text-slate-500" />
             )}
             <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{labelMarca(celda)}</span>
           </div>

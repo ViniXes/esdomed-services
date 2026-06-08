@@ -95,7 +95,7 @@ export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose 
               value={buscar}
               onChange={(e) => setBuscar(e.target.value)}
               placeholder="Buscar código u hora (ej. TH34, 7:00)"
-              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#c9a892]"
             />
           </div>
         </div>
@@ -114,18 +114,18 @@ export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose 
                     onClick={() => onSelect(h.codigo)}
                     className={`flex items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
                       activo
-                        ? "bg-fuchsia-600 text-white"
+                        ? "bg-[#1c1e4d] text-white dark:bg-[var(--color-institutional-navy)] dark:ring-1 dark:ring-[#c9a892]/40"
                         : "hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
-                    <span className={`shrink-0 w-14 text-xs font-bold tabular-nums ${activo ? "text-white" : "text-fuchsia-600 dark:text-fuchsia-400"}`}>
+                    <span className={`shrink-0 w-14 text-xs font-bold tabular-nums ${activo ? "text-[#c9a892]" : "text-[#1c1e4d] dark:text-[#c9a892]"}`}>
                       {h.codigo}
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className={`block text-xs font-medium ${activo ? "text-white" : "text-slate-700 dark:text-slate-200"}`}>
                         {h.entrada} – {h.salida}
                       </span>
-                      <span className={`block text-[10px] ${activo ? "text-fuchsia-100" : "text-slate-400"}`}>
+                      <span className={`block text-[10px] ${activo ? "text-slate-300" : "text-slate-400"}`}>
                         {h.horas} h · {h.tipo}
                       </span>
                     </span>

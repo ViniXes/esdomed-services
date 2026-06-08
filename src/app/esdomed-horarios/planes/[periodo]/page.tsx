@@ -225,7 +225,9 @@ export default function EditorPlanPage() {
             onClick={guardar}
             disabled={saving}
             className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white transition-colors active:scale-[0.98] disabled:opacity-50 ${
-              guardado ? "bg-emerald-600" : "bg-fuchsia-600 hover:bg-fuchsia-500"
+              guardado
+                ? "bg-emerald-600"
+                : "bg-blue-600 hover:bg-blue-500 dark:bg-[var(--color-institutional-navy)] dark:hover:bg-blue-800 dark:ring-1 dark:ring-[#c9a892]/35"
             }`}
           >
             {guardado ? <Check size={15} /> : <Save size={15} />}
@@ -241,7 +243,7 @@ export default function EditorPlanPage() {
           value={numeroHoras}
           onChange={(e) => { setNumeroHoras(e.target.value); setGuardado(false); }}
           placeholder="Ej: 168 Administrativo / 168 operativo"
-          className="flex-1 min-w-[200px] max-w-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+          className="flex-1 min-w-[200px] max-w-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#c9a892]"
         />
       </div>
 
@@ -253,7 +255,7 @@ export default function EditorPlanPage() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[#c9a892] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filas.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 px-6 py-12 text-center">
@@ -296,7 +298,7 @@ export default function EditorPlanPage() {
                       <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-2 py-1.5 border-r border-slate-200 dark:border-slate-700 min-w-[170px] max-w-[170px]">
                         <p className="text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight truncate" title={fila.nombre}>{fila.nombre}</p>
                         <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>
-                          {fila.codigoMarcacion ? <span className="font-medium text-fuchsia-600 dark:text-fuchsia-400">{fila.codigoMarcacion}</span> : <span className="text-amber-500">sin código</span>}
+                          {fila.codigoMarcacion ? <span className="font-medium text-[#1c1e4d] dark:text-[#c9a892]">{fila.codigoMarcacion}</span> : <span className="text-amber-600 dark:text-amber-400">sin código</span>}
                           {fila.puesto ? ` · ${fila.puesto}` : ""}
                         </p>
                       </td>
@@ -350,7 +352,8 @@ function colorCelda(celda: string): string {
   if (esMarcaEspecial(v)) {
     if (v === "VAC") return "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300";
     if (v === "INC") return "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300";
-    return "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-950 dark:text-violet-300";
+    // PER (permiso) — tono neutro de la paleta institucional (charcoal).
+    return "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-[var(--color-institutional-charcoal)] dark:text-slate-200";
   }
   return "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300";
 }

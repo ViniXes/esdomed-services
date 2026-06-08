@@ -27,7 +27,7 @@ export default function PlanesPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
       <div className="mb-6">
-        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-fuchsia-700 dark:text-fuchsia-300">
+        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
           <CalendarDays size={13} /> Planes de trabajo
         </div>
         <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading">
@@ -45,7 +45,7 @@ export default function PlanesPage() {
           <select
             value={nuevoPeriodo}
             onChange={(e) => setNuevoPeriodo(e.target.value)}
-            className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+            className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#c9a892]"
           >
             {periodosDisponibles.map((p) => (
               <option key={p} value={p}>{labelPeriodo(p)}</option>
@@ -53,7 +53,7 @@ export default function PlanesPage() {
           </select>
           <button
             onClick={() => router.push(`/esdomed-horarios/planes/${nuevoPeriodo}`)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors active:scale-[0.98]"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors active:scale-[0.98] dark:bg-[var(--color-institutional-navy)] dark:hover:bg-blue-800 dark:ring-1 dark:ring-[#c9a892]/35"
           >
             <Plus size={16} /> Abrir
           </button>
@@ -64,7 +64,7 @@ export default function PlanesPage() {
       <p className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Meses guardados</p>
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : planes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
@@ -76,9 +76,9 @@ export default function PlanesPage() {
             <Link
               key={plan.id}
               href={`/esdomed-horarios/planes/${plan.periodo}`}
-              className="group flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3.5 transition-all hover:border-fuchsia-300 dark:hover:border-fuchsia-700 hover:shadow-sm"
+              className="group flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3.5 transition-all hover:border-amber-300 dark:hover:border-[#c9a892]/50 hover:shadow-sm"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-50 dark:bg-fuchsia-950 text-fuchsia-600 dark:text-fuchsia-300">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
                 <CalendarDays size={20} />
               </div>
               <div className="flex-1 min-w-0">
