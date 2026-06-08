@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -28,6 +28,9 @@ import {
   parsePeriodo,
   formatPeriodo,
   sincronizarFilas,
+  GRUPOS_ESDOMED,
+  COLOR_GRUPO,
+  ordenGrupo,
 } from "@/lib/esdomed/plan";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
 import {
@@ -117,6 +120,11 @@ export default function EditorPlanPage() {
     setGuardado(false);
   };
 
+  const setGrupo = (filaIdx: number, grupo: string) => {
+    setFilas((prev) => prev.map((f, i) => (i === filaIdx ? { ...f, grupo } : f)));
+    setGuardado(false);
+  };
+
   const sincronizar = async () => {
     const lista = await cargarRoster();
     setFilas((prev) => sincronizarFilas(lista, prev, dias.length));
@@ -166,6 +174,7 @@ export default function EditorPlanPage() {
           codigoMarcacion: f.codigoMarcacion ?? "",
           nombre: f.nombre,
           puesto: f.puesto ?? "",
+          grupo: f.grupo ?? "",
           asignaciones: f.asignaciones,
           observaciones: f.observaciones ?? "",
         })),
@@ -198,6 +207,20 @@ export default function EditorPlanPage() {
   }, [mensaje]);
 
   const filaActiva = picker ? filas[picker.filaIdx] : null;
+
+  // Filas ordenadas por grupo y nombre, conservando el índice original (para editar).
+  const filasOrdenadas = useMemo(
+    () =>
+      filas
+        .map((f, i) => ({ f, i }))
+        .sort(
+          (a, b) =>
+            ordenGrupo(a.f.grupo) - ordenGrupo(b.f.grupo) ||
+            a.f.nombre.localeCompare(b.f.nombre),
+        ),
+    [filas],
+  );
+  const colSpanTotal = dias.length + 2; // Personal + días + Hrs
 
   return (
     <div className="px-3 sm:px-5 py-5">
@@ -290,39 +313,72 @@ export default function EditorPlanPage() {
                 </tr>
               </thead>
               <tbody>
-                {filas.map((fila, filaIdx) => {
-                  const total = totalHorasFila(fila.asignaciones);
-                  const vac = contarMarca(fila.asignaciones, "VAC");
-                  return (
-                    <tr key={fila.uid || fila.codigoMarcacion || filaIdx} className="border-t border-slate-100 dark:border-slate-800">
-                      <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-2 py-1.5 border-r border-slate-200 dark:border-slate-700 min-w-[170px] max-w-[170px]">
-                        <p className="text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight truncate" title={fila.nombre}>{fila.nombre}</p>
-                        <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>
-                          {fila.codigoMarcacion ? <span className="font-medium text-[#1c1e4d] dark:text-[#c9a892]">{fila.codigoMarcacion}</span> : <span className="text-amber-600 dark:text-amber-400">sin código</span>}
-                          {fila.puesto ? ` · ${fila.puesto}` : ""}
-                        </p>
-                      </td>
-                      {dias.map((d, diaIdx) => {
-                        const celda = (fila.asignaciones[diaIdx] ?? "").trim();
-                        const finde = iniciales[diaIdx] === "S" || iniciales[diaIdx] === "D";
-                        return (
-                          <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
-                            <button
-                              onClick={() => setPicker({ filaIdx, diaIdx })}
-                              className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors ${colorCelda(celda)}`}
+                {(() => {
+                  let grupoPrev: string | null = "__init__";
+                  return filasOrdenadas.map(({ f: fila, i: filaIdx }) => {
+                    const total = totalHorasFila(fila.asignaciones);
+                    const vac = contarMarca(fila.asignaciones, "VAC");
+                    const grupoActual = fila.grupo?.trim() || "";
+                    const mostrarHeader = grupoActual !== grupoPrev;
+                    grupoPrev = grupoActual;
+                    const estiloGrupo = grupoActual ? COLOR_GRUPO[grupoActual] : null;
+
+                    return (
+                      <Fragment key={fila.uid || fila.codigoMarcacion || filaIdx}>
+                        {mostrarHeader && (
+                          <tr>
+                            <td colSpan={colSpanTotal} className={`px-0 py-0 border-t border-slate-200 dark:border-slate-700 ${estiloGrupo ? estiloGrupo.barra : "bg-slate-100 dark:bg-slate-800/80"}`}>
+                              <span className="sticky left-0 inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold uppercase tracking-wide">
+                                {estiloGrupo && <span className={`h-2 w-2 rounded-full ${estiloGrupo.dot}`} />}
+                                {grupoActual || "Sin grupo asignado"}
+                              </span>
+                            </td>
+                          </tr>
+                        )}
+                        <tr className="border-t border-slate-100 dark:border-slate-800">
+                          <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-2 py-1.5 border-r border-slate-200 dark:border-slate-700 min-w-[190px] max-w-[190px]">
+                            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight">
+                              {estiloGrupo && <span className={`h-2 w-2 shrink-0 rounded-full ${estiloGrupo.dot}`} />}
+                              <span className="truncate" title={fila.nombre}>{fila.nombre}</span>
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>
+                              {fila.codigoMarcacion ? <span className="font-medium text-[#1c1e4d] dark:text-[#c9a892]">{fila.codigoMarcacion}</span> : <span className="text-amber-600 dark:text-amber-400">sin código</span>}
+                              {fila.puesto ? ` · ${fila.puesto}` : ""}
+                            </p>
+                            <select
+                              value={grupoActual}
+                              onChange={(e) => setGrupo(filaIdx, e.target.value)}
+                              className="mt-1 w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-1.5 py-1 text-[10px] text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#c9a892]"
                             >
-                              {celda.toUpperCase()}
-                            </button>
+                              <option value="">— Sin grupo —</option>
+                              {GRUPOS_ESDOMED.map((g) => (
+                                <option key={g} value={g}>{g}</option>
+                              ))}
+                            </select>
                           </td>
-                        );
-                      })}
-                      <td className="px-2 py-1.5 text-center border-l border-slate-200 dark:border-slate-700">
-                        <span className="text-[12px] font-bold tabular-nums text-slate-700 dark:text-slate-200">{total}</span>
-                        {vac > 0 && <span className="block text-[9px] text-amber-500">{vac} vac</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
+                          {dias.map((d, diaIdx) => {
+                            const celda = (fila.asignaciones[diaIdx] ?? "").trim();
+                            const finde = iniciales[diaIdx] === "S" || iniciales[diaIdx] === "D";
+                            return (
+                              <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
+                                <button
+                                  onClick={() => setPicker({ filaIdx, diaIdx })}
+                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors ${colorCelda(celda)}`}
+                                >
+                                  {celda.toUpperCase()}
+                                </button>
+                              </td>
+                            );
+                          })}
+                          <td className="px-2 py-1.5 text-center border-l border-slate-200 dark:border-slate-700">
+                            <span className="text-[12px] font-bold tabular-nums text-slate-700 dark:text-slate-200">{total}</span>
+                            {vac > 0 && <span className="block text-[9px] text-amber-500">{vac} vac</span>}
+                          </td>
+                        </tr>
+                      </Fragment>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>

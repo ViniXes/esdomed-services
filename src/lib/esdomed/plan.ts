@@ -2,6 +2,65 @@ import type { FilaPlanTrabajo, PlanTrabajo, UserProfile } from "@/types";
 
 // Helpers de calendario y armado de planes de trabajo ESDOMED.
 
+// ── Grupos de trabajo ────────────────────────────────────────────────────────
+// Cada empleado se asigna a un grupo dentro del mes (puede variar mes a mes).
+export const GRUPOS_ESDOMED = [
+  "Administrativo",
+  "Grupo 1",
+  "Grupo 2",
+  "Grupo 3",
+  "Grupo 4",
+  "Equipo de emergencia",
+] as const;
+
+export type GrupoEsdomed = (typeof GRUPOS_ESDOMED)[number];
+
+// Estilos por grupo para badges/encabezados (colores distintos para identificar).
+export const COLOR_GRUPO: Record<string, { badge: string; dot: string; barra: string; corto: string }> = {
+  "Administrativo": {
+    badge: "bg-[#1c1e4d]/10 text-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] dark:text-[#c9a892]",
+    dot: "bg-[#1c1e4d] dark:bg-[#c9a892]",
+    barra: "bg-[#1c1e4d]/10 text-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] dark:text-[#c9a892]",
+    corto: "Adm",
+  },
+  "Grupo 1": {
+    badge: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    dot: "bg-blue-500",
+    barra: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
+    corto: "G1",
+  },
+  "Grupo 2": {
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    dot: "bg-amber-500",
+    barra: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
+    corto: "G2",
+  },
+  "Grupo 3": {
+    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    dot: "bg-emerald-500",
+    barra: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
+    corto: "G3",
+  },
+  "Grupo 4": {
+    badge: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+    dot: "bg-teal-500",
+    barra: "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300",
+    corto: "G4",
+  },
+  "Equipo de emergencia": {
+    badge: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+    dot: "bg-rose-500",
+    barra: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
+    corto: "Emerg.",
+  },
+};
+
+/** Orden de un grupo para ordenar filas (los sin grupo van al final). */
+export function ordenGrupo(grupo: string | undefined | null): number {
+  const i = GRUPOS_ESDOMED.indexOf((grupo ?? "") as GrupoEsdomed);
+  return i === -1 ? 99 : i;
+}
+
 export const NOMBRES_MES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",

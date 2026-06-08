@@ -20,6 +20,7 @@ import {
   parsePeriodo,
   periodosCercanos,
   PERIODO_ACTUAL,
+  COLOR_GRUPO,
 } from "@/lib/esdomed/plan";
 import { CalendarClock, Clock, LogIn, LogOut, Sun, Plane, HeartPulse, FileText, Star } from "lucide-react";
 
@@ -86,6 +87,12 @@ export default function MiHorarioPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Código de marcación · {profile.codigoMarcacion}
             </p>
+          )}
+          {fila?.grupo && COLOR_GRUPO[fila.grupo] && (
+            <span className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${COLOR_GRUPO[fila.grupo].badge}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${COLOR_GRUPO[fila.grupo].dot}`} />
+              {fila.grupo}
+            </span>
           )}
         </div>
         <select
