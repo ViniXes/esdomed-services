@@ -9,7 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  ArrowLeft, Search, AlertTriangle, Save, CheckCircle2, User2, ShieldAlert, Ban,
+  ArrowLeft, Search, AlertTriangle, Save, CheckCircle2, User2, ShieldAlert, Ban, X,
 } from "lucide-react";
 import type { DiagnosticoCIE, Empleado, Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
@@ -51,8 +51,10 @@ export default function NuevaLicenciaPage() {
   const [justificacion, setJustificacion] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
+  type ModalState = { type: "success"; empleadoNombre: string; empleadoCodigo: string; categoria: string } | { type: "error"; message: string } | null;
+
   const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
 
   const buscarEmpleado = async (codigoArg?: string) => {
     const code = (codigoArg ?? codigoBusqueda).trim().toUpperCase();
@@ -117,20 +119,20 @@ export default function NuevaLicenciaPage() {
 
   const guardar = async () => {
     if (!user || !profile || !empleado || !evaluacion) return;
-    setError(null);
+    setModal(null);
 
     if (bloqueoGenero) {
-      setError(`La licencia de ${meta.label.toLowerCase()} solo aplica a empleados de género femenino.`);
+      setModal({ type: "error", message: `La licencia de ${meta.label.toLowerCase()} solo aplica a empleados de género femenino.` });
       return;
     }
     if (periodoInvalido) {
-      setError(esPorHoras ? "La hora final debe ser posterior a la inicial." : "La fecha final no puede ser anterior a la inicial.");
+      setModal({ type: "error", message: esPorHoras ? "La hora final debe ser posterior a la inicial." : "La fecha final no puede ser anterior a la inicial." });
       return;
     }
-    if (evaluacion.cantidad <= 0) { setError("El periodo debe ser mayor a cero."); return; }
-    if (meta.medica && !diagnostico.descripcion.trim()) { setError("El diagnóstico es obligatorio para licencias médicas."); return; }
-    if (evaluacion.bloqueado) { setError(evaluacion.mensaje ?? "No se puede registrar: supera el tope legal."); return; }
-    if (evaluacion.requiereJustificacion && !justificacion.trim()) { setError("Indica una justificación: esta licencia excede el tope con goce."); return; }
+    if (evaluacion.cantidad <= 0) { setModal({ type: "error", message: "El periodo debe ser mayor a cero." }); return; }
+    if (meta.medica && !diagnostico.descripcion.trim()) { setModal({ type: "error", message: "El diagnóstico es obligatorio para licencias médicas." }); return; }
+    if (evaluacion.bloqueado) { setModal({ type: "error", message: evaluacion.mensaje ?? "No se puede registrar: supera el tope legal." }); return; }
+    if (evaluacion.requiereJustificacion && !justificacion.trim()) { setModal({ type: "error", message: "Indica una justificación: esta licencia excede el tope con goce." }); return; }
 
     setGuardando(true);
     try {
@@ -166,9 +168,10 @@ export default function NuevaLicenciaPage() {
       if (observaciones.trim()) data.observaciones = observaciones.trim();
 
       await addDoc(collection(db, "licencias"), data);
-      router.push(`/rrhh/empleados/${encodeURIComponent(empleado.codigo)}`);
+      setModal({ type: "success", empleadoNombre: empleado.nombre, empleadoCodigo: empleado.codigo, categoria: CATEGORIAS[categoria].label });
     } catch (e) {
-      setError(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);
+      setModal({ type: "error", message: `Error al guardar: ${e instanceof Error ? e.message : "desconocido"}` });
+    } finally {
       setGuardando(false);
     }
   };
@@ -327,11 +330,6 @@ export default function NuevaLicenciaPage() {
       {/* Footer */}
       {empleado && (
         <div>
-          {error && (
-            <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400 mb-3">
-              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" /><span>{error}</span>
-            </div>
-          )}
           <button
             onClick={guardar}
             disabled={guardando || !!evaluacion?.bloqueado || periodoInvalido || bloqueoGenero}
@@ -339,6 +337,57 @@ export default function NuevaLicenciaPage() {
           >
             <Save size={15} /> {guardando ? "Guardando…" : "Registrar licencia"}
           </button>
+        </div>
+      )}
+
+      {/* Modal de resultado */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center text-center gap-4">
+            {modal.type === "success" ? (
+              <>
+                <div className="w-14 h-14 bg-green-50 dark:bg-green-500/10 rounded-full flex items-center justify-center border border-green-200 dark:border-green-500/30">
+                  <CheckCircle2 size={28} className="text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-base font-bold text-slate-900 dark:text-slate-100">Licencia registrada</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    La licencia de <span className="font-semibold text-slate-700 dark:text-slate-300">{modal.categoria}</span> para{" "}
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{modal.empleadoNombre}</span>{" "}
+                    fue registrada correctamente.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push(`/rrhh/empleados/${encodeURIComponent(modal.empleadoCodigo)}`)}
+                  className="w-full py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Aceptar
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-14 h-14 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center border border-red-200 dark:border-red-500/30">
+                  <AlertTriangle size={28} className="text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <p className="text-base font-bold text-slate-900 dark:text-slate-100">Error al registrar</p>
+                  <p className="text-sm text-slate-500 mt-1">{modal.message}</p>
+                </div>
+                <button
+                  onClick={() => setModal(null)}
+                  className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Cerrar
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => modal.type === "error" ? setModal(null) : router.push(`/rrhh/empleados/${encodeURIComponent(modal.empleadoCodigo)}`)}
+              className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
       )}
     </div>
