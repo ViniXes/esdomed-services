@@ -60,7 +60,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
   }
 
-  const userRecord = await adminAuth.createUser({ email, password, displayName: nombre });
+  // Si el correo ya está registrado, Firebase Auth lanza auth/email-already-exists.
+  // Lo devolvemos como 409 con un código que el cliente usa para abrir el modal.
+  let userRecord;
+  try {
+    userRecord = await adminAuth.createUser({ email, password, displayName: nombre });
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === "auth/email-already-exists") {
+      return NextResponse.json(
+        { error: `Ya existe un usuario con el correo ${email}`, code: "email-already-exists" },
+        { status: 409 },
+      );
+    }
+    if (code === "auth/invalid-email") {
+      return NextResponse.json({ error: "El correo electronico no es valido" }, { status: 400 });
+    }
+    if (code === "auth/invalid-password") {
+      return NextResponse.json({ error: "La contrasena debe tener al menos 6 caracteres" }, { status: 400 });
+    }
+    throw err;
+  }
 
   const tipoMedicoValido: TipoMedicoCuidadosCriticos | undefined =
     userRole === "medico" && (tipoMedico === "uci" || tipoMedico === "ucin")

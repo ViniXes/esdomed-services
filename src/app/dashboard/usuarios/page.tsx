@@ -83,6 +83,8 @@ export default function DashboardUsuariosPage() {
   const [form, setForm] = useState<NuevoUsuario>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Mensaje del modal de "usuario ya existe" (null = cerrado).
+  const [duplicadoMsg, setDuplicadoMsg] = useState<string | null>(null);
   const [deletingUid, setDeletingUid] = useState<string | null>(null);
   const [resettingUid, setResettingUid] = useState<string | null>(null);
   const [serviciosOpen, setServiciosOpen] = useState(false);
@@ -166,7 +168,15 @@ export default function DashboardUsuariosPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al crear usuario");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // El correo ya está registrado: lo mostramos en un modal en vez de texto rojo.
+        if (res.status === 409 && data.code === "email-already-exists") {
+          setDuplicadoMsg(data.error ?? `Ya existe un usuario con el correo ${form.email}`);
+          return;
+        }
+        throw new Error(data.error ?? "Error al crear usuario");
+      }
       setForm(EMPTY_FORM);
       setShowForm(false);
       setServiciosOpen(false);
@@ -687,6 +697,26 @@ export default function DashboardUsuariosPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Modal: el correo ya pertenece a un usuario existente. */}
+      {duplicadoMsg && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 flex items-center justify-center mb-4">
+              <Users size={20} className="text-amber-600 dark:text-amber-400" />
+            </div>
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 mb-1.5">El usuario ya existe</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{duplicadoMsg}</p>
+            <button
+              type="button"
+              onClick={() => setDuplicadoMsg(null)}
+              className="w-full py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
         </div>
       )}
 
