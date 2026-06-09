@@ -16,6 +16,8 @@ export default function DashboardImpresionesPage() {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
+  // Texto libre "entregado a" por solicitud, mientras está pendiente.
+  const [entregadoA, setEntregadoA] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const q = query(collection(db, "solicitudes_impresion"), orderBy("creadoEn", "desc"));
@@ -37,9 +39,11 @@ export default function DashboardImpresionesPage() {
   const marcarImpreso = async (id: string) => {
     if (!profile) return;
     setSaving(id);
+    const quien = (entregadoA[id] ?? "").trim();
     await updateDoc(doc(db, "solicitudes_impresion", id), {
       estado: "impreso", impresoPor: profile.uid,
       impresoPorNombre: profile.nombre, impresoEn: Timestamp.now(),
+      ...(quien ? { entregadoA: quien } : {}),
     });
     setSaving(null);
   };
@@ -127,8 +131,11 @@ export default function DashboardImpresionesPage() {
                 </div>
                 
                 {s.estado === "impreso" && s.impresoPorNombre && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-md border border-green-200 dark:border-green-800">
+                  <div className="mt-2 inline-flex flex-col gap-0.5 px-2.5 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-md border border-green-200 dark:border-green-800">
                     <p className="text-[11px] font-medium">Impreso por {s.impresoPorNombre} el {formatFecha(s.impresoEn)}</p>
+                    {s.entregadoA && (
+                      <p className="text-[11px] font-medium">Entregado a {s.entregadoA}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -152,10 +159,19 @@ export default function DashboardImpresionesPage() {
                 </div>
 
                 {s.estado === "pendiente" && (
-                  <button onClick={() => marcarImpreso(s.id!)} disabled={saving === s.id}
-                    className="w-full px-4 py-2 text-xs font-semibold text-white bg-green-700 rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors mt-1 shadow-sm">
-                    {saving === s.id ? "Procesando..." : "Marcar como impreso"}
-                  </button>
+                  <div className="w-full flex flex-col gap-1.5 mt-1">
+                    <input
+                      type="text"
+                      value={entregadoA[s.id!] ?? ""}
+                      onChange={e => setEntregadoA(prev => ({ ...prev, [s.id!]: e.target.value }))}
+                      placeholder="¿A quién se entregó? (opcional)"
+                      className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                    />
+                    <button onClick={() => marcarImpreso(s.id!)} disabled={saving === s.id}
+                      className="w-full px-4 py-2 text-xs font-semibold text-white bg-green-700 rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors shadow-sm">
+                      {saving === s.id ? "Procesando..." : "Marcar como impreso"}
+                    </button>
+                  </div>
                 )}
               </div>
 

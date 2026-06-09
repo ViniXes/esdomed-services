@@ -162,6 +162,7 @@ export interface SolicitudImpresion {
   impresoPor?: string;
   impresoPorNombre?: string;
   impresoEn?: Date;
+  entregadoA?: string; // Quién retiró la impresión (texto libre; puede no tener usuario, ej. internos)
 }
 
 // ============================================================================
