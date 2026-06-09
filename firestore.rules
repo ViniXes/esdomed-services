@@ -321,6 +321,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Registro de Altas (bitácora interna de egresos de ESDOMED) ───────────
+    // Control propio de ESDOMED para la digitación en SIMMOW. Solo ESDOMED/admin.
+    match /registro_altas/{id} {
+      allow read:   if isEsdomed() || isAdmin();
+      allow create: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isEsdomed() || isAdmin();
+    }
+
     // ─── Configuración global ────────────────────────────────────────────────
     // Servicios y camas: lectura pública (no es dato sensible), escritura solo admin.
     match /configuracion/{docId} {

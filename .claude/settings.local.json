@@ -72,7 +72,11 @@
       "Bash(git stash *)",
       "Bash(npx next *)",
       "Bash(echo \"EXIT $?\")",
-      "Bash(echo \"BUILD_EXIT=$?\")"
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "Bash(mkdir -p /tmp/xlsx)",
+      "Bash(unzip -o \"_ALTAS REGISTRO ESDO3_01-HNES-F.xlsx\" -d /tmp/xlsx)",
+      "Read(//tmp/xlsx/xl/**)",
+      "Bash(grep -i \"^xlsx$\\\\|^exceljs$\\\\|^read-excel\")"
     ]
   }
 }

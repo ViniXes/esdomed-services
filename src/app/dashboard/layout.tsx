@@ -14,6 +14,7 @@ import {
   History,
   Inbox,
   LayoutDashboard,
+  ListChecks,
   LogIn,
   Phone,
   Printer,
@@ -60,6 +61,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     profile?.role === "esdomed" ||
     profile?.role === "admin" ||
     profile?.role === "trabajo_social";
+  const verRegistroAltas = profile?.role === "esdomed" || profile?.role === "admin";
   const verConfiguracion = profile?.role === "admin";
   const verUsuarios = profile?.role === "admin";
   const verBusquedaTelefono = profile?.role === "admin";
@@ -130,6 +132,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       badge: pendientes.fallecidos,
       group: G_PACIENTES,
     },
+    ...(verRegistroAltas
+      ? [{ href: "/dashboard/registro-altas", label: "Registro de Altas", icon: ListChecks, group: G_PACIENTES }]
+      : []),
     ...(profile?.role === "trabajo_social"
       ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
       : []),
