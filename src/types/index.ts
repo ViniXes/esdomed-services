@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria";
+export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh";
 export type TipoMedicoCuidadosCriticos = "uci" | "ucin";
 
 export interface UserProfile {
@@ -10,6 +10,8 @@ export interface UserProfile {
   servicios?: string[]; // solo médicos — multi-servicio (campo nuevo)
   tipoMedico?: TipoMedicoCuidadosCriticos; // médicos de cuidados críticos
   jvpm?: string;        // solo médicos — sello/firma
+  codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
+  puesto?: string;          // solo personal ESDOMED — cargo que aparece en el plan (ej. "TECNICO EN ...")
   createdAt: Date;
 }
 
@@ -615,4 +617,177 @@ export interface Visita {
   registradoPorId: string;        // uid TS que creó el registro (compat. registros previos)
   registradoPorNombre: string;
   creadoEn: Date;
+}
+
+// ============================================================================
+// Recursos Humanos — Incapacidades y licencias del personal del hospital
+// ============================================================================
+// Sistema de gestión de licencias del personal acoplado a la Ley de Servicio
+// Civil. NO confundir con SolicitudIncapacidad (constancias médicas que los
+// médicos emiten a PACIENTES). Aquí el sujeto es el EMPLEADO del hospital.
+// Solo el rol "rrhh" (y "admin") usa este módulo. Las reglas legales (topes por
+// antigüedad, comportamiento al exceder) viven en src/lib/rrhh/.
+
+export type GeneroEmpleado = "masculino" | "femenino";
+
+// Padrón de empleados — espejo de la hoja CONSULTA (export del sistema de
+// gobierno). Se importa, NO se teclea a mano. La llave es el código de plaza.
+export interface Empleado {
+  id?: string;              // == codigo (id del documento en /empleados)
+
+  codigo: string;           // código de plaza, ej. "A-002" — llave estable
+  nombre: string;           // "NOMBRES APELLIDOS"
+  dui?: string;
+  nit?: string;
+  isss?: string;
+  nup?: string;
+  afp?: string;             // CONFIA | CRECER | ...
+  genero?: GeneroEmpleado;
+
+  cargo?: string;           // puesto funcional
+  departamento?: string;    // unidad organizativa (deuniorg)
+  fechaIngreso?: Date;      // feingreso — base para antigüedad
+
+  // Datos presupuestarios / contractuales (snapshot del padrón)
+  sueldoBasico?: number;
+  partidaPresupuestaria?: string;
+  unidadPresupuestaria?: string;
+  lineaTrabajo?: string;
+  codigoPresupuestario?: string;
+  estadoPlaza?: string;     // "Ocupada" | ...
+
+  email?: string;
+  celular?: string;
+
+  activo: boolean;          // false = plaza desocupada / empleado retirado
+
+  // Metadata de importación
+  importadoEn?: Date;
+  actualizadoEn?: Date;
+}
+
+// Bolsas de saldo (la lógica de topes vive en src/lib/rrhh/saldos.ts).
+// Cada bolsa se mide en su propia UNIDAD (días u horas):
+//  - incapacidad:       DÍAS · enfermedad/accidente — tope 15×años, máx 90 (con goce)
+//  - duelo_cuido:       DÍAS · duelo / cuido de pariente — tope 20
+//  - personal_congoce:  HORAS · permiso personal con goce — tope 40 h (= 5 días de 8 h)
+//  - permiso_singoce:   HORAS · permiso sin goce — tope 480 h (= 60 días de 8 h)
+//  - maternidad:        DÍAS · 112 días por evento (no es bolsa anual)
+//  - ninguna:           lactancia/decreto — no descuenta saldo (informativo)
+export type BolsaLicencia =
+  | "incapacidad"
+  | "duelo_cuido"
+  | "personal_congoce"
+  | "permiso_singoce"
+  | "maternidad"
+  | "ninguna";
+
+// Unidad en la que se mide y captura una licencia.
+//  - "dias":  rango de fechas (días totales, inclusivo).
+//  - "horas": un día con hora inicio→fin, en intervalos de 30 min.
+export type UnidadLicencia = "dias" | "horas";
+
+// Catálogo CERRADO de categorías (reemplaza el caos de texto libre del Excel).
+export type CategoriaLicencia =
+  | "enfermedad_comun"
+  | "enfermedad_profesional"
+  | "accidente_comun"
+  | "accidente_trabajo"
+  | "maternidad"
+  | "duelo"
+  | "cuido_pariente"
+  | "personal"
+  | "sin_goce"
+  | "lactancia"
+  | "decreto";
+
+export type TipoDocumentoLicencia = "resolucion" | "acuerdo";
+
+export interface Licencia {
+  id?: string;
+
+  // ── Empleado (referencia + snapshot al crear) ──
+  empleadoCodigo: string;
+  empleadoNombre: string;
+  empleadoCargo?: string;
+  empleadoDepartamento?: string;
+  empleadoGenero?: GeneroEmpleado;
+
+  // ── Clasificación ──
+  categoria: CategoriaLicencia;
+  bolsa: BolsaLicencia;            // derivada de la categoría (snapshot)
+  unidad: UnidadLicencia;         // "dias" | "horas" — según la bolsa
+  tipoDocumento: TipoDocumentoLicencia;
+  esProrroga: boolean;
+  conGoce: boolean;               // false = el documento completo es sin goce
+
+  // ── Diagnóstico (solo médicas) ──
+  diagnostico?: DiagnosticoCIE;
+
+  // ── Periodo ──
+  // Día-base: [fechaInicial, fechaFinal] como rango.
+  // Hora-base: fechaInicial = fechaFinal = el día; horaInicio/horaFin "HH:MM".
+  fechaInicial: Date;
+  fechaFinal: Date;
+  horaInicio?: string;            // "HH:MM" — solo licencias por horas
+  horaFin?: string;               // "HH:MM" — solo licencias por horas
+  cantidad: number;               // total en la unidad de la bolsa (días u horas)
+  anio: number;                   // año calendario de fechaInicial (para saldos)
+
+  // ── Desglose con/sin goce (cuando el exceso del tope se reclasifica) ──
+  cantidadConGoce: number;
+  cantidadSinGoce: number;
+
+  // ── Control de tope ──
+  excedeTope: boolean;            // true si superó el tope de su bolsa al emitirse
+  justificacion?: string;         // obligatoria cuando excedeTope
+
+  // ── Estado y trazabilidad ──
+  creadoEn: Date;
+  registradoPorId: string;        // uid RRHH
+  registradoPorNombre: string;
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
+
+  observaciones?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLANES DE TRABAJO ESDOMED (horarios mensuales)
+//
+// El asistente administrativo de ESDOMED arma un plan por mes: a cada empleado
+// le asigna un código de horario (ver src/lib/esdomed/horarios.ts) por cada día
+// del mes. El PDF resultante se presenta a RH con el formato oficial del Excel.
+// Los empleados con rol esdomed consultan su propia fila en "Mi horario".
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Una fila del plan = un empleado y sus asignaciones día por día.
+export interface FilaPlanTrabajo {
+  uid?: string;            // uid del usuario si está vinculado (para "Mi horario")
+  codigoMarcacion: string; // "C-043" — llave que vincula con el usuario
+  nombre: string;          // NOMBRE COMPLETO (snapshot)
+  puesto: string;          // PUESTO (snapshot)
+  grupo?: string;          // grupo del mes: Administrativo / Grupo 1-4 / Equipo de emergencia
+  // Asignación por día del mes. Índice 0 = día 1. Valor: código de horario
+  // ("MA2", "TH34"), marca especial ("VAC"|"INC"|"PER") o "" (descanso).
+  asignaciones: string[];
+  observaciones?: string;  // nota libre por persona (columna final del Excel)
+}
+
+export interface PlanTrabajo {
+  id?: string;             // == periodo, ej. "2026-06"
+  periodo: string;         // "YYYY-MM"
+  anio: number;
+  mes: number;             // 1-12
+  numeroHoras?: string;    // texto libre del encabezado, ej. "168 Administrativo / 168 operativo"
+  filas: FilaPlanTrabajo[];
+
+  // Trazabilidad
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
 }

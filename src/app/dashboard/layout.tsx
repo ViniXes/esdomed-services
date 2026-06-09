@@ -20,6 +20,7 @@ import {
   Settings,
   Users,
   DoorOpen,
+  CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -37,7 +38,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       (!profile ||
         profile.role === "medico" ||
         profile.role === "psicologia" ||
-        profile.role === "enfermeria")
+        profile.role === "enfermeria" ||
+        profile.role === "asistente_esdomed")
     ) {
       router.replace("/login");
     }
@@ -63,12 +65,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verBusquedaTelefono = profile?.role === "admin";
   const verCuidadosCriticos = profile?.role === "esdomed" || profile?.role === "admin";
   const verReportes = profile?.role === "esdomed" || profile?.role === "admin";
+  const verHorario = profile?.role === "esdomed" || profile?.role === "admin";
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
   const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
   const G_REPORTES = "Reportes";
+  const G_PERSONAL = "Mi área";
   const G_ADMIN = "Administración";
 
   const navItems: NavItem[] = [
@@ -147,6 +151,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     // ── Reportes ──
     ...(verReportes
       ? [{ href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES }]
+      : []),
+
+    // ── Mi área (horarios) ──
+    ...(verHorario
+      ? [{ href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL }]
       : []),
 
     // ── Administración ──

@@ -54,3 +54,9 @@ next-env.d.ts
 
 # presentaciones
 /presentacion
+
+# datos fuente con información sensible (PII de empleados/pacientes) — NUNCA commitear
+/recursoshumanos
+/trabajosocial
+
+/esdomed

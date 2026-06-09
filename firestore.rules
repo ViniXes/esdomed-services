@@ -13,11 +13,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.role;
     }
     function isEsdomed()      { return isAuth() && getRole() == 'esdomed'; }
+    function isAsistenteEsdomed() { return isAuth() && getRole() == 'asistente_esdomed'; }
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
+    function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
     function isMedicoCuidadosCriticos() {
       return isMedico()
         && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin'];
@@ -290,6 +292,32 @@ service cloud.firestore {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
       allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Recursos Humanos: empleados y licencias ──────────────────────────────
+    // Datos sensibles del personal (NIT, ISSS, salarios, incapacidades). Acceso
+    // EXCLUSIVO de RRHH y admin; ningún otro rol (médicos, ESDOMED, etc.) los ve.
+    match /empleados/{codigo} {
+      allow read:   if isRrhh() || isAdmin();
+      allow create: if isRrhh() || isAdmin();
+      allow update: if isRrhh() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /licencias/{id} {
+      allow read:   if isRrhh() || isAdmin();
+      allow create: if isRrhh() || isAdmin();
+      allow update: if isRrhh() || isAdmin();
+      allow delete: if isRrhh() || isAdmin();
+    }
+
+    // Planes de trabajo (horarios mensuales) de ESDOMED. No son datos sensibles
+    // del personal: cualquier miembro de ESDOMED puede consultar su horario; solo
+    // el asistente administrativo y admin pueden crear/editar el plan.
+    match /planes_trabajo/{periodo} {
+      allow read:   if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      allow create: if isAsistenteEsdomed() || isAdmin();
+      allow update: if isAsistenteEsdomed() || isAdmin();
       allow delete: if isAdmin();
     }
 
