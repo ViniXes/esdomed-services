@@ -14,9 +14,9 @@ import {
 import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, History, Plus, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
-import { valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, Paciente } from "@/types";
 
 const NUEVA_ESTANCIA = "nueva";
@@ -30,7 +30,7 @@ function toDate(value: unknown): Date | null {
 
 function fichaEgresada(ficha: FichaCuidadosCriticos) {
   return ficha.estadoEstancia === "egresada"
-    || Boolean(valorComoTexto(ficha.datos?.fecha_egreso_del_servicio))
+    || esValorRegistrado(ficha.datos?.fecha_egreso_del_servicio)
     || ficha.datos?.alta === "FALLECIDO";
 }
 
@@ -96,24 +96,31 @@ export default function CuidadosCriticosMedicoPage() {
 
   const guardarFicha = async (datos: DatosMatrizCuidadosCriticos) => {
     if (!user || !profile?.tipoMedico || !selected?.id) return;
-    if (!valorComoTexto(datos.fecha_ingreso_al_servicio)) {
+    if (!esValorRegistrado(datos.fecha_ingreso_al_servicio)) {
       const message = "Registra primero la FECHA INGRESO AL SERVICIO correspondiente a esta estancia UCI/UCIN.";
+      setError(message);
+      throw new Error(message);
+    }
+    const especialidad = valorComoTexto(datos.especialidad).trim();
+    if (!serviciosPorTipoMedico(profile.tipoMedico).includes(especialidad)) {
+      const message = "Selecciona una ESPECIALIDAD valida de las unidades asignadas a tu rol.";
       setError(message);
       throw new Error(message);
     }
 
     setSaving(true);
     setError("");
-    const estadoEstancia = valorComoTexto(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
+    const estadoEstancia = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
       ? "egresada"
       : "activa";
+    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, profile.tipoMedico);
 
     try {
       if (fichaSeleccionada?.id) {
         await updateDoc(doc(db, "fichas_cuidados_criticos", fichaSeleccionada.id), {
           estadoEstancia,
           cama: selected.camaActual ?? "",
-          datos,
+          datos: datosParaGuardar,
           actualizadoPorId: user.uid,
           actualizadoPorNombre: profile.nombre,
           actualizadoEn: serverTimestamp(),
@@ -127,7 +134,7 @@ export default function CuidadosCriticosMedicoPage() {
           pacienteNombre: `${selected.apellidos}, ${selected.nombres}`,
           servicio: selected.servicioActual,
           cama: selected.camaActual ?? "",
-          datos,
+          datos: datosParaGuardar,
           creadoPorId: user.uid,
           creadoPorNombre: profile.nombre,
           creadoEn: serverTimestamp(),

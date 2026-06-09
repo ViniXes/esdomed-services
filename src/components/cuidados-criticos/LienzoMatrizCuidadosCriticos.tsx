@@ -1,6 +1,6 @@
 "use client";
 
-import { camposMatrizPorTipo, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { camposMatrizPorTipo, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 interface Props {
@@ -30,7 +30,7 @@ export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas }: P
             <tr key={fila.id ?? index} className="bg-white dark:bg-slate-900">
               {campos.map(campo => (
                 <td key={campo.key} className="max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-300">
-                  <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valorCampo(fila, campo.key) || "—"}</span>
+                  <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valorCampo(fila, campo.key)}</span>
                 </td>
               ))}
             </tr>
@@ -54,5 +54,5 @@ function valorCampo(fila: FichaCuidadosCriticos, key: string) {
   if (key === "registro") return fila.pacienteExpediente;
   if (key === "nombres") return fila.pacienteNombre.split(",").slice(1).join(",").trim();
   if (key === "apellidos") return fila.pacienteNombre.split(",")[0]?.trim() ?? "";
-  return "";
+  return VALOR_NO_REGISTRADO;
 }

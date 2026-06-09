@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (loading || !profile) return;
+
+    if (profile.role === "medico") router.replace("/medico");
+    else if (profile.role === "psicologia") router.replace("/psicologia");
+    else if (profile.role === "enfermeria") router.replace("/enfermeria");
+    else if (profile.role === "rrhh") router.replace("/rrhh");
+    else if (profile.role === "asistente_esdomed") router.replace("/esdomed-horarios");
+    else router.replace("/dashboard");
+  }, [loading, profile, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,15 +36,6 @@ export default function LoginPage() {
       setSubmitting(false);
     }
   };
-
-  if (!loading && profile) {
-    if (profile.role === "medico") router.replace("/medico");
-    else if (profile.role === "psicologia") router.replace("/psicologia");
-    else if (profile.role === "enfermeria") router.replace("/enfermeria");
-    else if (profile.role === "rrhh") router.replace("/rrhh");
-    else if (profile.role === "asistente_esdomed") router.replace("/esdomed-horarios");
-    else router.replace("/dashboard");
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 px-4">
