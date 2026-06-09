@@ -1,6 +1,6 @@
 import type { Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
-export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select";
+export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "catalogoCritico";
 
 export interface CampoMatrizCuidadosCriticos {
   key: string;
@@ -20,6 +20,7 @@ export interface GrupoMatrizCuidadosCriticos {
 
 type ValorMatriz = string | number;
 export type DatosMatrizCuidadosCriticos = Record<string, ValorMatriz>;
+export const VALOR_NO_REGISTRADO = "No registrado";
 
 const CAMPOS_SI_NO = new Set([
   "REINGRESO ≤ 72 HORAS",
@@ -126,7 +127,9 @@ const CAMPOS_NUMERICOS = new Set([
   "GRADO DE ULCERA",
 ]);
 
-const CAMPOS_TEXTO_LARGO = new Set([
+const CAMPOS_TEXTO_LARGO = new Set<string>();
+
+const CAMPOS_DIAGNOSTICO_CIE10 = new Set<string>([
   "DIAGNOSTICOS DE INGRESO 1",
   "DIAGNOSTICOS DE INGRESO 2",
   "DIAGNOSTICOS DE INGRESO 3",
@@ -139,6 +142,34 @@ const CAMPOS_TEXTO_LARGO = new Set([
   "DIAGNOSTICO DE EGRESO 5",
 ]);
 
+const CAMPOS_CATALOGO_CRITICO = new Set<string>([
+  "PANEL 1",
+  "PANEL 2",
+  "PANEL 3",
+  "TIPO DE SHOCK",
+  "QUE TIPO DE AMINA",
+  "QUE TIPO DE AMINA 2",
+  "QUE TIPO DE SEDANTE 1",
+  "QUE TIPO DE SEDANTE 2",
+  "QUE TIPO DE OPIODE 1",
+  "QUE TIPO DE OPIODE 2",
+  "QUE TIPO DE RELAJANTE",
+  "TIPO DE ANTIBIOTICO 1",
+  "TIPO DE ANTIBIOTICO 2",
+  "TIPO DE ANTIBIOTICO 3",
+  "MICROORGANISMO (PANEL 1)",
+  "MICROORGANISMO (PANEL 2)",
+  "MICROORGANISMO (PANEL 3)",
+  "MICROORGANISMO 1",
+  "MICROORGANISMO 2",
+  "MICROORGANISMO 3",
+  "MICROORGANISMO 4",
+]);
+
+const ETIQUETAS_VISIBLES: Record<string, string> = {
+  REGISTRO: "Expediente clínico",
+};
+
 function slug(label: string) {
   return label
     .normalize("NFD")
@@ -149,6 +180,9 @@ function slug(label: string) {
 }
 
 function inferirTipo(label: string): Pick<CampoMatrizCuidadosCriticos, "tipo" | "opciones"> {
+  if (label === "ESPECIALIDAD") return { tipo: "servicioCritico" };
+  if (CAMPOS_DIAGNOSTICO_CIE10.has(label)) return { tipo: "cie10" };
+  if (CAMPOS_CATALOGO_CRITICO.has(label)) return { tipo: "catalogoCritico" };
   if (CAMPOS_SI_NO.has(label) || label.includes("MULTIRESISTENTE: SI/NO")) return { tipo: "yesno" };
   if (CAMPOS_NUMERICOS.has(label)) return { tipo: "number" };
   if (label.startsWith("FECHA")) return { tipo: "date" };
@@ -169,7 +203,7 @@ function construirCampos(labels: string[], solo?: TipoMedicoCuidadosCriticos): C
     const key = numero === 1 ? base : `${base}_${numero}`;
     return {
       key,
-      label,
+      label: ETIQUETAS_VISIBLES[label] ?? label,
       ...inferirTipo(label),
       solo,
       automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "SERVICIO PROVENIENTE", "DIAS EN SERVICIO", "MUERTE > 48 HORAS"].includes(label),
@@ -382,6 +416,11 @@ export function gruposMatrizPorTipo(tipo: TipoMedicoCuidadosCriticos) {
   }));
 }
 
+export function esValorRegistrado(value: unknown) {
+  const texto = valorComoTexto(value).trim();
+  return texto !== "" && texto !== VALOR_NO_REGISTRADO;
+}
+
 function fechaComoInput(value: unknown) {
   if (!value) return "";
   const date = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
@@ -434,9 +473,9 @@ function diferenciaDias(desde: string, hasta: string) {
 
 export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): DatosMatrizCuidadosCriticos {
   const resultado = { ...datos };
-  const ingreso = valorComoTexto(resultado.fecha_ingreso_al_servicio);
-  const egreso = valorComoTexto(resultado.fecha_egreso_del_servicio);
-  const muerte = valorComoTexto(resultado.fecha_de_muerte);
+  const ingreso = esValorRegistrado(resultado.fecha_ingreso_al_servicio) ? valorComoTexto(resultado.fecha_ingreso_al_servicio) : "";
+  const egreso = esValorRegistrado(resultado.fecha_egreso_del_servicio) ? valorComoTexto(resultado.fecha_egreso_del_servicio) : "";
+  const muerte = esValorRegistrado(resultado.fecha_de_muerte) ? valorComoTexto(resultado.fecha_de_muerte) : "";
 
   resultado.dias_en_servicio = ingreso && egreso ? diferenciaDias(ingreso, egreso) : "";
   if (ingreso && muerte) {
@@ -447,6 +486,15 @@ export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): Dato
     resultado.muerte_48_horas = "";
   }
 
+  return resultado;
+}
+
+export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCriticos, tipo: TipoMedicoCuidadosCriticos): DatosMatrizCuidadosCriticos {
+  const resultado = { ...datos };
+  for (const campo of camposMatrizPorTipo(tipo)) {
+    if (esValorRegistrado(resultado[campo.key])) continue;
+    resultado[campo.key] = campo.tipo === "number" ? 0 : VALOR_NO_REGISTRADO;
+  }
   return resultado;
 }
 
