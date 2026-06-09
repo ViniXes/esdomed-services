@@ -72,9 +72,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       procesadoPorId: caller.uid,
       procesadoPorNombre: caller.nombre,
       procesadoEn: FieldValue.serverTimestamp(),
-      modificadoPorId: caller.uid,
-      modificadoPorNombre: caller.nombre,
-      modificadoEn: FieldValue.serverTimestamp(),
     });
     return NextResponse.json({ ok: true });
   }
@@ -95,9 +92,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       observadoPorId: caller.uid,
       observadoPorNombre: caller.nombre,
       observadoEn: FieldValue.serverTimestamp(),
-      modificadoPorId: caller.uid,
-      modificadoPorNombre: caller.nombre,
-      modificadoEn: FieldValue.serverTimestamp(),
     });
     return NextResponse.json({ ok: true });
   }
@@ -110,9 +104,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       observadoPorId: FieldValue.delete(),
       observadoPorNombre: FieldValue.delete(),
       observadoEn: FieldValue.delete(),
-      modificadoPorId: caller.uid,
-      modificadoPorNombre: caller.nombre,
-      modificadoEn: FieldValue.serverTimestamp(),
     });
     return NextResponse.json({ ok: true });
   }
