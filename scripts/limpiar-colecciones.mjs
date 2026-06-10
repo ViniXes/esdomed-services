@@ -51,6 +51,8 @@ const COLECCIONES = [
   "recepciones",
   "empleados",
   "licencias",
+  "registro_altas",
+  "tramites_personal",
 ];
 
 async function main() {
