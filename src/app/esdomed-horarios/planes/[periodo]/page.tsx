@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -68,6 +68,18 @@ export default function EditorPlanPage() {
   const [prevPlanData, setPrevPlanData] = useState<PlanTrabajo | null>(null);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
+  const dragRef = useRef<{ filaIdx: number; valor: string; isDragging: boolean; cellsDragged: number } | null>(null);
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (dragRef.current) {
+        dragRef.current.isDragging = false;
+        setTimeout(() => { dragRef.current = null; }, 0);
+      }
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
 
   const cargarRoster = useCallback(async (): Promise<RosterUser[]> => {
     const snap = await getDocs(
@@ -407,8 +419,22 @@ export default function EditorPlanPage() {
                             return (
                               <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
                                 <button
-                                  onClick={() => setPicker({ filaIdx, diaIdx })}
-                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors ${colorCelda(celda)}`}
+                                  onMouseDown={() => {
+                                    dragRef.current = { filaIdx, valor: celda, isDragging: true, cellsDragged: 0 };
+                                  }}
+                                  onMouseEnter={() => {
+                                    if (dragRef.current && dragRef.current.isDragging && dragRef.current.filaIdx === filaIdx) {
+                                      dragRef.current.cellsDragged++;
+                                      if (!finde) {
+                                        setCelda(filaIdx, diaIdx, dragRef.current.valor);
+                                      }
+                                    }
+                                  }}
+                                  onClick={() => {
+                                    if (dragRef.current && dragRef.current.cellsDragged > 0) return;
+                                    setPicker({ filaIdx, diaIdx });
+                                  }}
+                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors ${colorCelda(celda)} cursor-cell hover:ring-2 hover:ring-blue-400 hover:z-10 relative`}
                                 >
                                   {celda.toUpperCase()}
                                 </button>
