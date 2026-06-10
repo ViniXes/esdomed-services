@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { Activity, FileSpreadsheet, ShieldCheck, Users } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { camposMatrizPorTipo, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
@@ -17,14 +18,20 @@ function toDate(value: unknown): Date | null {
 }
 
 export default function CuidadosCriticosDashboardPage() {
+  const { profile, loading } = useAuth();
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
-  useEffect(() => onSnapshot(collection(db, "fichas_cuidados_criticos"), snap => {
+  const puedeVer = profile?.role === "admin";
+
+  useEffect(() => {
+    if (!puedeVer) return;
+    return onSnapshot(collection(db, "fichas_cuidados_criticos"), snap => {
     const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
     docs.sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
     setFichas(docs);
-  }), []);
+    });
+  }, [puedeVer]);
 
   const fichasFiltradas = filtro === "todos" ? fichas : fichas.filter(ficha => ficha.tipoUnidad === filtro);
   const promedio = useMemo(() => {
@@ -36,6 +43,24 @@ export default function CuidadosCriticosDashboardPage() {
     }, 0);
     return Math.round(total / fichasFiltradas.length);
   }, [fichasFiltradas]);
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!puedeVer) {
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+          No tienes permisos para ver el consolidado UCI / UCIN.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-6">

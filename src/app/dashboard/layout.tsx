@@ -63,7 +63,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verConfiguracion = profile?.role === "admin";
   const verUsuarios = profile?.role === "admin";
   const verBusquedaTelefono = profile?.role === "admin";
-  const verCuidadosCriticos = profile?.role === "esdomed" || profile?.role === "admin";
+  const verCuidadosCriticos = profile?.role === "admin";
   const verReportes = profile?.role === "esdomed" || profile?.role === "admin";
   const verHorario = profile?.role === "esdomed" || profile?.role === "admin";
 

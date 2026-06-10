@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, Info, Save, Search, Table2, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
@@ -50,16 +50,23 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
   const grupos = useMemo(() => gruposMatrizPorTipo(tipo), [tipo]);
   const datosAutomaticos = useMemo(() => datosAutomaticosPaciente(paciente), [paciente]);
   const [paso, setPaso] = useState(0);
-  const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosGuardados, ...datosAutomaticos }));
+  const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosAutomaticos, ...datosGuardados }));
   const [message, setMessage] = useState("");
   const [mostrarLienzo, setMostrarLienzo] = useState(false);
-  const datosCalculados = aplicarCalculosBasicos({ ...datos, ...datosAutomaticos });
+  const datosCalculados = aplicarCalculosBasicos({ ...datosAutomaticos, ...datos });
   const datosConValoresPorDefecto = aplicarValoresPorDefectoMatriz(datosCalculados, tipo);
   const camposBloqueados = camposBloqueadosPorPaciente(paciente);
 
   const grupo = grupos[paso];
   const todosLosCampos = grupos.flatMap(item => item.campos);
-  const completados = todosLosCampos.filter(campo => valorComoTexto(datosCalculados[campo.key]).trim() !== "").length;
+  const campoCompleto = (campo: CampoMatrizCuidadosCriticos) => {
+    const valor = valorComoTexto(datosCalculados[campo.key]).trim();
+    if (valor) return true;
+    const alta = valorComoTexto(datosCalculados.alta).trim();
+    return alta !== "FALLECIDO" && (campo.key === "fecha_de_muerte" || campo.key === "muerte_48_horas");
+  };
+  const camposPendientes = todosLosCampos.filter(campo => !campoCompleto(campo));
+  const completados = todosLosCampos.length - camposPendientes.length;
   const porcentaje = Math.round((completados / todosLosCampos.length) * 100);
 
   const guardar = async () => {
@@ -91,12 +98,18 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${porcentaje}%` }} />
           </div>
+          {camposPendientes.length > 0 && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              Falta revisar: {camposPendientes.slice(0, 3).map(campo => campo.label).join(", ")}
+              {camposPendientes.length > 3 ? ` y ${camposPendientes.length - 3} mas` : ""}.
+            </p>
+          )}
         </div>
       </header>
 
       <div className="grid gap-2 md:grid-cols-4">
         {grupos.map((item, index) => {
-          const completosGrupo = item.campos.filter(campo => valorComoTexto(datosCalculados[campo.key]).trim() !== "").length;
+          const completosGrupo = item.campos.filter(campoCompleto).length;
           return (
             <button
               key={item.id}
@@ -201,8 +214,10 @@ function normalizarBusquedaCatalogo(value: string): string {
 
 function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; bloqueado?: boolean; onChange: (value: string) => void }) {
   const text = valorComoTexto(valor);
-  const inputValue = campo.tipo === "number" && !text
-    ? "0"
+  const [editandoNumero, setEditandoNumero] = useState(false);
+  const esNumero = campo.tipo === "number";
+  const inputValue = esNumero && (!text || text === VALOR_NO_REGISTRADO)
+    ? editandoNumero ? "" : "0"
     : text === VALOR_NO_REGISTRADO && (campo.tipo === "date" || campo.tipo === "time")
       ? ""
       : text;
@@ -251,12 +266,30 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo:
         </select>
       ) : (
         <input
-          type={campo.tipo}
-          min={campo.tipo === "number" ? 0 : undefined}
-          step={campo.tipo === "number" ? "any" : undefined}
+          type={esNumero ? "text" : campo.tipo}
+          inputMode={esNumero ? "decimal" : undefined}
+          min={esNumero ? 0 : undefined}
+          step={esNumero ? "any" : undefined}
           value={inputValue}
           disabled={automatico}
-          onChange={event => onChange(event.target.value)}
+          onFocus={event => {
+            if (!esNumero) return;
+            setEditandoNumero(true);
+            event.currentTarget.select();
+          }}
+          onBlur={event => {
+            if (!esNumero) return;
+            setEditandoNumero(false);
+            if (!event.currentTarget.value.trim()) onChange("0");
+          }}
+          onChange={event => {
+            if (!esNumero) {
+              onChange(event.target.value);
+              return;
+            }
+            const value = event.target.value.replace(",", ".");
+            if (/^\d*\.?\d*$/.test(value)) onChange(value);
+          }}
           className={inputCls}
         />
       )}
@@ -305,15 +338,28 @@ function OpcionesCriticasCombobox({
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const listRef = useRef<HTMLUListElement | null>(null);
   const term = value === VALOR_NO_REGISTRADO ? "" : normalizarBusquedaCatalogo(value);
   const resultados = term
     ? opciones.filter(opcion => normalizarBusquedaCatalogo(opcion).includes(term))
     : opciones;
   const hasValue = Boolean(value);
 
+  useEffect(() => {
+    if (!open) return;
+    const activeOption = listRef.current?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`);
+    activeOption?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
   const seleccionar = (opcion: string) => {
     onChange(opcion);
     setOpen(false);
+  };
+
+  const moverSeleccion = (direccion: 1 | -1) => {
+    if (resultados.length === 0) return;
+    setActiveIndex(index => (index + direccion + resultados.length) % resultados.length);
   };
 
   return (
@@ -324,10 +370,31 @@ function OpcionesCriticasCombobox({
         value={value}
         disabled={disabled}
         placeholder={placeholder}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setActiveIndex(0);
+          setOpen(true);
+        }}
         onChange={event => {
           onChange(event.target.value);
+          setActiveIndex(0);
           setOpen(true);
+        }}
+        onKeyDown={event => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            moverSeleccion(1);
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+            moverSeleccion(-1);
+          } else if (event.key === "Enter" && open && resultados[activeIndex]) {
+            event.preventDefault();
+            seleccionar(resultados[activeIndex]);
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            setOpen(false);
+          }
         }}
         onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         className={`${inputCls} pl-9 ${hasValue && !disabled ? "pr-9" : ""}`}
@@ -338,6 +405,7 @@ function OpcionesCriticasCombobox({
           onMouseDown={event => {
             event.preventDefault();
             onChange("");
+            setActiveIndex(0);
             setOpen(true);
           }}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
@@ -351,13 +419,17 @@ function OpcionesCriticasCombobox({
           {resultados.length === 0 ? (
             <div className="px-4 py-3 text-xs text-slate-400">{emptyText}</div>
           ) : (
-            <ul className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-              {resultados.map(opcion => (
+            <ul ref={listRef} className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {resultados.map((opcion, index) => (
                 <li key={opcion}>
                   <button
                     type="button"
+                    data-option-index={index}
                     onMouseDown={() => seleccionar(opcion)}
-                    className="w-full px-3 py-2.5 text-left text-sm leading-snug text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={`w-full px-3 py-2.5 text-left text-sm leading-snug text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 ${
+                      index === activeIndex ? "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" : ""
+                    }`}
                   >
                     {opcion}
                   </button>
