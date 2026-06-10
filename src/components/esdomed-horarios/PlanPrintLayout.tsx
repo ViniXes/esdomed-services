@@ -82,7 +82,7 @@ export function PlanPrintLayout({ plan }: Props) {
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
-                    <td key={`ini-${d}`} className={`border border-black text-center font-bold min-w-[18px] ${finde ? "bg-gray-200" : ""}`}>
+                    <td key={`ini-${d}`} className={`border border-black text-center font-bold min-w-[16px] ${finde ? "bg-gray-200" : ""}`}>
                       {iniciales[i]}
                     </td>
                   );
@@ -91,13 +91,13 @@ export function PlanPrintLayout({ plan }: Props) {
             </tr>
             {/* Fila de encabezados de columna */}
             <tr className="bg-gray-100">
-              <th className="border border-black px-1 py-0.5 text-left w-[40px] whitespace-nowrap">CÓDIGO</th>
-              <th className="border border-black px-1 py-0.5 text-left w-[120px] whitespace-nowrap">NOMBRE COMPLETO</th>
-              <th className="border border-black px-1 py-0.5 text-left w-[70px] whitespace-nowrap">PUESTO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[35px] whitespace-nowrap">CÓDIGO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[150px] whitespace-nowrap">NOMBRE COMPLETO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[55px] whitespace-nowrap">PUESTO</th>
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
-                    <th key={`num-${d}`} className={`border border-black text-center min-w-[18px] ${finde ? "bg-gray-200" : ""}`}>
+                    <th key={`num-${d}`} className={`border border-black text-center min-w-[16px] ${finde ? "bg-gray-200" : ""}`}>
                       {d}
                     </th>
                   );
@@ -110,9 +110,9 @@ export function PlanPrintLayout({ plan }: Props) {
                 const total = totalHorasFila(fila.asignaciones);
                 return (
                   <tr key={fila.uid || fila.codigoMarcacion || idx}>
-                    <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap max-w-[40px] overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
-                    <td className="border border-black px-1 py-0.5 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis" title={fila.nombre}>{fila.nombre}</td>
-                    <td className="border border-black px-1 py-0.5 text-[7px] leading-tight whitespace-nowrap max-w-[70px] overflow-hidden text-ellipsis" title={fila.puesto}>{fila.puesto}</td>
+                    <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap max-w-[35px] overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
+                    <td className="border border-black px-1 py-0.5 whitespace-nowrap max-w-[200px] overflow-hidden text-ellipsis" title={fila.nombre}>{fila.nombre}</td>
+                    <td className="border border-black px-1 py-0.5 text-[7px] leading-tight whitespace-nowrap max-w-[50px] overflow-hidden text-ellipsis" title={fila.puesto}>{fila.puesto}</td>
                     {dias.map((d, i) => {
                       const celda = (fila.asignaciones[i] ?? "").trim().toUpperCase();
                       const finde = iniciales[i] === "S" || iniciales[i] === "D";
