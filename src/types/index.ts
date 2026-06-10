@@ -834,3 +834,54 @@ export interface PlanTrabajo {
   actualizadoPorId?: string;
   actualizadoPorNombre?: string;
 }
+
+// ============================================================================
+// Trámites de Personal (ESDOMED)
+// ============================================================================
+
+export type CategoriaTramitePersonal = 
+  | "A1_permiso_con_goce"
+  | "A2_permiso_sin_goce"
+  | "A3_enfermedad"
+  | "A4_compensatorio"
+  | "A5_consulta_isss"
+  | "A6_paternidad"
+  | "A7_enfermedad_pariente"
+  | "A8_duelo"
+  | "A9_otros"
+  | "B_cambio_turno_individual"
+  | "C_cambio_turno_2personas"
+  | "D_licencia_o_acciones"
+  | "E_inconsistencias_marcacion"
+  | "F_tiempo_extra"
+  | "G_misiones_oficiales";
+
+export type EstadoTramitePersonal = "subido" | "pendiente" | "aprobado" | "rechazado";
+
+export interface TramitePersonal {
+  id?: string;
+  categoria: CategoriaTramitePersonal;
+  empleadoId: string;
+  empleadoNombre: string;
+  
+  // Documentos
+  documentoUrl?: string;
+  documentoNombre?: string;
+  notas?: string;
+
+  // Solicitudes (A1, A2)
+  fechaInicio?: Date;
+  fechaFin?: Date;
+  horas?: number;
+  
+  estado: EstadoTramitePersonal;
+  
+  creadoEn: Date;
+  actualizadoEn?: Date;
+  
+  // Aprobación
+  revisadoPorId?: string;
+  revisadoPorNombre?: string;
+  revisadoEn?: Date;
+  comentariosRevision?: string;
+}

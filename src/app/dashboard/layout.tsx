@@ -160,12 +160,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
     // ── Mi área (horarios) ──
     ...(verHorario
-      ? [{ href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL }]
+      ? [
+          { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL },
+          { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList, group: G_PERSONAL }
+        ]
       : []),
 
     // ── Administración ──
     ...(verUsuarios
-      ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN }]
+      ? [
+          { href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN },
+          { href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck, group: G_ADMIN }
+        ]
       : []),
     ...(verConfiguracion
       ? [
