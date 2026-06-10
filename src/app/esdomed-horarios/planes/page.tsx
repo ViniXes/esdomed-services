@@ -88,7 +88,7 @@ export default function PlanesPage() {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
+    <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
       <div className="mb-6">
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
           <CalendarDays size={13} /> Planes de trabajo
