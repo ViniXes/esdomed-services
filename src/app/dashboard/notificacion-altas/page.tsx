@@ -266,6 +266,7 @@ export default function NotificacionAltasPage() {
           registro={editando ?? undefined}
           profile={{ uid: profile.uid, nombre: profile.nombre }}
           onClose={() => { setAdding(false); setEditando(null); }}
+          onSaved={(f) => setFecha(f)}
           notify={notify}
         />
       )}
@@ -284,16 +285,19 @@ export default function NotificacionAltasPage() {
 }
 
 // ── Modal: registrar / editar notificación ────────────────────────────────────
-function RegistroModal({ fecha, registro, profile, onClose, notify }: {
+function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
   fecha: string;
   registro?: NotificacionPrealta;
   profile: { uid: string; nombre: string };
   onClose: () => void;
+  onSaved: (fecha: string) => void;
   notify: (tipo: "success" | "error", mensaje: string) => void;
 }) {
   const editar = !!registro;
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [tarjeta, setTarjeta] = useState<TarjetaVisita | null>(null);
+  // Fecha del alta (no la de hoy): las altas de mañana se notifican hoy, etc.
+  const [fechaAlta, setFechaAlta] = useState(registro?.fecha ?? fecha);
   const [familiarNombre, setFamiliarNombre] = useState(registro?.familiarNombre ?? "");
   const [obsPaciente, setObsPaciente] = useState(registro?.observacionesPaciente ?? "");
   const [obsFamiliar, setObsFamiliar] = useState(registro?.observacionesFamiliar ?? "");
@@ -325,17 +329,19 @@ function RegistroModal({ fecha, registro, profile, onClose, notify }: {
   }, [paciente, editar]);
 
   const horaADate = (): Date => {
-    const [y, m, d] = fecha.split("-").map(Number);
+    const [y, m, d] = fechaAlta.split("-").map(Number);
     const [hh, mm] = hora.split(":").map(Number);
     return new Date(y, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0);
   };
 
   const guardar = async () => {
+    if (!fechaAlta) { notify("error", "Selecciona la fecha del alta"); return; }
     setGuardando(true);
     try {
       const edadNum = edad.trim() ? Number(edad) : undefined;
       if (editar && registro?.id) {
         await updateDoc(doc(db, "notificaciones_prealta", registro.id), {
+          fecha: fechaAlta,
           familiarNombre: familiarNombre.trim() || null,
           observacionesPaciente: obsPaciente.trim() || null,
           observacionesFamiliar: obsFamiliar.trim() || null,
@@ -350,7 +356,7 @@ function RegistroModal({ fecha, registro, profile, onClose, notify }: {
       } else {
         if (!paciente?.id) { notify("error", "Selecciona un paciente activo"); setGuardando(false); return; }
         await addDoc(collection(db, "notificaciones_prealta"), {
-          fecha,
+          fecha: fechaAlta,
           pacienteId: paciente.id,
           pacienteExpediente: paciente.expediente,
           pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
@@ -369,6 +375,7 @@ function RegistroModal({ fecha, registro, profile, onClose, notify }: {
         });
         notify("success", "Notificación registrada");
       }
+      onSaved(fechaAlta);
       onClose();
     } catch {
       notify("error", "No se pudo guardar");
@@ -411,6 +418,12 @@ function RegistroModal({ fecha, registro, profile, onClose, notify }: {
                     <ArrowLeft size={13} /> Cambiar
                   </button>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha del alta</label>
+                <input type="date" className={inputCls} value={fechaAlta} onChange={e => setFechaAlta(e.target.value)} />
+                <p className="text-[11px] text-slate-400 mt-1">Fecha en que se dará el alta (las de mañana se notifican hoy).</p>
               </div>
 
               <div>
