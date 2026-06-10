@@ -63,6 +63,7 @@ export default function EditorPlanPage() {
   const [metaHorasOperativas, setMetaHorasOperativas] = useState<number | "">("");
   const [creadoMeta, setCreadoMeta] = useState<Pick<PlanTrabajo, "creadoEn" | "creadoPorId" | "creadoPorNombre"> | null>(null);
   const [roster, setRoster] = useState<RosterUser[]>([]);
+  const [prevPlanData, setPrevPlanData] = useState<PlanTrabajo | null>(null);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [mensaje, setMensaje] = useState<string>("");
 
@@ -89,7 +90,19 @@ export default function EditorPlanPage() {
     (async () => {
       setLoading(true);
       try {
-        const [snap, lista] = await Promise.all([getDoc(doc(db, "planes_trabajo", periodo)), cargarRoster()]);
+        const prevPeriodo = formatPeriodo(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
+        const [snap, lista, prevSnap] = await Promise.all([
+          getDoc(doc(db, "planes_trabajo", periodo)),
+          cargarRoster(),
+          getDoc(doc(db, "planes_trabajo", prevPeriodo))
+        ]);
+        
+        if (prevSnap.exists()) {
+          setPrevPlanData(prevSnap.data() as PlanTrabajo);
+        } else {
+          setPrevPlanData(null);
+        }
+
         if (snap.exists()) {
           const plan = snap.data() as PlanTrabajo;
           setNumeroHoras(plan.numeroHoras ?? "");
@@ -444,6 +457,36 @@ export default function EditorPlanPage() {
           subtitulo={`${labelPeriodo(periodo)} · Día ${picker.diaIdx + 1} (${iniciales[picker.diaIdx]})`}
           valorActual={filaActiva.asignaciones[picker.diaIdx] ?? ""}
           onSelect={(codigo) => {
+            // Validación de 2 días de descanso inter-mensual para operativos
+            const h = getHorario(codigo);
+            const isOperativo = h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario");
+            
+            if (isOperativo && prevPlanData && !filaActiva.grupo?.toLowerCase().includes("administrativo")) {
+              const filaAnterior = prevPlanData.filas.find(f => f.codigoMarcacion === filaActiva.codigoMarcacion || f.uid === filaActiva.uid);
+              if (filaAnterior) {
+                const prevDias = diasDelMesArray(prevPlanData.anio, prevPlanData.mes).length;
+                let lastShiftIdx = -1;
+                for (let i = prevDias - 1; i >= prevDias - 3; i--) {
+                  if (i < 0) break;
+                  const celdaPrev = filaAnterior.asignaciones[i] || "";
+                  const hPrev = getHorario(celdaPrev);
+                  if (hPrev && (hPrev.tipo === "Turno Operativo" || hPrev.tipo === "Turno Hospitalario")) {
+                    lastShiftIdx = i;
+                    break;
+                  }
+                }
+                
+                if (lastShiftIdx !== -1) {
+                  const diasDescansoPrev = prevDias - 1 - lastShiftIdx;
+                  const reqDescanso = 2 - diasDescansoPrev;
+                  if (picker.diaIdx < reqDescanso) {
+                    alert(`⚠️ No se puede asignar este turno.\n\nEl empleado tuvo su último turno operativo el día ${lastShiftIdx + 1} del mes pasado.\nNecesita al menos 2 días de descanso inter-mensual para iniciar turno. Solo ha tenido ${diasDescansoPrev + picker.diaIdx} día(s).`);
+                    return; // Cancela la asignación
+                  }
+                }
+              }
+            }
+            
             setCelda(picker.filaIdx, picker.diaIdx, codigo);
             setPicker(null);
           }}
