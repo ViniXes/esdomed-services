@@ -41,6 +41,8 @@ import {
   RefreshCw,
   Save,
   Users,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
 
 type RosterUser = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;
@@ -65,7 +67,7 @@ export default function EditorPlanPage() {
   const [roster, setRoster] = useState<RosterUser[]>([]);
   const [prevPlanData, setPrevPlanData] = useState<PlanTrabajo | null>(null);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
-  const [mensaje, setMensaje] = useState<string>("");
+  const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
 
   const cargarRoster = useCallback(async (): Promise<RosterUser[]> => {
     const snap = await getDocs(
@@ -145,7 +147,7 @@ export default function EditorPlanPage() {
   const sincronizar = async () => {
     const lista = await cargarRoster();
     setFilas((prev) => sincronizarFilas(lista, prev, dias.length));
-    setMensaje("Roster actualizado con los usuarios ESDOMED.");
+    setModalState({ tipo: "exito", titulo: "Sincronización Completa", mensaje: "El listado de personal se ha actualizado correctamente con los usuarios ESDOMED vigentes." });
     setGuardado(false);
   };
 
@@ -153,7 +155,7 @@ export default function EditorPlanPage() {
     const prevPeriodo = formatPeriodo(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
     const snap = await getDoc(doc(db, "planes_trabajo", prevPeriodo));
     if (!snap.exists()) {
-      setMensaje(`No hay plan guardado para ${labelPeriodo(prevPeriodo)}.`);
+      setModalState({ tipo: "alerta", titulo: "Sin datos", mensaje: `No hay plan guardado para ${labelPeriodo(prevPeriodo)} del cual copiar el patrón.` });
       return;
     }
     const prevPlan = snap.data() as PlanTrabajo;
@@ -174,7 +176,7 @@ export default function EditorPlanPage() {
     if (!numeroHoras && prevPlan.numeroHoras) setNumeroHoras(prevPlan.numeroHoras);
     if (metaHorasAdmin === "" && prevPlan.metaHorasAdmin) setMetaHorasAdmin(prevPlan.metaHorasAdmin);
     if (metaHorasOperativas === "" && prevPlan.metaHorasOperativas) setMetaHorasOperativas(prevPlan.metaHorasOperativas);
-    setMensaje(`Patrón copiado desde ${labelPeriodo(prevPeriodo)}.`);
+    setModalState({ tipo: "exito", titulo: "Patrón Copiado", mensaje: `Se han copiado los turnos desde ${labelPeriodo(prevPeriodo)}. Por favor, ajusta los detalles antes de guardar.` });
     setGuardado(false);
   };
 
@@ -213,19 +215,13 @@ export default function EditorPlanPage() {
         setCreadoMeta({ creadoEn: ahora, creadoPorId: profile.uid, creadoPorNombre: profile.nombre });
       }
       setGuardado(true);
-      setMensaje("Plan guardado correctamente.");
+      setModalState({ tipo: "exito", titulo: "Plan Guardado", mensaje: "Los cambios se han guardado exitosamente en la base de datos." });
     } catch (e) {
-      setMensaje("Error al guardar: " + (e instanceof Error ? e.message : "desconocido"));
+      setModalState({ tipo: "error", titulo: "Error al Guardar", mensaje: "Hubo un problema guardando el plan: " + (e instanceof Error ? e.message : "desconocido") });
     } finally {
       setSaving(false);
     }
   };
-
-  useEffect(() => {
-    if (!mensaje) return;
-    const t = setTimeout(() => setMensaje(""), 4000);
-    return () => clearTimeout(t);
-  }, [mensaje]);
 
   const filaActiva = picker ? filas[picker.filaIdx] : null;
 
@@ -319,12 +315,6 @@ export default function EditorPlanPage() {
           />
         </div>
       </div>
-
-      {mensaje && (
-        <div className="mb-3 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium px-3 py-2 inline-block">
-          {mensaje}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -480,7 +470,12 @@ export default function EditorPlanPage() {
                   const diasDescansoPrev = prevDias - 1 - lastShiftIdx;
                   const reqDescanso = 2 - diasDescansoPrev;
                   if (picker.diaIdx < reqDescanso) {
-                    alert(`⚠️ No se puede asignar este turno.\n\nEl empleado tuvo su último turno operativo el día ${lastShiftIdx + 1} del mes pasado.\nNecesita al menos 2 días de descanso inter-mensual para iniciar turno. Solo ha tenido ${diasDescansoPrev + picker.diaIdx} día(s).`);
+                    setModalState({ 
+                      tipo: "error", 
+                      titulo: "Asignación Inválida", 
+                      mensaje: `No se puede asignar este turno.\n\nEl empleado tuvo su último turno operativo el día ${lastShiftIdx + 1} del mes pasado. Necesita al menos 2 días de descanso inter-mensual para iniciar un nuevo turno.\n\nSolo ha tenido ${diasDescansoPrev + picker.diaIdx} día(s) de descanso acumulados.`
+                    });
+                    setPicker(null);
                     return; // Cancela la asignación
                   }
                 }
@@ -492,6 +487,47 @@ export default function EditorPlanPage() {
           }}
           onClose={() => setPicker(null)}
         />
+      )}
+
+      {/* Modal Genérico */}
+      {modalState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+            <div className={`p-4 border-b ${
+              modalState.tipo === "exito" ? "bg-emerald-50 border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/50" : 
+              modalState.tipo === "error" ? "bg-rose-50 border-rose-100 dark:bg-rose-950/30 dark:border-rose-900/50" : 
+              "bg-amber-50 border-amber-100 dark:bg-amber-950/30 dark:border-amber-900/50"
+            }`}>
+              <div className="flex items-center gap-2">
+                {modalState.tipo === "exito" ? <Check className="text-emerald-600 dark:text-emerald-400" size={20} /> :
+                 modalState.tipo === "error" ? <XCircle className="text-rose-600 dark:text-rose-400" size={20} /> :
+                 <AlertTriangle className="text-amber-600 dark:text-amber-400" size={20} />}
+                <h3 className={`font-bold ${
+                  modalState.tipo === "exito" ? "text-emerald-800 dark:text-emerald-500" : 
+                  modalState.tipo === "error" ? "text-rose-800 dark:text-rose-500" : 
+                  "text-amber-800 dark:text-amber-500"
+                }`}>
+                  {modalState.titulo}
+                </h3>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{modalState.mensaje}</p>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setModalState(null)}
+                  className={`px-4 py-2 text-sm font-bold rounded-xl transition-colors ${
+                    modalState.tipo === "exito" ? "bg-emerald-600 hover:bg-emerald-500 text-white" : 
+                    modalState.tipo === "error" ? "bg-rose-600 hover:bg-rose-500 text-white" : 
+                    "bg-amber-500 hover:bg-amber-400 text-white"
+                  }`}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
