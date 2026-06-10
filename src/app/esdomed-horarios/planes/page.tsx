@@ -18,46 +18,53 @@ function TurnoActualWidget({ planes }: { planes: PlanTrabajo[] }) {
     const hoy = new Date();
     const diaIdx = hoy.getDate() - 1;
     
-    const countByGroup = new Map<string, number>();
+    const namesByGroup = new Map<string, string[]>();
     
     planActual.filas.forEach(f => {
       const celda = (f.asignaciones[diaIdx] ?? "").trim().toUpperCase();
       if (celda && !esMarcaEspecial(celda)) {
         const h = getHorario(celda);
         if (h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario")) {
-          const g = f.grupo?.trim();
-          if (g) countByGroup.set(g, (countByGroup.get(g) || 0) + 1);
+          const g = f.grupo?.trim() || "Sin grupo";
+          const names = namesByGroup.get(g) || [];
+          names.push(f.nombre);
+          namesByGroup.set(g, names);
         }
       }
     });
 
-    return Array.from(countByGroup.entries())
-      .filter(([_, count]) => count > 0)
-      .sort((a, b) => b[1] - a[1]);
+    return Array.from(namesByGroup.entries())
+      .filter(([_, names]) => names.length > 0)
+      .sort((a, b) => b[1].length - a[1].length);
   }, [planActual]);
 
   if (!planActual || gruposDeTurno.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-teal-200 dark:border-teal-900/50 bg-teal-50/50 dark:bg-teal-950/20 p-4 mb-6 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-teal-400/10 dark:bg-teal-400/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+    <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 mb-6 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 dark:bg-emerald-400/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
       <div className="flex items-center gap-2 mb-4">
-        <div className="relative flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500"></span>
-        </div>
-        <h2 className="text-sm font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+        <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-sm" />
+        <h2 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
           <Clock size={14} /> Equipos de turno hoy
         </h2>
       </div>
-      <div className="flex flex-wrap gap-2.5">
-        {gruposDeTurno.map(([grupo, count]) => (
-          <div key={grupo} className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-teal-100 dark:border-teal-800 shadow-sm rounded-xl px-3.5 py-2 z-10">
-            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{grupo}</span>
-            <span className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-            <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
-              {count} {count === 1 ? "persona" : "personas"}
-            </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {gruposDeTurno.map(([grupo, nombres]) => (
+          <div key={grupo} className="bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-800/60 shadow-sm rounded-xl p-3 z-10 flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{grupo}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full">
+                {nombres.length} {nombres.length === 1 ? "persona" : "personas"}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {nombres.sort((a, b) => a.localeCompare(b)).map(nombre => (
+                <span key={nombre} className="inline-flex items-center px-2 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">
+                  {nombre}
+                </span>
+              ))}
+            </div>
           </div>
         ))}
       </div>
