@@ -509,7 +509,7 @@ function RectificacionModal({
 export default function AltasVivosPage() {
   const { user, profile } = useAuth();
   const isTS = profile?.role === "trabajo_social";
-  const isEsdomed = profile?.role === "esdomed" || profile?.role === "admin";
+  const isEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   const [notificaciones, setNotificaciones] = useState<NotificacionAltaVivo[]>([]);
   const [busqueda, setBusqueda] = useState("");

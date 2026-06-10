@@ -12,7 +12,10 @@ service cloud.firestore {
     function getRole() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.role;
     }
-    function isEsdomed()      { return isAuth() && getRole() == 'esdomed'; }
+    // El auxiliar administrativo ESDOMED (asistente_esdomed) comparte los mismos
+    // permisos operativos que ESDOMED; por eso se incluye aquí. El superusuario
+    // (admin) sigue siendo aparte y con privilegios más profundos.
+    function isEsdomed()      { return isAuth() && getRole() in ['esdomed', 'asistente_esdomed']; }
     function isAsistenteEsdomed() { return isAuth() && getRole() == 'asistente_esdomed'; }
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
@@ -28,7 +31,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.servicios;
     }
     function isStaff() {
-      return isAuth() && getRole() in ['esdomed', 'admin', 'psicologia', 'trabajo_social'];
+      return isAuth() && getRole() in ['esdomed', 'asistente_esdomed', 'admin', 'psicologia', 'trabajo_social'];
     }
 
     // ─── Usuarios ────────────────────────────────────────────────────────────

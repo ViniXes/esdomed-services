@@ -460,7 +460,7 @@ function CausasDefuncionEditor({
   paciente: Paciente;
 }) {
   const { profile } = useAuth();
-  const puedeEditar = profile?.role === "esdomed" || profile?.role === "admin";
+  const puedeEditar = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   const snapshot = () => ({
     causaMuerteD: paciente.causaMuerteD ?? emptyDx(),
