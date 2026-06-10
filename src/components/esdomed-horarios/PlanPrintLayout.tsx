@@ -92,8 +92,8 @@ export function PlanPrintLayout({ plan }: Props) {
             {/* Fila de encabezados de columna */}
             <tr className="bg-gray-100">
               <th className="border border-black px-1 py-0.5 text-left w-[35px] whitespace-nowrap">CÓDIGO</th>
-              <th className="border border-black px-1 py-0.5 text-left w-[130px]">NOMBRE COMPLETO</th>
-              <th className="border border-black px-1 py-0.5 text-left w-[65px]">PUESTO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[120px]">NOMBRE COMPLETO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[90px]">PUESTO</th>
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
@@ -111,8 +111,8 @@ export function PlanPrintLayout({ plan }: Props) {
                 return (
                   <tr key={fila.uid || fila.codigoMarcacion || idx}>
                     <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap w-[35px] overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
-                    <td className="border border-black px-1 py-0.5 text-[7px] leading-[1.1] whitespace-normal w-[130px] break-words" title={fila.nombre}>{fila.nombre}</td>
-                    <td className="border border-black px-1 py-0.5 text-[6px] leading-[1.1] whitespace-normal w-[65px] break-words" title={fila.puesto}>{fila.puesto}</td>
+                    <td className="border border-black px-1 py-0.5 text-[7px] leading-[1.1] whitespace-normal w-[120px] break-words" title={fila.nombre}>{fila.nombre}</td>
+                    <td className="border border-black px-1 py-0.5 text-[7px] leading-[1.1] whitespace-normal w-[90px] break-words" title={fila.puesto}>{fila.puesto}</td>
                     {dias.map((d, i) => {
                       const celda = (fila.asignaciones[i] ?? "").trim().toUpperCase();
                       const finde = iniciales[i] === "S" || iniciales[i] === "D";
