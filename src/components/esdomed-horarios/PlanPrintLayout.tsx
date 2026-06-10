@@ -69,11 +69,11 @@ export function PlanPrintLayout({ plan }: Props) {
             </div>
           </div>
 
-          <table className="plan-table w-full border-collapse text-[8px] mt-2 table-fixed">
+          <table className="plan-table w-full border-collapse text-[8px] mt-2">
             <thead>
               {/* Fila de mes/año + iniciales de día */}
               <tr>
-                <td className="border border-black px-1 py-0.5 font-bold text-[9px] w-[35px]" colSpan={1}>
+                <td className="border border-black px-1 py-0.5 font-bold text-[9px] w-[40px] whitespace-nowrap" colSpan={1}>
                   MES: {plan.mes}
                 </td>
                 <td className="border border-black px-1 py-0.5 font-bold text-[9px]" colSpan={2}>
@@ -82,27 +82,27 @@ export function PlanPrintLayout({ plan }: Props) {
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
-                    <td key={`ini-${d}`} className={`border border-black text-center font-bold w-[18px] ${finde ? "bg-gray-200" : ""}`}>
+                    <td key={`ini-${d}`} className={`border border-black text-center font-bold min-w-[18px] ${finde ? "bg-gray-200" : ""}`}>
                       {iniciales[i]}
                     </td>
                   );
                 })}
-                <td className="border border-black w-[15px]" />
-              </tr>
-              {/* Fila de encabezados de columna */}
-              <tr className="bg-gray-100">
-                <th className="border border-black px-1 py-0.5 text-left w-[35px]">CÓDIGO</th>
-                <th className="border border-black px-1 py-0.5 text-left w-[85px]">NOMBRE COMPLETO</th>
-                <th className="border border-black px-1 py-0.5 text-left w-[55px]">PUESTO</th>
+              <td className="border border-black w-[20px]" />
+            </tr>
+            {/* Fila de encabezados de columna */}
+            <tr className="bg-gray-100">
+              <th className="border border-black px-1 py-0.5 text-left w-[40px] whitespace-nowrap">CÓDIGO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[120px] whitespace-nowrap">NOMBRE COMPLETO</th>
+              <th className="border border-black px-1 py-0.5 text-left w-[70px] whitespace-nowrap">PUESTO</th>
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
-                    <th key={`num-${d}`} className={`border border-black text-center w-[18px] ${finde ? "bg-gray-200" : ""}`}>
+                    <th key={`num-${d}`} className={`border border-black text-center min-w-[18px] ${finde ? "bg-gray-200" : ""}`}>
                       {d}
                     </th>
                   );
                 })}
-                <th className="border border-black px-0.5 text-center w-[15px]">HRS</th>
+                <th className="border border-black px-0.5 text-center w-[20px]">HRS</th>
               </tr>
             </thead>
             <tbody>
@@ -110,9 +110,9 @@ export function PlanPrintLayout({ plan }: Props) {
                 const total = totalHorasFila(fila.asignaciones);
                 return (
                   <tr key={fila.uid || fila.codigoMarcacion || idx}>
-                    <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
-                    <td className="border border-black px-1 py-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{fila.nombre}</td>
-                    <td className="border border-black px-1 py-0.5 text-[7px] leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{fila.puesto}</td>
+                    <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap max-w-[40px] overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
+                    <td className="border border-black px-1 py-0.5 whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis" title={fila.nombre}>{fila.nombre}</td>
+                    <td className="border border-black px-1 py-0.5 text-[7px] leading-tight whitespace-nowrap max-w-[70px] overflow-hidden text-ellipsis" title={fila.puesto}>{fila.puesto}</td>
                     {dias.map((d, i) => {
                       const celda = (fila.asignaciones[i] ?? "").trim().toUpperCase();
                       const finde = iniciales[i] === "S" || iniciales[i] === "D";
