@@ -9,7 +9,7 @@ import { Sidebar } from "@/components/Sidebar";
 const navItems = [
   { href: "/enfermeria/altas", label: "Notificar Alta Vivo", icon: LogIn },
   { href: "/enfermeria/movimientos", label: "Movimientos", icon: History },
-  { href: "/enfermeria/notificacion-altas", label: "Notificación de Altas", icon: ClipboardCheck },
+  { href: "/enfermeria/notificacion-altas", label: "Reporte TS", icon: ClipboardCheck },
 ];
 
 export default function EnfermeriaLayout({ children }: { children: React.ReactNode }) {
