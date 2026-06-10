@@ -73,7 +73,7 @@ export function PlanPrintLayout({ plan }: Props) {
             <thead>
               {/* Fila de mes/año + iniciales de día */}
               <tr>
-                <td className="border border-black px-1 py-0.5 font-bold text-[9px] w-[40px]" colSpan={1}>
+                <td className="border border-black px-1 py-0.5 font-bold text-[9px] w-[35px]" colSpan={1}>
                   MES: {plan.mes}
                 </td>
                 <td className="border border-black px-1 py-0.5 font-bold text-[9px]" colSpan={2}>
@@ -82,27 +82,27 @@ export function PlanPrintLayout({ plan }: Props) {
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
-                    <td key={`ini-${d}`} className={`border border-black text-center font-bold w-[16px] ${finde ? "bg-gray-200" : ""}`}>
+                    <td key={`ini-${d}`} className={`border border-black text-center font-bold w-[18px] ${finde ? "bg-gray-200" : ""}`}>
                       {iniciales[i]}
                     </td>
                   );
                 })}
-                <td className="border border-black w-[18px]" />
+                <td className="border border-black w-[15px]" />
               </tr>
               {/* Fila de encabezados de columna */}
               <tr className="bg-gray-100">
-                <th className="border border-black px-1 py-0.5 text-left w-[40px]">CÓDIGO</th>
-                <th className="border border-black px-1 py-0.5 text-left w-[110px]">NOMBRE COMPLETO</th>
-                <th className="border border-black px-1 py-0.5 text-left w-[70px]">PUESTO</th>
+                <th className="border border-black px-1 py-0.5 text-left w-[35px]">CÓDIGO</th>
+                <th className="border border-black px-1 py-0.5 text-left w-[85px]">NOMBRE COMPLETO</th>
+                <th className="border border-black px-1 py-0.5 text-left w-[55px]">PUESTO</th>
                 {dias.map((d, i) => {
                   const finde = iniciales[i] === "S" || iniciales[i] === "D";
                   return (
-                    <th key={`num-${d}`} className={`border border-black text-center w-[16px] ${finde ? "bg-gray-200" : ""}`}>
+                    <th key={`num-${d}`} className={`border border-black text-center w-[18px] ${finde ? "bg-gray-200" : ""}`}>
                       {d}
                     </th>
                   );
                 })}
-                <th className="border border-black px-0.5 text-center w-[18px]">HRS</th>
+                <th className="border border-black px-0.5 text-center w-[15px]">HRS</th>
               </tr>
             </thead>
             <tbody>
@@ -133,8 +133,8 @@ export function PlanPrintLayout({ plan }: Props) {
         <div>
           {/* Cuadro de horarios presentes */}
           {horariosUsados.length > 0 && (
-            <div className="mt-4 px-2 break-inside-avoid">
-              <p className="text-[9px] font-bold mb-1 uppercase">Códigos de Horario Utilizados en este plan:</p>
+            <div className="mt-1 px-2 break-inside-avoid">
+              <p className="text-[9px] font-bold mb-0.5 uppercase">Códigos de Horario Utilizados en este plan:</p>
               <div className="flex flex-wrap gap-x-6 gap-y-2">
                 <table className="border-collapse text-[8px] w-auto">
                   <thead>
