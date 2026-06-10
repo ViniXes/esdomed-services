@@ -34,9 +34,6 @@ export function PlanPrintLayout({ plan }: Props) {
     return a.nombre.localeCompare(b.nombre);
   });
 
-  const filasInstitucional = filas.filter(f => !f.codigoMarcacion?.toUpperCase().includes("MPW"));
-  const filasManpower = filas.filter(f => f.codigoMarcacion?.toUpperCase().includes("MPW"));
-
   // Obtener horarios únicos presentes en TODO el plan para mostrar la leyenda unificada
   const codigosPresentes = new Set<string>();
   filas.forEach(f => {
@@ -109,41 +106,26 @@ export function PlanPrintLayout({ plan }: Props) {
               </tr>
             </thead>
             <tbody>
-              {(() => {
-                let grupoPrev: string | null = "__init__";
-                return datos.map((fila, idx) => {
-                  const total = totalHorasFila(fila.asignaciones);
-                  const grupoActual = fila.grupo?.trim() || "";
-                  const mostrarHeader = grupoActual !== grupoPrev;
-                  grupoPrev = grupoActual;
-                  return (
-                    <Fragment key={fila.uid || fila.codigoMarcacion || idx}>
-                      {mostrarHeader && (
-                        <tr>
-                          <td colSpan={colSpanTotal} className="border border-black bg-gray-200 px-1 py-0.5 font-bold text-[8px] uppercase tracking-wide">
-                            {grupoActual || "Sin grupo"}
-                          </td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
-                        <td className="border border-black px-1 py-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{fila.nombre}</td>
-                        <td className="border border-black px-1 py-0.5 text-[7px] leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{fila.puesto}</td>
-                        {dias.map((d, i) => {
-                          const celda = (fila.asignaciones[i] ?? "").trim().toUpperCase();
-                          const finde = iniciales[i] === "S" || iniciales[i] === "D";
-                          return (
-                            <td key={`${idx}-${d}`} className={`border border-black text-center font-bold ${finde ? "bg-gray-100" : ""}`}>
-                              {celda}
-                            </td>
-                          );
-                        })}
-                        <td className="border border-black text-center font-bold tabular-nums bg-gray-50">{total}</td>
-                      </tr>
-                    </Fragment>
-                  );
-                });
-              })()}
+              {datos.map((fila, idx) => {
+                const total = totalHorasFila(fila.asignaciones);
+                return (
+                  <tr key={fila.uid || fila.codigoMarcacion || idx}>
+                    <td className="border border-black px-1 py-0.5 font-medium whitespace-nowrap overflow-hidden text-ellipsis">{fila.codigoMarcacion}</td>
+                    <td className="border border-black px-1 py-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{fila.nombre}</td>
+                    <td className="border border-black px-1 py-0.5 text-[7px] leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{fila.puesto}</td>
+                    {dias.map((d, i) => {
+                      const celda = (fila.asignaciones[i] ?? "").trim().toUpperCase();
+                      const finde = iniciales[i] === "S" || iniciales[i] === "D";
+                      return (
+                        <td key={`${idx}-${d}`} className={`border border-black text-center font-bold ${finde ? "bg-gray-100" : ""}`}>
+                          {celda}
+                        </td>
+                      );
+                    })}
+                    <td className="border border-black text-center font-bold tabular-nums bg-gray-50">{total}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -219,13 +201,7 @@ export function PlanPrintLayout({ plan }: Props) {
 
   return (
     <div className="plan-print text-black bg-white">
-      {renderTable(filasInstitucional)}
-      
-      {filasManpower.length > 0 && (
-        <div style={{ pageBreakBefore: "always" }}>
-          {renderTable(filasManpower)}
-        </div>
-      )}
+      {renderTable(filas)}
     </div>
   );
 }
