@@ -330,6 +330,16 @@ service cloud.firestore {
       allow delete: if isEsdomed() || isAdmin();
     }
 
+    // ─── Trámites de Personal ─────────────────────────────────────────────────
+    // Los empleados pueden crear y leer sus propios trámites.
+    // Administración / Esdomed pueden leer todos y actualizarlos (para aprobar/rechazar).
+    match /tramites_personal/{id} {
+      allow read:   if isAuth() && (resource.data.empleadoId == uid() || isEsdomed() || isAsistenteEsdomed() || isAdmin());
+      allow create: if isAuth() && request.resource.data.empleadoId == uid();
+      allow update: if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Configuración global ────────────────────────────────────────────────
     // Servicios y camas: lectura pública (no es dato sensible), escritura solo admin.
     match /configuracion/{docId} {
