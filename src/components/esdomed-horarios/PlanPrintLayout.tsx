@@ -21,9 +21,18 @@ export function PlanPrintLayout({ plan }: Props) {
   const colSpanTotal = dias.length + 4; // código + nombre + puesto + días + total
 
   // Ordenadas por grupo y nombre, para subtotalizar por grupo en el PDF.
-  const filas = [...plan.filas].sort(
-    (a, b) => ordenGrupo(a.grupo) - ordenGrupo(b.grupo) || a.nombre.localeCompare(b.nombre),
-  );
+  const filas = [...plan.filas].sort((a, b) => {
+    const isJefeA = a.nombre.toLowerCase().includes("benjamin") && a.nombre.toLowerCase().includes("cardoza");
+    const isJefeB = b.nombre.toLowerCase().includes("benjamin") && b.nombre.toLowerCase().includes("cardoza");
+
+    const grupoDiff = ordenGrupo(a.grupo) - ordenGrupo(b.grupo);
+    if (grupoDiff !== 0) return grupoDiff;
+
+    if (isJefeA && !isJefeB) return -1;
+    if (!isJefeA && isJefeB) return 1;
+
+    return a.nombre.localeCompare(b.nombre);
+  });
 
   return (
     <div className="plan-print text-black bg-white">

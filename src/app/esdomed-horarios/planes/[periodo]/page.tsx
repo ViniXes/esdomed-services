@@ -59,6 +59,8 @@ export default function EditorPlanPage() {
   const [guardado, setGuardado] = useState(false);
   const [filas, setFilas] = useState<FilaPlanTrabajo[]>([]);
   const [numeroHoras, setNumeroHoras] = useState("");
+  const [metaHorasAdmin, setMetaHorasAdmin] = useState<number | "">("");
+  const [metaHorasOperativas, setMetaHorasOperativas] = useState<number | "">("");
   const [creadoMeta, setCreadoMeta] = useState<Pick<PlanTrabajo, "creadoEn" | "creadoPorId" | "creadoPorNombre"> | null>(null);
   const [roster, setRoster] = useState<RosterUser[]>([]);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
@@ -91,6 +93,8 @@ export default function EditorPlanPage() {
         if (snap.exists()) {
           const plan = snap.data() as PlanTrabajo;
           setNumeroHoras(plan.numeroHoras ?? "");
+          setMetaHorasAdmin(plan.metaHorasAdmin ?? "");
+          setMetaHorasOperativas(plan.metaHorasOperativas ?? "");
           setCreadoMeta({
             creadoEn: plan.creadoEn,
             creadoPorId: plan.creadoPorId,
@@ -155,6 +159,8 @@ export default function EditorPlanPage() {
       }),
     );
     if (!numeroHoras && prevPlan.numeroHoras) setNumeroHoras(prevPlan.numeroHoras);
+    if (metaHorasAdmin === "" && prevPlan.metaHorasAdmin) setMetaHorasAdmin(prevPlan.metaHorasAdmin);
+    if (metaHorasOperativas === "" && prevPlan.metaHorasOperativas) setMetaHorasOperativas(prevPlan.metaHorasOperativas);
     setMensaje(`Patrón copiado desde ${labelPeriodo(prevPeriodo)}.`);
     setGuardado(false);
   };
@@ -169,6 +175,8 @@ export default function EditorPlanPage() {
         anio,
         mes,
         numeroHoras: numeroHoras.trim(),
+        metaHorasAdmin: metaHorasAdmin === "" ? undefined : Number(metaHorasAdmin),
+        metaHorasOperativas: metaHorasOperativas === "" ? undefined : Number(metaHorasOperativas),
         filas: filas.map((f) => ({
           uid: f.uid,
           codigoMarcacion: f.codigoMarcacion ?? "",
@@ -213,11 +221,18 @@ export default function EditorPlanPage() {
     () =>
       filas
         .map((f, i) => ({ f, i }))
-        .sort(
-          (a, b) =>
-            ordenGrupo(a.f.grupo) - ordenGrupo(b.f.grupo) ||
-            a.f.nombre.localeCompare(b.f.nombre),
-        ),
+        .sort((a, b) => {
+          const isJefeA = a.f.nombre.toLowerCase().includes("benjamin") && a.f.nombre.toLowerCase().includes("cardoza");
+          const isJefeB = b.f.nombre.toLowerCase().includes("benjamin") && b.f.nombre.toLowerCase().includes("cardoza");
+          
+          const grupoDiff = ordenGrupo(a.f.grupo) - ordenGrupo(b.f.grupo);
+          if (grupoDiff !== 0) return grupoDiff;
+          
+          if (isJefeA && !isJefeB) return -1;
+          if (!isJefeA && isJefeB) return 1;
+          
+          return a.f.nombre.localeCompare(b.f.nombre);
+        }),
     [filas],
   );
   const colSpanTotal = dias.length + 2; // Personal + días + Hrs
@@ -259,15 +274,37 @@ export default function EditorPlanPage() {
         </div>
       </div>
 
-      {/* Número de horas (encabezado del formato) */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Número de horas:</label>
-        <input
-          value={numeroHoras}
-          onChange={(e) => { setNumeroHoras(e.target.value); setGuardado(false); }}
-          placeholder="Ej: 168 Administrativo / 168 operativo"
-          className="flex-1 min-w-[200px] max-w-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#c9a892]"
-        />
+      {/* Metas de horas */}
+      <div className="mb-4 flex flex-wrap items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Meta Hrs Admin:</label>
+          <input
+            type="number"
+            value={metaHorasAdmin}
+            onChange={(e) => { setMetaHorasAdmin(e.target.value ? Number(e.target.value) : ""); setGuardado(false); }}
+            placeholder="Ej: 168"
+            className="w-24 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Meta Hrs Operativas:</label>
+          <input
+            type="number"
+            value={metaHorasOperativas}
+            onChange={(e) => { setMetaHorasOperativas(e.target.value ? Number(e.target.value) : ""); setGuardado(false); }}
+            placeholder="Ej: 160"
+            className="w-24 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+          />
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Etiqueta texto (opcional):</label>
+          <input
+            value={numeroHoras}
+            onChange={(e) => { setNumeroHoras(e.target.value); setGuardado(false); }}
+            placeholder="Ej: 168 Adm / 168 Ope"
+            className="w-48 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#c9a892]"
+          />
+        </div>
       </div>
 
       {mensaje && (
@@ -319,6 +356,11 @@ export default function EditorPlanPage() {
                     const total = totalHorasFila(fila.asignaciones);
                     const vac = contarMarca(fila.asignaciones, "VAC");
                     const grupoActual = fila.grupo?.trim() || "";
+                    const isAdministrativo = grupoActual.toLowerCase().includes("administrativo");
+                    const targetHoras = isAdministrativo ? metaHorasAdmin : metaHorasOperativas;
+                    const metaValida = typeof targetHoras === "number" && targetHoras > 0;
+                    const dif = metaValida ? total - targetHoras : 0;
+                    
                     const mostrarHeader = grupoActual !== grupoPrev;
                     grupoPrev = grupoActual;
                     const estiloGrupo = grupoActual ? COLOR_GRUPO[grupoActual] : null;
@@ -370,9 +412,20 @@ export default function EditorPlanPage() {
                               </td>
                             );
                           })}
-                          <td className="px-2 py-1.5 text-center border-l border-slate-200 dark:border-slate-700">
-                            <span className="text-[12px] font-bold tabular-nums text-slate-700 dark:text-slate-200">{total}</span>
-                            {vac > 0 && <span className="block text-[9px] text-amber-500">{vac} vac</span>}
+                          <td className="px-2 py-1.5 text-center border-l border-slate-200 dark:border-slate-700 min-w-[70px]">
+                            <span className="text-[13px] font-bold tabular-nums text-slate-800 dark:text-slate-100 block leading-none">{total}</span>
+                            {metaValida && (
+                              <div className="mt-1">
+                                {dif === 0 ? (
+                                  <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">OK</span>
+                                ) : dif > 0 ? (
+                                  <span className="text-[9px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.5 rounded" title={`Excede meta por ${dif} hrs`}>+{dif} hrs</span>
+                                ) : (
+                                  <span className="text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded" title={`Faltan ${Math.abs(dif)} hrs`}>{dif} hrs</span>
+                                )}
+                              </div>
+                            )}
+                            {vac > 0 && <span className="block mt-1 text-[9px] font-semibold text-amber-500 bg-amber-50 dark:bg-amber-950/30 px-1 rounded">{vac} VAC</span>}
                           </td>
                         </tr>
                       </Fragment>

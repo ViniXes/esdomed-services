@@ -824,6 +824,8 @@ export interface PlanTrabajo {
   anio: number;
   mes: number;             // 1-12
   numeroHoras?: string;    // texto libre del encabezado, ej. "168 Administrativo / 168 operativo"
+  metaHorasAdmin?: number; // Metas numéricas para validación
+  metaHorasOperativas?: number;
   filas: FilaPlanTrabajo[];
 
   // Trazabilidad
