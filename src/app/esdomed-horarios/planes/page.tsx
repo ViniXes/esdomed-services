@@ -7,7 +7,63 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { PlanTrabajo } from "@/types";
 import { labelPeriodo, periodosCercanos, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
-import { CalendarDays, ChevronRight, Plus, Users } from "lucide-react";
+import { getHorario, esMarcaEspecial } from "@/lib/esdomed/horarios";
+import { CalendarDays, ChevronRight, Plus, Users, Clock } from "lucide-react";
+
+function TurnoActualWidget({ planes }: { planes: PlanTrabajo[] }) {
+  const planActual = planes.find((p) => p.periodo === PERIODO_ACTUAL);
+  
+  const gruposDeTurno = useMemo(() => {
+    if (!planActual) return [];
+    const hoy = new Date();
+    const diaIdx = hoy.getDate() - 1;
+    
+    const countByGroup = new Map<string, number>();
+    
+    planActual.filas.forEach(f => {
+      const celda = (f.asignaciones[diaIdx] ?? "").trim().toUpperCase();
+      if (celda && !esMarcaEspecial(celda)) {
+        const h = getHorario(celda);
+        if (h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario")) {
+          const g = f.grupo?.trim();
+          if (g) countByGroup.set(g, (countByGroup.get(g) || 0) + 1);
+        }
+      }
+    });
+
+    return Array.from(countByGroup.entries())
+      .filter(([_, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1]);
+  }, [planActual]);
+
+  if (!planActual || gruposDeTurno.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-teal-200 dark:border-teal-900/50 bg-teal-50/50 dark:bg-teal-950/20 p-4 mb-6 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-teal-400/10 dark:bg-teal-400/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-teal-500"></span>
+        </div>
+        <h2 className="text-sm font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+          <Clock size={14} /> Equipos de turno hoy
+        </h2>
+      </div>
+      <div className="flex flex-wrap gap-2.5">
+        {gruposDeTurno.map(([grupo, count]) => (
+          <div key={grupo} className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-teal-100 dark:border-teal-800 shadow-sm rounded-xl px-3.5 py-2 z-10">
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{grupo}</span>
+            <span className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+            <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+              {count} {count === 1 ? "persona" : "personas"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PlanesPage() {
   const router = useRouter();
@@ -37,6 +93,8 @@ export default function PlanesPage() {
           Selecciona un mes para editar la cuadrícula de turnos y generar el PDF para RH.
         </p>
       </div>
+
+      {!loading && <TurnoActualWidget planes={planes} />}
 
       {/* Abrir / crear un mes */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 mb-6">
