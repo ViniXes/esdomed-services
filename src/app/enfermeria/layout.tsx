@@ -2,13 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { History, LogIn } from "lucide-react";
+import { ClipboardCheck, History, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 
 const navItems = [
   { href: "/enfermeria/altas", label: "Notificar Alta Vivo", icon: LogIn },
   { href: "/enfermeria/movimientos", label: "Movimientos", icon: History },
+  { href: "/enfermeria/notificacion-altas", label: "Notificación de Altas", icon: ClipboardCheck },
 ];
 
 export default function EnfermeriaLayout({ children }: { children: React.ReactNode }) {
