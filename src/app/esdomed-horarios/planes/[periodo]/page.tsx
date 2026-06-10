@@ -194,6 +194,16 @@ export default function EditorPlanPage() {
 
   const guardar = async () => {
     if (!profile) return;
+
+    const diasIncompletos = conteoOperativosPorDia
+      .map((count, idx) => count < 2 ? idx + 1 : null)
+      .filter(val => val !== null);
+
+    if (diasIncompletos.length > 0) {
+      const confirmacion = window.confirm(`⚠️ ADVERTENCIA: Hay días con menos de 2 operativos asignados (Días: ${diasIncompletos.join(", ")}).\n\n¿Estás seguro que deseas guardar el plan de todas formas?`);
+      if (!confirmacion) return;
+    }
+
     setSaving(true);
     try {
       const ahora = new Date();
@@ -256,6 +266,20 @@ export default function EditorPlanPage() {
         }),
     [filas],
   );
+
+  const conteoOperativosPorDia = useMemo(() => {
+    const conteos = new Array(dias.length).fill(0);
+    filas.forEach(f => {
+      f.asignaciones.forEach((celda, diaIdx) => {
+        const h = getHorario(celda);
+        if (h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario")) {
+          conteos[diaIdx]++;
+        }
+      });
+    });
+    return conteos;
+  }, [filas, dias.length]);
+
   const colSpanTotal = dias.length + 2; // Personal + días + Hrs
 
   return (
@@ -462,6 +486,25 @@ export default function EditorPlanPage() {
                   });
                 })()}
               </tbody>
+              <tfoot>
+                <tr className="bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-200 dark:border-slate-700">
+                  <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-2 py-2 font-bold text-[10px] text-right text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 uppercase tracking-wider">
+                    Total Operativos / Día:
+                  </td>
+                  {dias.map((d, diaIdx) => {
+                    const count = conteoOperativosPorDia[diaIdx];
+                    const faltan = count < 2;
+                    return (
+                      <td key={`tot-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-slate-100 dark:border-slate-700/50 last:border-r-0">
+                        <div className={`mx-auto w-7 h-6 flex items-center justify-center rounded transition-colors ${faltan ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400 border border-rose-300 dark:border-rose-700/80 shadow-sm" : "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"}`} title={faltan ? "Se requieren al menos 2 operativos" : "Cobertura operativa OK"}>
+                          {count}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </>
