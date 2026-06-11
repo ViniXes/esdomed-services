@@ -399,24 +399,24 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
   const listaBlanca = tarjeta ? [tarjeta.titular, ...tarjeta.listaBlanca.filter(v => v.nombre !== tarjeta.titular.nombre)] : [];
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900">
+    <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center p-3 sm:p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ClipboardCheck size={18} className="text-amber-600" /> {editar ? "Editar notificación" : "Registrar notificación"}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={18} /></button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 flex-1 overflow-y-auto min-h-0">
           {!editar && !paciente && (
             <BuscadorPacienteActivo value={paciente} onSelect={elegirPaciente} accent="amber" />
           )}
 
           {pac && (
-            <>
-              {/* Tarjeta del paciente — ancho completo */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2">
+            <div className="flex flex-col gap-4 h-full">
+              {/* Tarjeta del paciente */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2 shrink-0">
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800 dark:text-slate-200">{pac.nombre}</p>
                   <p className="text-xs text-slate-500">Exp. {pac.exp} · {pac.servicio} · Cama {pac.cama || "—"} · {generoLetra(pac.genero)}</p>
@@ -428,64 +428,67 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
-                {/* Columna izquierda: datos del alta */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha del alta</label>
-                    <input type="date" className={inputCls} value={fechaAlta} onChange={e => setFechaAlta(e.target.value)} />
-                    <p className="text-[11px] text-slate-400 mt-1">Las de mañana se notifican hoy.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad</label>
-                      <input type="number" min={0} max={130} className={inputCls} value={edad} onChange={e => setEdad(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Hora</label>
-                      <input type="time" className={inputCls} value={hora} onChange={e => setHora(e.target.value)} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Estado</label>
-                    <select value={estado} onChange={e => setEstado(e.target.value as EstadoPrealta)} className={selectCls}>
-                      {ESTADOS.map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Columna derecha: familiar notificado */}
+              {/* Datos del alta */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Familiar notificado</label>
-                  {listaBlanca.length > 0 && (
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha del alta</label>
+                  <input type="date" className={inputCls} value={fechaAlta} onChange={e => setFechaAlta(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad</label>
+                  <input type="number" min={0} max={130} className={inputCls} value={edad} onChange={e => setEdad(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Hora</label>
+                  <input type="time" className={inputCls} value={hora} onChange={e => setHora(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Estado</label>
+                  <select value={estado} onChange={e => setEstado(e.target.value as EstadoPrealta)} className={selectCls}>
+                    {ESTADOS.map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 -mt-2 shrink-0">La fecha del alta: las de mañana se notifican hoy.</p>
+
+              {/* Familiar notificado */}
+              <div className="shrink-0">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Familiar notificado</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {listaBlanca.length > 0 ? (
                     <select
                       value=""
                       onChange={e => { if (e.target.value) setFamiliarNombre(e.target.value); }}
-                      className={selectCls + " mb-2"}
+                      className={selectCls}
                     >
                       <option value="">— Elegir de la lista blanca de visitas —</option>
                       {listaBlanca.map((v, i) => <option key={i} value={v.nombre}>{v.nombre}{v.parentesco ? ` · ${v.parentesco}` : ""}</option>)}
                     </select>
-                  )}
+                  ) : <div className="hidden sm:block" />}
                   <input className={inputCls} placeholder="Nombre del familiar" value={familiarNombre}
                     onChange={e => setFamiliarNombre(e.target.value.toUpperCase())} />
-                  <textarea className={inputCls + " mt-2 resize-none"} rows={listaBlanca.length > 0 ? 3 : 5} placeholder="Observaciones del familiar (autorizaciones, contacto de emergencia…)"
+                </div>
+              </div>
+
+              {/* Observaciones — llenan el alto disponible */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 md:grid-rows-1">
+                <div className="flex flex-col min-h-0">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Observaciones del familiar</label>
+                  <textarea className={inputCls + " resize-none flex-1 min-h-[100px]"} placeholder="Autorizaciones, contacto de emergencia…"
                     value={obsFamiliar} onChange={e => setObsFamiliar(e.target.value)} />
                 </div>
-
-                {/* Observaciones del paciente — ancho completo */}
-                <div className="md:col-span-2">
+                <div className="flex flex-col min-h-0">
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Observaciones del paciente</label>
-                  <textarea className={inputCls + " resize-none"} rows={2} placeholder="Reingreso, fecha de alta, cuenta con teléfono, etc."
+                  <textarea className={inputCls + " resize-none flex-1 min-h-[100px]"} placeholder="Reingreso, fecha de alta, cuenta con teléfono, etc."
                     value={obsPaciente} onChange={e => setObsPaciente(e.target.value)} />
                 </div>
               </div>
 
               <button onClick={guardar} disabled={guardando}
-                className="w-full py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors">
+                className="w-full py-2.5 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors shrink-0">
                 {guardando ? "Guardando…" : editar ? "Guardar cambios" : "Registrar notificación"}
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
