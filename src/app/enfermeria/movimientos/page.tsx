@@ -115,6 +115,8 @@ export default function EnfermeriaMovimientosPage() {
   const [registros, setRegistros] = useState<NotificacionAltaVivo[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoNotificacionAlta | "todos">("todos");
+  const [fechaDesde, setFechaDesde] = useState(() => new Date().toISOString().split("T")[0]);
+  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split("T")[0]);
   const [editing, setEditing] = useState<NotificacionAltaVivo | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">("");
@@ -137,6 +139,12 @@ export default function EnfermeriaMovimientosPage() {
 
   const lista = registrosVisibles.filter((n) => {
     if (filtroEstado !== "todos" && n.estado !== filtroEstado) return false;
+    if (fechaDesde || fechaHasta) {
+      const d = toDate(n.creadoEn);
+      if (!d) return false;
+      if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
+      if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
+    }
     if (!busqueda) return true;
     const b = busqueda.toLowerCase();
     return (
@@ -255,6 +263,35 @@ export default function EnfermeriaMovimientosPage() {
           <option value="procesada">Alta efectiva</option>
           <option value="recibida">Acusada de recibido</option>
         </select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Desde</span>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        {(busqueda || filtroEstado !== "todos") && (
+          <button
+            onClick={() => {
+              setBusqueda("");
+              setFiltroEstado("todos");
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
 
       <div className="space-y-2">
