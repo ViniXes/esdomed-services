@@ -12,6 +12,7 @@ import {
   Check, MessageSquareWarning, Pencil,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
+import { notificacionAltaAbierta, fmtCuando } from "@/lib/altas/duplicados";
 import type {
   EstadoNotificacionAlta,
   MotivoObservacionAlta,
@@ -151,6 +152,13 @@ function CreateModal({
     setSaving(true);
     setError(null);
     try {
+      // Pre-chequeo: evitar duplicados si el paciente ya tiene una alta abierta.
+      const dup = await notificacionAltaAbierta(selectedPaciente.id!);
+      if (dup) {
+        setError(`Este paciente ya tiene una notificación de alta sin procesar${dup.por ? `, registrada por ${dup.por}` : ""}${dup.cuando ? ` (${fmtCuando(dup.cuando)})` : ""}.`);
+        setSaving(false);
+        return;
+      }
       await addDoc(collection(db, "notificaciones_altas"), {
         notificadoPorId: user.uid,
         notificadoPorNombre: profile.nombre,

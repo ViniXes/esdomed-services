@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogIn, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
+import { notificacionAltaAbierta, fmtCuando } from "@/lib/altas/duplicados";
 import type { Paciente, TipoAltaVivo } from "@/types";
 
 const TIPOS_ALTA: { value: TipoAltaVivo; label: string }[] = [
@@ -34,6 +35,16 @@ export default function EnfermeriaAltasPage() {
     if (!user || !profile || !selectedPaciente || !tipoAlta) return;
     setSaving(true);
     try {
+      // Pre-chequeo: evitar duplicados si el paciente ya tiene una alta abierta.
+      const dup = await notificacionAltaAbierta(selectedPaciente.id!);
+      if (dup) {
+        setModal({
+          type: "error",
+          message: `Este paciente ya tiene una notificación de alta sin procesar${dup.por ? `, registrada por ${dup.por}` : ""}${dup.cuando ? ` (${fmtCuando(dup.cuando)})` : ""}. Verifica antes de volver a enviarla.`,
+        });
+        setSaving(false);
+        return;
+      }
       await addDoc(collection(db, "notificaciones_altas"), {
         notificadoPorId: user.uid,
         notificadoPorNombre: profile.nombre,

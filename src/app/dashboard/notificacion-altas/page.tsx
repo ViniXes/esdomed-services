@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
+import { prealtaExistente } from "@/lib/altas/duplicados";
 import { ubicacionLabel } from "@/lib/servicios";
 import { toDate } from "@/lib/pacientes/helpers";
 import type { Paciente, NotificacionPrealta, EstadoPrealta, TarjetaVisita } from "@/types";
@@ -334,6 +335,16 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
     if (!fechaAlta) { notify("error", "Selecciona la fecha del alta"); return; }
     setGuardando(true);
     try {
+      // Pre-chequeo: no duplicar la prealta del mismo paciente en la misma fecha.
+      const pid = registro?.pacienteId ?? paciente?.id;
+      if (pid) {
+        const dup = await prealtaExistente(pid, fechaAlta, registro?.id);
+        if (dup) {
+          notify("error", `Este paciente ya tiene una prealta para el ${fechaAlta}${dup.por ? ` (registrada por ${dup.por})` : ""}.`);
+          setGuardando(false);
+          return;
+        }
+      }
       const edadNum = edad.trim() ? Number(edad) : undefined;
       if (editar && registro?.id) {
         await updateDoc(doc(db, "notificaciones_prealta", registro.id), {
