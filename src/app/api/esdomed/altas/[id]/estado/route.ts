@@ -32,7 +32,7 @@ async function getCaller(req: NextRequest): Promise<Caller | null> {
     const snap = await adminDb.collection("usuarios").doc(decoded.uid).get();
     const data = snap.data();
     const role = data?.role;
-    if (role !== "esdomed" && role !== "admin") return null;
+    if (role !== "esdomed" && role !== "asistente_esdomed" && role !== "admin") return null;
 
     return {
       uid: decoded.uid,

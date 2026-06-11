@@ -162,6 +162,49 @@ export interface SolicitudImpresion {
   impresoPor?: string;
   impresoPorNombre?: string;
   impresoEn?: Date;
+  entregadoA?: string; // Quién retiró la impresión (texto libre; puede no tener usuario, ej. internos)
+}
+
+// ============================================================================
+// Registro de Altas — bitácora interna de egresos de ESDOMED (control SIMMOW)
+// ============================================================================
+// Reemplaza la hoja de cálculo "_ALTAS REGISTRO ESDO3". Cada documento es una
+// alta/egreso que ESDOMED procesó para digitar en SIMMOW. Es solo para control.
+
+// Tipos de alta (columna "ESTADO" de la hoja, normalizada a un catálogo cerrado).
+export type TipoAlta =
+  | "alta_efectiva"
+  | "alta_exigida"
+  | "alta_voluntaria"
+  | "alta_suspendida"
+  | "alta_dengue"
+  | "alta_jornada_cirugia"
+  | "deposito"
+  | "traslado_otro_hospital";
+
+export interface RegistroAlta {
+  id?: string;
+  fecha: string;                 // YYYY-MM-DD — fecha del alta
+  expediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+  genero?: Genero;
+  tipoAlta: TipoAlta;
+
+  responsableEsdomed: string;    // quién de ESDOMED procesó (default: usuario actual)
+  digitadorSimmow?: string;      // quién lo digitó en SIMMOW
+  medicoRetira?: string;         // médico/persona que retiró la documentación (texto libre)
+
+  // Estado de la documentación — reemplaza el texto libre de la columna "NOTAS".
+  documentacionCompleta: boolean;
+  documentacionEntregada: boolean;
+  notas?: string;
+
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
 }
 
 // ============================================================================
@@ -782,6 +825,8 @@ export interface PlanTrabajo {
   anio: number;
   mes: number;             // 1-12
   numeroHoras?: string;    // texto libre del encabezado, ej. "168 Administrativo / 168 operativo"
+  metaHorasAdmin?: number; // Metas numéricas para validación
+  metaHorasOperativas?: number;
   filas: FilaPlanTrabajo[];
 
   // Trazabilidad
@@ -791,4 +836,55 @@ export interface PlanTrabajo {
   actualizadoEn?: Date;
   actualizadoPorId?: string;
   actualizadoPorNombre?: string;
+}
+
+// ============================================================================
+// Trámites de Personal (ESDOMED)
+// ============================================================================
+
+export type CategoriaTramitePersonal = 
+  | "A1_permiso_con_goce"
+  | "A2_permiso_sin_goce"
+  | "A3_enfermedad"
+  | "A4_compensatorio"
+  | "A5_consulta_isss"
+  | "A6_paternidad"
+  | "A7_enfermedad_pariente"
+  | "A8_duelo"
+  | "A9_otros"
+  | "B_cambio_turno_individual"
+  | "C_cambio_turno_2personas"
+  | "D_licencia_o_acciones"
+  | "E_inconsistencias_marcacion"
+  | "F_tiempo_extra"
+  | "G_misiones_oficiales";
+
+export type EstadoTramitePersonal = "subido" | "pendiente" | "aprobado" | "rechazado";
+
+export interface TramitePersonal {
+  id?: string;
+  categoria: CategoriaTramitePersonal;
+  empleadoId: string;
+  empleadoNombre: string;
+  
+  // Documentos
+  documentoUrl?: string;
+  documentoNombre?: string;
+  notas?: string;
+
+  // Solicitudes (A1, A2)
+  fechaInicio?: Date;
+  fechaFin?: Date;
+  horas?: number;
+  
+  estado: EstadoTramitePersonal;
+  
+  creadoEn: Date;
+  actualizadoEn?: Date;
+  
+  // Aprobación
+  revisadoPorId?: string;
+  revisadoPorNombre?: string;
+  revisadoEn?: Date;
+  comentariosRevision?: string;
 }

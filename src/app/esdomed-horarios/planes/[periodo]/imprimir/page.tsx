@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -11,6 +11,8 @@ import { PlanPrintLayout } from "@/components/esdomed-horarios/PlanPrintLayout";
 
 export default function ImprimirPlanPage({ params }: { params: Promise<{ periodo: string }> }) {
   const { periodo } = use(params);
+  const searchParams = useSearchParams();
+  const tipo = searchParams.get("tipo");
   const router = useRouter();
   const [plan, setPlan] = useState<PlanTrabajo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,13 @@ export default function ImprimirPlanPage({ params }: { params: Promise<{ periodo
         if (!snap.exists()) {
           setError("No hay un plan guardado para este mes.");
         } else {
-          setPlan({ id: snap.id, ...snap.data() } as PlanTrabajo);
+          const data = snap.data() as PlanTrabajo;
+          if (tipo === "institucional") {
+            data.filas = data.filas.filter(f => !f.codigoMarcacion?.toUpperCase().includes("MPW"));
+          } else if (tipo === "manpower") {
+            data.filas = data.filas.filter(f => f.codigoMarcacion?.toUpperCase().includes("MPW"));
+          }
+          setPlan({ id: snap.id, ...data } as PlanTrabajo);
         }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar"))
@@ -54,7 +62,7 @@ export default function ImprimirPlanPage({ params }: { params: Promise<{ periodo
           <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors">
             <ArrowLeft size={15} /> Volver
           </button>
-          <p className="text-xs text-slate-500">Rol de turnos · {labelPeriodo(periodo)}</p>
+          <p className="text-xs text-slate-500">Rol de turnos · {labelPeriodo(periodo)} {tipo === 'institucional' ? '(Institucional)' : tipo === 'manpower' ? '(Manpower)' : ''}</p>
           <button
             onClick={() => window.print()}
             className="flex items-center gap-1.5 bg-[#1c1e4d] hover:bg-[#262a66] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"

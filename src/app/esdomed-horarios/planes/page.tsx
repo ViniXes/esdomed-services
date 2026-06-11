@@ -7,7 +7,70 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { PlanTrabajo } from "@/types";
 import { labelPeriodo, periodosCercanos, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
-import { CalendarDays, ChevronRight, Plus, Users } from "lucide-react";
+import { getHorario, esMarcaEspecial } from "@/lib/esdomed/horarios";
+import { CalendarDays, ChevronRight, Plus, Users, Clock } from "lucide-react";
+
+function TurnoActualWidget({ planes }: { planes: PlanTrabajo[] }) {
+  const planActual = planes.find((p) => p.periodo === PERIODO_ACTUAL);
+  
+  const gruposDeTurno = useMemo(() => {
+    if (!planActual) return [];
+    const hoy = new Date();
+    const diaIdx = hoy.getDate() - 1;
+    
+    const namesByGroup = new Map<string, string[]>();
+    
+    planActual.filas.forEach(f => {
+      const celda = (f.asignaciones[diaIdx] ?? "").trim().toUpperCase();
+      if (celda && !esMarcaEspecial(celda)) {
+        const h = getHorario(celda);
+        if (h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario")) {
+          const g = f.grupo?.trim() || "Sin grupo";
+          const names = namesByGroup.get(g) || [];
+          names.push(f.nombre);
+          namesByGroup.set(g, names);
+        }
+      }
+    });
+
+    return Array.from(namesByGroup.entries())
+      .filter(([_, names]) => names.length > 0)
+      .sort((a, b) => b[1].length - a[1].length);
+  }, [planActual]);
+
+  if (!planActual || gruposDeTurno.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 mb-6 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 dark:bg-emerald-400/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+      <div className="flex items-center gap-2 mb-4">
+        <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-sm" />
+        <h2 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+          <Clock size={14} /> Equipos de turno hoy
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {gruposDeTurno.map(([grupo, nombres]) => (
+          <div key={grupo} className="bg-white dark:bg-slate-900 border border-emerald-100 dark:border-emerald-800/60 shadow-sm rounded-xl p-3 z-10 flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{grupo}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full">
+                {nombres.length} {nombres.length === 1 ? "persona" : "personas"}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {nombres.sort((a, b) => a.localeCompare(b)).map(nombre => (
+                <span key={nombre} className="inline-flex items-center px-2 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-[11px] font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/50">
+                  {nombre}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PlanesPage() {
   const router = useRouter();
@@ -25,7 +88,7 @@ export default function PlanesPage() {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
+    <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
       <div className="mb-6">
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
           <CalendarDays size={13} /> Planes de trabajo
@@ -37,6 +100,8 @@ export default function PlanesPage() {
           Selecciona un mes para editar la cuadrícula de turnos y generar el PDF para RH.
         </p>
       </div>
+
+      {!loading && <TurnoActualWidget planes={planes} />}
 
       {/* Abrir / crear un mes */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 mb-6">

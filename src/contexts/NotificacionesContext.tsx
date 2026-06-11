@@ -65,7 +65,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const knownAnexo5     = useRef<Set<string> | null>(null);
   const knownImpresiones = useRef<Set<string> | null>(null);
 
-  const esEsdomed   = profile?.role === "esdomed" || profile?.role === "admin";
+  const esEsdomed   = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
   const puedeAltas  = esEsdomed || profile?.role === "trabajo_social";
 
   const addToast = useCallback((toast: Omit<NotifToast, "id">) => {

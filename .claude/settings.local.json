@@ -72,7 +72,15 @@
       "Bash(git stash *)",
       "Bash(npx next *)",
       "Bash(echo \"EXIT $?\")",
-      "Bash(echo \"BUILD_EXIT=$?\")"
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "Bash(mkdir -p /tmp/xlsx)",
+      "Bash(unzip -o \"_ALTAS REGISTRO ESDO3_01-HNES-F.xlsx\" -d /tmp/xlsx)",
+      "Read(//tmp/xlsx/xl/**)",
+      "Bash(grep -i \"^xlsx$\\\\|^exceljs$\\\\|^read-excel\")",
+      "Bash(sed -n '36,41p' src/app/dashboard/reportes/page.tsx)",
+      "Bash(sed -n '463p' src/app/dashboard/pacientes/\\\\[id\\\\]/page.tsx)",
+      "Bash(sed -n '40p' src/app/dashboard/incapacidades/\\\\[id\\\\]/page.tsx)",
+      "Bash(sed -n '511,512p' src/app/dashboard/altas-vivos/page.tsx)"
     ]
   }
 }

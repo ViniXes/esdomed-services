@@ -20,7 +20,6 @@ export default function LoginPage() {
     else if (profile.role === "psicologia") router.replace("/psicologia");
     else if (profile.role === "enfermeria") router.replace("/enfermeria");
     else if (profile.role === "rrhh") router.replace("/rrhh");
-    else if (profile.role === "asistente_esdomed") router.replace("/esdomed-horarios");
     else router.replace("/dashboard");
   }, [loading, profile, router]);
 

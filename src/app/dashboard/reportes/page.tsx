@@ -34,7 +34,7 @@ const selectCls =
 export default function ReportesPage() {
   const { profile, loading: authLoading } = useAuth();
   const router = useRouter();
-  const esEsdomed = profile?.role === "esdomed" || profile?.role === "admin";
+  const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   useEffect(() => {
     if (!authLoading && profile && !esEsdomed) router.replace("/dashboard");

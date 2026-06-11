@@ -14,6 +14,7 @@ import {
   History,
   Inbox,
   LayoutDashboard,
+  ListChecks,
   LogIn,
   Phone,
   Printer,
@@ -38,8 +39,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       (!profile ||
         profile.role === "medico" ||
         profile.role === "psicologia" ||
-        profile.role === "enfermeria" ||
-        profile.role === "asistente_esdomed")
+        profile.role === "enfermeria")
     ) {
       router.replace("/login");
     }
@@ -53,19 +53,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         : "ESDOMED";
 
   const esTS = profile?.role === "trabajo_social";
-  const verControlIngresos = profile?.role === "esdomed" || profile?.role === "admin";
-  const verPacientes       = profile?.role === "esdomed" || profile?.role === "admin";
-  const verIncapacidades   = profile?.role === "esdomed" || profile?.role === "admin";
-  const verAltasVivos =
-    profile?.role === "esdomed" ||
-    profile?.role === "admin" ||
-    profile?.role === "trabajo_social";
-  const verConfiguracion = profile?.role === "admin";
-  const verUsuarios = profile?.role === "admin";
-  const verBusquedaTelefono = profile?.role === "admin";
-  const verCuidadosCriticos = profile?.role === "admin";
-  const verReportes = profile?.role === "esdomed" || profile?.role === "admin";
-  const verHorario = profile?.role === "esdomed" || profile?.role === "admin";
+  // El auxiliar administrativo ESDOMED comparte los mismos permisos operativos que ESDOMED.
+  const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed";
+  const esAsistente = profile?.role === "asistente_esdomed";
+  const esAdmin = profile?.role === "admin";
+  const verControlIngresos = esEsdomed || esAdmin;
+  const verPacientes       = esEsdomed || esAdmin;
+  const verIncapacidades   = esEsdomed || esAdmin;
+  const verAltasVivos = esEsdomed || esAdmin || esTS;
+  const verRegistroAltas = esEsdomed || esAdmin;
+  const verConfiguracion = esAdmin;
+  const verUsuarios = esAdmin;
+  const verBusquedaTelefono = esAdmin;
+  const verCuidadosCriticos = esEsdomed || esAdmin;
+  const verReportes = esEsdomed || esAdmin;
+  const verHorario = esEsdomed || esAdmin;
+  // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
+  const verAprobacionTramites = esAdmin || esAsistente;
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
@@ -130,6 +134,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       badge: pendientes.fallecidos,
       group: G_PACIENTES,
     },
+    ...(verRegistroAltas
+      ? [{ href: "/dashboard/registro-altas", label: "Registro de Altas", icon: ListChecks, group: G_PACIENTES }]
+      : []),
     ...(profile?.role === "trabajo_social"
       ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
       : []),
@@ -155,12 +162,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
     // ── Mi área (horarios) ──
     ...(verHorario
-      ? [{ href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL }]
+      ? [
+          { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL },
+          { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList, group: G_PERSONAL }
+        ]
       : []),
 
     // ── Administración ──
     ...(verUsuarios
       ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN }]
+      : []),
+    ...(verAprobacionTramites
+      ? [{ href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck, group: G_ADMIN }]
       : []),
     ...(verConfiguracion
       ? [

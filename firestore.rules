@@ -12,7 +12,10 @@ service cloud.firestore {
     function getRole() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.role;
     }
-    function isEsdomed()      { return isAuth() && getRole() == 'esdomed'; }
+    // El auxiliar administrativo ESDOMED (asistente_esdomed) comparte los mismos
+    // permisos operativos que ESDOMED; por eso se incluye aquí. El superusuario
+    // (admin) sigue siendo aparte y con privilegios más profundos.
+    function isEsdomed()      { return isAuth() && getRole() in ['esdomed', 'asistente_esdomed']; }
     function isAsistenteEsdomed() { return isAuth() && getRole() == 'asistente_esdomed'; }
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
@@ -28,7 +31,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.servicios;
     }
     function isStaff() {
-      return isAuth() && getRole() in ['esdomed', 'admin', 'psicologia', 'trabajo_social'];
+      return isAuth() && getRole() in ['esdomed', 'asistente_esdomed', 'admin', 'psicologia', 'trabajo_social'];
     }
 
     // ─── Usuarios ────────────────────────────────────────────────────────────
@@ -265,7 +268,8 @@ service cloud.firestore {
     // ─── Notificación de Altas / pre-altas (log interno de Trabajo Social) ────
     // Registro diario de pacientes notificados de alta. Control interno de TS.
     match /notificaciones_prealta/{id} {
-      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      // Enfermería tiene acceso SOLO de lectura (ver e imprimir el reporte); no crea/edita.
+      allow read:   if isTrabajoSocial() || isEsdomed() || isEnfermeria() || isAdmin();
       allow create: if isTrabajoSocial();
       allow update: if isTrabajoSocial() || isAdmin();
       allow delete: if isTrabajoSocial() || isAdmin();
@@ -318,6 +322,25 @@ service cloud.firestore {
       allow read:   if isEsdomed() || isAsistenteEsdomed() || isAdmin();
       allow create: if isAsistenteEsdomed() || isAdmin();
       allow update: if isAsistenteEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Registro de Altas (bitácora interna de egresos de ESDOMED) ───────────
+    // Control propio de ESDOMED para la digitación en SIMMOW. Solo ESDOMED/admin.
+    match /registro_altas/{id} {
+      allow read:   if isEsdomed() || isAdmin();
+      allow create: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isEsdomed() || isAdmin();
+    }
+
+    // ─── Trámites de Personal ─────────────────────────────────────────────────
+    // Los empleados pueden crear y leer sus propios trámites.
+    // Administración / Esdomed pueden leer todos y actualizarlos (para aprobar/rechazar).
+    match /tramites_personal/{id} {
+      allow read:   if isAuth() && (resource.data.empleadoId == uid() || isEsdomed() || isAsistenteEsdomed() || isAdmin());
+      allow create: if isAuth() && request.resource.data.empleadoId == uid();
+      allow update: if isEsdomed() || isAsistenteEsdomed() || isAdmin();
       allow delete: if isAdmin();
     }
 

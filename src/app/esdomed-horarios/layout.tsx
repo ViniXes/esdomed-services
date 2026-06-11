@@ -19,8 +19,8 @@ export default function EsdomedHorariosLayout({ children }: { children: React.Re
   }, [loading, profile, router]);
 
   const puedePlanificar = profile?.role === "asistente_esdomed" || profile?.role === "admin";
-  // ESDOMED/admin tienen su panel principal en /dashboard; el asistente no.
-  const tienePanel = profile?.role === "esdomed" || profile?.role === "admin";
+  // ESDOMED, auxiliar administrativo y admin tienen su panel principal en /dashboard.
+  const tienePanel = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   const navItems: NavItem[] = [
     { href: "/esdomed-horarios", label: "Inicio", icon: LayoutDashboard, exact: true },

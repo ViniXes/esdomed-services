@@ -57,7 +57,7 @@ export default function ControlIngresosPage() {
 
   useEffect(() => {
     if (!profile) return;
-    if (profile.role !== "esdomed" && profile.role !== "admin") router.replace("/dashboard");
+    if (profile.role !== "esdomed" && profile.role !== "asistente_esdomed" && profile.role !== "admin") router.replace("/dashboard");
   }, [profile, router]);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function ControlIngresosPage() {
     );
   }, []);
 
-  if (!profile || (profile.role !== "esdomed" && profile.role !== "admin")) {
+  if (!profile || (profile.role !== "esdomed" && profile.role !== "asistente_esdomed" && profile.role !== "admin")) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />

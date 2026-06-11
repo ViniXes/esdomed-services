@@ -37,7 +37,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  const puedeEliminar = profile?.role === "esdomed" || profile?.role === "admin";
+  const puedeEliminar = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   // Suscripción a la incapacidad
   useEffect(() => {
