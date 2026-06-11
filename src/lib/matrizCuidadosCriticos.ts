@@ -170,6 +170,21 @@ const ETIQUETAS_VISIBLES: Record<string, string> = {
   REGISTRO: "Expediente clínico",
 };
 
+const MESES = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE",
+];
+
 function slug(label: string) {
   return label
     .normalize("NFD")
@@ -188,7 +203,7 @@ function inferirTipo(label: string): Pick<CampoMatrizCuidadosCriticos, "tipo" | 
   if (label.startsWith("FECHA")) return { tipo: "date" };
   if (label.startsWith("HORA")) return { tipo: "time" };
   if (CAMPOS_TEXTO_LARGO.has(label)) return { tipo: "textarea" };
-  if (label === "MES") return { tipo: "select", opciones: ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"] };
+  if (label === "MES") return { tipo: "select", opciones: MESES };
   if (label === "SEXO") return { tipo: "select", opciones: ["Femenino", "Masculino", "Otro"] };
   if (label === "ALTA") return { tipo: "select", opciones: ["ALTA", "TRASLADO", "FALLECIDO", "FUGA", "OTRO"] };
   return { tipo: "text" };
@@ -439,11 +454,16 @@ function calcularEdad(value: unknown) {
   return edad;
 }
 
+function mesActual() {
+  return MESES[new Date().getMonth()];
+}
+
 export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidadosCriticos {
   const sexo = paciente.genero === "femenino" ? "Femenino" : paciente.genero === "masculino" ? "Masculino" : "Otro";
   const fallecido = paciente.estado === "alta_fallecido";
 
   return {
+    mes: mesActual(),
     registro: paciente.expediente,
     nombres: paciente.nombres,
     apellidos: paciente.apellidos,

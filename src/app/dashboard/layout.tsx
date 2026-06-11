@@ -66,7 +66,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verConfiguracion = esAdmin;
   const verUsuarios = esAdmin;
   const verBusquedaTelefono = esAdmin;
-  const verCuidadosCriticos = esEsdomed || esAdmin;
+  const verCuidadosCriticos = esAdmin;
   const verReportes = esEsdomed || esAdmin;
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.

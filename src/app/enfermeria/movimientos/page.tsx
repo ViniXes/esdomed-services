@@ -53,6 +53,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   suspendida: "Suspendida",
   procesada: "Alta efectiva",
   recibida: "Acusada de recibido",
+  duplicada: "Duplicada",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -62,19 +63,22 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   suspendida: "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
   procesada: "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900",
   recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
+  duplicada: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
-  cama_expediente: "Error de cama o expediente",
+  cama_expediente: "Datos de cama o expediente no coinciden",
   expediente_duplicado: "Expediente duplicado",
-  no_subido_sis: "No aparece subido en SIS",
-  otro: "Otra observacion",
+  no_subido_sis: "Pre-alta no registrada en SIS",
+  otro: "Otra situacion a corregir",
 };
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition";
 
 const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
+const esEstadoOcultoParaEnfermeria = (n: NotificacionAltaVivo) =>
+  esSoloAcuseRecibido(n.tipoAlta) || n.estado === "deposito" || n.estado === "suspendida";
 
 const estadoBadgeLabel = (n: NotificacionAltaVivo) =>
   n.estado === "recibida" && esSoloAcuseRecibido(n.tipoAlta)
@@ -113,6 +117,8 @@ export default function EnfermeriaMovimientosPage() {
   const [registros, setRegistros] = useState<NotificacionAltaVivo[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoNotificacionAlta | "todos">("todos");
+  const [fechaDesde, setFechaDesde] = useState(() => new Date().toISOString().split("T")[0]);
+  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split("T")[0]);
   const [editing, setEditing] = useState<NotificacionAltaVivo | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">("");
@@ -131,8 +137,16 @@ export default function EnfermeriaMovimientosPage() {
     });
   }, []);
 
-  const lista = registros.filter((n) => {
+  const registrosVisibles = registros.filter((n) => !esEstadoOcultoParaEnfermeria(n));
+
+  const lista = registrosVisibles.filter((n) => {
     if (filtroEstado !== "todos" && n.estado !== filtroEstado) return false;
+    if (fechaDesde || fechaHasta) {
+      const d = toDate(n.creadoEn);
+      if (!d) return false;
+      if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
+      if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
+    }
     if (!busqueda) return true;
     const b = busqueda.toLowerCase();
     return (
@@ -224,10 +238,10 @@ export default function EnfermeriaMovimientosPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
-        <SummaryCard label="Pendientes" value={registros.filter((n) => n.estado === "pendiente").length} />
-        <SummaryCard label="Con observacion" value={registros.filter((n) => n.estado === "observada").length} tone="rose" />
-        <SummaryCard label="Altas efectivas" value={registros.filter((n) => n.estado === "procesada").length} tone="green" />
-        <SummaryCard label="Rectificadas" value={registros.filter((n) => n.rectificacionUsada).length} tone="blue" />
+        <SummaryCard label="Pendientes" value={registrosVisibles.filter((n) => n.estado === "pendiente").length} />
+        <SummaryCard label="Con observacion" value={registrosVisibles.filter((n) => n.estado === "observada").length} tone="rose" />
+        <SummaryCard label="Altas efectivas" value={registrosVisibles.filter((n) => n.estado === "procesada").length} tone="green" />
+        <SummaryCard label="Rectificadas" value={registrosVisibles.filter((n) => n.rectificacionUsada).length} tone="blue" />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -250,15 +264,43 @@ export default function EnfermeriaMovimientosPage() {
           <option value="observada">Requiere correccion</option>
           <option value="procesada">Alta efectiva</option>
           <option value="recibida">Acusada de recibido</option>
-          <option value="deposito">En deposito</option>
-          <option value="suspendida">Suspendida</option>
+          <option value="duplicada">Duplicada</option>
         </select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Desde</span>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+          />
+        </div>
+        {(busqueda || filtroEstado !== "todos") && (
+          <button
+            onClick={() => {
+              setBusqueda("");
+              setFiltroEstado("todos");
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
 
       <div className="space-y-2">
         {lista.length === 0 && (
           <p className="text-sm text-slate-500 py-10 text-center">
-            {registros.length === 0 ? "Aun no hay movimientos de enfermeria." : "Sin resultados para los filtros aplicados."}
+            {registrosVisibles.length === 0 ? "Aun no hay movimientos de enfermeria." : "Sin resultados para los filtros aplicados."}
           </p>
         )}
 
@@ -267,6 +309,7 @@ export default function EnfermeriaMovimientosPage() {
             (n.estado === "pendiente" || n.estado === "observada") &&
             !n.rectificacionUsada &&
             n.notificadoPorId === user?.uid;
+          const estaCerrada = n.estado === "procesada" || n.estado === "recibida" || n.estado === "duplicada";
 
           return (
             <div
@@ -305,12 +348,17 @@ export default function EnfermeriaMovimientosPage() {
                 )}
                 {n.estado === "procesada" && n.procesadoPorNombre && (
                   <p className="text-xs text-green-600 dark:text-green-500 font-medium">
-                    Alta efectiva por {n.procesadoPorNombre} - {formatFecha(n.procesadoEn)}
+                    Alta efectiva por ESDOMED - {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.estado === "recibida" && n.procesadoPorNombre && (
                   <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
-                    Acusada de recibido por {n.procesadoPorNombre} - {formatFecha(n.procesadoEn)}
+                    Acusada de recibido por ESDOMED - {formatFecha(n.procesadoEn)}
+                  </p>
+                )}
+                {n.estado === "duplicada" && n.duplicadoPorNombre && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    Notificacion duplicada cerrada por ESDOMED - {formatFecha(n.duplicadoEn)}
                   </p>
                 )}
                 {n.observacionEsdomedMotivo && (
@@ -325,7 +373,7 @@ export default function EnfermeriaMovimientosPage() {
                     )}
                     {n.observadoPorNombre && (
                       <p className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                        Reportado por {n.observadoPorNombre} - {formatFecha(n.observadoEn)}
+                        Reportado por ESDOMED - {formatFecha(n.observadoEn)}
                       </p>
                     )}
                   </details>
@@ -347,7 +395,7 @@ export default function EnfermeriaMovimientosPage() {
                     <Clock3 size={13} />
                     Rectificacion utilizada
                   </span>
-                ) : n.estado !== "procesada" && n.estado !== "recibida" ? (
+                ) : !estaCerrada ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock3 size={13} />
                     En seguimiento

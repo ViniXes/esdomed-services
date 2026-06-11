@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone } from "lucide-react";
+import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
@@ -30,7 +30,8 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
   const navItems = profile?.tipoMedico
     ? [
         baseNavItems[0],
-        { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity },
+        { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, exact: true },
+        { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2 },
         ...baseNavItems.slice(1),
       ]
     : baseNavItems;

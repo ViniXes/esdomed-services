@@ -47,7 +47,7 @@ service cloud.firestore {
     // Registros clínicos inmutables de UCI y UCIN. Los médicos solo pueden
     // registrar y consultar actividad de sus servicios asignados.
     match /atenciones_cuidados_criticos/{id} {
-      allow read: if isEsdomed() || isAdmin()
+      allow read: if isAdmin()
                   || (isMedicoCuidadosCriticos()
                       && resource.data.servicio in serviciosAsignados());
       allow create: if isMedicoCuidadosCriticos()
@@ -92,7 +92,7 @@ service cloud.firestore {
     // Ficha estructurada que reemplaza la fila de la matriz en Drive. Puede
     // completarse por partes; cada guardado conserva autor y fecha de edición.
     match /fichas_cuidados_criticos/{id} {
-      allow read: if isEsdomed() || isAdmin()
+      allow read: if isAdmin()
                   || (isMedicoCuidadosCriticos()
                       && resource.data.servicio in serviciosAsignados());
       allow create: if isMedicoCuidadosCriticos()
