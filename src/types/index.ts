@@ -4,6 +4,7 @@ export type TipoMedicoCuidadosCriticos = "uci" | "ucin";
 export interface UserProfile {
   uid: string;
   email: string;
+  username?: string;    // alias corto para iniciar sesión (único, en minúsculas)
   nombre: string;
   role: UserRole;
   servicio?: string;    // solo médicos — campo legacy (un servicio)

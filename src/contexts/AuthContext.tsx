@@ -18,7 +18,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -100,7 +100,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const login = async (email: string, password: string) => {
+  // Acepta correo (lleva "@") o username. Si es username, lo traduce a correo en el
+  // servidor antes de autenticar. Cualquier fallo se reporta como credenciales
+  // incorrectas para no filtrar qué usuarios existen.
+  const login = async (identifier: string, password: string) => {
+    const id = identifier.trim();
+    let email = id;
+    if (id && !id.includes("@")) {
+      const res = await fetch("/api/auth/resolve-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: id }),
+      });
+      if (!res.ok) throw new Error("Credenciales incorrectas");
+      email = (await res.json()).email;
+    }
     await signInWithEmailAndPassword(auth, email, password);
   };
 

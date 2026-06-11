@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { Clock, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const { login, profile, loading } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [avisoInactividad, setAvisoInactividad] = useState(false);
@@ -43,9 +44,9 @@ export default function LoginPage() {
     setAvisoInactividad(false);
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(identifier, password);
     } catch {
-      setError("Credenciales incorrectas. Verifica tu correo y contraseña.");
+      setError("Credenciales incorrectas. Verifica tu usuario/correo y contraseña.");
     } finally {
       setSubmitting(false);
     }
@@ -78,7 +79,7 @@ export default function LoginPage() {
 
           {avisoInactividad && (
             <div className="mb-4 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2.5">
-              <span>⏱</span>
+              <Clock size={15} className="mt-0.5 flex-shrink-0" />
               <span>Tu sesión se cerró por inactividad. Por seguridad, vuelve a iniciar sesión.</span>
             </div>
           )}
@@ -86,16 +87,18 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                Correo electrónico
+                Usuario o correo
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                placeholder="usuario@hospital.com"
+                placeholder="tu usuario o correo"
               />
             </div>
 
@@ -116,7 +119,7 @@ export default function LoginPage() {
 
             {error && (
               <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-3 py-2.5">
-                <span>⚠</span> {error}
+                <AlertTriangle size={15} className="flex-shrink-0" /> {error}
               </div>
             )}
 

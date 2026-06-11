@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import { normalizarUsername, usernameValido } from "@/lib/username";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const VALID_ROLES = new Set<UserRole>([
@@ -51,13 +52,25 @@ export async function POST(req: NextRequest) {
   const role = await getCallerRole(req);
   if (!isSuperAdmin(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, codigoMarcacion, puesto } = await req.json();
+  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, codigoMarcacion, puesto, username: usernameRaw } = await req.json();
 
   if (!nombre || !email || !password || !userRole) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
   }
   if (!VALID_ROLES.has(userRole as UserRole)) {
     return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
+  }
+
+  // Username opcional (alias de login). Si viene, se valida formato y unicidad.
+  const username = normalizarUsername(usernameRaw);
+  if (username) {
+    if (!usernameValido(username)) {
+      return NextResponse.json({ error: "Username invalido (3-30 caracteres: letras, numeros, . _ -)" }, { status: 400 });
+    }
+    const dup = await adminDb.collection("usuarios").where("username", "==", username).limit(1).get();
+    if (!dup.empty) {
+      return NextResponse.json({ error: `El username "${username}" ya esta en uso`, code: "username-taken" }, { status: 409 });
+    }
   }
 
   // Si el correo ya está registrado, Firebase Auth lanza auth/email-already-exists.
@@ -95,6 +108,7 @@ export async function POST(req: NextRequest) {
   await adminDb.collection("usuarios").doc(userRecord.uid).set({
     nombre,
     email,
+    ...(username ? { username } : {}),
     role: userRole,
     servicios: serviciosArr,
     servicio: serviciosArr[0] ?? "",

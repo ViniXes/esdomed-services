@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import { normalizarUsername, usernameValido } from "@/lib/username";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const DEFAULT_TEST_PASSWORD = "123456";
@@ -65,6 +66,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
     if (!email) return NextResponse.json({ error: "El correo es requerido" }, { status: 400 });
     update.email = email;
     authUpdate.email = email;
+  }
+
+  if ("username" in body) {
+    const username = normalizarUsername(body.username);
+    if (username) {
+      if (!usernameValido(username)) {
+        return NextResponse.json({ error: "Username invalido (3-30 caracteres: letras, numeros, . _ -)" }, { status: 400 });
+      }
+      const dup = await adminDb.collection("usuarios").where("username", "==", username).limit(1).get();
+      if (dup.docs.some((d) => d.id !== uid)) {
+        return NextResponse.json({ error: `El username "${username}" ya esta en uso`, code: "username-taken" }, { status: 409 });
+      }
+      update.username = username;
+    } else {
+      update.username = FieldValue.delete();
+    }
   }
 
   let nextRole: UserRole | undefined;

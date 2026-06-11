@@ -15,6 +15,7 @@ import {
 interface NuevoUsuario {
   nombre: string;
   email: string;
+  username: string;
   password: string;
   userRole: UserRole;
   tipoMedico: TipoMedicoCuidadosCriticos | "";
@@ -30,6 +31,7 @@ const DEFAULT_PASSWORD = "123456";
 const EMPTY_FORM: NuevoUsuario = {
   nombre: "",
   email: "",
+  username: "",
   password: DEFAULT_PASSWORD,
   userRole: "medico",
   tipoMedico: "",
@@ -222,6 +224,7 @@ export default function DashboardUsuariosPage() {
     setEditForm({
       nombre: u.nombre,
       email: u.email,
+      username: u.username ?? "",
       userRole: u.role,
       tipoMedico: u.tipoMedico ?? "",
       servicios: serviciosActuales,
@@ -309,16 +312,23 @@ export default function DashboardUsuariosPage() {
         !q ||
         u.nombre?.toLowerCase().includes(q) ||
         u.email?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q) ||
         u.codigoMarcacion?.toLowerCase().includes(q);
       return matchRol && matchNombre;
     });
   }, [usuarios, filtroNombre, filtroRol]);
 
+  // Al cambiar filtros, volver a la página 1 (ajuste en render, sin efecto).
+  const filtrosKey = `${filtroNombre}|${filtroRol}`;
+  const [prevFiltros, setPrevFiltros] = useState(filtrosKey);
+  if (filtrosKey !== prevFiltros) {
+    setPrevFiltros(filtrosKey);
+    setPagina(1);
+  }
+
   const totalPaginas = Math.max(1, Math.ceil(usuariosFiltrados.length / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);
   const usuariosPagina = usuariosFiltrados.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
-
-  useEffect(() => { setPagina(1); }, [filtroNombre, filtroRol]);
 
   const hayFiltros = filtroNombre.trim() !== "" || filtroRol !== "todos";
 
@@ -348,6 +358,13 @@ export default function DashboardUsuariosPage() {
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Correo electronico</label>
               <input type="email" value={form.email} onChange={setField("email")} required className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Usuario (para iniciar sesion)</label>
+              <input type="text" value={form.username}
+                onChange={e => setForm(prev => ({ ...prev, username: e.target.value.toLowerCase().replace(/\s+/g, "") }))}
+                autoCapitalize="none" spellCheck={false} placeholder="ej. jperez" className={inputCls} />
+              <p className="mt-1 text-[11px] text-slate-400">Opcional. 3-30 caracteres: letras, numeros, . _ -</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Contrasena inicial</label>
@@ -511,6 +528,9 @@ export default function DashboardUsuariosPage() {
                 <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900 dark:text-slate-100">{u.nombre}</p>
+                    {u.username && (
+                      <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5 font-mono">@{u.username}</p>
+                    )}
                     {u.role === "medico" && (
                       <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-mono">
                         {u.jvpm ? `JVPM: ${u.jvpm}` : <span className="italic">Sin JVPM</span>}
@@ -602,6 +622,12 @@ export default function DashboardUsuariosPage() {
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Correo electronico</label>
                 <input type="email" value={editForm.email} onChange={setEditField("email")} required className={inputCls} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Usuario (para iniciar sesion)</label>
+                <input type="text" value={editForm.username}
+                  onChange={e => setEditForm(prev => prev ? { ...prev, username: e.target.value.toLowerCase().replace(/\s+/g, "") } : prev)}
+                  autoCapitalize="none" spellCheck={false} placeholder="ej. jperez" className={inputCls} />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Rol</label>

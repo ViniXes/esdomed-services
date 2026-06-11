@@ -229,9 +229,11 @@ export default function ConfirmacionAltaPage() {
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${filtro === "todos" ? "bg-slate-700 text-white border-slate-700" : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"}`}>
           Todos ({registros.length})
         </button>
-        <span className="text-xs text-slate-500 ml-1">
-          ✅ {conteos.confirmada} · 🚫 {conteos.suspendida} · 📦 {conteos.deposito}
-        </span>
+        <div className="flex items-center gap-3 text-xs text-slate-500 ml-1">
+          <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} className="text-emerald-600" /> {conteos.confirmada}</span>
+          <span className="inline-flex items-center gap-1"><Ban size={13} className="text-rose-600" /> {conteos.suspendida}</span>
+          <span className="inline-flex items-center gap-1"><PackageOpen size={13} className="text-violet-600" /> {conteos.deposito}</span>
+        </div>
       </div>
 
       <p className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{fmtFechaLarga(fecha)}</p>
@@ -242,7 +244,7 @@ export default function ConfirmacionAltaPage() {
           {registros.length === 0
             ? "No hay prealtas programadas para esta fecha."
             : filtro === "por_confirmar"
-              ? "No quedan prealtas por confirmar en esta fecha. 🎉"
+              ? "No quedan prealtas por confirmar en esta fecha."
               : "Ningún registro coincide con el filtro."}
         </p>
       ) : (

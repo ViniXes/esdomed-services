@@ -400,7 +400,7 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ClipboardCheck size={18} className="text-amber-600" /> {editar ? "Editar notificación" : "Registrar notificación"}
@@ -415,6 +415,7 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
 
           {pac && (
             <>
+              {/* Tarjeta del paciente — ancho completo */}
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800 dark:text-slate-200">{pac.nombre}</p>
@@ -427,50 +428,56 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha del alta</label>
-                <input type="date" className={inputCls} value={fechaAlta} onChange={e => setFechaAlta(e.target.value)} />
-                <p className="text-[11px] text-slate-400 mt-1">Fecha en que se dará el alta (las de mañana se notifican hoy).</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Familiar notificado</label>
-                {listaBlanca.length > 0 && (
-                  <select
-                    value=""
-                    onChange={e => { if (e.target.value) setFamiliarNombre(e.target.value); }}
-                    className={selectCls + " mb-2"}
-                  >
-                    <option value="">— Elegir de la lista blanca de visitas —</option>
-                    {listaBlanca.map((v, i) => <option key={i} value={v.nombre}>{v.nombre}{v.parentesco ? ` · ${v.parentesco}` : ""}</option>)}
-                  </select>
-                )}
-                <input className={inputCls} placeholder="Nombre del familiar" value={familiarNombre}
-                  onChange={e => setFamiliarNombre(e.target.value.toUpperCase())} />
-                <textarea className={inputCls + " mt-2 resize-none"} rows={2} placeholder="Observaciones del familiar (autorizaciones, contacto de emergencia…)"
-                  value={obsFamiliar} onChange={e => setObsFamiliar(e.target.value)} />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Observaciones del paciente</label>
-                <textarea className={inputCls + " resize-none"} rows={2} placeholder="Reingreso, fecha de alta, cuenta con teléfono, etc."
-                  value={obsPaciente} onChange={e => setObsPaciente(e.target.value)} />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad paciente</label>
-                  <input type="number" min={0} max={130} className={inputCls} value={edad} onChange={e => setEdad(e.target.value)} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+                {/* Columna izquierda: datos del alta */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha del alta</label>
+                    <input type="date" className={inputCls} value={fechaAlta} onChange={e => setFechaAlta(e.target.value)} />
+                    <p className="text-[11px] text-slate-400 mt-1">Las de mañana se notifican hoy.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad</label>
+                      <input type="number" min={0} max={130} className={inputCls} value={edad} onChange={e => setEdad(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Hora</label>
+                      <input type="time" className={inputCls} value={hora} onChange={e => setHora(e.target.value)} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Estado</label>
+                    <select value={estado} onChange={e => setEstado(e.target.value as EstadoPrealta)} className={selectCls}>
+                      {ESTADOS.map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
+                    </select>
+                  </div>
                 </div>
+
+                {/* Columna derecha: familiar notificado */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Hora</label>
-                  <input type="time" className={inputCls} value={hora} onChange={e => setHora(e.target.value)} />
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Familiar notificado</label>
+                  {listaBlanca.length > 0 && (
+                    <select
+                      value=""
+                      onChange={e => { if (e.target.value) setFamiliarNombre(e.target.value); }}
+                      className={selectCls + " mb-2"}
+                    >
+                      <option value="">— Elegir de la lista blanca de visitas —</option>
+                      {listaBlanca.map((v, i) => <option key={i} value={v.nombre}>{v.nombre}{v.parentesco ? ` · ${v.parentesco}` : ""}</option>)}
+                    </select>
+                  )}
+                  <input className={inputCls} placeholder="Nombre del familiar" value={familiarNombre}
+                    onChange={e => setFamiliarNombre(e.target.value.toUpperCase())} />
+                  <textarea className={inputCls + " mt-2 resize-none"} rows={listaBlanca.length > 0 ? 3 : 5} placeholder="Observaciones del familiar (autorizaciones, contacto de emergencia…)"
+                    value={obsFamiliar} onChange={e => setObsFamiliar(e.target.value)} />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Estado</label>
-                  <select value={estado} onChange={e => setEstado(e.target.value as EstadoPrealta)} className={selectCls}>
-                    {ESTADOS.map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
-                  </select>
+
+                {/* Observaciones del paciente — ancho completo */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Observaciones del paciente</label>
+                  <textarea className={inputCls + " resize-none"} rows={2} placeholder="Reingreso, fecha de alta, cuenta con teléfono, etc."
+                    value={obsPaciente} onChange={e => setObsPaciente(e.target.value)} />
                 </div>
               </div>
 
