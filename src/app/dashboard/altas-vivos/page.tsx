@@ -61,16 +61,16 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
-  cama_expediente: "Error de cama o expediente",
+  cama_expediente: "Datos de cama o expediente no coinciden",
   expediente_duplicado: "Expediente duplicado",
-  no_subido_sis: "No aparece subido en SIS",
-  otro: "Otra observacion",
+  no_subido_sis: "Pre-alta no registrada en SIS",
+  otro: "Otra situacion a corregir",
 };
 
 const OBSERVACION_DEFAULT: Record<MotivoObservacionAlta, string> = {
-  cama_expediente: "Verificar cama y expediente reportado; los datos no coinciden para procesar el alta.",
-  expediente_duplicado: "El expediente aparece duplicado. Revisar antes de reenviar la notificacion.",
-  no_subido_sis: "El paciente no aparece subido en SIS al momento de la notificacion. Subirlo y reenviar la correccion.",
+  cama_expediente: "Los datos de cama o expediente no coinciden con la informacion disponible para procesar el alta. Verificar y reenviar la correccion.",
+  expediente_duplicado: "El expediente se encuentra duplicado. Confirmar el registro correcto antes de reenviar la correccion.",
+  no_subido_sis: "No se encuentra registrada en SIS la pre-alta del paciente. Verificar el registro y reenviar la correccion.",
   otro: "",
 };
 

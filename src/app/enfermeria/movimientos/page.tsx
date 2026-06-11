@@ -65,10 +65,10 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
-  cama_expediente: "Error de cama o expediente",
+  cama_expediente: "Datos de cama o expediente no coinciden",
   expediente_duplicado: "Expediente duplicado",
-  no_subido_sis: "No aparece subido en SIS",
-  otro: "Otra observacion",
+  no_subido_sis: "Pre-alta no registrada en SIS",
+  otro: "Otra situacion a corregir",
 };
 
 const inputCls =
