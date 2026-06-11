@@ -12,11 +12,72 @@ const MOTIVOS = new Set<MotivoObservacionAlta>([
 
 const TIPOS_SOLO_RECIBIDO = new Set(["deposito", "suspendida"]);
 
+// Al procesar un alta efectiva, el tipo de notificación define con qué estado de
+// egreso se desactiva al paciente. ESDOMED completará luego el resto del egreso.
+const ESTADO_PACIENTE_POR_TIPO: Record<string, string> = {
+  domicilio: "alta_vivo",
+  exigida: "alta_voluntaria",
+  referido: "referido",
+  fuga: "fuga",
+  in_extremis: "in_extremis",
+};
+
 type Caller = {
   uid: string;
   nombre: string;
   role: string;
 };
+
+// Saca al paciente de los activos en cuanto ESDOMED procesa el alta, para que el
+// buscador de pacientes activos (que usa enfermería) deje de mostrarlo y no se
+// reenvíen notificaciones duplicadas. Solo marca el estado; ESDOMED completa el
+// egreso después. Si el paciente no existe o ya no está activo, no hace nada.
+async function desactivarPacienteDelAlta(
+  noti: FirebaseFirestore.DocumentData,
+  notificacionId: string,
+  caller: Caller,
+) {
+  const nuevoEstado = ESTADO_PACIENTE_POR_TIPO[String(noti.tipoAlta)] ?? "alta_vivo";
+
+  // Localizar el ingreso activo: por pacienteId y, si no, por expediente.
+  let ref: FirebaseFirestore.DocumentReference | null = null;
+  let data: FirebaseFirestore.DocumentData | null = null;
+
+  if (noti.pacienteId) {
+    const snap = await adminDb.collection("pacientes").doc(String(noti.pacienteId)).get();
+    if (snap.exists && snap.data()?.estado === "activo") { ref = snap.ref; data = snap.data()!; }
+  }
+  if (!ref && noti.pacienteExpediente) {
+    const q = await adminDb.collection("pacientes")
+      .where("expediente", "==", String(noti.pacienteExpediente))
+      .where("estado", "==", "activo")
+      .limit(1)
+      .get();
+    if (!q.empty) { ref = q.docs[0].ref; data = q.docs[0].data(); }
+  }
+  if (!ref) return; // ya egresado o no existe en la base de pacientes
+
+  await ref.update({
+    estado: nuevoEstado,
+    egresoPendiente: true, // bandera: el egreso aún debe completarlo ESDOMED
+    egresadoAutoEn: FieldValue.serverTimestamp(),
+    notificacionAltaId: notificacionId,
+    actualizadoEn: FieldValue.serverTimestamp(),
+    actualizadoPor: caller.uid,
+  });
+
+  // Anular las tarjetas de visita activas del expediente (igual que en el egreso
+  // normal), ya que el paciente deja de estar internado.
+  const expediente = String(data?.expediente ?? noti.pacienteExpediente ?? "");
+  if (expediente) {
+    const tv = await adminDb.collection("tarjetas_visita").where("expediente", "==", expediente).get();
+    await Promise.all(
+      tv.docs
+        .filter(d => d.data().estado === "activa")
+        .map(d => d.ref.update({ estado: "anulada", actualizadoEn: FieldValue.serverTimestamp() })),
+    );
+  }
+}
 
 type Body =
   | { action: "procesar" }
@@ -73,6 +134,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       procesadoPorNombre: caller.nombre,
       procesadoEn: FieldValue.serverTimestamp(),
     });
+
+    // Alta efectiva → sacar al paciente de activos de una. (Depósito/suspendida solo
+    // se acusan de recibido; el paciente sigue internado y no se desactiva.)
+    if (estadoCierre === "procesada") {
+      try {
+        await desactivarPacienteDelAlta(actual, id, caller);
+      } catch (e) {
+        // No bloqueamos el cierre del alta si la desactivación falla.
+        console.error("No se pudo desactivar al paciente tras procesar el alta:", e);
+      }
+    }
     return NextResponse.json({ ok: true });
   }
 

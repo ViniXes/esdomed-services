@@ -7,6 +7,7 @@ import {
   Activity,
   BarChart3,
   BedDouble,
+  CheckCheck,
   ClipboardCheck,
   ClipboardList,
   FileText,
@@ -109,12 +110,20 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     // ── Gestiones de Altas (TS agrupa Notificación + Verificación) ──
     ...(esTS
-      ? [{
-          href: "/dashboard/notificacion-altas",
-          label: "Notificación de Altas",
-          icon: ClipboardCheck,
-          group: G_GESTIONES_ALTAS,
-        }]
+      ? [
+          {
+            href: "/dashboard/notificacion-altas",
+            label: "Notificación de Prealta",
+            icon: ClipboardCheck,
+            group: G_GESTIONES_ALTAS,
+          },
+          {
+            href: "/dashboard/confirmacion-alta",
+            label: "Confirmación de Alta",
+            icon: CheckCheck,
+            group: G_GESTIONES_ALTAS,
+          },
+        ]
       : []),
     ...(verAltasVivos
       ? [{

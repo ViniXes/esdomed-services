@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
-import { Layers, Hash, BedDouble } from "lucide-react";
+import { Layers, Hash, BedDouble, Search, X } from "lucide-react";
 import type { Paciente } from "@/types";
 
 type Modo = "servicio" | "expediente" | "cama";
@@ -55,11 +55,16 @@ export function BuscadorPacienteActivo({ value, onSelect, accent = "blue" }: Pro
   const [loading, setLoading] = useState(false);
   const [buscado, setBuscado] = useState(false);
   const [existeInactivo, setExisteInactivo] = useState(false);
+  // Buscador rápido de servicio (combobox con lupa).
+  const [servQuery, setServQuery] = useState("");
+  const [servOpen, setServOpen] = useState(false);
 
   const cambiarModo = (m: Modo) => {
     if (m === modo) return;
     setModo(m);
     setServicio("");
+    setServQuery("");
+    setServOpen(false);
     setTexto("");
     setResultados([]);
     setBuscado(false);
@@ -122,6 +127,8 @@ export function BuscadorPacienteActivo({ value, onSelect, accent = "blue" }: Pro
   );
 
   const t = texto.trim();
+  const servQ = servQuery.trim().toLowerCase();
+  const serviciosFiltrados = servQ ? servicios.filter(s => s.toLowerCase().includes(servQ)) : servicios;
 
   return (
     <div className="space-y-3">
@@ -143,17 +150,56 @@ export function BuscadorPacienteActivo({ value, onSelect, accent = "blue" }: Pro
 
       {/* Entrada según el modo */}
       {modo === "servicio" ? (
-        <select value={servicio} onChange={e => setServicio(e.target.value)} className={inputCls}>
-          <option value="">Seleccionar servicio...</option>
-          {servicios.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={servQuery}
+            onChange={e => { setServQuery(e.target.value); setServOpen(true); if (servicio) setServicio(""); }}
+            onFocus={() => setServOpen(true)}
+            onBlur={() => window.setTimeout(() => setServOpen(false), 150)}
+            placeholder="Buscar servicio..."
+            className={inputCls + " pl-9 pr-8"}
+          />
+          {(servQuery || servicio) && (
+            <button
+              type="button"
+              onClick={() => { setServQuery(""); setServicio(""); setServOpen(true); }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              <X size={14} />
+            </button>
+          )}
+          {servOpen && (
+            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+              {serviciosFiltrados.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-slate-400">Sin coincidencias</p>
+              ) : (
+                serviciosFiltrados.map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setServicio(s); setServQuery(s); setServOpen(false); }}
+                    className={`block w-full text-left px-3 py-2 text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-700/60 ${
+                      servicio === s ? "bg-slate-50 dark:bg-slate-700/40 font-medium text-slate-900 dark:text-slate-100" : "text-slate-700 dark:text-slate-200"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       ) : (
         <input
           type="text"
           value={texto}
-          onChange={e => setTexto(e.target.value)}
+          onChange={e => setTexto(modo === "cama" ? e.target.value.toUpperCase() : e.target.value)}
           placeholder={modo === "expediente" ? "Número de expediente (ej. 1-26)" : "Cama (ej. MH1-05)"}
           className={inputCls}
+          style={modo === "cama" ? { textTransform: "uppercase" } : undefined}
         />
       )}
 

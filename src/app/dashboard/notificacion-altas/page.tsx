@@ -26,16 +26,12 @@ const ESTADOS: { v: EstadoPrealta; label: string }[] = [
   { v: "notificado",  label: "Notificado" },
   { v: "pendiente",   label: "Pendiente" },
   { v: "no_responde", label: "N/R (no respondió)" },
-  { v: "suspendida",  label: "Suspendida" },
-  { v: "deposito",    label: "Depósito" },
 ];
 
 const ESTADO_CFG: Record<EstadoPrealta, { label: string; c: string }> = {
   notificado:  { label: "Notificado", c: "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900" },
   pendiente:   { label: "Pendiente",  c: "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900" },
   no_responde: { label: "N/R",        c: "text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700" },
-  suspendida:  { label: "Suspendida", c: "text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900" },
-  deposito:    { label: "Depósito",   c: "text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950 border-violet-200 dark:border-violet-900" },
 };
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
@@ -146,8 +142,8 @@ export default function NotificacionAltasPage() {
             <ClipboardCheck size={17} className="text-amber-700 dark:text-amber-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Notificación de Altas</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Registro de altas notificadas a familiares — control interno de Trabajo Social</p>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Notificación de Prealta</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Registro de prealtas notificadas a familiares — control interno de Trabajo Social</p>
           </div>
         </div>
         {esTS && (
@@ -527,7 +523,7 @@ function ReportePrealtaPrint({ fecha, registros, onClose }: {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo_hnes.png" alt="Hospital El Salvador" className="h-12 w-auto object-contain" />
             <div className="text-center">
-              <h1 className="text-base font-bold uppercase tracking-wide">Altas notificadas por Trabajo Social</h1>
+              <h1 className="text-base font-bold uppercase tracking-wide">Prealtas notificadas por Trabajo Social</h1>
               <p className="text-sm text-slate-600 capitalize">{fmtFechaLarga(fecha)}</p>
             </div>
             <div className="text-[10px] font-semibold uppercase text-slate-500 text-right w-16">Trabajo Social</div>

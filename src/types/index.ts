@@ -367,12 +367,19 @@ export interface NotificacionAltaVivo {
 // Registro diario de pacientes activos cuyo familiar fue notificado de que se
 // irán de alta. Control interno de TS; no involucra a otros roles.
 
+// Estado de la NOTIFICACIÓN (fase 1): ¿se logró avisar a la familia?
 export type EstadoPrealta =
   | "notificado"
   | "pendiente"
-  | "no_responde"   // N/R
-  | "suspendida"
-  | "deposito";
+  | "no_responde";  // N/R
+
+// Resultado de la CONFIRMACIÓN (fase 2, el día del alta): ¿qué pasó realmente?
+// Es una fase distinta de la notificación; se registra en el módulo Confirmación de Alta.
+export type ResultadoConfirmacion =
+  | "por_confirmar"
+  | "confirmada"
+  | "suspendida"   // se descompensó / el médico decide que no está apto; sin nueva fecha
+  | "deposito";    // de alta pero sin quién lo retire; se reprograma a otra fecha
 
 export interface NotificacionPrealta {
   id?: string;
@@ -394,6 +401,15 @@ export interface NotificacionPrealta {
 
   estado: EstadoPrealta;
   horaNotificacion?: Date;        // hora a la que se notificó (default: creadoEn)
+
+  // Confirmación (fase 2 — el día del alta). undefined ⇒ aún "por_confirmar".
+  confirmacion?: ResultadoConfirmacion;
+  motivoConfirmacion?: string;
+  reprogramadaA?: string;         // YYYY-MM-DD — nueva fecha cuando el resultado es "deposito"
+  reprogramadaDe?: string;        // id de la prealta origen (en la copia reprogramada)
+  confirmadoEn?: Date;
+  confirmadoPorId?: string;
+  confirmadoPorNombre?: string;
 
   creadoEn: Date;
   creadoPorId: string;
@@ -537,6 +553,12 @@ export interface Paciente {
   procedimientos?: string[];
   medicoEgresoNombre?: string;
   medicoEgresoJvpm?: string;
+
+  // Egreso provisional: ESDOMED procesó la notificación de alta y el paciente
+  // salió de activos, pero aún faltan los datos completos del egreso por capturar.
+  egresoPendiente?: boolean;
+  egresadoAutoEn?: Date;
+  notificacionAltaId?: string;
 
   // COVID (legado del CSV)
   fechaPruebaCovid?: Date;

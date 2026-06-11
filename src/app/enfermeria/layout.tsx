@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, History, LogIn } from "lucide-react";
+import { CheckCheck, ClipboardCheck, History, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/enfermeria/altas", label: "Notificar Alta Vivo", icon: LogIn },
   { href: "/enfermeria/movimientos", label: "Movimientos", icon: History },
   { href: "/enfermeria/notificacion-altas", label: "Reporte TS", icon: ClipboardCheck },
+  { href: "/enfermeria/confirmacion-alta", label: "Confirmación de Alta", icon: CheckCheck },
 ];
 
 export default function EnfermeriaLayout({ children }: { children: React.ReactNode }) {

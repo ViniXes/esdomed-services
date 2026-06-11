@@ -270,7 +270,7 @@ service cloud.firestore {
     match /notificaciones_prealta/{id} {
       // Enfermería tiene acceso SOLO de lectura (ver e imprimir el reporte); no crea/edita.
       allow read:   if isTrabajoSocial() || isEsdomed() || isEnfermeria() || isAdmin();
-      allow create: if isTrabajoSocial();
+      allow create: if isTrabajoSocial() || isAdmin();
       allow update: if isTrabajoSocial() || isAdmin();
       allow delete: if isTrabajoSocial() || isAdmin();
     }
