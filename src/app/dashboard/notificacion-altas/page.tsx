@@ -544,7 +544,8 @@ function ReportePrealtaPrint({ fecha, registros, onClose }: {
               <h1 className="text-base font-bold uppercase tracking-wide">Prealtas notificadas por Trabajo Social</h1>
               <p className="text-sm text-slate-600 capitalize">{fmtFechaLarga(fecha)}</p>
             </div>
-            <div className="text-[10px] font-semibold uppercase text-slate-500 text-right w-16">Trabajo Social</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logots.jpeg" alt="Trabajo Social" className="h-12 w-auto object-contain" />
           </div>
 
           <table className="w-full border-collapse" style={{ fontSize: "10px" }}>
