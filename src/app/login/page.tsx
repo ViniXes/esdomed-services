@@ -11,7 +11,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [avisoInactividad, setAvisoInactividad] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Aviso de sesión cerrada por inactividad (marca dejada por AuthContext).
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("esdomed:session_expired") === "inactividad") {
+        // Lectura post-montaje de una API del navegador (hidratación-safe); el aviso
+        // se fija aquí a propósito.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setAvisoInactividad(true);
+        sessionStorage.removeItem("esdomed:session_expired");
+      }
+    } catch { /* noop */ }
+  }, []);
 
   useEffect(() => {
     if (loading || !profile) return;
@@ -26,6 +40,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setAvisoInactividad(false);
     setSubmitting(true);
     try {
       await login(email, password);
@@ -60,6 +75,13 @@ export default function LoginPage() {
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/10 dark:shadow-black/40 p-7">
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading mb-1">Iniciar sesión</h1>
           <p className="text-xs text-slate-500 mb-6">Portal ESDOMED</p>
+
+          {avisoInactividad && (
+            <div className="mb-4 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2.5">
+              <span>⏱</span>
+              <span>Tu sesión se cerró por inactividad. Por seguridad, vuelve a iniciar sesión.</span>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

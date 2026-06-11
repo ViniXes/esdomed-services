@@ -44,6 +44,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  // Cierre de sesión por inactividad (2 horas). La última actividad se comparte
+  // entre pestañas vía localStorage: si otra pestaña sigue activa, una pestaña en
+  // segundo plano no cierra la sesión. Al expirar, deja una marca para que /login
+  // muestre el aviso y luego hace signOut.
+  useEffect(() => {
+    if (!user) return;
+
+    const LIMITE_MS = 2 * 60 * 60 * 1000; // 2 horas
+    const KEY_ACTIVIDAD = "esdomed:last_activity";
+    let timeoutId: number;
+    let ultimaEscritura = 0;
+
+    const ahora = () => Date.now();
+    const leerUltima = () => {
+      const v = Number(localStorage.getItem(KEY_ACTIVIDAD));
+      return Number.isFinite(v) && v > 0 ? v : ahora();
+    };
+
+    const cerrarPorInactividad = async () => {
+      try { sessionStorage.setItem("esdomed:session_expired", "inactividad"); } catch { /* noop */ }
+      await signOut(auth);
+    };
+
+    const programar = () => {
+      window.clearTimeout(timeoutId);
+      const restante = LIMITE_MS - (ahora() - leerUltima());
+      if (restante <= 0) { void cerrarPorInactividad(); return; }
+      timeoutId = window.setTimeout(() => {
+        // Revalidar contra la última actividad (pudo actualizarse en otra pestaña).
+        if (ahora() - leerUltima() >= LIMITE_MS) void cerrarPorInactividad();
+        else programar();
+      }, restante);
+    };
+
+    const registrarActividad = () => {
+      const t = ahora();
+      if (t - ultimaEscritura < 30_000) return; // throttle: a lo sumo 1 escritura/30 s
+      ultimaEscritura = t;
+      try { localStorage.setItem(KEY_ACTIVIDAD, String(t)); } catch { /* noop */ }
+      programar();
+    };
+
+    const eventos: (keyof WindowEventMap)[] = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
+    eventos.forEach(e => window.addEventListener(e, registrarActividad, { passive: true }));
+
+    // Inicializar marca y temporizador.
+    ultimaEscritura = ahora();
+    try { localStorage.setItem(KEY_ACTIVIDAD, String(ultimaEscritura)); } catch { /* noop */ }
+    programar();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      eventos.forEach(e => window.removeEventListener(e, registrarActividad));
+    };
+  }, [user]);
+
   const login = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
