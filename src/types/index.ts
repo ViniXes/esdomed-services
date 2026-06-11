@@ -297,6 +297,7 @@ export interface NotificacionAltaVivo {
   // Modificado por TS
   modificadoPorId?: string;
   modificadoPorNombre?: string;
+  modificadoPorRol?: UserRole | string;
   modificadoEn?: Date;
 
   // Rectificacion por Enfermeria antes del alta efectiva

@@ -75,6 +75,8 @@ const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition";
 
 const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
+const esEstadoOcultoParaEnfermeria = (n: NotificacionAltaVivo) =>
+  esSoloAcuseRecibido(n.tipoAlta) || n.estado === "deposito" || n.estado === "suspendida";
 
 const estadoBadgeLabel = (n: NotificacionAltaVivo) =>
   n.estado === "recibida" && esSoloAcuseRecibido(n.tipoAlta)
@@ -131,7 +133,9 @@ export default function EnfermeriaMovimientosPage() {
     });
   }, []);
 
-  const lista = registros.filter((n) => {
+  const registrosVisibles = registros.filter((n) => !esEstadoOcultoParaEnfermeria(n));
+
+  const lista = registrosVisibles.filter((n) => {
     if (filtroEstado !== "todos" && n.estado !== filtroEstado) return false;
     if (!busqueda) return true;
     const b = busqueda.toLowerCase();
@@ -224,10 +228,10 @@ export default function EnfermeriaMovimientosPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
-        <SummaryCard label="Pendientes" value={registros.filter((n) => n.estado === "pendiente").length} />
-        <SummaryCard label="Con observacion" value={registros.filter((n) => n.estado === "observada").length} tone="rose" />
-        <SummaryCard label="Altas efectivas" value={registros.filter((n) => n.estado === "procesada").length} tone="green" />
-        <SummaryCard label="Rectificadas" value={registros.filter((n) => n.rectificacionUsada).length} tone="blue" />
+        <SummaryCard label="Pendientes" value={registrosVisibles.filter((n) => n.estado === "pendiente").length} />
+        <SummaryCard label="Con observacion" value={registrosVisibles.filter((n) => n.estado === "observada").length} tone="rose" />
+        <SummaryCard label="Altas efectivas" value={registrosVisibles.filter((n) => n.estado === "procesada").length} tone="green" />
+        <SummaryCard label="Rectificadas" value={registrosVisibles.filter((n) => n.rectificacionUsada).length} tone="blue" />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -250,15 +254,13 @@ export default function EnfermeriaMovimientosPage() {
           <option value="observada">Requiere correccion</option>
           <option value="procesada">Alta efectiva</option>
           <option value="recibida">Acusada de recibido</option>
-          <option value="deposito">En deposito</option>
-          <option value="suspendida">Suspendida</option>
         </select>
       </div>
 
       <div className="space-y-2">
         {lista.length === 0 && (
           <p className="text-sm text-slate-500 py-10 text-center">
-            {registros.length === 0 ? "Aun no hay movimientos de enfermeria." : "Sin resultados para los filtros aplicados."}
+            {registrosVisibles.length === 0 ? "Aun no hay movimientos de enfermeria." : "Sin resultados para los filtros aplicados."}
           </p>
         )}
 
@@ -305,12 +307,12 @@ export default function EnfermeriaMovimientosPage() {
                 )}
                 {n.estado === "procesada" && n.procesadoPorNombre && (
                   <p className="text-xs text-green-600 dark:text-green-500 font-medium">
-                    Alta efectiva por {n.procesadoPorNombre} - {formatFecha(n.procesadoEn)}
+                    Alta efectiva por ESDOMED - {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.estado === "recibida" && n.procesadoPorNombre && (
                   <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
-                    Acusada de recibido por {n.procesadoPorNombre} - {formatFecha(n.procesadoEn)}
+                    Acusada de recibido por ESDOMED - {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.observacionEsdomedMotivo && (
@@ -325,7 +327,7 @@ export default function EnfermeriaMovimientosPage() {
                     )}
                     {n.observadoPorNombre && (
                       <p className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                        Reportado por {n.observadoPorNombre} - {formatFecha(n.observadoEn)}
+                        Reportado por ESDOMED - {formatFecha(n.observadoEn)}
                       </p>
                     )}
                   </details>

@@ -111,6 +111,16 @@ const estadoBadgeColor = (n: NotificacionAltaVivo) => {
   return ESTADO_COLOR[n.estado];
 };
 
+const esRolEsdomed = (rol?: string) => rol === "esdomed" || rol === "admin";
+
+const fueModificadaPorEsdomed = (n: NotificacionAltaVivo) =>
+  esRolEsdomed(n.modificadoPorRol) ||
+  (Boolean(n.modificadoPorId) &&
+    (n.modificadoPorId === n.procesadoPorId || n.modificadoPorId === n.observadoPorId));
+
+const nombreEsdomedVisible = (mostrarNombre: boolean, nombre?: string) =>
+  mostrarNombre ? nombre ?? "ESDOMED" : "ESDOMED";
+
 // ── Create Modal (TS) ─────────────────────────────────────────────────────────
 
 function CreateModal({
@@ -688,6 +698,8 @@ export default function AltasVivosPage() {
         {displayList.map(n => {
           const requiereSoloAcuse = esSoloAcuseRecibido(n.tipoAlta);
           const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida";
+          const mostrarNombresEsdomed = isEsdomed;
+          const modificadoPorNombre = isTS && fueModificadaPorEsdomed(n) ? "ESDOMED" : n.modificadoPorNombre;
           const puedeRectificarTS =
             isTS &&
             (n.estado === "pendiente" || n.estado === "observada") &&
@@ -725,18 +737,18 @@ export default function AltasVivosPage() {
                 </p>
                 {n.modificadoPorNombre && (
                   <p className="text-xs text-slate-400">
-                    Modificado por <span className="text-slate-500 font-medium">{n.modificadoPorNombre}</span>
+                    Modificado por <span className="text-slate-500 font-medium">{modificadoPorNombre}</span>
                     {" · "}{formatFecha(n.modificadoEn)}
                   </p>
                 )}
                 {n.estado === "procesada" && n.procesadoPorNombre && (
                   <p className="text-xs text-green-600 dark:text-green-500 font-medium">
-                    Alta efectiva por {n.procesadoPorNombre} · {formatFecha(n.procesadoEn)}
+                    Alta efectiva por {nombreEsdomedVisible(mostrarNombresEsdomed, n.procesadoPorNombre)} · {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.estado === "recibida" && n.procesadoPorNombre && (
                   <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
-                    Acusada de recibido por {n.procesadoPorNombre} · {formatFecha(n.procesadoEn)}
+                    Acusada de recibido por {nombreEsdomedVisible(mostrarNombresEsdomed, n.procesadoPorNombre)} · {formatFecha(n.procesadoEn)}
                   </p>
                 )}
                 {n.observacionEsdomedMotivo && (
@@ -751,7 +763,7 @@ export default function AltasVivosPage() {
                     )}
                     {n.observadoPorNombre && (
                       <p className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                        Observado por {n.observadoPorNombre} - {formatFecha(n.observadoEn)}
+                        Observado por {nombreEsdomedVisible(mostrarNombresEsdomed, n.observadoPorNombre)} - {formatFecha(n.observadoEn)}
                       </p>
                     )}
                   </details>

@@ -96,6 +96,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     },
     modificadoPorId: caller.uid,
     modificadoPorNombre: caller.nombre,
+    modificadoPorRol: caller.role,
     modificadoEn: FieldValue.serverTimestamp(),
   };
 
