@@ -53,6 +53,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   suspendida: "Suspendida",
   procesada: "Alta efectiva",
   recibida: "Acusada de recibido",
+  duplicada: "Duplicada",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -62,6 +63,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   suspendida: "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
   procesada: "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900",
   recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
+  duplicada: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
@@ -262,6 +264,7 @@ export default function EnfermeriaMovimientosPage() {
           <option value="observada">Requiere correccion</option>
           <option value="procesada">Alta efectiva</option>
           <option value="recibida">Acusada de recibido</option>
+          <option value="duplicada">Duplicada</option>
         </select>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Desde</span>
@@ -306,6 +309,7 @@ export default function EnfermeriaMovimientosPage() {
             (n.estado === "pendiente" || n.estado === "observada") &&
             !n.rectificacionUsada &&
             n.notificadoPorId === user?.uid;
+          const estaCerrada = n.estado === "procesada" || n.estado === "recibida" || n.estado === "duplicada";
 
           return (
             <div
@@ -352,6 +356,11 @@ export default function EnfermeriaMovimientosPage() {
                     Acusada de recibido por ESDOMED - {formatFecha(n.procesadoEn)}
                   </p>
                 )}
+                {n.estado === "duplicada" && n.duplicadoPorNombre && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    Notificacion duplicada cerrada por ESDOMED - {formatFecha(n.duplicadoEn)}
+                  </p>
+                )}
                 {n.observacionEsdomedMotivo && (
                   <details className="group mt-2 rounded-lg border border-rose-200/70 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 px-3 py-2 text-slate-900 dark:text-slate-100">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold">
@@ -386,7 +395,7 @@ export default function EnfermeriaMovimientosPage() {
                     <Clock3 size={13} />
                     Rectificacion utilizada
                   </span>
-                ) : n.estado !== "procesada" && n.estado !== "recibida" ? (
+                ) : !estaCerrada ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                     <Clock3 size={13} />
                     En seguimiento

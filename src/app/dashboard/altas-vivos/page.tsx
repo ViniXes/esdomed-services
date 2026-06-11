@@ -49,6 +49,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   suspendida: "Suspendida",
   procesada:  "Alta efectiva",
   recibida:   "Acusada de recibido",
+  duplicada:  "Duplicada",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -58,6 +59,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   suspendida: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
   procesada:  "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
   recibida:   "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
+  duplicada:  "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
@@ -73,6 +75,12 @@ const OBSERVACION_DEFAULT: Record<MotivoObservacionAlta, string> = {
   no_subido_sis: "No se encuentra registrada en SIS la pre-alta del paciente. Verificar el registro y reenviar la correccion.",
   otro: "",
 };
+
+const OBSERVACION_MOTIVOS: MotivoObservacionAlta[] = [
+  "cama_expediente",
+  "no_subido_sis",
+  "otro",
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -315,7 +323,7 @@ function ObservacionModal({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {(Object.keys(OBSERVACION_LABEL) as MotivoObservacionAlta[]).map((value) => (
+          {OBSERVACION_MOTIVOS.map((value) => (
             <button
               key={value}
               type="button"
@@ -535,6 +543,8 @@ export default function AltasVivosPage() {
 
   const [observandoId, setObservandoId] = useState<string | null>(null);
   const [observandoLoading, setObservandoLoading] = useState(false);
+  const [duplicandoId, setDuplicandoId] = useState<string | null>(null);
+  const [duplicandoLoading, setDuplicandoLoading] = useState(false);
   const [quitandoObservacionId, setQuitandoObservacionId] = useState<string | null>(null);
   const [rectificando, setRectificando] = useState<NotificacionAltaVivo | null>(null);
 
@@ -619,8 +629,29 @@ export default function AltasVivosPage() {
     }
   };
 
+  const cerrarDuplicada = async () => {
+    if (!duplicandoId || !user || !profile) return;
+    setDuplicandoLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${duplicandoId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "cerrar_duplicada" }),
+      });
+      if (!res.ok) throw new Error("No se pudo cerrar la notificacion como duplicada.");
+    } finally {
+      setDuplicandoLoading(false);
+      setDuplicandoId(null);
+    }
+  };
+
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
   const observandoNot = observandoId ? notificaciones.find(n => n.id === observandoId) : null;
+  const duplicandoNot = duplicandoId ? notificaciones.find(n => n.id === duplicandoId) : null;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -666,6 +697,7 @@ export default function AltasVivosPage() {
           <option value="observada">Requiere correccion</option>
           <option value="procesada">Alta efectiva</option>
           <option value="recibida">Acusada de recibido</option>
+          <option value="duplicada">Duplicada</option>
           <option value="deposito">En depósito</option>
           <option value="suspendida">Suspendida</option>
         </select>
@@ -697,7 +729,7 @@ export default function AltasVivosPage() {
 
         {displayList.map(n => {
           const requiereSoloAcuse = esSoloAcuseRecibido(n.tipoAlta);
-          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida";
+          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida" || n.estado === "duplicada";
           const mostrarNombresEsdomed = isEsdomed;
           const modificadoPorNombre = isTS && fueModificadaPorEsdomed(n) ? "ESDOMED" : n.modificadoPorNombre;
           const puedeRectificarTS =
@@ -751,6 +783,11 @@ export default function AltasVivosPage() {
                     Acusada de recibido por {nombreEsdomedVisible(mostrarNombresEsdomed, n.procesadoPorNombre)} · {formatFecha(n.procesadoEn)}
                   </p>
                 )}
+                {n.estado === "duplicada" && n.duplicadoPorNombre && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    Notificacion duplicada cerrada por {nombreEsdomedVisible(mostrarNombresEsdomed, n.duplicadoPorNombre)} · {formatFecha(n.duplicadoEn)}
+                  </p>
+                )}
                 {n.observacionEsdomedMotivo && (
                   <details className="group mt-2 rounded-lg border border-rose-200/70 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 px-3 py-2 text-slate-900 dark:text-slate-100">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold">
@@ -797,6 +834,13 @@ export default function AltasVivosPage() {
                       >
                         <MessageSquareWarning size={13} />
                         {n.estado === "observada" ? "Cambiar observacion" : "Marcar con observacion"}
+                      </button>
+                      <button
+                        onClick={() => setDuplicandoId(n.id!)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <X size={13} />
+                        Cerrar duplicada
                       </button>
                       {n.estado === "observada" && (
                         <button
@@ -861,6 +905,18 @@ export default function AltasVivosPage() {
           onConfirm={observarNotificacion}
           onCancel={() => setObservandoId(null)}
           loading={observandoLoading}
+        />
+      )}
+
+      {duplicandoId && duplicandoNot && (
+        <ConfirmModal
+          title="Cerrar como duplicada"
+          message={`Confirma que la notificacion de ${duplicandoNot.pacienteNombre} esta duplicada. Quedara cerrada sin solicitar correccion a Enfermeria o Trabajo Social.`}
+          confirmLabel="Cerrar duplicada"
+          confirmCls="bg-slate-700 hover:bg-slate-600"
+          onConfirm={cerrarDuplicada}
+          onCancel={() => setDuplicandoId(null)}
+          loading={duplicandoLoading}
         />
       )}
 

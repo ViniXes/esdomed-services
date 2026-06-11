@@ -5,7 +5,6 @@ import type { MotivoObservacionAlta } from "@/types";
 
 const MOTIVOS = new Set<MotivoObservacionAlta>([
   "cama_expediente",
-  "expediente_duplicado",
   "no_subido_sis",
   "otro",
 ]);
@@ -21,7 +20,8 @@ type Caller = {
 type Body =
   | { action: "procesar" }
   | { action: "observar"; motivo: MotivoObservacionAlta; detalle: string }
-  | { action: "quitar_observacion" };
+  | { action: "quitar_observacion" }
+  | { action: "cerrar_duplicada" };
 
 async function getCaller(req: NextRequest): Promise<Caller | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
@@ -107,6 +107,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.action === "quitar_observacion") {
     await ref.update({
       estado: "pendiente",
+      observacionEsdomedMotivo: FieldValue.delete(),
+      observacionEsdomedDetalle: FieldValue.delete(),
+      observadoPorId: FieldValue.delete(),
+      observadoPorNombre: FieldValue.delete(),
+      observadoEn: FieldValue.delete(),
+      modificadoPorId: caller.uid,
+      modificadoPorNombre: caller.nombre,
+      modificadoPorRol: caller.role,
+      modificadoEn: FieldValue.serverTimestamp(),
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.action === "cerrar_duplicada") {
+    await ref.update({
+      estado: "duplicada",
+      duplicadoPorId: caller.uid,
+      duplicadoPorNombre: caller.nombre,
+      duplicadoEn: FieldValue.serverTimestamp(),
       observacionEsdomedMotivo: FieldValue.delete(),
       observacionEsdomedDetalle: FieldValue.delete(),
       observadoPorId: FieldValue.delete(),

@@ -301,7 +301,7 @@ export interface SolicitudIncapacidad {
 // ============================================================================
 
 export type TipoAltaVivo = "domicilio" | "exigida" | "referido" | "fuga" | "in_extremis" | "deposito" | "suspendida";
-export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada" | "recibida";
+export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada" | "recibida" | "duplicada";
 export type MotivoObservacionAlta =
   | "cama_expediente"
   | "expediente_duplicado"
@@ -362,6 +362,11 @@ export interface NotificacionAltaVivo {
   procesadoPorId?: string;
   procesadoPorNombre?: string;
   procesadoEn?: Date;
+
+  // Cierre administrativo por duplicidad
+  duplicadoPorId?: string;
+  duplicadoPorNombre?: string;
+  duplicadoEn?: Date;
 }
 
 // ── Notificación de Altas (pre-alta) — log interno de Trabajo Social ──────────
