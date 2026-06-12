@@ -11,7 +11,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, History, Plus, Search } from "lucide-react";
+import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
@@ -52,6 +52,7 @@ export default function CuidadosCriticosMedicoPage() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedEstanciaId, setSelectedEstanciaId] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [servicioFiltro, setServicioFiltro] = useState("todos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -79,15 +80,18 @@ export default function CuidadosCriticosMedicoPage() {
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
-  const estanciaActiva = fichasPaciente.find(ficha => !fichaEgresada(ficha));
   const numeroEstancia = fichaSeleccionada
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
     : fichasPaciente.length + 1;
 
+  const busquedaNormalizada = busqueda.trim().toLowerCase();
+  const debeBuscarOFiltrar = servicioFiltro === "todos" && busquedaNormalizada.length < 2;
   const pacientesFiltrados = pacientes.filter(paciente => {
-    const term = busqueda.trim().toLowerCase();
+    if (debeBuscarOFiltrar) return false;
+    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
+    const term = busquedaNormalizada;
     if (!term) return true;
-    return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""}`
+    return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
       .toLowerCase()
       .includes(term);
   });
@@ -103,7 +107,7 @@ export default function CuidadosCriticosMedicoPage() {
   const guardarFicha = async (datos: DatosMatrizCuidadosCriticos) => {
     if (!user || !profile?.tipoMedico || !selected?.id) return;
     if (!esValorRegistrado(datos.fecha_ingreso_al_servicio)) {
-      const message = "Registra primero la FECHA INGRESO AL SERVICIO correspondiente a esta estancia UCI/UCIN.";
+      const message = "Registra primero la FECHA INGRESO AL SERVICIO correspondiente a este registro UCI/UCIN.";
       setError(message);
       throw new Error(message);
     }
@@ -120,6 +124,13 @@ export default function CuidadosCriticosMedicoPage() {
       ? "egresada"
       : "activa";
     const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, profile.tipoMedico);
+    const registroActivoExistente = fichasPaciente.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
+    if (!fichaSeleccionada?.id && registroActivoExistente) {
+      const message = "Este paciente ya tiene un registro activo. Cierra el registro actual antes de crear uno nuevo.";
+      setError(message);
+      setSaving(false);
+      throw new Error(message);
+    }
 
     try {
       if (fichaSeleccionada?.id) {
@@ -151,7 +162,7 @@ export default function CuidadosCriticosMedicoPage() {
         setSelectedEstanciaId(creada.id);
       }
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "No se pudo guardar la estancia.";
+      const message = cause instanceof Error ? cause.message : "No se pudo guardar el registro.";
       setError(message);
       throw cause;
     } finally {
@@ -185,18 +196,34 @@ export default function CuidadosCriticosMedicoPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat icon={<Activity size={18} />} label="Pacientes en mis unidades" value={pacientes.length} />
-        <Stat icon={<FileSpreadsheet size={18} />} label="Estancias registradas" value={fichas.length} />
-        <Stat icon={<CheckCircle2 size={18} />} label="Estancias activas" value={fichas.filter(item => !fichaEgresada(item)).length} />
+        <Stat icon={<FileSpreadsheet size={18} />} label="Registros guardados" value={fichas.length} />
+        <Stat icon={<CheckCircle2 size={18} />} label="Registros activos" value={fichas.filter(item => !fichaEgresada(item)).length} />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-100 p-4 dark:border-slate-800">
           <h2 className="font-bold font-heading text-slate-900 dark:text-slate-100">Seleccionar paciente</h2>
-          <p className="mt-1 text-xs text-slate-500">Cada entrada del paciente a UCI o UCIN debe registrarse como una estancia independiente.</p>
-          <div className="relative mt-3">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={busqueda} onChange={event => setBusqueda(event.target.value)} placeholder="Buscar paciente, expediente, servicio o cama" className={`${inputCls} pl-9`} />
+          <p className="mt-1 text-xs text-slate-500">Cada entrada del paciente a UCI o UCIN debe registrarse como un registro independiente.</p>
+          <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={busqueda} onChange={event => setBusqueda(event.target.value)} placeholder="Buscar paciente, expediente, servicio o cama" className={`${inputCls} pl-9`} />
+            </div>
+            <select
+              value={servicioFiltro}
+              onChange={event => setServicioFiltro(event.target.value)}
+              className={inputCls}
+              aria-label="Filtrar pacientes por servicio asignado"
+            >
+              <option value="todos">Todos mis servicios</option>
+              {servicios.map(servicio => (
+                <option key={servicio} value={servicio}>{servicio}</option>
+              ))}
+            </select>
           </div>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Mostrando solo pacientes de las unidades asignadas a {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]}.
+          </p>
         </div>
         <div className="grid max-h-64 gap-2 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
           {pacientesFiltrados.map(paciente => {
@@ -223,34 +250,17 @@ export default function CuidadosCriticosMedicoPage() {
               </button>
             );
           })}
-          {pacientesFiltrados.length === 0 && <p className="col-span-full py-10 text-center text-sm text-slate-400">No hay pacientes en los servicios asignados.</p>}
+          {pacientesFiltrados.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-slate-400">
+              {debeBuscarOFiltrar
+                ? "Busca por expediente, cama o nombre, o elige un servicio para cargar sus pacientes."
+                : "No hay pacientes que coincidan con la busqueda o el servicio seleccionado."}
+            </p>
+          )}
         </div>
       </section>
+      {/*
 
-      {selected && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-2 font-bold font-heading text-slate-900 dark:text-slate-100"><History size={17} /> Estancias del paciente</h2>
-              <p className="mt-1 text-xs text-slate-500">Cierra la estancia actual registrando su fecha de egreso antes de iniciar un reingreso.</p>
-            </div>
-            <button
-              type="button"
-              disabled={Boolean(estanciaActiva)}
-              onClick={() => setSelectedEstanciaId(NUEVA_ESTANCIA)}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Plus size={16} /> Nueva estancia
-            </button>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {fichasPaciente.map((ficha, index) => (
-              <button
-                key={ficha.id}
-                type="button"
-                onClick={() => setSelectedEstanciaId(ficha.id!)}
-                className={`rounded-lg border px-3 py-2 text-left text-xs ${selectedEstanciaId === ficha.id ? "border-blue-500 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300" : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}
-              >
                 <span className="block font-semibold">Estancia {index + 1} · {fichaEgresada(ficha) ? "Egresada" : "Activa"}</span>
                 <span className="mt-0.5 block text-slate-400">
                   Exp. {ficha.pacienteExpediente} · {ficha.pacienteNombre} · {ubicacionLabel(ficha.servicio, ficha.cama)} · Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "pendiente"}
@@ -272,6 +282,7 @@ export default function CuidadosCriticosMedicoPage() {
         </section>
       )}
 
+      */}
       {error && (
         <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
           <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}

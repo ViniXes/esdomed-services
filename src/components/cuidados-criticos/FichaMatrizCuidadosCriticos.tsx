@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Info, Save, Search, Table2, X } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import {
   aplicarCalculosBasicos,
-  aplicarValoresPorDefectoMatriz,
   camposBloqueadosPorPaciente,
   datosAutomaticosPaciente,
   gruposMatrizPorTipo,
@@ -17,7 +16,6 @@ import {
 } from "@/lib/matrizCuidadosCriticos";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import type { DiagnosticoCIE, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
-import { LienzoMatrizCuidadosCriticos } from "./LienzoMatrizCuidadosCriticos";
 
 interface Props {
   paciente: Paciente;
@@ -52,9 +50,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
   const [paso, setPaso] = useState(0);
   const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosAutomaticos, ...datosGuardados }));
   const [message, setMessage] = useState("");
-  const [mostrarLienzo, setMostrarLienzo] = useState(false);
   const datosCalculados = aplicarCalculosBasicos({ ...datosAutomaticos, ...datos });
-  const datosConValoresPorDefecto = aplicarValoresPorDefectoMatriz(datosCalculados, tipo);
   const camposBloqueados = camposBloqueadosPorPaciente(paciente);
 
   const grupo = grupos[paso];
@@ -84,7 +80,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold font-heading text-slate-900 dark:text-slate-100">
-            Estancia {numeroEstancia}: {paciente.apellidos}, {paciente.nombres}
+            Registro {numeroEstancia}: {paciente.apellidos}, {paciente.nombres}
           </h2>
           <p className="mt-1 text-xs text-slate-500">
             Exp. {paciente.expediente} · {servicioEstancia} · Cama {paciente.camaActual || "—"}
@@ -114,11 +110,8 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
             <button
               key={item.id}
               type="button"
-              onClick={() => {
-                setPaso(index);
-                setMostrarLienzo(false);
-              }}
-              className={`rounded-xl border p-3 text-left transition-colors ${paso === index && !mostrarLienzo ? "border-blue-500 bg-blue-50 dark:border-blue-700 dark:bg-blue-950" : "border-slate-200 hover:border-blue-300 dark:border-slate-700"}`}
+              onClick={() => setPaso(index)}
+              className={`rounded-xl border p-3 text-left transition-colors ${paso === index ? "border-blue-500 bg-blue-50 dark:border-blue-700 dark:bg-blue-950" : "border-slate-200 hover:border-blue-300 dark:border-slate-700"}`}
             >
               <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{item.titulo}</span>
               <span className="mt-1 block text-xs text-slate-500">{completosGrupo}/{item.campos.length} completados</span>
@@ -127,32 +120,10 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setMostrarLienzo(value => !value)}
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-700 dark:border-slate-700 dark:text-slate-300"
-      >
-        <Table2 size={16} />
-        {mostrarLienzo ? "Volver al formulario" : "Revisar lienzo completo"}
-      </button>
-
-      {mostrarLienzo ? (
-        <div className="space-y-3">
-          <div className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
-            <Info size={16} className="mt-0.5 shrink-0" />
-            Esta vista conserva el orden y los nombres de la matriz compartida. Desplázate horizontalmente para revisarla.
-          </div>
-          <LienzoMatrizCuidadosCriticos tipo={tipo} datos={datosConValoresPorDefecto} />
-        </div>
-      ) : (
-        <>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100">{grupo.titulo}</h3>
-            <p className="mt-1 text-sm text-slate-500">{grupo.descripcion}</p>
-            <p className="mt-2 flex items-start gap-2 text-xs text-slate-500">
-              <Info size={14} className="mt-0.5 shrink-0 text-blue-500" />
-              Registra únicamente información comprobada. Lo que no corresponda o no esté confirmado se guardará como No registrado.
-            </p>
+      <>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{grupo.titulo}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">{grupo.descripcion}</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -198,7 +169,6 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
             </div>
           </footer>
         </>
-      )}
     </section>
   );
 }
