@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, Timestamp } from "firebase/firestore";
+import { addDoc, collection, getDocs, limit, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
-import type { SolicitudAnexo5 } from "@/types";
+import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown, Search, User2, X } from "lucide-react";
+import type { Paciente, SolicitudAnexo5 } from "@/types";
+import { CIRCUNSTANCIA_LABEL, calcularEdad, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
@@ -80,6 +81,11 @@ export default function NuevaAnexo5Page() {
   const [modalInfo, setModalInfo] = useState<{ tipo: "exito" | "error", mensaje: string } | null>(null);
   const [establecimientosOpen, setEstablecimientosOpen] = useState(false);
 
+  // Búsqueda de paciente por expediente (autocompletado)
+  const [buscandoExp, setBuscandoExp] = useState(false);
+  const [pacienteEncontrado, setPacienteEncontrado] = useState<Paciente | null>(null);
+  const [busquedaExpInfo, setBusquedaExpInfo] = useState<string | null>(null);
+
   const busquedaEstablecimiento = normalizarBusqueda(form.establecimientoReferencia.trim());
   const establecimientosFiltrados = busquedaEstablecimiento
     ? establecimientosReferencia.filter((establecimiento) =>
@@ -92,6 +98,56 @@ export default function NuevaAnexo5Page() {
       setForm((prev) => ({ ...prev, medicoRefiere: profile.nombre }));
     }
   }, [profile]);
+
+  const buscarPorExpediente = async () => {
+    const exp = form.expediente.trim();
+    if (!exp) return;
+    setBuscandoExp(true);
+    setBusquedaExpInfo(null);
+    setPacienteEncontrado(null);
+    try {
+      const q = query(
+        collection(db, "pacientes"),
+        where("expediente", "==", exp),
+        orderBy("fechaIngreso", "desc"),
+        limit(1),
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setBusquedaExpInfo("No se encontró ese expediente en el sistema. Puedes llenar los datos manualmente.");
+        return;
+      }
+      const d = snap.docs[0];
+      const data = d.data();
+      const p = {
+        id: d.id,
+        ...data,
+        fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+        fechaNacimiento: toDate(data.fechaNacimiento),
+        creadoEn: toDate(data.creadoEn) ?? new Date(),
+      } as Paciente;
+      setPacienteEncontrado(p);
+
+      // "Referido de": si vino referido y tenemos el establecimiento de procedencia
+      // lo usamos; si no, la circunstancia de ingreso (demanda espontánea / emergencia).
+      const referido =
+        p.circunstanciaIngreso === "referido" && p.establecimientoProcedencia
+          ? p.establecimientoProcedencia
+          : p.circunstanciaIngreso
+            ? CIRCUNSTANCIA_LABEL[p.circunstanciaIngreso]
+            : "";
+
+      setForm((prev) => ({
+        ...prev,
+        nombrePaciente: nombreCompleto(p),
+        ...(referido && !prev.referidoDe.trim() ? { referidoDe: referido } : {}),
+      }));
+    } catch (e) {
+      setBusquedaExpInfo(`Error al buscar: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setBuscandoExp(false);
+    }
+  };
 
   const guardar = async () => {
     if (!user || !profile) return;
@@ -152,6 +208,8 @@ export default function NuevaAnexo5Page() {
     });
     setModalInfo(null);
     setEstablecimientosOpen(false);
+    setPacienteEncontrado(null);
+    setBusquedaExpInfo(null);
   };
 
   return (
@@ -230,12 +288,59 @@ export default function NuevaAnexo5Page() {
             <div className="md:col-span-2">
               <label className={lbl}>
                 Expediente
-                <span className="ml-1.5 font-normal text-slate-400">(solo referencia interna — no aparece en el impreso)</span>
+                <span className="ml-1.5 font-normal text-slate-400">(autocompleta los datos del paciente — no aparece en el impreso)</span>
               </label>
-              <input type="text" className={inputCls} value={form.expediente}
-                onChange={(e) => setForm({ ...form, expediente: e.target.value })}
-                placeholder="Ej. 1234567" />
+              <div className="flex gap-2">
+                <input type="text" className={inputCls} value={form.expediente}
+                  onChange={(e) => setForm({ ...form, expediente: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarPorExpediente(); } }}
+                  placeholder="Ej. 1234567" />
+                <button type="button" onClick={buscarPorExpediente}
+                  disabled={buscandoExp || !form.expediente.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors flex-shrink-0">
+                  <Search size={14} />
+                  {buscandoExp ? "Buscando..." : "Buscar"}
+                </button>
+              </div>
             </div>
+
+            {/* Resultado de la búsqueda por expediente */}
+            {(pacienteEncontrado || busquedaExpInfo) && (
+              <div className="md:col-span-3">
+                {pacienteEncontrado ? (
+                  <div className="flex items-start gap-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 rounded-xl px-4 py-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center flex-shrink-0">
+                      <User2 size={16} className="text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400">
+                        <CheckCircle2 size={13} /> Paciente encontrado — datos autocompletados
+                      </p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
+                        {nombreCompleto(pacienteEncontrado)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Exp. <span className="font-mono">{pacienteEncontrado.expediente}</span>
+                        {calcularEdad(pacienteEncontrado.fechaNacimiento) !== null && <> · {calcularEdad(pacienteEncontrado.fechaNacimiento)} años</>}
+                        {pacienteEncontrado.servicioActual && <> · {pacienteEncontrado.servicioActual}</>}
+                        {pacienteEncontrado.camaActual && <> · Cama {pacienteEncontrado.camaActual}</>}
+                      </p>
+                    </div>
+                    <button type="button"
+                      onClick={() => { setPacienteEncontrado(null); setBusquedaExpInfo(null); }}
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex-shrink-0"
+                      aria-label="Quitar">
+                      <X size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>{busquedaExpInfo}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Fila 2: Nombre paciente (full) */}
             <div className="md:col-span-3">

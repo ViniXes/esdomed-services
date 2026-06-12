@@ -81,7 +81,8 @@
       "Bash(sed -n '463p' src/app/dashboard/pacientes/\\\\[id\\\\]/page.tsx)",
       "Bash(sed -n '40p' src/app/dashboard/incapacidades/\\\\[id\\\\]/page.tsx)",
       "Bash(sed -n '511,512p' src/app/dashboard/altas-vivos/page.tsx)",
-      "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|svg|webp\\)$\")"
+      "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|svg|webp\\)$\")",
+      "Bash(claude update *)"
     ]
   }
 }
