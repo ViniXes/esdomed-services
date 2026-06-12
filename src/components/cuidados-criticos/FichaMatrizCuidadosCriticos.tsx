@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Info, Save, Search, X } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import {
@@ -80,7 +80,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold font-heading text-slate-900 dark:text-slate-100">
-            Estancia {numeroEstancia}: {paciente.apellidos}, {paciente.nombres}
+            Registro {numeroEstancia}: {paciente.apellidos}, {paciente.nombres}
           </h2>
           <p className="mt-1 text-xs text-slate-500">
             Exp. {paciente.expediente} · {servicioEstancia} · Cama {paciente.camaActual || "—"}
@@ -121,13 +121,9 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
       </div>
 
       <>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-            <h3 className="font-bold text-slate-900 dark:text-slate-100">{grupo.titulo}</h3>
-            <p className="mt-1 text-sm text-slate-500">{grupo.descripcion}</p>
-            <p className="mt-2 flex items-start gap-2 text-xs text-slate-500">
-              <Info size={14} className="mt-0.5 shrink-0 text-blue-500" />
-              Registra únicamente información comprobada. Lo que no corresponda o no esté confirmado se guardará como No registrado.
-            </p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{grupo.titulo}</h3>
+            <p className="mt-0.5 text-xs text-slate-500">{grupo.descripcion}</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
