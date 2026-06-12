@@ -52,6 +52,7 @@ export default function CuidadosCriticosMedicoPage() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedEstanciaId, setSelectedEstanciaId] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [servicioFiltro, setServicioFiltro] = useState("todos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -85,9 +86,10 @@ export default function CuidadosCriticosMedicoPage() {
     : fichasPaciente.length + 1;
 
   const pacientesFiltrados = pacientes.filter(paciente => {
+    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
     const term = busqueda.trim().toLowerCase();
     if (!term) return true;
-    return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""}`
+    return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
       .toLowerCase()
       .includes(term);
   });
@@ -193,10 +195,26 @@ export default function CuidadosCriticosMedicoPage() {
         <div className="border-b border-slate-100 p-4 dark:border-slate-800">
           <h2 className="font-bold font-heading text-slate-900 dark:text-slate-100">Seleccionar paciente</h2>
           <p className="mt-1 text-xs text-slate-500">Cada entrada del paciente a UCI o UCIN debe registrarse como una estancia independiente.</p>
-          <div className="relative mt-3">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={busqueda} onChange={event => setBusqueda(event.target.value)} placeholder="Buscar paciente, expediente, servicio o cama" className={`${inputCls} pl-9`} />
+          <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={busqueda} onChange={event => setBusqueda(event.target.value)} placeholder="Buscar paciente, expediente, servicio o cama" className={`${inputCls} pl-9`} />
+            </div>
+            <select
+              value={servicioFiltro}
+              onChange={event => setServicioFiltro(event.target.value)}
+              className={inputCls}
+              aria-label="Filtrar pacientes por servicio asignado"
+            >
+              <option value="todos">Todos mis servicios</option>
+              {servicios.map(servicio => (
+                <option key={servicio} value={servicio}>{servicio}</option>
+              ))}
+            </select>
           </div>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Mostrando solo pacientes de las unidades asignadas a {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]}.
+          </p>
         </div>
         <div className="grid max-h-64 gap-2 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
           {pacientesFiltrados.map(paciente => {
@@ -223,7 +241,7 @@ export default function CuidadosCriticosMedicoPage() {
               </button>
             );
           })}
-          {pacientesFiltrados.length === 0 && <p className="col-span-full py-10 text-center text-sm text-slate-400">No hay pacientes en los servicios asignados.</p>}
+          {pacientesFiltrados.length === 0 && <p className="col-span-full py-10 text-center text-sm text-slate-400">No hay pacientes que coincidan con la busqueda o el servicio seleccionado.</p>}
         </div>
       </section>
 
