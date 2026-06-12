@@ -85,9 +85,12 @@ export default function CuidadosCriticosMedicoPage() {
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
     : fichasPaciente.length + 1;
 
+  const busquedaNormalizada = busqueda.trim().toLowerCase();
+  const debeBuscarOFiltrar = servicioFiltro === "todos" && busquedaNormalizada.length < 2;
   const pacientesFiltrados = pacientes.filter(paciente => {
+    if (debeBuscarOFiltrar) return false;
     if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
-    const term = busqueda.trim().toLowerCase();
+    const term = busquedaNormalizada;
     if (!term) return true;
     return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
       .toLowerCase()
@@ -241,7 +244,13 @@ export default function CuidadosCriticosMedicoPage() {
               </button>
             );
           })}
-          {pacientesFiltrados.length === 0 && <p className="col-span-full py-10 text-center text-sm text-slate-400">No hay pacientes que coincidan con la busqueda o el servicio seleccionado.</p>}
+          {pacientesFiltrados.length === 0 && (
+            <p className="col-span-full py-10 text-center text-sm text-slate-400">
+              {debeBuscarOFiltrar
+                ? "Busca por expediente, cama o nombre, o elige un servicio para cargar sus pacientes."
+                : "No hay pacientes que coincidan con la busqueda o el servicio seleccionado."}
+            </p>
+          )}
         </div>
       </section>
 
