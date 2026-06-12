@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCheck, ClipboardCheck, History, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
+import { SoporteGlobo } from "@/components/SoporteGlobo";
 
 const navItems = [
   { href: "/enfermeria/altas", label: "Notificar Alta Vivo", icon: LogIn },
@@ -31,6 +32,7 @@ export default function EnfermeriaLayout({ children }: { children: React.ReactNo
           </div>
         ) : children}
       </main>
+      <SoporteGlobo />
     </div>
   );
 }
