@@ -2,16 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { Activity, CheckCircle2, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
+import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
-import { esValorRegistrado, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
+import { camposPendientesCierreCuidadosCriticos, esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import type { FichaCuidadosCriticos } from "@/types";
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
+type CierreFiltro = "todos" | "pendientes" | "cerrados";
 
 const MESES = [
   "ENERO",
@@ -62,6 +63,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [servicio, setServicio] = useState("todos");
   const [periodo, setPeriodo] = useState<PeriodoFiltro>("todos");
+  const [cierre, setCierre] = useState<CierreFiltro>("todos");
   const [mes, setMes] = useState(MESES[new Date().getMonth()]);
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -83,6 +85,9 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     const texto = busqueda.trim().toLowerCase();
     return fichas.filter(ficha => {
       if (servicio !== "todos" && ficha.servicio !== servicio) return false;
+      const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
+      if (cierre === "pendientes" && !pendienteCierre) return false;
+      if (cierre === "cerrados" && pendienteCierre) return false;
       if (periodo === "mes" && valorComoTexto(ficha.datos?.mes) !== mes) return false;
       if (periodo === "rango" && !enRango(fechaIngresoFicha(ficha), desde, hasta)) return false;
       if (!texto) return true;
@@ -90,11 +95,11 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         .toLowerCase()
         .includes(texto);
     });
-  }, [busqueda, desde, fichas, hasta, mes, periodo, servicio]);
+  }, [busqueda, cierre, desde, fichas, hasta, mes, periodo, servicio]);
 
   const pacientesUnicos = new Set(fichasFiltradas.map(ficha => ficha.pacienteExpediente)).size;
   const activas = fichasFiltradas.filter(ficha => !fichaEgresada(ficha)).length;
-  const egresadas = fichasFiltradas.length - activas;
+  const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
 
   if (!profile?.tipoMedico) {
     return (
@@ -124,7 +129,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasFiltradas.length} />
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
         <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
-        <Stat icon={<CheckCircle2 size={18} />} label="Egresadas" value={egresadas} />
+        <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -145,6 +150,15 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
               <option value="todos">Todas las entradas</option>
               <option value="mes">Por mes</option>
               <option value="rango">Rango de fechas</option>
+            </select>
+          </label>
+
+          <label>
+            <span className="mb-1 block text-xs font-semibold text-slate-500">Cierre</span>
+            <select value={cierre} onChange={event => setCierre(event.target.value as CierreFiltro)} className={inputCls}>
+              <option value="todos">Todos</option>
+              <option value="pendientes">Pendientes</option>
+              <option value="cerrados">Cerrados</option>
             </select>
           </label>
 
@@ -201,22 +215,36 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
                 <th className="px-3 py-2">Paciente</th>
                 <th className="px-3 py-2">Ubicación</th>
                 <th className="px-3 py-2">Ingreso</th>
+                <th className="px-3 py-2">Responsable</th>
                 <th className="px-3 py-2">Estado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {fichasFiltradas.slice(0, 12).map(ficha => (
-                <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
-                  <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
-                  <td className="px-3 py-2">{ficha.pacienteNombre}</td>
-                  <td className="px-3 py-2">{ubicacionLabel(ficha.servicio, ficha.cama)}</td>
-                  <td className="px-3 py-2">{valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}</td>
-                  <td className="px-3 py-2">{fichaEgresada(ficha) ? "Egresada" : "Activa"}</td>
-                </tr>
-              ))}
+              {fichasFiltradas.slice(0, 12).map(ficha => {
+                const pendientes = camposPendientesCierreCuidadosCriticos(ficha.datos);
+                return (
+                  <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
+                    <td className="px-3 py-2">{ficha.pacienteNombre}</td>
+                    <td className="px-3 py-2">{ubicacionLabel(ficha.servicio, ficha.cama)}</td>
+                    <td className="px-3 py-2">{valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}</td>
+                    <td className="px-3 py-2">{ficha.creadoPorNombre || "No registrado"}</td>
+                    <td className="px-3 py-2">
+                      {pendientes.length > 0 ? (
+                        <div className="text-amber-600 dark:text-amber-300">
+                          <span className="font-semibold">Pendiente</span>
+                          <p className="mt-0.5 text-[11px]">{pendientes.map(campo => campo.label).join(", ")}</p>
+                        </div>
+                      ) : (
+                        <span className="text-emerald-600 dark:text-emerald-300">{fichaEgresada(ficha) ? "Cerrada" : "Completa"}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {fichasFiltradas.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-slate-400">No hay registros con los filtros seleccionados.</td>
+                  <td colSpan={6} className="px-3 py-8 text-center text-slate-400">No hay registros con los filtros seleccionados.</td>
                 </tr>
               )}
             </tbody>

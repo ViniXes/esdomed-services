@@ -1,4 +1,4 @@
-import type { Paciente, TipoMedicoCuidadosCriticos } from "@/types";
+import type { FichaCuidadosCriticos, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
 export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "catalogoCritico";
 
@@ -21,6 +21,13 @@ export interface GrupoMatrizCuidadosCriticos {
 type ValorMatriz = string | number;
 export type DatosMatrizCuidadosCriticos = Record<string, ValorMatriz>;
 export const VALOR_NO_REGISTRADO = "No registrado";
+export const CAMPOS_CIERRE_CUIDADOS_CRITICOS = new Set(["fecha_egreso_del_servicio", "alta", "fecha_de_muerte"]);
+
+const LABELS_CIERRE_CUIDADOS_CRITICOS: Record<string, string> = {
+  fecha_egreso_del_servicio: "FECHA EGRESO DEL SERVICIO",
+  alta: "ALTA",
+  fecha_de_muerte: "FECHA DE MUERTE",
+};
 
 const CAMPOS_SI_NO = new Set([
   "REINGRESO ≤ 72 HORAS",
@@ -516,6 +523,17 @@ export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCritico
     resultado[campo.key] = campo.tipo === "number" ? 0 : VALOR_NO_REGISTRADO;
   }
   return resultado;
+}
+
+export function camposPendientesCierreCuidadosCriticos(datos?: DatosMatrizCuidadosCriticos) {
+  const pendientes = ["fecha_egreso_del_servicio", "alta"].filter(key => !esValorRegistrado(datos?.[key]));
+  const alta = valorComoTexto(datos?.alta).trim().toUpperCase();
+  if (alta === "FALLECIDO" && !esValorRegistrado(datos?.fecha_de_muerte)) pendientes.push("fecha_de_muerte");
+  return pendientes.map(key => ({ key, label: LABELS_CIERRE_CUIDADOS_CRITICOS[key] ?? key }));
+}
+
+export function fichaPendienteCierreCuidadosCriticos(ficha: FichaCuidadosCriticos) {
+  return camposPendientesCierreCuidadosCriticos(ficha.datos).length > 0;
 }
 
 export function valorComoTexto(value: unknown) {
