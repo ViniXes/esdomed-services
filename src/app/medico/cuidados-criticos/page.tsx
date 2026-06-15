@@ -51,14 +51,20 @@ export default function CuidadosCriticosMedicoPage() {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [pacientePrecargado, setPacientePrecargado] = useState<Paciente | null>(null);
-  const [fichaUrlId] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("ficha") ?? "");
+  const [fichaUrlId, setFichaUrlId] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [selectedEstanciaId, setSelectedEstanciaId] = useState("");
   const [busqueda, setBusqueda] = useState("");
-  const [busquedaHistorica, setBusquedaHistorica] = useState("");
   const [servicioFiltro, setServicioFiltro] = useState("todos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    queueMicrotask(() => {
+      setFichaUrlId(new URLSearchParams(window.location.search).get("ficha") ?? "");
+    });
+  }, []);
 
   useEffect(() => {
     if (!profile?.tipoMedico || servicios.length === 0) return;
@@ -128,19 +134,21 @@ export default function CuidadosCriticosMedicoPage() {
       .includes(term);
   });
 
-  const busquedaHistoricaNormalizada = busquedaHistorica.trim().toLowerCase();
-  const fichasHistoricasFiltradas = busquedaHistoricaNormalizada.length < 2
+  const fichasHistoricasFiltradas = busquedaNormalizada.length < 2
     ? []
     : fichas
-        .filter(ficha => `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaHistoricaNormalizada))
+        .filter(ficha => {
+          if (servicioFiltro !== "todos" && ficha.servicio !== servicioFiltro) return false;
+          return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaNormalizada);
+        })
         .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0))
         .slice(0, 8);
+  const totalResultadosBusqueda = pacientesFiltrados.length + fichasHistoricasFiltradas.length;
 
   const abrirFichaHistorica = (ficha: FichaCuidadosCriticos) => {
     setSelectedId(ficha.pacienteId);
     setSelectedEstanciaId(ficha.id ?? "");
     setBusqueda(ficha.pacienteExpediente);
-    setBusquedaHistorica("");
     setServicioFiltro(ficha.servicio);
     setError("");
   };
@@ -300,17 +308,44 @@ export default function CuidadosCriticosMedicoPage() {
               </button>
             );
           })}
-          {pacientesFiltrados.length === 0 && (
+          {fichasHistoricasFiltradas.map(ficha => {
+            const cerrada = fichaEgresada(ficha);
+            const seleccionada = selectedEstanciaId === ficha.id;
+            return (
+              <button
+                key={ficha.id}
+                type="button"
+                onClick={() => abrirFichaHistorica(ficha)}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${seleccionada ? "border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950" : "border-slate-200 hover:border-blue-300 dark:border-slate-700 dark:hover:border-blue-800"}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900 dark:text-slate-100">{ficha.pacienteNombre}</p>
+                    <p className="mt-0.5 text-[11px] font-mono text-slate-500">Exp. {ficha.pacienteExpediente}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${cerrada ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"}`}>
+                    {cerrada ? "Registro cerrado" : "Registro activo"}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(ficha.servicio, ficha.cama)}</p>
+                <p className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  Abrir registro guardado - Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}
+                </p>
+              </button>
+            );
+          })}
+          {totalResultadosBusqueda === 0 && (
             <p className="col-span-full py-10 text-center text-sm text-slate-400">
               {debeBuscarOFiltrar
                 ? "Busca por expediente, cama o nombre, o elige un servicio para cargar sus pacientes."
-                : "No hay pacientes que coincidan con la busqueda o el servicio seleccionado."}
+                : "No hay pacientes ni registros guardados que coincidan con la busqueda o el servicio seleccionado."}
             </p>
           )}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      {/*
+      <section className="hidden">
         <div className="flex flex-wrap items-end gap-3">
           <label className="min-w-64 flex-1">
             <span className="mb-1 block text-xs font-semibold text-slate-500">Abrir registro anterior</span>
@@ -368,6 +403,7 @@ export default function CuidadosCriticosMedicoPage() {
           </div>
         )}
       </section>
+      */}
       {error && (
         <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
           <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}
