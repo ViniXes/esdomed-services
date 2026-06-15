@@ -6,6 +6,7 @@ import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import {
   aplicarCalculosBasicos,
+  aplicarValoresPorDefectoMatriz,
   camposBloqueadosPorPaciente,
   datosAutomaticosPaciente,
   gruposMatrizPorTipo,
@@ -51,14 +52,15 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
   const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosAutomaticos, ...datosGuardados }));
   const [message, setMessage] = useState("");
   const datosCalculados = aplicarCalculosBasicos({ ...datosAutomaticos, ...datos });
+  const datosParaPorcentaje = datosGuardados ? aplicarValoresPorDefectoMatriz(datosCalculados, tipo) : datosCalculados;
   const camposBloqueados = camposBloqueadosPorPaciente(paciente);
 
   const grupo = grupos[paso];
   const todosLosCampos = grupos.flatMap(item => item.campos);
   const campoCompleto = (campo: CampoMatrizCuidadosCriticos) => {
-    const valor = valorComoTexto(datosCalculados[campo.key]).trim();
+    const valor = valorComoTexto(datosParaPorcentaje[campo.key]).trim();
     if (valor) return true;
-    const alta = valorComoTexto(datosCalculados.alta).trim();
+    const alta = valorComoTexto(datosParaPorcentaje.alta).trim();
     return alta !== "FALLECIDO" && (campo.key === "fecha_de_muerte" || campo.key === "muerte_48_horas");
   };
   const camposPendientes = todosLosCampos.filter(campo => !campoCompleto(campo));
@@ -134,6 +136,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
                 tipoMedico={tipo}
                 valor={datosCalculados[campo.key]}
                 bloqueado={camposBloqueados.has(campo.key)}
+                destacarEgreso={Boolean(datosGuardados)}
                 onChange={value => setDatos(actual => ({ ...actual, [campo.key]: value }))}
               />
             ))}
@@ -182,10 +185,11 @@ function normalizarBusquedaCatalogo(value: string): string {
     .trim();
 }
 
-function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; bloqueado?: boolean; onChange: (value: string) => void }) {
+function CampoMatriz({ campo, tipoMedico, valor, bloqueado, destacarEgreso, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; bloqueado?: boolean; destacarEgreso?: boolean; onChange: (value: string) => void }) {
   const text = valorComoTexto(valor);
   const [editandoNumero, setEditandoNumero] = useState(false);
   const esNumero = campo.tipo === "number";
+  const campoEgreso = destacarEgreso && (campo.key === "fecha_egreso_del_servicio" || campo.key === "alta");
   const inputValue = esNumero && (!text || text === VALOR_NO_REGISTRADO)
     ? editandoNumero ? "" : "0"
     : text === VALOR_NO_REGISTRADO && (campo.tipo === "date" || campo.tipo === "time")
@@ -194,7 +198,7 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo:
   const selectValue = text || VALOR_NO_REGISTRADO;
   const automatico = campo.automatico || bloqueado;
   return (
-    <label className={campo.tipo === "textarea" ? "md:col-span-2 xl:col-span-3" : ""}>
+    <label className={`${campo.tipo === "textarea" ? "md:col-span-2 xl:col-span-3" : ""} ${campoEgreso ? "rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-2 dark:border-emerald-900/60 dark:bg-emerald-950/20" : ""}`}>
       <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
         {campo.label}
         {automatico && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800">AUTOMÁTICO</span>}

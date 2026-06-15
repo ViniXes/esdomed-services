@@ -259,30 +259,6 @@ export default function CuidadosCriticosMedicoPage() {
           )}
         </div>
       </section>
-      {/*
-
-                <span className="block font-semibold">Estancia {index + 1} · {fichaEgresada(ficha) ? "Egresada" : "Activa"}</span>
-                <span className="mt-0.5 block text-slate-400">
-                  Exp. {ficha.pacienteExpediente} · {ficha.pacienteNombre} · {ubicacionLabel(ficha.servicio, ficha.cama)} · Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "pendiente"}
-                </span>
-              </button>
-            ))}
-            {selectedEstanciaId === NUEVA_ESTANCIA && (
-              <span className="rounded-lg border border-dashed border-blue-400 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                Nueva estancia {fichasPaciente.length + 1}
-              </span>
-            )}
-          </div>
-          {estanciaActiva && (
-            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-              <AlertCircle size={15} className="mt-0.5 shrink-0" />
-              Existe una estancia activa. Registra FECHA EGRESO DEL SERVICIO o el fallecimiento antes de crear un nuevo reingreso.
-            </p>
-          )}
-        </section>
-      )}
-
-      */}
       {error && (
         <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
           <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}
@@ -291,7 +267,7 @@ export default function CuidadosCriticosMedicoPage() {
 
       {selected && selectedEstanciaId ? (
         <FichaMatrizCuidadosCriticos
-          key={`${selected.id}-${selectedEstanciaId}`}
+          key={`${selected.id}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
           paciente={selected}
           tipo={profile.tipoMedico}
           servicioEstancia={fichaSeleccionada?.servicio ?? selected.servicioActual}
