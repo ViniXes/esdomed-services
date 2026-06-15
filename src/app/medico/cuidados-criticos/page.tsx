@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   addDoc,
   collection,
@@ -18,7 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
-import { aplicarValoresPorDefectoMatriz, camposPendientesCierreCuidadosCriticos, esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, Paciente } from "@/types";
 
 const NUEVA_ESTANCIA = "nueva";
@@ -78,10 +77,6 @@ export default function CuidadosCriticosMedicoPage() {
 
   const selected = pacientes.find(paciente => paciente.id === selectedId) ?? null;
   const fichasPaciente = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === selectedId));
-  const misPendientesCierre = useMemo(
-    () => fichas.filter(ficha => ficha.creadoPorId === user?.uid && fichaPendienteCierreCuidadosCriticos(ficha)),
-    [fichas, user?.uid],
-  );
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
@@ -204,28 +199,6 @@ export default function CuidadosCriticosMedicoPage() {
         <Stat icon={<FileSpreadsheet size={18} />} label="Registros guardados" value={fichas.length} />
         <Stat icon={<CheckCircle2 size={18} />} label="Registros activos" value={fichas.filter(item => !fichaEgresada(item)).length} />
       </div>
-
-      {misPendientesCierre.length > 0 && (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-2">
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <p className="font-semibold">Tienes {misPendientesCierre.length} registro{misPendientesCierre.length !== 1 ? "s" : ""} pendiente{misPendientesCierre.length !== 1 ? "s" : ""} de cierre.</p>
-                <p className="mt-0.5 truncate text-xs">
-                  {misPendientesCierre.slice(0, 3).map(ficha => {
-                    const faltantes = camposPendientesCierreCuidadosCriticos(ficha.datos).map(campo => campo.label).join(", ");
-                    return `${ficha.pacienteExpediente} - ${ficha.pacienteNombre}: falta ${faltantes}`;
-                  }).join(" | ")}
-                </p>
-              </div>
-            </div>
-            <Link href="/medico/cuidados-criticos/registros" className="shrink-0 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40">
-              Ver pendientes
-            </Link>
-          </div>
-        </section>
-      )}
 
       <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-100 p-4 dark:border-slate-800">
