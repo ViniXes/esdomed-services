@@ -242,14 +242,12 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {pendientes.length > 0 && (
-                        <Link
-                          href={`/medico/cuidados-criticos?ficha=${ficha.id}`}
-                          className="inline-flex rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
-                        >
-                          Completar
-                        </Link>
-                      )}
+                      <Link
+                        href={`/medico/cuidados-criticos?ficha=${ficha.id}`}
+                        className="inline-flex rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
+                      >
+                        Abrir
+                      </Link>
                     </td>
                   </tr>
                 );

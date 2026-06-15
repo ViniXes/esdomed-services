@@ -55,6 +55,7 @@ export default function CuidadosCriticosMedicoPage() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedEstanciaId, setSelectedEstanciaId] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaHistorica, setBusquedaHistorica] = useState("");
   const [servicioFiltro, setServicioFiltro] = useState("todos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -126,6 +127,23 @@ export default function CuidadosCriticosMedicoPage() {
       .toLowerCase()
       .includes(term);
   });
+
+  const busquedaHistoricaNormalizada = busquedaHistorica.trim().toLowerCase();
+  const fichasHistoricasFiltradas = busquedaHistoricaNormalizada.length < 2
+    ? []
+    : fichas
+        .filter(ficha => `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaHistoricaNormalizada))
+        .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0))
+        .slice(0, 8);
+
+  const abrirFichaHistorica = (ficha: FichaCuidadosCriticos) => {
+    setSelectedId(ficha.pacienteId);
+    setSelectedEstanciaId(ficha.id ?? "");
+    setBusqueda(ficha.pacienteExpediente);
+    setBusquedaHistorica("");
+    setServicioFiltro(ficha.servicio);
+    setError("");
+  };
 
   const seleccionarPaciente = (paciente: Paciente) => {
     const estancias = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === paciente.id));
@@ -290,6 +308,65 @@ export default function CuidadosCriticosMedicoPage() {
             </p>
           )}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-64 flex-1">
+            <span className="mb-1 block text-xs font-semibold text-slate-500">Abrir registro anterior</span>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={busquedaHistorica}
+                onChange={event => setBusquedaHistorica(event.target.value)}
+                placeholder="Buscar por expediente, paciente, servicio o cama..."
+                className={`${inputCls} pl-9`}
+              />
+            </div>
+          </label>
+          <p className="max-w-xl text-xs text-slate-500">
+            Usa esta búsqueda para abrir registros UCI/UCIN ya guardados, aunque el paciente ya no aparezca ingresado.
+          </p>
+        </div>
+        {busquedaHistoricaNormalizada.length >= 2 && (
+          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <tr>
+                  <th className="px-3 py-2">Expediente</th>
+                  <th className="px-3 py-2">Paciente</th>
+                  <th className="px-3 py-2">Ubicación</th>
+                  <th className="px-3 py-2">Ingreso</th>
+                  <th className="px-3 py-2 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {fichasHistoricasFiltradas.map(ficha => (
+                  <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
+                    <td className="px-3 py-2">{ficha.pacienteNombre}</td>
+                    <td className="px-3 py-2">{ubicacionLabel(ficha.servicio, ficha.cama)}</td>
+                    <td className="px-3 py-2">{valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => abrirFichaHistorica(ficha)}
+                        className="inline-flex rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
+                      >
+                        Abrir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {fichasHistoricasFiltradas.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-slate-400">No hay registros guardados que coincidan.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       {error && (
         <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
