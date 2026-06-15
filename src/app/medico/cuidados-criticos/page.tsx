@@ -5,6 +5,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -49,6 +50,8 @@ export default function CuidadosCriticosMedicoPage() {
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
+  const [pacientePrecargado, setPacientePrecargado] = useState<Paciente | null>(null);
+  const [fichaUrlId] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("ficha") ?? "");
   const [selectedId, setSelectedId] = useState("");
   const [selectedEstanciaId, setSelectedEstanciaId] = useState("");
   const [busqueda, setBusqueda] = useState("");
@@ -75,7 +78,35 @@ export default function CuidadosCriticosMedicoPage() {
     };
   }, [profile?.tipoMedico, servicios]);
 
-  const selected = pacientes.find(paciente => paciente.id === selectedId) ?? null;
+  useEffect(() => {
+    if (!fichaUrlId || fichas.length === 0) return;
+    const ficha = fichas.find(item => item.id === fichaUrlId);
+    if (!ficha || selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id) return;
+    queueMicrotask(() => {
+      setSelectedId(ficha.pacienteId);
+      setSelectedEstanciaId(ficha.id ?? "");
+      setBusqueda(ficha.pacienteExpediente);
+      setServicioFiltro(ficha.servicio);
+      setError("");
+    });
+  }, [fichaUrlId, fichas, selectedEstanciaId, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || pacientes.some(paciente => paciente.id === selectedId)) return;
+    let activo = true;
+    getDoc(doc(db, "pacientes", selectedId))
+      .then(snap => {
+        if (activo && snap.exists()) setPacientePrecargado({ id: snap.id, ...snap.data() } as Paciente);
+      })
+      .catch(() => {
+        if (activo) setPacientePrecargado(null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [pacientes, selectedId]);
+
+  const selected = pacientes.find(paciente => paciente.id === selectedId) ?? (pacientePrecargado?.id === selectedId ? pacientePrecargado : null);
   const fichasPaciente = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === selectedId));
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
@@ -99,6 +130,7 @@ export default function CuidadosCriticosMedicoPage() {
   const seleccionarPaciente = (paciente: Paciente) => {
     const estancias = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === paciente.id));
     const activa = estancias.find(ficha => !fichaEgresada(ficha));
+    setPacientePrecargado(null);
     setSelectedId(paciente.id!);
     setSelectedEstanciaId(activa?.id ?? NUEVA_ESTANCIA);
     setError("");

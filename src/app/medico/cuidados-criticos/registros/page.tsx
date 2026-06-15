@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
@@ -217,6 +218,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
                 <th className="px-3 py-2">Ingreso</th>
                 <th className="px-3 py-2">Responsable</th>
                 <th className="px-3 py-2">Estado</th>
+                <th className="px-3 py-2 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -239,12 +241,22 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
                         <span className="text-emerald-600 dark:text-emerald-300">{fichaEgresada(ficha) ? "Cerrada" : "Completa"}</span>
                       )}
                     </td>
+                    <td className="px-3 py-2 text-right">
+                      {pendientes.length > 0 && (
+                        <Link
+                          href={`/medico/cuidados-criticos?ficha=${ficha.id}`}
+                          className="inline-flex rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
+                        >
+                          Completar
+                        </Link>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {fichasFiltradas.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-slate-400">No hay registros con los filtros seleccionados.</td>
+                  <td colSpan={7} className="px-3 py-8 text-center text-slate-400">No hay registros con los filtros seleccionados.</td>
                 </tr>
               )}
             </tbody>
