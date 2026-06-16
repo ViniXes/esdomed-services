@@ -291,6 +291,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Gestiones de Trabajo Social (UTS) ────────────────────────────────────
+    // Registro transversal de intervenciones (reemplazo del Google Form). Cada
+    // trabajadora crea y administra las propias; ESDOMED/admin leen para reportes.
+    match /gestiones_ts/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create: if (isTrabajoSocial() || isAdmin())
+                    && request.resource.data.trabajadoraId == uid()
+                    && request.resource.data.trabajadoraNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre;
+      allow update: if isAdmin()
+                    || (isTrabajoSocial() && resource.data.trabajadoraId == uid());
+      allow delete: if isAdmin()
+                    || (isTrabajoSocial() && resource.data.trabajadoraId == uid());
+    }
+
     // ─── Anexo 5 ──────────────────────────────────────────────────────────────
     match /anexo5/{id} {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
