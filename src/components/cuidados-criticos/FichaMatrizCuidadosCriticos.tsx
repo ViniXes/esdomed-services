@@ -327,7 +327,7 @@ function ServicioCriticoCombobox({
       opciones={opciones}
       disabled={disabled}
       placeholder="Escribe o elige la unidad UCI / UCIN..."
-      emptyText={`Sin coincidencias. Elige una unidad asignada a ${tipoMedico === "uci" ? "Medico UCI" : "Medico UCIN"}.`}
+      emptyText={`Sin coincidencias. Elige una unidad asignada a ${tipoMedico === "uci" ? "Medico UCI" : tipoMedico === "ucin" ? "Medico UCIN" : "Medico UCI/UCIN"}.`}
       onChange={onChange}
     />
   );

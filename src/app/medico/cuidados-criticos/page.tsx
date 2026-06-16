@@ -15,7 +15,7 @@ import {
 import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { serviciosPorTipoMedico, tipoUnidadPorServicio, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
 import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
@@ -167,6 +167,8 @@ export default function CuidadosCriticosMedicoPage() {
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
+  const tipoRegistro = tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
+    ?? (profile?.tipoMedico === "ucin" ? "ucin" : "uci");
   const numeroEstancia = fichaSeleccionada
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
     : fichasPaciente.length + 1;
@@ -249,7 +251,7 @@ export default function CuidadosCriticosMedicoPage() {
     const estadoEstancia = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
       ? "egresada"
       : "activa";
-    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, profile.tipoMedico);
+    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, tipoRegistro);
     const registroActivoExistente = fichasPaciente.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
     if (!fichaSeleccionada?.id && registroActivoExistente) {
       const message = "Este paciente ya tiene un registro activo. Cierra el registro actual antes de crear uno nuevo.";
@@ -261,6 +263,7 @@ export default function CuidadosCriticosMedicoPage() {
     try {
       if (fichaSeleccionada?.id) {
         await updateDoc(doc(db, "fichas_cuidados_criticos", fichaSeleccionada.id), {
+          tipoUnidad: tipoRegistro,
           estadoEstancia,
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
@@ -270,7 +273,7 @@ export default function CuidadosCriticosMedicoPage() {
         });
       } else {
         const creada = await addDoc(collection(db, "fichas_cuidados_criticos"), {
-          tipoUnidad: profile.tipoMedico,
+          tipoUnidad: tipoRegistro,
           estadoEstancia,
           pacienteId: selected.id,
           pacienteExpediente: selected.expediente,
@@ -484,7 +487,7 @@ export default function CuidadosCriticosMedicoPage() {
         <FichaMatrizCuidadosCriticos
           key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
           paciente={selected}
-          tipo={profile.tipoMedico}
+          tipo={tipoRegistro}
           servicioEstancia={fichaSeleccionada?.servicio ?? selected.servicioActual}
           numeroEstancia={numeroEstancia}
           datosGuardados={fichaSeleccionada?.datos}

@@ -429,13 +429,13 @@ export const GRUPOS_MATRIZ_CUIDADOS_CRITICOS: GrupoMatrizCuidadosCriticos[] = [
 ];
 
 export function camposMatrizPorTipo(tipo: TipoMedicoCuidadosCriticos) {
-  return GRUPOS_MATRIZ_CUIDADOS_CRITICOS.flatMap(grupo => grupo.campos).filter(campo => !campo.solo || campo.solo === tipo);
+  return GRUPOS_MATRIZ_CUIDADOS_CRITICOS.flatMap(grupo => grupo.campos).filter(campo => tipo === "uci_ucin" || !campo.solo || campo.solo === tipo);
 }
 
 export function gruposMatrizPorTipo(tipo: TipoMedicoCuidadosCriticos) {
   return GRUPOS_MATRIZ_CUIDADOS_CRITICOS.map(grupo => ({
     ...grupo,
-    campos: grupo.campos.filter(campo => !campo.solo || campo.solo === tipo),
+    campos: grupo.campos.filter(campo => tipo === "uci_ucin" || !campo.solo || campo.solo === tipo),
   }));
 }
 

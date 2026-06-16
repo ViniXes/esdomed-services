@@ -16,6 +16,10 @@ const VALID_ROLES = new Set<UserRole>([
   "rrhh",
 ]);
 
+function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
+  return value === "uci" || value === "ucin" || value === "uci_ucin";
+}
+
 // Roles del personal ESDOMED que llevan código de marcación y puesto en el plan.
 function esPersonalEsdomed(role: UserRole) {
   return role === "esdomed" || role === "asistente_esdomed";
@@ -96,7 +100,7 @@ export async function POST(req: NextRequest) {
   }
 
   const tipoMedicoValido: TipoMedicoCuidadosCriticos | undefined =
-    userRole === "medico" && (tipoMedico === "uci" || tipoMedico === "ucin")
+    userRole === "medico" && esTipoMedicoValido(tipoMedico)
       ? tipoMedico
       : undefined;
   const serviciosArr: string[] = tipoMedicoValido

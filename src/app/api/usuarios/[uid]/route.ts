@@ -21,6 +21,10 @@ function esPersonalEsdomed(role: string | undefined) {
   return role === "esdomed" || role === "asistente_esdomed";
 }
 
+function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
+  return value === "uci" || value === "ucin" || value === "uci_ucin";
+}
+
 async function getCaller(req: NextRequest): Promise<{ uid: string; role: string } | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
@@ -96,13 +100,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
   const targetData = targetSnap.data();
   const targetRole = nextRole ?? targetData?.role;
   let targetTipoMedico: TipoMedicoCuidadosCriticos | undefined =
-    targetData?.tipoMedico === "uci" || targetData?.tipoMedico === "ucin"
+    esTipoMedicoValido(targetData?.tipoMedico)
       ? targetData.tipoMedico
       : undefined;
 
   if ("tipoMedico" in body) {
     targetTipoMedico =
-      targetRole === "medico" && (body.tipoMedico === "uci" || body.tipoMedico === "ucin")
+      targetRole === "medico" && esTipoMedicoValido(body.tipoMedico)
         ? body.tipoMedico
         : undefined;
   }
