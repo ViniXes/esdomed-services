@@ -67,6 +67,14 @@ function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente 
   };
 }
 
+function limpiarFichaUrl() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("ficha")) return;
+  url.searchParams.delete("ficha");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
@@ -110,15 +118,23 @@ export default function CuidadosCriticosMedicoPage() {
   useEffect(() => {
     if (!fichaUrlId || fichas.length === 0) return;
     const ficha = fichas.find(item => item.id === fichaUrlId);
-    if (!ficha || selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id) return;
+    if (!ficha || (selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id)) {
+      queueMicrotask(() => {
+        limpiarFichaUrl();
+        setFichaUrlId("");
+      });
+      return;
+    }
     const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
     queueMicrotask(() => {
+      limpiarFichaUrl();
       setPacientePrecargado(pacienteDesdeFicha(ficha, pacienteId));
       setSelectedId(pacienteId);
       setSelectedEstanciaId(ficha.id ?? "");
       setBusqueda(ficha.pacienteExpediente);
       setServicioFiltro(ficha.servicio);
       setError("");
+      setFichaUrlId("");
     });
   }, [fichaUrlId, fichas, selectedEstanciaId, selectedId]);
 
@@ -193,6 +209,8 @@ export default function CuidadosCriticosMedicoPage() {
   const abrirFichaHistorica = (ficha: FichaCuidadosCriticos) => {
     const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
     const paciente = pacienteDesdeFicha(ficha, pacienteId);
+    limpiarFichaUrl();
+    setFichaUrlId("");
     setPacientePrecargado(paciente);
     setSelectedId(pacienteId);
     setSelectedEstanciaId(ficha.id ?? "");
@@ -204,6 +222,8 @@ export default function CuidadosCriticosMedicoPage() {
   const seleccionarPaciente = (paciente: Paciente) => {
     const estancias = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === paciente.id));
     const activa = estancias.find(ficha => !fichaEgresada(ficha));
+    limpiarFichaUrl();
+    setFichaUrlId("");
     setPacientePrecargado(null);
     setSelectedId(paciente.id!);
     setSelectedEstanciaId(activa?.id ?? NUEVA_ESTANCIA);
