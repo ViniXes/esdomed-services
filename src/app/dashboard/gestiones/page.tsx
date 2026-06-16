@@ -248,7 +248,7 @@ export default function GestionesPage() {
   }, [gestiones]);
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-900">
@@ -487,7 +487,7 @@ export default function GestionesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                      {["Paciente", "Gestión", "Trabajadora", "Hora", ""].map((h, i) => (
+                      {["Paciente", "Servicio / Estado", "Gestión", "Trabajadora", "Hora", ""].map((h, i) => (
                         <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                       ))}
                     </tr>
@@ -501,9 +501,10 @@ export default function GestionesPage() {
                             {g.vinculadoPadron && <Link2 size={10} className="text-emerald-500" />}
                           </p>
                           <p className="font-medium text-slate-800 dark:text-slate-200">{g.pacienteNombre}</p>
-                          <p className="text-xs text-slate-500">
-                            {g.servicio || "—"} · {ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}
-                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-slate-700 dark:text-slate-300">{g.servicio || "—"}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</p>
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
@@ -511,7 +512,7 @@ export default function GestionesPage() {
                             {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
                             {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
                           </p>
-                          {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-xs">{g.notas}</p>}
+                          {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-md">{g.notas}</p>}
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                           <span className="inline-flex items-center gap-1"><User size={12} className="text-slate-400" /> {g.trabajadoraNombre}</span>
