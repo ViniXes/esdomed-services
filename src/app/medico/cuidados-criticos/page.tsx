@@ -5,6 +5,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -14,7 +15,7 @@ import {
 import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { serviciosPorTipoMedico, tipoUnidadPorServicio, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
 import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
@@ -44,17 +45,56 @@ function estadoPacienteLabel(estado: Paciente["estado"]) {
   return estado.replaceAll("_", " ");
 }
 
+function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente {
+  const [apellidos = ficha.pacienteNombre, nombres = ""] = ficha.pacienteNombre.split(",").map(parte => parte.trim());
+  const sexo = valorComoTexto(ficha.datos?.sexo).toLowerCase();
+  const fechaIngreso = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
+  return {
+    id,
+    expediente: ficha.pacienteExpediente,
+    apellidos,
+    nombres,
+    genero: sexo === "femenino" ? "femenino" : sexo === "masculino" ? "masculino" : "otro",
+    fechaIngreso: fechaIngreso ? new Date(`${fechaIngreso}T00:00:00`) : new Date(),
+    establecimientoProcedencia: valorComoTexto(ficha.datos?.centro_de_procedencia),
+    servicioIngreso: valorComoTexto(ficha.datos?.servicio_proveniente) || ficha.servicio,
+    servicioActual: ficha.servicio,
+    camaActual: ficha.cama ?? "",
+    estado: ficha.datos?.alta === "FALLECIDO" ? "alta_fallecido" : fichaEgresada(ficha) ? "alta_vivo" : "activo",
+    creadoEn: toDate(ficha.creadoEn) ?? new Date(),
+    creadoPor: ficha.creadoPorId,
+    creadoPorNombre: ficha.creadoPorNombre,
+  };
+}
+
+function limpiarFichaUrl() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("ficha")) return;
+  url.searchParams.delete("ficha");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
+  const [pacientePrecargado, setPacientePrecargado] = useState<Paciente | null>(null);
+  const [fichaUrlId, setFichaUrlId] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [selectedEstanciaId, setSelectedEstanciaId] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [servicioFiltro, setServicioFiltro] = useState("todos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    queueMicrotask(() => {
+      setFichaUrlId(new URLSearchParams(window.location.search).get("ficha") ?? "");
+    });
+  }, []);
 
   useEffect(() => {
     if (!profile?.tipoMedico || servicios.length === 0) return;
@@ -75,30 +115,118 @@ export default function CuidadosCriticosMedicoPage() {
     };
   }, [profile?.tipoMedico, servicios]);
 
-  const selected = pacientes.find(paciente => paciente.id === selectedId) ?? null;
-  const fichasPaciente = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === selectedId));
+  useEffect(() => {
+    if (!fichaUrlId || fichas.length === 0) return;
+    const ficha = fichas.find(item => item.id === fichaUrlId);
+    if (!ficha || (selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id)) {
+      queueMicrotask(() => {
+        limpiarFichaUrl();
+        setFichaUrlId("");
+      });
+      return;
+    }
+    const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
+    queueMicrotask(() => {
+      limpiarFichaUrl();
+      setPacientePrecargado(pacienteDesdeFicha(ficha, pacienteId));
+      setSelectedId(pacienteId);
+      setSelectedEstanciaId(ficha.id ?? "");
+      setBusqueda(ficha.pacienteExpediente);
+      setServicioFiltro(ficha.servicio);
+      setError("");
+      setFichaUrlId("");
+    });
+  }, [fichaUrlId, fichas, selectedEstanciaId, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId || pacientes.some(paciente => paciente.id === selectedId)) return;
+    if (pacientePrecargado?.id === selectedId) return;
+    let activo = true;
+    getDoc(doc(db, "pacientes", selectedId))
+      .then(snap => {
+        if (activo && snap.exists()) setPacientePrecargado({ id: snap.id, ...snap.data() } as Paciente);
+      })
+      .catch(() => {
+        if (activo) setPacientePrecargado(null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [pacientePrecargado?.id, pacientes, selectedId]);
+
+  const selected = pacientePrecargado?.id === selectedId
+    ? pacientePrecargado
+    : pacientes.find(paciente => paciente.id === selectedId) ?? null;
+  const selectedDesdeFichaGuardada = pacientePrecargado?.id === selectedId;
+  const fichasPaciente = ordenarFichas(fichas.filter(ficha => {
+    if (ficha.id === selectedEstanciaId) return true;
+    if (selected?.expediente && ficha.pacienteExpediente === selected.expediente) return true;
+    if (selectedDesdeFichaGuardada) return false;
+    return ficha.pacienteId === selectedId;
+  }));
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
+  const tipoRegistro = tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
+    ?? (profile?.tipoMedico === "ucin" ? "ucin" : "uci");
   const numeroEstancia = fichaSeleccionada
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
     : fichasPaciente.length + 1;
 
   const busquedaNormalizada = busqueda.trim().toLowerCase();
   const debeBuscarOFiltrar = servicioFiltro === "todos" && busquedaNormalizada.length < 2;
+  const fichasCoincidentes = busquedaNormalizada.length < 2
+    ? []
+    : fichas
+        .filter(ficha => {
+          if (servicioFiltro !== "todos" && ficha.servicio !== servicioFiltro) return false;
+          return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaNormalizada);
+        })
+        .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
   const pacientesFiltrados = pacientes.filter(paciente => {
     if (debeBuscarOFiltrar) return false;
     if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
     const term = busquedaNormalizada;
-    if (!term) return true;
-    return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
+    const coincide = !term || `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
       .toLowerCase()
       .includes(term);
+    if (!coincide) return false;
+    const fichaActiva = fichas.find(ficha => ficha.pacienteId === paciente.id && !fichaEgresada(ficha));
+    const fichaGuardadaCoincidente = fichasCoincidentes.some(ficha => (ficha.pacienteId && ficha.pacienteId === paciente.id) || ficha.pacienteExpediente === paciente.expediente);
+    return Boolean(fichaActiva) || !fichaGuardadaCoincidente;
   });
+  const pacientesFiltradosIds = new Set(pacientesFiltrados.map(paciente => paciente.id).filter(Boolean));
+  const pacientesFiltradosExpedientes = new Set(pacientesFiltrados.map(paciente => paciente.expediente));
+
+  const fichasHistoricasFiltradas = busquedaNormalizada.length < 2
+    ? []
+    : fichasCoincidentes
+        .filter(ficha => {
+          const pacienteYaVisible = (ficha.pacienteId && pacientesFiltradosIds.has(ficha.pacienteId)) || pacientesFiltradosExpedientes.has(ficha.pacienteExpediente);
+          return !pacienteYaVisible;
+        })
+        .slice(0, 8);
+  const totalResultadosBusqueda = pacientesFiltrados.length + fichasHistoricasFiltradas.length;
+
+  const abrirFichaHistorica = (ficha: FichaCuidadosCriticos) => {
+    const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
+    const paciente = pacienteDesdeFicha(ficha, pacienteId);
+    limpiarFichaUrl();
+    setFichaUrlId("");
+    setPacientePrecargado(paciente);
+    setSelectedId(pacienteId);
+    setSelectedEstanciaId(ficha.id ?? "");
+    setBusqueda(paciente.expediente);
+    setServicioFiltro(paciente.servicioActual);
+    setError("");
+  };
 
   const seleccionarPaciente = (paciente: Paciente) => {
     const estancias = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === paciente.id));
     const activa = estancias.find(ficha => !fichaEgresada(ficha));
+    limpiarFichaUrl();
+    setFichaUrlId("");
+    setPacientePrecargado(null);
     setSelectedId(paciente.id!);
     setSelectedEstanciaId(activa?.id ?? NUEVA_ESTANCIA);
     setError("");
@@ -123,7 +251,7 @@ export default function CuidadosCriticosMedicoPage() {
     const estadoEstancia = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
       ? "egresada"
       : "activa";
-    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, profile.tipoMedico);
+    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, tipoRegistro);
     const registroActivoExistente = fichasPaciente.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
     if (!fichaSeleccionada?.id && registroActivoExistente) {
       const message = "Este paciente ya tiene un registro activo. Cierra el registro actual antes de crear uno nuevo.";
@@ -135,6 +263,7 @@ export default function CuidadosCriticosMedicoPage() {
     try {
       if (fichaSeleccionada?.id) {
         await updateDoc(doc(db, "fichas_cuidados_criticos", fichaSeleccionada.id), {
+          tipoUnidad: tipoRegistro,
           estadoEstancia,
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
@@ -144,7 +273,7 @@ export default function CuidadosCriticosMedicoPage() {
         });
       } else {
         const creada = await addDoc(collection(db, "fichas_cuidados_criticos"), {
-          tipoUnidad: profile.tipoMedico,
+          tipoUnidad: tipoRegistro,
           estadoEstancia,
           pacienteId: selected.id,
           pacienteExpediente: selected.expediente,
@@ -228,7 +357,7 @@ export default function CuidadosCriticosMedicoPage() {
         <div className="grid max-h-64 gap-2 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
           {pacientesFiltrados.map(paciente => {
             const estancias = fichas.filter(ficha => ficha.pacienteId === paciente.id);
-            const activa = estancias.some(ficha => !fichaEgresada(ficha));
+            const fichaActiva = estancias.find(ficha => !fichaEgresada(ficha));
             return (
               <button
                 key={paciente.id}
@@ -244,44 +373,109 @@ export default function CuidadosCriticosMedicoPage() {
                   <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${paciente.estado === "activo" ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800"}`}>{estadoPacienteLabel(paciente.estado)}</span>
                 </div>
                 <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(paciente.servicioActual, paciente.camaActual)}</p>
-                <p className={`mt-1 text-[11px] font-medium ${activa ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
-                  Matriz: {estancias.length} estancia{estancias.length !== 1 ? "s" : ""} · {activa ? "activa" : "sin activa"}
+                <p className={`mt-1 text-[11px] font-medium ${fichaActiva ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {fichaActiva
+                    ? `Abrir registro activo - Ingreso ${valorComoTexto(fichaActiva.datos?.fecha_ingreso_al_servicio) || "No registrado"}`
+                    : `Sin registro activo - ${estancias.length} registro${estancias.length !== 1 ? "s" : ""} guardado${estancias.length !== 1 ? "s" : ""}`}
                 </p>
               </button>
             );
           })}
-          {pacientesFiltrados.length === 0 && (
+          {fichasHistoricasFiltradas.map(ficha => {
+            const cerrada = fichaEgresada(ficha);
+            const seleccionada = selectedEstanciaId === ficha.id;
+            return (
+              <button
+                key={ficha.id}
+                type="button"
+                onClick={() => abrirFichaHistorica(ficha)}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${seleccionada ? "border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950" : "border-slate-200 hover:border-blue-300 dark:border-slate-700 dark:hover:border-blue-800"}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900 dark:text-slate-100">{ficha.pacienteNombre}</p>
+                    <p className="mt-0.5 text-[11px] font-mono text-slate-500">Exp. {ficha.pacienteExpediente}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${cerrada ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"}`}>
+                    {cerrada ? "Registro cerrado" : "Registro activo"}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(ficha.servicio, ficha.cama)}</p>
+                <p className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  Abrir registro guardado - Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}
+                </p>
+              </button>
+            );
+          })}
+          {totalResultadosBusqueda === 0 && (
             <p className="col-span-full py-10 text-center text-sm text-slate-400">
               {debeBuscarOFiltrar
                 ? "Busca por expediente, cama o nombre, o elige un servicio para cargar sus pacientes."
-                : "No hay pacientes que coincidan con la busqueda o el servicio seleccionado."}
+                : "No hay pacientes ni registros guardados que coincidan con la busqueda o el servicio seleccionado."}
             </p>
           )}
         </div>
       </section>
+
       {/*
-
-                <span className="block font-semibold">Estancia {index + 1} · {fichaEgresada(ficha) ? "Egresada" : "Activa"}</span>
-                <span className="mt-0.5 block text-slate-400">
-                  Exp. {ficha.pacienteExpediente} · {ficha.pacienteNombre} · {ubicacionLabel(ficha.servicio, ficha.cama)} · Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "pendiente"}
-                </span>
-              </button>
-            ))}
-            {selectedEstanciaId === NUEVA_ESTANCIA && (
-              <span className="rounded-lg border border-dashed border-blue-400 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                Nueva estancia {fichasPaciente.length + 1}
-              </span>
-            )}
+      <section className="hidden">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-64 flex-1">
+            <span className="mb-1 block text-xs font-semibold text-slate-500">Abrir registro anterior</span>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={busquedaHistorica}
+                onChange={event => setBusquedaHistorica(event.target.value)}
+                placeholder="Buscar por expediente, paciente, servicio o cama..."
+                className={`${inputCls} pl-9`}
+              />
+            </div>
+          </label>
+          <p className="max-w-xl text-xs text-slate-500">
+            Usa esta búsqueda para abrir registros UCI/UCIN ya guardados, aunque el paciente ya no aparezca ingresado.
+          </p>
+        </div>
+        {busquedaHistoricaNormalizada.length >= 2 && (
+          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <tr>
+                  <th className="px-3 py-2">Expediente</th>
+                  <th className="px-3 py-2">Paciente</th>
+                  <th className="px-3 py-2">Ubicación</th>
+                  <th className="px-3 py-2">Ingreso</th>
+                  <th className="px-3 py-2 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {fichasHistoricasFiltradas.map(ficha => (
+                  <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
+                    <td className="px-3 py-2">{ficha.pacienteNombre}</td>
+                    <td className="px-3 py-2">{ubicacionLabel(ficha.servicio, ficha.cama)}</td>
+                    <td className="px-3 py-2">{valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => abrirFichaHistorica(ficha)}
+                        className="inline-flex rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
+                      >
+                        Abrir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {fichasHistoricasFiltradas.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-slate-400">No hay registros guardados que coincidan.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          {estanciaActiva && (
-            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-              <AlertCircle size={15} className="mt-0.5 shrink-0" />
-              Existe una estancia activa. Registra FECHA EGRESO DEL SERVICIO o el fallecimiento antes de crear un nuevo reingreso.
-            </p>
-          )}
-        </section>
-      )}
-
+        )}
+      </section>
       */}
       {error && (
         <p className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
@@ -291,9 +485,9 @@ export default function CuidadosCriticosMedicoPage() {
 
       {selected && selectedEstanciaId ? (
         <FichaMatrizCuidadosCriticos
-          key={`${selected.id}-${selectedEstanciaId}`}
+          key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
           paciente={selected}
-          tipo={profile.tipoMedico}
+          tipo={tipoRegistro}
           servicioEstancia={fichaSeleccionada?.servicio ?? selected.servicioActual}
           numeroEstancia={numeroEstancia}
           datosGuardados={fichaSeleccionada?.datos}

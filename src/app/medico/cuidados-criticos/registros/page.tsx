@@ -2,16 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { Activity, CheckCircle2, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
+import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
-import { esValorRegistrado, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
-import { ubicacionLabel } from "@/lib/servicios";
+import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos } from "@/types";
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
+type CierreFiltro = "todos" | "pendientes" | "cerrados";
 
 const MESES = [
   "ENERO",
@@ -62,6 +62,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [servicio, setServicio] = useState("todos");
   const [periodo, setPeriodo] = useState<PeriodoFiltro>("todos");
+  const [cierre, setCierre] = useState<CierreFiltro>("todos");
   const [mes, setMes] = useState(MESES[new Date().getMonth()]);
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -83,6 +84,9 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     const texto = busqueda.trim().toLowerCase();
     return fichas.filter(ficha => {
       if (servicio !== "todos" && ficha.servicio !== servicio) return false;
+      const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
+      if (cierre === "pendientes" && !pendienteCierre) return false;
+      if (cierre === "cerrados" && pendienteCierre) return false;
       if (periodo === "mes" && valorComoTexto(ficha.datos?.mes) !== mes) return false;
       if (periodo === "rango" && !enRango(fechaIngresoFicha(ficha), desde, hasta)) return false;
       if (!texto) return true;
@@ -90,17 +94,17 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         .toLowerCase()
         .includes(texto);
     });
-  }, [busqueda, desde, fichas, hasta, mes, periodo, servicio]);
+  }, [busqueda, cierre, desde, fichas, hasta, mes, periodo, servicio]);
 
   const pacientesUnicos = new Set(fichasFiltradas.map(ficha => ficha.pacienteExpediente)).size;
   const activas = fichasFiltradas.filter(ficha => !fichaEgresada(ficha)).length;
-  const egresadas = fichasFiltradas.length - activas;
+  const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
 
   if (!profile?.tipoMedico) {
     return (
       <div className="p-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          Tu usuario no tiene permisos de Médico UCI o Médico UCIN para consultar este consolidado.
+          Tu usuario no tiene permisos de Medico UCI o Medico UCIN para consultar este consolidado.
         </div>
       </div>
     );
@@ -115,7 +119,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <div>
           <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-slate-100">Mis registros UCI / UCIN</h1>
           <p className="text-xs text-slate-500">
-            {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · Vista consolidada de las estancias registradas en tus unidades.
+            {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} - Vista consolidada de las estancias registradas en tus unidades.
           </p>
         </div>
       </header>
@@ -124,7 +128,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasFiltradas.length} />
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
         <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
-        <Stat icon={<CheckCircle2 size={18} />} label="Egresadas" value={egresadas} />
+        <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} variant={pendientesCierre > 0 ? "warning" : "default"} />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -145,6 +149,15 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
               <option value="todos">Todas las entradas</option>
               <option value="mes">Por mes</option>
               <option value="rango">Rango de fechas</option>
+            </select>
+          </label>
+
+          <label>
+            <span className="mb-1 block text-xs font-semibold text-slate-500">Cierre</span>
+            <select value={cierre} onChange={event => setCierre(event.target.value as CierreFiltro)} className={inputCls}>
+              <option value="todos">Todos</option>
+              <option value="pendientes">Pendientes</option>
+              <option value="cerrados">Cerrados</option>
             </select>
           </label>
 
@@ -185,55 +198,29 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div>
-          <h2 className="font-bold font-heading text-slate-900 dark:text-slate-100">Lienzo de registros filtrados</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Puedes revisar todas tus entradas, filtrarlas por servicio, mes o fecha de ingreso a UCI/UCIN.
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              <tr>
-                <th className="px-3 py-2">Expediente</th>
-                <th className="px-3 py-2">Paciente</th>
-                <th className="px-3 py-2">Ubicación</th>
-                <th className="px-3 py-2">Ingreso</th>
-                <th className="px-3 py-2">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {fichasFiltradas.slice(0, 12).map(ficha => (
-                <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
-                  <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
-                  <td className="px-3 py-2">{ficha.pacienteNombre}</td>
-                  <td className="px-3 py-2">{ubicacionLabel(ficha.servicio, ficha.cama)}</td>
-                  <td className="px-3 py-2">{valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}</td>
-                  <td className="px-3 py-2">{fichaEgresada(ficha) ? "Egresada" : "Activa"}</td>
-                </tr>
-              ))}
-              {fichasFiltradas.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-slate-400">No hay registros con los filtros seleccionados.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <LienzoMatrizCuidadosCriticos tipo={profile.tipoMedico} fichas={fichasFiltradas} />
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <LienzoMatrizCuidadosCriticos
+          tipo={profile.tipoMedico}
+          fichas={fichasFiltradas}
+          expedienteHref={ficha => ficha.id ? `/medico/cuidados-criticos?ficha=${ficha.id}` : undefined}
+        />
       </section>
     </div>
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+function Stat({ icon, label, value, variant = "default" }: { icon: React.ReactNode; label: string; value: number | string; variant?: "default" | "warning" }) {
+  const warning = variant === "warning";
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">{icon}<span className="text-xs font-medium text-slate-500">{label}</span></div>
-      <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
+    <div className={`rounded-xl border p-4 ${
+      warning
+        ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/25"
+        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+    }`}>
+      <div className={`flex items-center gap-2 ${warning ? "text-rose-500 dark:text-rose-300" : "text-blue-600 dark:text-blue-400"}`}>
+        {icon}<span className={`text-xs font-medium ${warning ? "text-rose-700 dark:text-rose-200" : "text-slate-500"}`}>{label}</span>
+      </div>
+      <p className={`mt-2 text-2xl font-bold ${warning ? "text-rose-600 dark:text-rose-200" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
     </div>
   );
 }

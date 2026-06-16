@@ -1,5 +1,5 @@
 export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh";
-export type TipoMedicoCuidadosCriticos = "uci" | "ucin";
+export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin";
 
 export interface UserProfile {
   uid: string;

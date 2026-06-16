@@ -1,6 +1,6 @@
-import type { Paciente, TipoMedicoCuidadosCriticos } from "@/types";
+import type { FichaCuidadosCriticos, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
-export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "catalogoCritico";
+export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "servicioHospitalario" | "catalogoCritico";
 
 export interface CampoMatrizCuidadosCriticos {
   key: string;
@@ -21,6 +21,13 @@ export interface GrupoMatrizCuidadosCriticos {
 type ValorMatriz = string | number;
 export type DatosMatrizCuidadosCriticos = Record<string, ValorMatriz>;
 export const VALOR_NO_REGISTRADO = "No registrado";
+export const CAMPOS_CIERRE_CUIDADOS_CRITICOS = new Set(["fecha_egreso_del_servicio", "alta", "fecha_de_muerte"]);
+
+const LABELS_CIERRE_CUIDADOS_CRITICOS: Record<string, string> = {
+  fecha_egreso_del_servicio: "FECHA EGRESO DEL SERVICIO",
+  alta: "ALTA",
+  fecha_de_muerte: "FECHA DE MUERTE",
+};
 
 const CAMPOS_SI_NO = new Set([
   "REINGRESO ≤ 72 HORAS",
@@ -196,6 +203,7 @@ function slug(label: string) {
 
 function inferirTipo(label: string): Pick<CampoMatrizCuidadosCriticos, "tipo" | "opciones"> {
   if (label === "ESPECIALIDAD") return { tipo: "servicioCritico" };
+  if (label === "SERVICIO PROVENIENTE") return { tipo: "servicioHospitalario" };
   if (CAMPOS_DIAGNOSTICO_CIE10.has(label)) return { tipo: "cie10" };
   if (CAMPOS_CATALOGO_CRITICO.has(label)) return { tipo: "catalogoCritico" };
   if (CAMPOS_SI_NO.has(label) || label.includes("MULTIRESISTENTE: SI/NO")) return { tipo: "yesno" };
@@ -221,7 +229,7 @@ function construirCampos(labels: string[], solo?: TipoMedicoCuidadosCriticos): C
       label: ETIQUETAS_VISIBLES[label] ?? label,
       ...inferirTipo(label),
       solo,
-      automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "SERVICIO PROVENIENTE", "DIAS EN SERVICIO", "MUERTE > 48 HORAS"].includes(label),
+      automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "DIAS EN SERVICIO", "MUERTE > 48 HORAS"].includes(label),
     };
   });
 }
@@ -421,13 +429,13 @@ export const GRUPOS_MATRIZ_CUIDADOS_CRITICOS: GrupoMatrizCuidadosCriticos[] = [
 ];
 
 export function camposMatrizPorTipo(tipo: TipoMedicoCuidadosCriticos) {
-  return GRUPOS_MATRIZ_CUIDADOS_CRITICOS.flatMap(grupo => grupo.campos).filter(campo => !campo.solo || campo.solo === tipo);
+  return GRUPOS_MATRIZ_CUIDADOS_CRITICOS.flatMap(grupo => grupo.campos).filter(campo => tipo === "uci_ucin" || !campo.solo || campo.solo === tipo);
 }
 
 export function gruposMatrizPorTipo(tipo: TipoMedicoCuidadosCriticos) {
   return GRUPOS_MATRIZ_CUIDADOS_CRITICOS.map(grupo => ({
     ...grupo,
-    campos: grupo.campos.filter(campo => !campo.solo || campo.solo === tipo),
+    campos: grupo.campos.filter(campo => tipo === "uci_ucin" || !campo.solo || campo.solo === tipo),
   }));
 }
 
@@ -470,7 +478,6 @@ export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidado
     sexo,
     edad: calcularEdad(paciente.fechaNacimiento),
     centro_de_procedencia: paciente.establecimientoProcedencia ?? "",
-    servicio_proveniente: paciente.servicioIngreso ?? "",
     ...(fallecido ? {
       fecha_de_muerte: fechaComoInput(paciente.fechaEgreso),
       alta: "FALLECIDO",
@@ -516,6 +523,17 @@ export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCritico
     resultado[campo.key] = campo.tipo === "number" ? 0 : VALOR_NO_REGISTRADO;
   }
   return resultado;
+}
+
+export function camposPendientesCierreCuidadosCriticos(datos?: DatosMatrizCuidadosCriticos) {
+  const pendientes = ["fecha_egreso_del_servicio", "alta"].filter(key => !esValorRegistrado(datos?.[key]));
+  const alta = valorComoTexto(datos?.alta).trim().toUpperCase();
+  if (alta === "FALLECIDO" && !esValorRegistrado(datos?.fecha_de_muerte)) pendientes.push("fecha_de_muerte");
+  return pendientes.map(key => ({ key, label: LABELS_CIERRE_CUIDADOS_CRITICOS[key] ?? key }));
+}
+
+export function fichaPendienteCierreCuidadosCriticos(ficha: FichaCuidadosCriticos) {
+  return camposPendientesCierreCuidadosCriticos(ficha.datos).length > 0;
 }
 
 export function valorComoTexto(value: unknown) {

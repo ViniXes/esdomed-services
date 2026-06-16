@@ -4,9 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   aplicarCalculosBasicos,
+  aplicarValoresPorDefectoMatriz,
+  CAMPOS_CIERRE_CUIDADOS_CRITICOS,
   camposBloqueadosPorPaciente,
+  camposPendientesCierreCuidadosCriticos,
   datosAutomaticosPaciente,
   gruposMatrizPorTipo,
   VALOR_NO_REGISTRADO,
@@ -51,14 +55,19 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
   const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosAutomaticos, ...datosGuardados }));
   const [message, setMessage] = useState("");
   const datosCalculados = aplicarCalculosBasicos({ ...datosAutomaticos, ...datos });
+  const datosParaPorcentaje = datosGuardados ? aplicarValoresPorDefectoMatriz(datosCalculados, tipo) : datosCalculados;
   const camposBloqueados = camposBloqueadosPorPaciente(paciente);
+  const camposPendientesCierre = useMemo(
+    () => new Set(camposPendientesCierreCuidadosCriticos(datosCalculados).map(campo => campo.key)),
+    [datosCalculados],
+  );
 
   const grupo = grupos[paso];
   const todosLosCampos = grupos.flatMap(item => item.campos);
   const campoCompleto = (campo: CampoMatrizCuidadosCriticos) => {
-    const valor = valorComoTexto(datosCalculados[campo.key]).trim();
+    const valor = valorComoTexto(datosParaPorcentaje[campo.key]).trim();
     if (valor) return true;
-    const alta = valorComoTexto(datosCalculados.alta).trim();
+    const alta = valorComoTexto(datosParaPorcentaje.alta).trim();
     return alta !== "FALLECIDO" && (campo.key === "fecha_de_muerte" || campo.key === "muerte_48_horas");
   };
   const camposPendientes = todosLosCampos.filter(campo => !campoCompleto(campo));
@@ -134,6 +143,8 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
                 tipoMedico={tipo}
                 valor={datosCalculados[campo.key]}
                 bloqueado={camposBloqueados.has(campo.key)}
+                destacarEgreso={Boolean(datosGuardados)}
+                pendienteCierre={Boolean(datosGuardados) && camposPendientesCierre.has(campo.key)}
                 onChange={value => setDatos(actual => ({ ...actual, [campo.key]: value }))}
               />
             ))}
@@ -182,10 +193,12 @@ function normalizarBusquedaCatalogo(value: string): string {
     .trim();
 }
 
-function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; bloqueado?: boolean; onChange: (value: string) => void }) {
+function CampoMatriz({ campo, tipoMedico, valor, bloqueado, destacarEgreso, pendienteCierre, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; bloqueado?: boolean; destacarEgreso?: boolean; pendienteCierre?: boolean; onChange: (value: string) => void }) {
   const text = valorComoTexto(valor);
   const [editandoNumero, setEditandoNumero] = useState(false);
   const esNumero = campo.tipo === "number";
+  const campoEgreso = destacarEgreso && CAMPOS_CIERRE_CUIDADOS_CRITICOS.has(campo.key);
+  const cierreSinDato = campoEgreso && (!text || text === VALOR_NO_REGISTRADO);
   const inputValue = esNumero && (!text || text === VALOR_NO_REGISTRADO)
     ? editandoNumero ? "" : "0"
     : text === VALOR_NO_REGISTRADO && (campo.tipo === "date" || campo.tipo === "time")
@@ -194,7 +207,7 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo:
   const selectValue = text || VALOR_NO_REGISTRADO;
   const automatico = campo.automatico || bloqueado;
   return (
-    <label className={campo.tipo === "textarea" ? "md:col-span-2 xl:col-span-3" : ""}>
+    <label className={`${campo.tipo === "textarea" ? "md:col-span-2 xl:col-span-3" : ""} ${campoEgreso ? `rounded-xl border p-2 ${pendienteCierre || cierreSinDato ? "border-rose-300/80 bg-rose-50/60 dark:border-rose-700/80 dark:bg-rose-950/25" : "border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/60 dark:bg-emerald-950/20"}` : ""}`}>
       <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
         {campo.label}
         {automatico && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800">AUTOMÁTICO</span>}
@@ -210,6 +223,12 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo:
         <ServicioCriticoCombobox
           value={text}
           tipoMedico={tipoMedico}
+          disabled={automatico}
+          onChange={onChange}
+        />
+      ) : campo.tipo === "servicioHospitalario" ? (
+        <ServicioHospitalarioCombobox
+          value={text}
           disabled={automatico}
           onChange={onChange}
         />
@@ -267,6 +286,28 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, onChange }: { campo:
   );
 }
 
+function ServicioHospitalarioCombobox({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <OpcionesCriticasCombobox
+      value={value}
+      opciones={[...SERVICIOS_HOSPITALARIOS]}
+      disabled={disabled}
+      placeholder="Escribe o elige el servicio proveniente..."
+      emptyText="Sin coincidencias. Elige un servicio del catalogo hospitalario."
+      soloOpciones
+      onChange={onChange}
+    />
+  );
+}
+
 function ServicioCriticoCombobox({
   value,
   tipoMedico,
@@ -286,7 +327,7 @@ function ServicioCriticoCombobox({
       opciones={opciones}
       disabled={disabled}
       placeholder="Escribe o elige la unidad UCI / UCIN..."
-      emptyText={`Sin coincidencias. Elige una unidad asignada a ${tipoMedico === "uci" ? "Medico UCI" : "Medico UCIN"}.`}
+      emptyText={`Sin coincidencias. Elige una unidad asignada a ${tipoMedico === "uci" ? "Medico UCI" : tipoMedico === "ucin" ? "Medico UCIN" : "Medico UCI/UCIN"}.`}
       onChange={onChange}
     />
   );
@@ -298,6 +339,7 @@ function OpcionesCriticasCombobox({
   disabled,
   placeholder,
   emptyText = "Sin coincidencias.",
+  soloOpciones = false,
   onChange,
 }: {
   value: string;
@@ -305,6 +347,7 @@ function OpcionesCriticasCombobox({
   disabled?: boolean;
   placeholder: string;
   emptyText?: string;
+  soloOpciones?: boolean;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -366,7 +409,14 @@ function OpcionesCriticasCombobox({
             setOpen(false);
           }
         }}
-        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+        onBlur={() => window.setTimeout(() => {
+          if (soloOpciones && value && !opciones.some(opcion => opcion === value)) {
+            const coincidenciaExacta = opciones.find(opcion => normalizarBusquedaCatalogo(opcion) === normalizarBusquedaCatalogo(value));
+            const coincidenciaUnica = resultados.length === 1 ? resultados[0] : undefined;
+            onChange(coincidenciaExacta ?? coincidenciaUnica ?? "");
+          }
+          setOpen(false);
+        }, 150)}
         className={`${inputCls} pl-9 ${hasValue && !disabled ? "pr-9" : ""}`}
       />
       {hasValue && !disabled && (
@@ -395,7 +445,10 @@ function OpcionesCriticasCombobox({
                   <button
                     type="button"
                     data-option-index={index}
-                    onMouseDown={() => seleccionar(opcion)}
+                    onMouseDown={event => {
+                      event.preventDefault();
+                      seleccionar(opcion);
+                    }}
                     onMouseEnter={() => setActiveIndex(index)}
                     className={`w-full px-3 py-2.5 text-left text-sm leading-snug text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 ${
                       index === activeIndex ? "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" : ""

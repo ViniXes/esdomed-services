@@ -398,6 +398,7 @@ export default function DashboardUsuariosPage() {
                     <option value="">Medico general / servicios manuales</option>
                     <option value="uci">Medico UCI</option>
                     <option value="ucin">Medico UCIN</option>
+                    <option value="uci_ucin">Medico UCI/UCIN</option>
                   </select>
                 </div>
                 <div>
@@ -657,6 +658,7 @@ export default function DashboardUsuariosPage() {
                       <option value="">Medico general / servicios manuales</option>
                       <option value="uci">Medico UCI</option>
                       <option value="ucin">Medico UCIN</option>
+                      <option value="uci_ucin">Medico UCI/UCIN</option>
                     </select>
                   </div>
                   <div>
