@@ -1,0 +1,543 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, query, Timestamp, where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { useServicios } from "@/contexts/ServiciosContext";
+import { getPersona } from "@/lib/pacientes/persona";
+import { GestionesTabs } from "./_components/GestionesTabs";
+import {
+  ESTADO_PACIENTE_GESTION_LABEL, GRUPOS_GESTION_TS, labelTipoGestion,
+  TIPOS_GESTION_TS, type EstadoPacienteGestion,
+} from "@/lib/trabajosocial/catalogos";
+import type { EstadoPaciente, GestionTS, Paciente } from "@/types";
+import {
+  AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, Link2, Loader2,
+  NotebookPen, Search, Trash2, User, X,
+} from "lucide-react";
+
+// ── Estilos compartidos (acento ámbar, igual que el resto de vistas de TS) ──────
+const inputCls =
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition";
+const selectCls =
+  "w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 transition cursor-pointer";
+const labelCls = "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5";
+
+// ── Utilidades de fecha ─────────────────────────────────────────────────────────
+function fechaStr(d: Date): string {
+  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
+}
+function hoyStr(): string {
+  return fechaStr(new Date());
+}
+function toDate(ts: unknown): Date | null {
+  if (!ts) return null;
+  return (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
+}
+function fmtHora(ts: unknown): string {
+  const d = toDate(ts);
+  return d ? d.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+}
+function fmtFechaStr(fecha: string): string {
+  const [y, m, d] = fecha.split("-").map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  return dt.toLocaleDateString("es-HN", { weekday: "long", day: "2-digit", month: "long" });
+}
+
+// Mapea el estado vital del ingreso (padrón) al estado simplificado de la gestión.
+function estadoIngresoAGestion(estado?: EstadoPaciente): EstadoPacienteGestion {
+  if (!estado) return "na";
+  if (estado === "activo") return "actual";
+  if (estado === "alta_fallecido") return "defuncion";
+  return "alta"; // alta_vivo, alta_voluntaria, fuga, in_extremis, referido
+}
+
+// ── Formulario en blanco ────────────────────────────────────────────────────────
+interface FormValue {
+  expediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  estadoPaciente: EstadoPacienteGestion;
+  vinculadoPadron: boolean;
+  tipo: string;
+  notas: string;
+  fecha: string;
+}
+const formVacio = (fecha: string): FormValue => ({
+  expediente: "",
+  pacienteNombre: "",
+  servicio: "",
+  estadoPaciente: "actual",
+  vinculadoPadron: false,
+  tipo: "",
+  notas: "",
+  fecha,
+});
+
+export default function GestionesPage() {
+  const { profile } = useAuth();
+  const { servicios } = useServicios();
+
+  const [form, setForm] = useState<FormValue>(() => formVacio(hoyStr()));
+  const [buscandoExp, setBuscandoExp] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  // Lista del día
+  const [fechaLista, setFechaLista] = useState(hoyStr());
+  const [gestiones, setGestiones] = useState<GestionTS[]>([]);
+  const [permissionError, setPermissionError] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+
+  // Toasts
+  const feedbackId = useRef(0);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const notify = useCallback((tipo: "success" | "error", mensaje: string) => {
+    const id = ++feedbackId.current;
+    setFeedbacks((f) => [...f, { id, tipo, mensaje }]);
+  }, []);
+  const dismiss = useCallback((id: number) => setFeedbacks((f) => f.filter((x) => x.id !== id)), []);
+
+  const expRef = useRef<HTMLInputElement>(null);
+
+  // Suscripción a las gestiones de la fecha seleccionada.
+  useEffect(() => {
+    const q = query(collection(db, "gestiones_ts"), where("fecha", "==", fechaLista));
+    return onSnapshot(
+      q,
+      (s) => {
+        setPermissionError(false);
+        const docs = s.docs.map((d) => ({ id: d.id, ...d.data() } as GestionTS));
+        docs.sort((a, b) => (toDate(b.creadoEn)?.getTime() ?? 0) - (toDate(a.creadoEn)?.getTime() ?? 0));
+        setGestiones(docs);
+      },
+      (err) => { if (err.code === "permission-denied") setPermissionError(true); },
+    );
+  }, [fechaLista]);
+
+  // Autocompletar desde el padrón al escribir el expediente (debounce 400 ms).
+  // Si calza en personas: rellena nombre + vincula. Busca su ingreso para servicio/estado.
+  // Si no calza: deja el nombre editable (paciente ISBM / rastreo / fuera del padrón).
+  useEffect(() => {
+    const exp = form.expediente.trim();
+    if (!exp) { setBuscandoExp(false); return; }
+    let cancel = false;
+    setBuscandoExp(true);
+    const id = window.setTimeout(async () => {
+      try {
+        const persona = await getPersona(exp);
+        if (cancel) return;
+        if (!persona) {
+          setForm((f) => (f.expediente.trim() === exp ? { ...f, vinculadoPadron: false } : f));
+          return;
+        }
+        // Buscar el ingreso más reciente para inferir servicio y estado actuales.
+        let servicio = "";
+        let estado: EstadoPacienteGestion = "na";
+        try {
+          const snap = await getDocs(query(collection(db, "pacientes"), where("expediente", "==", exp)));
+          const ingresos = snap.docs
+            .map((d) => d.data() as Paciente)
+            .sort((a, b) => (toDate(b.fechaIngreso)?.getTime() ?? 0) - (toDate(a.fechaIngreso)?.getTime() ?? 0));
+          const ult = ingresos[0];
+          if (ult) {
+            servicio = ult.servicioActual ?? "";
+            estado = estadoIngresoAGestion(ult.estado);
+          }
+        } catch { /* sin permisos de pacientes: solo se usa la persona */ }
+        if (cancel) return;
+        setForm((f) => {
+          if (f.expediente.trim() !== exp) return f; // el usuario siguió escribiendo
+          return {
+            ...f,
+            pacienteNombre: `${persona.apellidos}, ${persona.nombres}`,
+            servicio: servicio || f.servicio,
+            estadoPaciente: estado !== "na" ? estado : f.estadoPaciente,
+            vinculadoPadron: true,
+          };
+        });
+      } finally {
+        if (!cancel) setBuscandoExp(false);
+      }
+    }, 400);
+    return () => { cancel = true; window.clearTimeout(id); };
+  }, [form.expediente]);
+
+  const setExpediente = (v: string) =>
+    setForm((f) => ({ ...f, expediente: v, vinculadoPadron: false }));
+
+  const valido =
+    form.expediente.trim() && form.pacienteNombre.trim() && form.tipo && form.fecha;
+
+  const registrar = async () => {
+    if (!profile) return;
+    if (!valido) { notify("error", "Completa expediente, paciente y tipo de gestión"); return; }
+    setGuardando(true);
+    try {
+      const nuevo: Omit<GestionTS, "id"> = {
+        expediente: form.expediente.trim(),
+        pacienteNombre: form.pacienteNombre.trim(),
+        servicio: form.servicio.trim() || undefined,
+        estadoPaciente: form.estadoPaciente,
+        vinculadoPadron: form.vinculadoPadron,
+        tipo: form.tipo,
+        notas: form.notas.trim() || undefined,
+        fecha: form.fecha,
+        trabajadoraId: profile.uid,
+        trabajadoraNombre: profile.nombre,
+        creadoEn: Timestamp.now() as unknown as Date,
+      };
+      // Firestore no acepta `undefined`: limpiar las claves vacías.
+      const payload = Object.fromEntries(Object.entries(nuevo).filter(([, v]) => v !== undefined));
+      await addDoc(collection(db, "gestiones_ts"), payload);
+      notify("success", "Gestión registrada");
+      // Mantener la fecha (sesión de captura del mismo día); limpiar el resto.
+      setForm(formVacio(form.fecha));
+      expRef.current?.focus();
+    } catch {
+      notify("error", "No se pudo registrar la gestión");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const eliminar = async (g: GestionTS) => {
+    if (!g.id) return;
+    if (!confirm("¿Eliminar esta gestión? Esta acción no se puede deshacer.")) return;
+    try {
+      await deleteDoc(doc(db, "gestiones_ts", g.id));
+      notify("success", "Gestión eliminada");
+    } catch {
+      notify("error", "No se pudo eliminar (solo el administrador puede borrar gestiones de otros días).");
+    }
+  };
+
+  // Filtrado de la lista (texto + tipo).
+  const listaFiltrada = useMemo(() => {
+    const t = texto.trim().toLowerCase();
+    return gestiones.filter((g) => {
+      if (filtroTipo !== "todos" && g.tipo !== filtroTipo) return false;
+      if (!t) return true;
+      return (
+        g.expediente?.toLowerCase().includes(t) ||
+        g.pacienteNombre?.toLowerCase().includes(t) ||
+        g.servicio?.toLowerCase().includes(t) ||
+        g.trabajadoraNombre?.toLowerCase().includes(t) ||
+        labelTipoGestion(g.tipo).toLowerCase().includes(t) ||
+        (g.notas ?? "").toLowerCase().includes(t)
+      );
+    });
+  }, [gestiones, texto, filtroTipo]);
+
+  // Productividad del día: conteo por trabajadora (vista previa de PRODUCCION DIARIA).
+  const productividad = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const g of gestiones) m.set(g.trabajadoraNombre, (m.get(g.trabajadoraNombre) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [gestiones]);
+
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-900">
+          <NotebookPen size={17} className="text-amber-600 dark:text-amber-400" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Registro de gestiones</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Intervenciones de Trabajo Social — reemplaza el formulario de intervenciones presenciales</p>
+        </div>
+      </div>
+
+      <GestionesTabs />
+
+      {permissionError && (
+        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          Sin permisos para leer las gestiones. Pide al administrador que despliegue la regla de la colección <strong>gestiones_ts</strong>.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5 items-start">
+        {/* ── Formulario de captura ── */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 lg:sticky lg:top-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Nueva gestión</p>
+
+          {/* Expediente + autocompletar */}
+          <div>
+            <label className={labelCls}>Expediente</label>
+            <div className="relative">
+              <input
+                ref={expRef}
+                value={form.expediente}
+                onChange={(e) => setExpediente(e.target.value)}
+                placeholder="Ej. 1-26"
+                className={inputCls + " pr-9 font-mono"}
+                autoFocus
+              />
+              {buscandoExp && (
+                <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+              )}
+            </div>
+            {form.expediente.trim() && !buscandoExp && (
+              form.vinculadoPadron ? (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                  <Link2 size={11} /> Vinculado al padrón de pacientes
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                  Expediente fuera del padrón — captura el nombre manualmente
+                </p>
+              )
+            )}
+          </div>
+
+          {/* Paciente */}
+          <div>
+            <label className={labelCls}>Paciente</label>
+            <input
+              value={form.pacienteNombre}
+              onChange={(e) => setForm((f) => ({ ...f, pacienteNombre: e.target.value }))}
+              placeholder="Apellidos, nombres"
+              className={inputCls}
+            />
+          </div>
+
+          {/* Servicio + estado */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className={labelCls}>Servicio</label>
+              <input
+                value={form.servicio}
+                onChange={(e) => setForm((f) => ({ ...f, servicio: e.target.value }))}
+                list="servicios-ts"
+                placeholder="Servicio"
+                className={inputCls}
+              />
+              <datalist id="servicios-ts">
+                {servicios.map((s) => <option key={s} value={s} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className={labelCls}>Estado</label>
+              <select
+                value={form.estadoPaciente}
+                onChange={(e) => setForm((f) => ({ ...f, estadoPaciente: e.target.value as EstadoPacienteGestion }))}
+                className={selectCls}
+              >
+                {(Object.keys(ESTADO_PACIENTE_GESTION_LABEL) as EstadoPacienteGestion[]).map((e) => (
+                  <option key={e} value={e}>{ESTADO_PACIENTE_GESTION_LABEL[e]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Tipo de gestión (catálogo cerrado, agrupado) */}
+          <div>
+            <label className={labelCls}>Tipo de gestión</label>
+            <select
+              value={form.tipo}
+              onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+              className={selectCls}
+            >
+              <option value="">— Selecciona el tipo</option>
+              {GRUPOS_GESTION_TS.map((grupo) => (
+                <optgroup key={grupo} label={grupo}>
+                  {TIPOS_GESTION_TS.filter((t) => t.grupo === grupo).map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {/* Fecha */}
+          <div>
+            <label className={labelCls}>Fecha de la gestión</label>
+            <input
+              type="date"
+              value={form.fecha}
+              onChange={(e) => setForm((f) => ({ ...f, fecha: e.target.value }))}
+              max={hoyStr()}
+              className={inputCls}
+            />
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label className={labelCls}>Notas <span className="text-slate-400 normal-case font-normal">(opcional)</span></label>
+            <textarea
+              value={form.notas}
+              onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
+              rows={2}
+              placeholder="Detalle de la intervención…"
+              className={inputCls + " resize-y"}
+            />
+          </div>
+
+          <button
+            onClick={registrar}
+            disabled={!valido || guardando}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+          >
+            {guardando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+            Registrar gestión
+          </button>
+        </div>
+
+        {/* ── Lista del día ── */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <CalendarDays size={15} />
+              <input
+                type="date"
+                value={fechaLista}
+                onChange={(e) => setFechaLista(e.target.value)}
+                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </label>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 capitalize">{fmtFechaStr(fechaLista)}</span>
+            <span className="ml-auto text-sm text-slate-500">{listaFiltrada.length} de {gestiones.length} gestión(es)</span>
+          </div>
+
+          {/* Productividad del día */}
+          {productividad.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5">
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Productividad del día</p>
+              <div className="flex flex-wrap gap-2">
+                {productividad.map(([nombre, n]) => (
+                  <span key={nombre} className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300">
+                    {nombre} <span className="font-bold">{n}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filtros de la lista */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                placeholder="Buscar por paciente, expediente, trabajadora, tipo o notas…"
+                className={inputCls + " pl-9"}
+              />
+            </div>
+            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className={selectCls + " max-w-[240px]"}>
+              <option value="todos">Todos los tipos</option>
+              {GRUPOS_GESTION_TS.map((grupo) => (
+                <optgroup key={grupo} label={grupo}>
+                  {TIPOS_GESTION_TS.filter((t) => t.grupo === grupo).map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {/* Tabla */}
+          {gestiones.length === 0 ? (
+            <EmptyState texto="No hay gestiones registradas para este día." sub="Registra la primera con el formulario de la izquierda." />
+          ) : listaFiltrada.length === 0 ? (
+            <p className="text-sm text-slate-400 py-10 text-center">Ninguna gestión coincide con el filtro.</p>
+          ) : (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                      {["Paciente", "Gestión", "Trabajadora", "Hora", ""].map((h, i) => (
+                        <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {listaFiltrada.map((g) => (
+                      <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 align-top">
+                        <td className="px-4 py-3">
+                          <p className="font-mono text-xs text-slate-500 flex items-center gap-1">
+                            {g.expediente}
+                            {g.vinculadoPadron && <Link2 size={10} className="text-emerald-500" />}
+                          </p>
+                          <p className="font-medium text-slate-800 dark:text-slate-200">{g.pacienteNombre}</p>
+                          <p className="text-xs text-slate-500">
+                            {g.servicio || "—"} · {ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
+                          {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-xs">{g.notas}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          <span className="inline-flex items-center gap-1"><User size={12} className="text-slate-400" /> {g.trabajadoraNombre}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{fmtHora(g.creadoEn)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => eliminar(g)}
+                            className="text-slate-400 hover:text-rose-500 transition-colors"
+                            aria-label="Eliminar gestión"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <FeedbackStack items={feedbacks} onDismiss={dismiss} />
+    </div>
+  );
+}
+
+// ── Subcomponentes ──────────────────────────────────────────────────────────────
+function EmptyState({ texto, sub }: { texto: string; sub?: string }) {
+  return (
+    <div className="text-center py-16 text-slate-400">
+      <ClipboardList size={32} className="mx-auto mb-3 opacity-40" />
+      <p className="text-sm">{texto}</p>
+      {sub && <p className="text-xs mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Toasts (mismo patrón que el resto del portal) ───────────────────────────────
+type Feedback = { id: number; tipo: "success" | "error"; mensaje: string };
+
+function FeedbackStack({ items, onDismiss }: { items: Feedback[]; onDismiss: (id: number) => void }) {
+  if (!items.length) return null;
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[210] flex flex-col gap-2 items-center pointer-events-none">
+      {items.map((f) => <FeedbackToast key={f.id} f={f} onDismiss={() => onDismiss(f.id)} />)}
+    </div>
+  );
+}
+
+function FeedbackToast({ f, onDismiss }: { f: Feedback; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 4000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+  const ok = f.tipo === "success";
+  return (
+    <div
+      className="pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-3 shadow-xl text-sm font-medium bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+      style={{ borderLeftWidth: 4, borderLeftColor: ok ? "#10b981" : "#f43f5e", animation: "notif-in 0.25s ease-out" }}
+    >
+      {ok ? <CheckCircle2 size={16} className="text-emerald-500 flex-shrink-0" /> : <AlertTriangle size={16} className="text-rose-500 flex-shrink-0" />}
+      <span>{f.mensaje}</span>
+      <button onClick={onDismiss} className="ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Cerrar"><X size={13} /></button>
+    </div>
+  );
+}

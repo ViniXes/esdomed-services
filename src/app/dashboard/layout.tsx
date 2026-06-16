@@ -23,6 +23,7 @@ import {
   Users,
   DoorOpen,
   CalendarClock,
+  NotebookPen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -74,6 +75,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
+  const G_TRABAJO_SOCIAL = "Trabajo Social";
   const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
   const G_REPORTES = "Reportes";
@@ -151,6 +153,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(esTS
       ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_PACIENTES }]
+      : []),
+
+    // ── Trabajo Social ──
+    ...(esTS || esAdmin
+      ? [{ href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen, group: G_TRABAJO_SOCIAL }]
       : []),
 
     // ── Documentos ──

@@ -593,6 +593,39 @@ export interface Paciente {
 }
 
 // ============================================================================
+// Gestiones de Trabajo Social (UTS) — registro transversal de intervenciones
+// Reemplaza el Google Form "INTERVENCIONES PRESENCIALES". Un documento por
+// intervención, ligado al paciente por expediente. De aquí salen como vistas las
+// hojas diarias, la productividad (trabajadora × día) y la bitácora del paciente.
+// El catálogo de `tipo` y `estadoPaciente` vive en src/lib/trabajosocial/catalogos.ts.
+// ============================================================================
+
+export interface GestionTS {
+  id?: string;
+
+  // Paciente — snapshot por expediente. El expediente puede NO existir en el
+  // padrón (personas) cuando es un paciente ISBM / de rastreo / ya egresado;
+  // por eso el nombre se guarda como texto y `vinculadoPadron` marca si calzó.
+  expediente: string;
+  pacienteNombre: string;
+  servicio?: string;           // último servicio conocido del paciente
+  estadoPaciente: import("@/lib/trabajosocial/catalogos").EstadoPacienteGestion;
+  vinculadoPadron: boolean;    // true si el expediente existía en personas al registrar
+
+  // Intervención
+  tipo: string;                // id del catálogo TIPOS_GESTION_TS
+  notas?: string;
+  fecha: string;               // "YYYY-MM-DD" — día de la gestión (llave de las hojas diarias)
+
+  // Autoría (la trabajadora que la realizó = quien la registra)
+  trabajadoraId: string;
+  trabajadoraNombre: string;   // p. ej. "Licda. Villatoro"
+
+  // Metadata
+  creadoEn: Date;
+}
+
+// ============================================================================
 // Busqueda de telefono — auditoria de consultas hechas por medicos
 // ============================================================================
 
