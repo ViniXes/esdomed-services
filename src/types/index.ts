@@ -614,6 +614,8 @@ export interface GestionTS {
 
   // Intervención
   tipo: string;                // id del catálogo TIPOS_GESTION_TS
+  modalidad: import("@/lib/trabajosocial/catalogos").ModalidadGestion; // presencial | llamada | videollamada
+  duracionMin?: number;        // duración de la intervención en minutos (opcional)
   notas?: string;
   fecha: string;               // "YYYY-MM-DD" — día de la gestión (llave de las hojas diarias)
 

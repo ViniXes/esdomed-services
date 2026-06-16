@@ -98,3 +98,14 @@ export const ESTADO_PACIENTE_GESTION_LABEL: Record<EstadoPacienteGestion, string
   defuncion: "Defunción",
   na:        "N/A",
 };
+
+// Modalidad de la intervención — la BITACORA DE EXP distingue presencial / llamada /
+// videollamada. Por defecto presencial (el origen es el formulario de intervenciones
+// PRESENCIALES); las otras dan visibilidad al seguimiento a distancia (ISBM, familias).
+export type ModalidadGestion = "presencial" | "llamada" | "videollamada";
+
+export const MODALIDAD_GESTION_LABEL: Record<ModalidadGestion, string> = {
+  presencial:   "Presencial",
+  llamada:      "Llamada",
+  videollamada: "Videollamada",
+};

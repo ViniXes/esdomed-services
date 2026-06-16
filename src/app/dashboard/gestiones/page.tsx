@@ -11,7 +11,8 @@ import { getPersona } from "@/lib/pacientes/persona";
 import { GestionesTabs } from "./_components/GestionesTabs";
 import {
   ESTADO_PACIENTE_GESTION_LABEL, GRUPOS_GESTION_TS, labelTipoGestion,
-  TIPOS_GESTION_TS, type EstadoPacienteGestion,
+  MODALIDAD_GESTION_LABEL, TIPOS_GESTION_TS,
+  type EstadoPacienteGestion, type ModalidadGestion,
 } from "@/lib/trabajosocial/catalogos";
 import type { EstadoPaciente, GestionTS, Paciente } from "@/types";
 import {
@@ -63,6 +64,8 @@ interface FormValue {
   estadoPaciente: EstadoPacienteGestion;
   vinculadoPadron: boolean;
   tipo: string;
+  modalidad: ModalidadGestion;
+  duracionMin: string;
   notas: string;
   fecha: string;
 }
@@ -73,6 +76,8 @@ const formVacio = (fecha: string): FormValue => ({
   estadoPaciente: "actual",
   vinculadoPadron: false,
   tipo: "",
+  modalidad: "presencial",
+  duracionMin: "",
   notas: "",
   fecha,
 });
@@ -177,6 +182,7 @@ export default function GestionesPage() {
     if (!valido) { notify("error", "Completa expediente, paciente y tipo de gestión"); return; }
     setGuardando(true);
     try {
+      const dur = parseInt(form.duracionMin, 10);
       const nuevo: Omit<GestionTS, "id"> = {
         expediente: form.expediente.trim(),
         pacienteNombre: form.pacienteNombre.trim(),
@@ -184,6 +190,8 @@ export default function GestionesPage() {
         estadoPaciente: form.estadoPaciente,
         vinculadoPadron: form.vinculadoPadron,
         tipo: form.tipo,
+        modalidad: form.modalidad,
+        duracionMin: Number.isFinite(dur) && dur > 0 ? dur : undefined,
         notas: form.notas.trim() || undefined,
         fecha: form.fecha,
         trabajadoraId: profile.uid,
@@ -353,6 +361,34 @@ export default function GestionesPage() {
             </select>
           </div>
 
+          {/* Modalidad + duración */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className={labelCls}>Modalidad</label>
+              <select
+                value={form.modalidad}
+                onChange={(e) => setForm((f) => ({ ...f, modalidad: e.target.value as ModalidadGestion }))}
+                className={selectCls}
+              >
+                {(Object.keys(MODALIDAD_GESTION_LABEL) as ModalidadGestion[]).map((m) => (
+                  <option key={m} value={m}>{MODALIDAD_GESTION_LABEL[m]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Duración <span className="text-slate-400 normal-case font-normal">(min)</span></label>
+              <input
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={form.duracionMin}
+                onChange={(e) => setForm((f) => ({ ...f, duracionMin: e.target.value }))}
+                placeholder="—"
+                className={inputCls}
+              />
+            </div>
+          </div>
+
           {/* Fecha */}
           <div>
             <label className={labelCls}>Fecha de la gestión</label>
@@ -471,6 +507,10 @@ export default function GestionesPage() {
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
+                            {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
+                          </p>
                           {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-xs">{g.notas}</p>}
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">

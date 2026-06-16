@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { GRUPOS_GESTION_TS, labelTipoGestion, TIPOS_GESTION_TS } from "@/lib/trabajosocial/catalogos";
+import {
+  GRUPOS_GESTION_TS, labelTipoGestion, MODALIDAD_GESTION_LABEL,
+  TIPOS_GESTION_TS, type ModalidadGestion,
+} from "@/lib/trabajosocial/catalogos";
 import type { GestionTS } from "@/types";
 import { BarChart3, Download } from "lucide-react";
 import { GestionesTabs } from "../_components/GestionesTabs";
@@ -81,6 +84,18 @@ export default function ProductividadPage() {
     return m;
   }, [gestiones]);
 
+  // Desglose por modalidad + total de minutos registrados en el mes.
+  const { porModalidad, totalMin } = useMemo(() => {
+    const porModalidad = new Map<ModalidadGestion, number>();
+    let totalMin = 0;
+    for (const g of gestiones) {
+      const mod = (g.modalidad ?? "presencial") as ModalidadGestion;
+      porModalidad.set(mod, (porModalidad.get(mod) ?? 0) + 1);
+      if (g.duracionMin) totalMin += g.duracionMin;
+    }
+    return { porModalidad, totalMin };
+  }, [gestiones]);
+
   const diasArr = Array.from({ length: dias }, (_, i) => i + 1);
 
   // Exportar la matriz a CSV (mismo formato que la hoja PRODUCCION DIARIA).
@@ -148,6 +163,24 @@ export default function ProductividadPage() {
         </div>
       ) : (
         <>
+          {/* Resumen: modalidad + tiempo */}
+          <div className="flex flex-wrap gap-2.5">
+            {(Object.keys(MODALIDAD_GESTION_LABEL) as ModalidadGestion[]).map((m) => (
+              <div key={m} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2">
+                <span className="text-xs text-slate-500">{MODALIDAD_GESTION_LABEL[m]}</span>
+                <span className="text-lg font-bold font-heading tabular-nums text-slate-800 dark:text-slate-200">{porModalidad.get(m) ?? 0}</span>
+              </div>
+            ))}
+            {totalMin > 0 && (
+              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl px-3.5 py-2">
+                <span className="text-xs text-amber-700 dark:text-amber-400">Tiempo registrado</span>
+                <span className="text-lg font-bold font-heading tabular-nums text-amber-700 dark:text-amber-400">
+                  {Math.floor(totalMin / 60)}h {totalMin % 60}m
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Matriz trabajadora × día */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">

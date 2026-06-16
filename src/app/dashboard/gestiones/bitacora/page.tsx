@@ -5,7 +5,8 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getPersona } from "@/lib/pacientes/persona";
 import {
-  ESTADO_PACIENTE_GESTION_LABEL, labelTipoGestion, type EstadoPacienteGestion,
+  ESTADO_PACIENTE_GESTION_LABEL, labelTipoGestion, MODALIDAD_GESTION_LABEL,
+  type EstadoPacienteGestion,
 } from "@/lib/trabajosocial/catalogos";
 import type { GestionTS, Persona } from "@/types";
 import { FileClock, Loader2, Search, User } from "lucide-react";
@@ -174,6 +175,8 @@ export default function BitacoraPage() {
                               <span className="inline-flex items-center gap-1"><User size={11} className="text-slate-400" /> {g.trabajadoraNombre}</span>
                               <span className="text-slate-300 dark:text-slate-600">·</span>
                               <span>{fmtHora(g.creadoEn)}</span>
+                              <span className="text-slate-300 dark:text-slate-600">·</span>
+                              <span>{g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}{g.duracionMin ? ` · ${g.duracionMin} min` : ""}</span>
                               {g.servicio && <><span className="text-slate-300 dark:text-slate-600">·</span><span>{g.servicio}</span></>}
                             </p>
                           </div>
