@@ -45,6 +45,28 @@ function estadoPacienteLabel(estado: Paciente["estado"]) {
   return estado.replaceAll("_", " ");
 }
 
+function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente {
+  const [apellidos = ficha.pacienteNombre, nombres = ""] = ficha.pacienteNombre.split(",").map(parte => parte.trim());
+  const sexo = valorComoTexto(ficha.datos?.sexo).toLowerCase();
+  const fechaIngreso = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
+  return {
+    id,
+    expediente: ficha.pacienteExpediente,
+    apellidos,
+    nombres,
+    genero: sexo === "femenino" ? "femenino" : sexo === "masculino" ? "masculino" : "otro",
+    fechaIngreso: fechaIngreso ? new Date(`${fechaIngreso}T00:00:00`) : new Date(),
+    establecimientoProcedencia: valorComoTexto(ficha.datos?.centro_de_procedencia),
+    servicioIngreso: valorComoTexto(ficha.datos?.servicio_proveniente) || ficha.servicio,
+    servicioActual: ficha.servicio,
+    camaActual: ficha.cama ?? "",
+    estado: ficha.datos?.alta === "FALLECIDO" ? "alta_fallecido" : fichaEgresada(ficha) ? "alta_vivo" : "activo",
+    creadoEn: toDate(ficha.creadoEn) ?? new Date(),
+    creadoPor: ficha.creadoPorId,
+    creadoPorNombre: ficha.creadoPorNombre,
+  };
+}
+
 export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
@@ -89,8 +111,10 @@ export default function CuidadosCriticosMedicoPage() {
     if (!fichaUrlId || fichas.length === 0) return;
     const ficha = fichas.find(item => item.id === fichaUrlId);
     if (!ficha || selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id) return;
+    const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
     queueMicrotask(() => {
-      setSelectedId(ficha.pacienteId);
+      setPacientePrecargado(pacienteDesdeFicha(ficha, pacienteId));
+      setSelectedId(pacienteId);
       setSelectedEstanciaId(ficha.id ?? "");
       setBusqueda(ficha.pacienteExpediente);
       setServicioFiltro(ficha.servicio);
@@ -100,6 +124,7 @@ export default function CuidadosCriticosMedicoPage() {
 
   useEffect(() => {
     if (!selectedId || pacientes.some(paciente => paciente.id === selectedId)) return;
+    if (pacientePrecargado?.id === selectedId) return;
     let activo = true;
     getDoc(doc(db, "pacientes", selectedId))
       .then(snap => {
@@ -111,10 +136,10 @@ export default function CuidadosCriticosMedicoPage() {
     return () => {
       activo = false;
     };
-  }, [pacientes, selectedId]);
+  }, [pacientePrecargado?.id, pacientes, selectedId]);
 
   const selected = pacientes.find(paciente => paciente.id === selectedId) ?? (pacientePrecargado?.id === selectedId ? pacientePrecargado : null);
-  const fichasPaciente = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === selectedId));
+  const fichasPaciente = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === selectedId || ficha.id === selectedEstanciaId));
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
@@ -146,7 +171,9 @@ export default function CuidadosCriticosMedicoPage() {
   const totalResultadosBusqueda = pacientesFiltrados.length + fichasHistoricasFiltradas.length;
 
   const abrirFichaHistorica = (ficha: FichaCuidadosCriticos) => {
-    setSelectedId(ficha.pacienteId);
+    const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
+    setPacientePrecargado(pacienteDesdeFicha(ficha, pacienteId));
+    setSelectedId(pacienteId);
     setSelectedEstanciaId(ficha.id ?? "");
     setBusqueda(ficha.pacienteExpediente);
     setServicioFiltro(ficha.servicio);
