@@ -6,6 +6,8 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  limit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -79,6 +81,7 @@ export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [pacientesHistoricos, setPacientesHistoricos] = useState<Paciente[]>([]);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [pacientePrecargado, setPacientePrecargado] = useState<Paciente | null>(null);
   const [fichaUrlId, setFichaUrlId] = useState("");
@@ -114,6 +117,34 @@ export default function CuidadosCriticosMedicoPage() {
       unsubFichas();
     };
   }, [profile?.tipoMedico, servicios]);
+
+  useEffect(() => {
+    const expediente = busqueda.trim();
+    if (expediente.length < 4) {
+      queueMicrotask(() => setPacientesHistoricos([]));
+      return;
+    }
+
+    let activo = true;
+    const timeout = window.setTimeout(async () => {
+      try {
+        const snap = await getDocs(query(
+          collection(db, "pacientes"),
+          where("expediente", "==", expediente),
+          limit(5)
+        ));
+        if (!activo) return;
+        setPacientesHistoricos(snap.docs.map(item => ({ id: item.id, ...item.data() } as Paciente)));
+      } catch {
+        if (activo) setPacientesHistoricos([]);
+      }
+    }, 250);
+
+    return () => {
+      activo = false;
+      window.clearTimeout(timeout);
+    };
+  }, [busqueda]);
 
   useEffect(() => {
     if (!fichaUrlId || fichas.length === 0) return;
@@ -167,8 +198,9 @@ export default function CuidadosCriticosMedicoPage() {
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
-  const tipoRegistro = tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
-    ?? (profile?.tipoMedico === "ucin" ? "ucin" : "uci");
+  const tipoFormulario = tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
+    ?? profile?.tipoMedico
+    ?? "uci";
   const numeroEstancia = fichaSeleccionada
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
     : fichasPaciente.length + 1;
@@ -183,9 +215,16 @@ export default function CuidadosCriticosMedicoPage() {
           return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaNormalizada);
         })
         .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
-  const pacientesFiltrados = pacientes.filter(paciente => {
+  const pacientesBase = [...pacientes];
+  for (const paciente of pacientesHistoricos) {
+    const yaIncluido = pacientesBase.some(item => (paciente.id && item.id === paciente.id) || item.expediente === paciente.expediente);
+    if (!yaIncluido) pacientesBase.push(paciente);
+  }
+
+  const pacientesFiltrados = pacientesBase.filter(paciente => {
+    const vieneDeBusquedaHistorica = pacientesHistoricos.some(item => (paciente.id && item.id === paciente.id) || item.expediente === paciente.expediente);
     if (debeBuscarOFiltrar) return false;
-    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
+    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro && !vieneDeBusquedaHistorica) return false;
     const term = busquedaNormalizada;
     const coincide = !term || `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
       .toLowerCase()
@@ -226,7 +265,7 @@ export default function CuidadosCriticosMedicoPage() {
     const activa = estancias.find(ficha => !fichaEgresada(ficha));
     limpiarFichaUrl();
     setFichaUrlId("");
-    setPacientePrecargado(null);
+    setPacientePrecargado(paciente);
     setSelectedId(paciente.id!);
     setSelectedEstanciaId(activa?.id ?? NUEVA_ESTANCIA);
     setError("");
@@ -245,13 +284,17 @@ export default function CuidadosCriticosMedicoPage() {
       setError(message);
       throw new Error(message);
     }
+    const tipoRegistroGuardar = tipoUnidadPorServicio(especialidad)
+      ?? tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected.servicioActual)
+      ?? (profile.tipoMedico === "ucin" ? "ucin" : "uci");
+    const servicioFicha = especialidad || selected.servicioActual;
 
     setSaving(true);
     setError("");
     const estadoEstancia = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
       ? "egresada"
       : "activa";
-    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, tipoRegistro);
+    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, tipoRegistroGuardar);
     const registroActivoExistente = fichasPaciente.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
     if (!fichaSeleccionada?.id && registroActivoExistente) {
       const message = "Este paciente ya tiene un registro activo. Cierra el registro actual antes de crear uno nuevo.";
@@ -259,12 +302,22 @@ export default function CuidadosCriticosMedicoPage() {
       setSaving(false);
       throw new Error(message);
     }
+    if (!fichaSeleccionada?.id) {
+      const pacienteDoc = await getDoc(doc(db, "pacientes", selected.id));
+      if (!pacienteDoc.exists()) {
+        const message = "No se puede crear el registro porque el expediente no existe en el sistema de pacientes.";
+        setError(message);
+        setSaving(false);
+        throw new Error(message);
+      }
+    }
 
     try {
       if (fichaSeleccionada?.id) {
         await updateDoc(doc(db, "fichas_cuidados_criticos", fichaSeleccionada.id), {
-          tipoUnidad: tipoRegistro,
+          tipoUnidad: tipoRegistroGuardar,
           estadoEstancia,
+          servicio: servicioFicha,
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
           actualizadoPorId: user.uid,
@@ -273,12 +326,12 @@ export default function CuidadosCriticosMedicoPage() {
         });
       } else {
         const creada = await addDoc(collection(db, "fichas_cuidados_criticos"), {
-          tipoUnidad: tipoRegistro,
+          tipoUnidad: tipoRegistroGuardar,
           estadoEstancia,
           pacienteId: selected.id,
           pacienteExpediente: selected.expediente,
           pacienteNombre: `${selected.apellidos}, ${selected.nombres}`,
-          servicio: selected.servicioActual,
+          servicio: servicioFicha,
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
           creadoPorId: user.uid,
@@ -411,7 +464,7 @@ export default function CuidadosCriticosMedicoPage() {
             <p className="col-span-full py-10 text-center text-sm text-slate-400">
               {debeBuscarOFiltrar
                 ? "Busca por expediente, cama o nombre, o elige un servicio para cargar sus pacientes."
-                : "No hay pacientes ni registros guardados que coincidan con la busqueda o el servicio seleccionado."}
+                : "No hay pacientes ni registros guardados que coincidan. Solo se pueden registrar expedientes existentes en el sistema."}
             </p>
           )}
         </div>
@@ -487,7 +540,7 @@ export default function CuidadosCriticosMedicoPage() {
         <FichaMatrizCuidadosCriticos
           key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
           paciente={selected}
-          tipo={tipoRegistro}
+          tipo={tipoFormulario}
           servicioEstancia={fichaSeleccionada?.servicio ?? selected.servicioActual}
           numeroEstancia={numeroEstancia}
           datosGuardados={fichaSeleccionada?.datos}
