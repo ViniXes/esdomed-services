@@ -1,6 +1,6 @@
 import type { FichaCuidadosCriticos, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
-export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "catalogoCritico";
+export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "servicioHospitalario" | "catalogoCritico";
 
 export interface CampoMatrizCuidadosCriticos {
   key: string;
@@ -203,6 +203,7 @@ function slug(label: string) {
 
 function inferirTipo(label: string): Pick<CampoMatrizCuidadosCriticos, "tipo" | "opciones"> {
   if (label === "ESPECIALIDAD") return { tipo: "servicioCritico" };
+  if (label === "SERVICIO PROVENIENTE") return { tipo: "servicioHospitalario" };
   if (CAMPOS_DIAGNOSTICO_CIE10.has(label)) return { tipo: "cie10" };
   if (CAMPOS_CATALOGO_CRITICO.has(label)) return { tipo: "catalogoCritico" };
   if (CAMPOS_SI_NO.has(label) || label.includes("MULTIRESISTENTE: SI/NO")) return { tipo: "yesno" };
@@ -228,7 +229,7 @@ function construirCampos(labels: string[], solo?: TipoMedicoCuidadosCriticos): C
       label: ETIQUETAS_VISIBLES[label] ?? label,
       ...inferirTipo(label),
       solo,
-      automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "SERVICIO PROVENIENTE", "DIAS EN SERVICIO", "MUERTE > 48 HORAS"].includes(label),
+      automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "DIAS EN SERVICIO", "MUERTE > 48 HORAS"].includes(label),
     };
   });
 }
@@ -477,7 +478,6 @@ export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidado
     sexo,
     edad: calcularEdad(paciente.fechaNacimiento),
     centro_de_procedencia: paciente.establecimientoProcedencia ?? "",
-    servicio_proveniente: paciente.servicioIngreso ?? "",
     ...(fallecido ? {
       fecha_de_muerte: fechaComoInput(paciente.fechaEgreso),
       alta: "FALLECIDO",
