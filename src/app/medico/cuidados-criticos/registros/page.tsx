@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
-import { camposPendientesCierreCuidadosCriticos, esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
-import { ubicacionLabel } from "@/lib/servicios";
+import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos } from "@/types";
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
@@ -106,7 +104,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     return (
       <div className="p-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          Tu usuario no tiene permisos de Médico UCI o Médico UCIN para consultar este consolidado.
+          Tu usuario no tiene permisos de Medico UCI o Medico UCIN para consultar este consolidado.
         </div>
       </div>
     );
@@ -121,7 +119,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <div>
           <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-slate-100">Mis registros UCI / UCIN</h1>
           <p className="text-xs text-slate-500">
-            {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · Vista consolidada de las estancias registradas en tus unidades.
+            {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} - Vista consolidada de las estancias registradas en tus unidades.
           </p>
         </div>
       </header>
@@ -200,67 +198,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div>
-          <h2 className="font-bold font-heading text-slate-900 dark:text-slate-100">Lienzo de registros filtrados</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Puedes revisar todas tus entradas, filtrarlas por servicio, mes o fecha de ingreso a UCI/UCIN.
-          </p>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              <tr>
-                <th className="px-3 py-2">Expediente</th>
-                <th className="px-3 py-2">Paciente</th>
-                <th className="px-3 py-2">Ubicación</th>
-                <th className="px-3 py-2">Ingreso</th>
-                <th className="px-3 py-2">Responsable</th>
-                <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {fichasFiltradas.slice(0, 12).map(ficha => {
-                const pendientes = camposPendientesCierreCuidadosCriticos(ficha.datos);
-                return (
-                  <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
-                    <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
-                    <td className="px-3 py-2">{ficha.pacienteNombre}</td>
-                    <td className="px-3 py-2">{ubicacionLabel(ficha.servicio, ficha.cama)}</td>
-                    <td className="px-3 py-2">{valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}</td>
-                    <td className="px-3 py-2">{ficha.creadoPorNombre || "No registrado"}</td>
-                    <td className="px-3 py-2">
-                      {pendientes.length > 0 ? (
-                        <div className="text-amber-600 dark:text-amber-300">
-                          <span className="font-semibold">Pendiente</span>
-                          <p className="mt-0.5 text-[11px]">{pendientes.map(campo => campo.label).join(", ")}</p>
-                        </div>
-                      ) : (
-                        <span className="text-emerald-600 dark:text-emerald-300">{fichaEgresada(ficha) ? "Cerrada" : "Completa"}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Link
-                        href={`/medico/cuidados-criticos?ficha=${ficha.id}`}
-                        className="inline-flex rounded-lg border border-blue-200 px-3 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
-                      >
-                        Abrir
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-              {fichasFiltradas.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-400">No hay registros con los filtros seleccionados.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <LienzoMatrizCuidadosCriticos tipo={profile.tipoMedico} fichas={fichasFiltradas} />
       </section>
     </div>
