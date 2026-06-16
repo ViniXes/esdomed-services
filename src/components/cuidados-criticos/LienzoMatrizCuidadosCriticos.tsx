@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Download } from "lucide-react";
 import { useState } from "react";
 import { camposMatrizPorTipo, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
@@ -9,9 +10,10 @@ interface Props {
   tipo?: TipoMedicoCuidadosCriticos;
   datos?: DatosMatrizCuidadosCriticos;
   fichas?: FichaCuidadosCriticos[];
+  expedienteHref?: (ficha: FichaCuidadosCriticos) => string | undefined;
 }
 
-export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas }: Props) {
+export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas, expedienteHref }: Props) {
   const [exportando, setExportando] = useState(false);
   const campos = camposMatrizPorTipo(tipo);
   const filas = fichas ?? (datos ? [{ id: "vista", datos } as FichaCuidadosCriticos] : []);
@@ -64,11 +66,24 @@ export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas }: P
           <tbody>
             {filas.map((fila, index) => (
               <tr key={fila.id ?? index} className="bg-white dark:bg-slate-900">
-                {campos.map(campo => (
-                  <td key={campo.key} className="max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-300">
-                    <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valorCampo(fila, campo.key)}</span>
-                  </td>
-                ))}
+                {campos.map(campo => {
+                  const valor = valorCampo(fila, campo.key);
+                  const href = campo.key === "registro" ? expedienteHref?.(fila) : undefined;
+                  return (
+                    <td key={campo.key} className="max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-300">
+                      {href ? (
+                        <Link
+                          href={href}
+                          className="block max-h-20 overflow-hidden whitespace-pre-wrap font-semibold text-blue-600 underline-offset-2 hover:underline dark:text-blue-300"
+                        >
+                          {valor}
+                        </Link>
+                      ) : (
+                        <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valor}</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             {filas.length === 0 && (

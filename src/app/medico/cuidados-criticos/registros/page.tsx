@@ -199,7 +199,11 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <LienzoMatrizCuidadosCriticos tipo={profile.tipoMedico} fichas={fichasFiltradas} />
+        <LienzoMatrizCuidadosCriticos
+          tipo={profile.tipoMedico}
+          fichas={fichasFiltradas}
+          expedienteHref={ficha => ficha.id ? `/medico/cuidados-criticos?ficha=${ficha.id}` : undefined}
+        />
       </section>
     </div>
   );
