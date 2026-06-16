@@ -374,23 +374,23 @@ export default function EditorPlanPage() {
           <p className="mb-2 text-[11px] text-slate-400">
             Toca una celda para asignar un código de horario, vacaciones, incapacidad/permiso o descanso.
           </p>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div className="overflow-auto max-h-[calc(100vh-14rem)] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <table className="border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60">
-                  <th className="sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 min-w-[170px] border-r border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="sticky left-0 top-0 z-30 bg-slate-50 dark:bg-slate-800 px-2 py-2 text-left font-semibold text-slate-600 dark:text-slate-300 min-w-[170px] border-r border-b border-slate-200 dark:border-slate-700">
                     Personal
                   </th>
                   {dias.map((d, i) => {
                     const finde = iniciales[i] === "S" || iniciales[i] === "D";
                     return (
-                      <th key={d} className={`px-0 py-1 text-center font-semibold w-9 ${finde ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500" : "text-slate-500 dark:text-slate-400"}`}>
+                      <th key={d} className={`sticky top-0 z-20 px-0 py-1 text-center font-semibold w-9 border-b border-slate-200 dark:border-slate-700 ${finde ? "bg-rose-50 dark:bg-rose-950 text-rose-500" : "bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
                         <div className="text-[9px] leading-none">{iniciales[i]}</div>
                         <div className="text-[11px] tabular-nums">{d}</div>
                       </th>
                     );
                   })}
-                  <th className="px-2 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 border-l border-slate-200 dark:border-slate-700">Hrs</th>
+                  <th className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-800 px-2 py-2 text-center font-semibold text-slate-600 dark:text-slate-300 border-l border-b border-slate-200 dark:border-slate-700">Hrs</th>
                 </tr>
               </thead>
               <tbody>
@@ -452,7 +452,7 @@ export default function EditorPlanPage() {
                                     dragRef.current = { filaIdx, valor: celda, isDragging: true, cellsDragged: 0 };
                                   }}
                                   onMouseEnter={() => {
-                                    if (dragRef.current && dragRef.current.isDragging && dragRef.current.filaIdx === filaIdx) {
+                                    if (dragRef.current && dragRef.current.isDragging) {
                                       dragRef.current.cellsDragged++;
                                       if (!finde) {
                                         setCelda(filaIdx, diaIdx, dragRef.current.valor);
