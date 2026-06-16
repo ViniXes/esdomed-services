@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { useState } from "react";
-import { camposMatrizPorTipo, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 interface Props {
@@ -69,12 +69,17 @@ export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas, exp
                 {campos.map(campo => {
                   const valor = valorCampo(fila, campo.key);
                   const href = campo.key === "registro" ? expedienteHref?.(fila) : undefined;
+                  const expedientePendiente = href && fichaPendienteCierreCuidadosCriticos(fila);
                   return (
                     <td key={campo.key} className="max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-300">
                       {href ? (
                         <Link
                           href={href}
-                          className="block max-h-20 overflow-hidden whitespace-pre-wrap font-semibold text-blue-600 underline-offset-2 hover:underline dark:text-blue-300"
+                          className={`block max-h-20 overflow-hidden whitespace-pre-wrap font-semibold underline-offset-2 hover:underline ${
+                            expedientePendiente
+                              ? "text-rose-500 dark:text-rose-300"
+                              : "text-blue-600 dark:text-blue-300"
+                          }`}
                         >
                           {valor}
                         </Link>

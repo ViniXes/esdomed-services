@@ -128,7 +128,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasFiltradas.length} />
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
         <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
-        <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
+        <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} variant="warning" />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -209,11 +209,18 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+function Stat({ icon, label, value, variant = "default" }: { icon: React.ReactNode; label: string; value: number | string; variant?: "default" | "warning" }) {
+  const warning = variant === "warning";
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">{icon}<span className="text-xs font-medium text-slate-500">{label}</span></div>
-      <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
+    <div className={`rounded-xl border p-4 ${
+      warning
+        ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/25"
+        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+    }`}>
+      <div className={`flex items-center gap-2 ${warning ? "text-rose-500 dark:text-rose-300" : "text-blue-600 dark:text-blue-400"}`}>
+        {icon}<span className={`text-xs font-medium ${warning ? "text-rose-700 dark:text-rose-200" : "text-slate-500"}`}>{label}</span>
+      </div>
+      <p className={`mt-2 text-2xl font-bold ${warning ? "text-rose-600 dark:text-rose-200" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
     </div>
   );
 }
