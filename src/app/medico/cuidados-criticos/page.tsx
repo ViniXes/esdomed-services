@@ -138,8 +138,16 @@ export default function CuidadosCriticosMedicoPage() {
     };
   }, [pacientePrecargado?.id, pacientes, selectedId]);
 
-  const selected = pacientes.find(paciente => paciente.id === selectedId) ?? (pacientePrecargado?.id === selectedId ? pacientePrecargado : null);
-  const fichasPaciente = ordenarFichas(fichas.filter(ficha => ficha.pacienteId === selectedId || ficha.id === selectedEstanciaId));
+  const selected = pacientePrecargado?.id === selectedId
+    ? pacientePrecargado
+    : pacientes.find(paciente => paciente.id === selectedId) ?? null;
+  const selectedDesdeFichaGuardada = pacientePrecargado?.id === selectedId;
+  const fichasPaciente = ordenarFichas(fichas.filter(ficha => {
+    if (ficha.id === selectedEstanciaId) return true;
+    if (selected?.expediente && ficha.pacienteExpediente === selected.expediente) return true;
+    if (selectedDesdeFichaGuardada) return false;
+    return ficha.pacienteId === selectedId;
+  }));
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
@@ -184,11 +192,12 @@ export default function CuidadosCriticosMedicoPage() {
 
   const abrirFichaHistorica = (ficha: FichaCuidadosCriticos) => {
     const pacienteId = ficha.pacienteId || `ficha:${ficha.id}`;
-    setPacientePrecargado(pacienteDesdeFicha(ficha, pacienteId));
+    const paciente = pacienteDesdeFicha(ficha, pacienteId);
+    setPacientePrecargado(paciente);
     setSelectedId(pacienteId);
     setSelectedEstanciaId(ficha.id ?? "");
-    setBusqueda(ficha.pacienteExpediente);
-    setServicioFiltro(ficha.servicio);
+    setBusqueda(paciente.expediente);
+    setServicioFiltro(paciente.servicioActual);
     setError("");
   };
 
@@ -453,7 +462,7 @@ export default function CuidadosCriticosMedicoPage() {
 
       {selected && selectedEstanciaId ? (
         <FichaMatrizCuidadosCriticos
-          key={`${selected.id}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
+          key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
           paciente={selected}
           tipo={profile.tipoMedico}
           servicioEstancia={fichaSeleccionada?.servicio ?? selected.servicioActual}
