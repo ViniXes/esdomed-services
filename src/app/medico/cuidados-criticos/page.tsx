@@ -149,24 +149,36 @@ export default function CuidadosCriticosMedicoPage() {
 
   const busquedaNormalizada = busqueda.trim().toLowerCase();
   const debeBuscarOFiltrar = servicioFiltro === "todos" && busquedaNormalizada.length < 2;
-  const pacientesFiltrados = pacientes.filter(paciente => {
-    if (debeBuscarOFiltrar) return false;
-    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
-    const term = busquedaNormalizada;
-    if (!term) return true;
-    return `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
-      .toLowerCase()
-      .includes(term);
-  });
-
-  const fichasHistoricasFiltradas = busquedaNormalizada.length < 2
+  const fichasCoincidentes = busquedaNormalizada.length < 2
     ? []
     : fichas
         .filter(ficha => {
           if (servicioFiltro !== "todos" && ficha.servicio !== servicioFiltro) return false;
           return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaNormalizada);
         })
-        .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0))
+        .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
+  const pacientesFiltrados = pacientes.filter(paciente => {
+    if (debeBuscarOFiltrar) return false;
+    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro) return false;
+    const term = busquedaNormalizada;
+    const coincide = !term || `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
+      .toLowerCase()
+      .includes(term);
+    if (!coincide) return false;
+    const fichaActiva = fichas.find(ficha => ficha.pacienteId === paciente.id && !fichaEgresada(ficha));
+    const fichaGuardadaCoincidente = fichasCoincidentes.some(ficha => (ficha.pacienteId && ficha.pacienteId === paciente.id) || ficha.pacienteExpediente === paciente.expediente);
+    return Boolean(fichaActiva) || !fichaGuardadaCoincidente;
+  });
+  const pacientesFiltradosIds = new Set(pacientesFiltrados.map(paciente => paciente.id).filter(Boolean));
+  const pacientesFiltradosExpedientes = new Set(pacientesFiltrados.map(paciente => paciente.expediente));
+
+  const fichasHistoricasFiltradas = busquedaNormalizada.length < 2
+    ? []
+    : fichasCoincidentes
+        .filter(ficha => {
+          const pacienteYaVisible = (ficha.pacienteId && pacientesFiltradosIds.has(ficha.pacienteId)) || pacientesFiltradosExpedientes.has(ficha.pacienteExpediente);
+          return !pacienteYaVisible;
+        })
         .slice(0, 8);
   const totalResultadosBusqueda = pacientesFiltrados.length + fichasHistoricasFiltradas.length;
 
@@ -313,7 +325,7 @@ export default function CuidadosCriticosMedicoPage() {
         <div className="grid max-h-64 gap-2 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
           {pacientesFiltrados.map(paciente => {
             const estancias = fichas.filter(ficha => ficha.pacienteId === paciente.id);
-            const activa = estancias.some(ficha => !fichaEgresada(ficha));
+            const fichaActiva = estancias.find(ficha => !fichaEgresada(ficha));
             return (
               <button
                 key={paciente.id}
@@ -329,8 +341,10 @@ export default function CuidadosCriticosMedicoPage() {
                   <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${paciente.estado === "activo" ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800"}`}>{estadoPacienteLabel(paciente.estado)}</span>
                 </div>
                 <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(paciente.servicioActual, paciente.camaActual)}</p>
-                <p className={`mt-1 text-[11px] font-medium ${activa ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
-                  Matriz: {estancias.length} estancia{estancias.length !== 1 ? "s" : ""} · {activa ? "activa" : "sin activa"}
+                <p className={`mt-1 text-[11px] font-medium ${fichaActiva ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  {fichaActiva
+                    ? `Abrir registro activo - Ingreso ${valorComoTexto(fichaActiva.datos?.fecha_ingreso_al_servicio) || "No registrado"}`
+                    : `Sin registro activo - ${estancias.length} registro${estancias.length !== 1 ? "s" : ""} guardado${estancias.length !== 1 ? "s" : ""}`}
                 </p>
               </button>
             );
