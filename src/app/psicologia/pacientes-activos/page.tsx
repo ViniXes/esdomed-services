@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowDownWideNarrow, ArrowUpWideNarrow, BedDouble, Clock, Filter, ChevronDown, Search, X } from "lucide-react";
@@ -14,19 +14,21 @@ export default function PacientesActivosPsicologiaPage() {
   const { profile } = useAuth();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [servicioFiltro, setServicioFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState<Orden>("antiguos");
 
   useEffect(() => {
     if (!profile) return;
-    // Misma fuente que ESDOMED: ingresos activos. Orden base por fecha de ingreso.
+    // Misma fuente que ESDOMED: ingresos activos. Sin orderBy en la consulta para
+    // no depender de un índice compuesto (estado + fechaIngreso); ordenamos en cliente.
     const q = query(
       collection(db, "pacientes"),
       where("estado", "==", "activo"),
-      orderBy("fechaIngreso", "asc"),
     );
     const unsub = onSnapshot(q, (snap) => {
+      setError("");
       setPacientes(
         snap.docs.map((d) => {
           const data = d.data();
@@ -39,7 +41,11 @@ export default function PacientesActivosPsicologiaPage() {
         }),
       );
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => {
+      console.error("pacientes-activos:", err);
+      setError(err.message || "No se pudieron cargar los pacientes.");
+      setLoading(false);
+    });
     return unsub;
   }, [profile]);
 
@@ -133,6 +139,12 @@ export default function PacientesActivosPsicologiaPage() {
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          {error}
+        </div>
+      )}
 
       {/* Tabla */}
       {loading ? (
