@@ -33,10 +33,12 @@ import {
   ordenGrupo,
 } from "@/lib/esdomed/plan";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
+import { exportarPlanExcel, type TipoPlan } from "@/lib/esdomed/exportar-plan";
 import {
   ArrowLeft,
   Check,
   Copy,
+  FileSpreadsheet,
   Printer,
   RefreshCw,
   Save,
@@ -165,6 +167,26 @@ export default function EditorPlanPage() {
       ),
     );
     setGuardado(false);
+  };
+
+  const descargarExcel = (tipo: TipoPlan) => {
+    exportarPlanExcel(
+      {
+        anio,
+        mes,
+        numeroHoras: numeroHoras.trim(),
+        filas: filas.map((f) => ({
+          uid: f.uid,
+          codigoMarcacion: f.codigoMarcacion ?? "",
+          nombre: f.nombre,
+          puesto: f.puesto ?? "",
+          grupo: f.grupo ?? "",
+          asignaciones: f.asignaciones,
+          observaciones: f.observaciones ?? "",
+        })),
+      },
+      tipo,
+    );
   };
 
   const sincronizar = async () => {
@@ -331,6 +353,14 @@ export default function EditorPlanPage() {
             <Link href={`/esdomed-horarios/planes/${periodo}/imprimir?tipo=manpower`} target="_blank" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               <Printer size={14} /> Imprimir MPW
             </Link>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => descargarExcel("institucional")} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
+              <FileSpreadsheet size={14} /> Excel Inst.
+            </button>
+            <button onClick={() => descargarExcel("manpower")} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors">
+              <FileSpreadsheet size={14} /> Excel MPW
+            </button>
           </div>
           <button
             onClick={guardar}
