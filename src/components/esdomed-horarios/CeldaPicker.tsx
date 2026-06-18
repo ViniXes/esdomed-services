@@ -50,6 +50,12 @@ export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose 
   const q = buscar.trim().toLowerCase();
   const filtrados = useMemo<Horario[]>(() => {
     if (!q) return HORARIOS;
+    // Si se escribe solo un número (ej. "12" o "15.5"), buscar por cantidad de
+    // horas exacta — así "12" devuelve todos los códigos de 12 horas.
+    if (/^\d+(\.\d+)?$/.test(q)) {
+      const horas = Number(q);
+      return HORARIOS.filter((h) => h.horas === horas);
+    }
     return HORARIOS.filter(
       (h) =>
         h.codigo.toLowerCase().includes(q) ||
@@ -112,7 +118,7 @@ export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose 
               autoFocus
               value={buscar}
               onChange={(e) => setBuscar(e.target.value)}
-              placeholder="Buscar código u hora (ej. TH34, 7:00)"
+              placeholder="Buscar código, hora o nº de horas (ej. TH34, 7:00, 12)"
               className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#c9a892]"
             />
           </div>
