@@ -520,7 +520,9 @@ export default function EditorPlanPage() {
                                   onMouseEnter={() => {
                                     if (dragRef.current && dragRef.current.isDragging) {
                                       dragRef.current.cellsDragged++;
-                                      if (!finde) {
+                                      // Solo el personal administrativo descansa fin de semana;
+                                      // el operativo sí puede tener turnos sábado/domingo.
+                                      if (!finde || !isAdministrativo) {
                                         setCelda(filaIdx, diaIdx, dragRef.current.valor);
                                       }
                                     }
