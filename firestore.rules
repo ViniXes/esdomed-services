@@ -19,13 +19,28 @@ service cloud.firestore {
     function isAsistenteEsdomed() { return isAuth() && getRole() == 'asistente_esdomed'; }
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
+    function isAdminAlfonsoMontes() {
+      return isAdmin()
+        && (
+          get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*Alfonso.*Montes.*')
+          || get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*ALFONSO.*MONTES.*')
+          || get(/databases/$(database)/documents/usuarios/$(uid())).data.email.matches('.*alfonso.*montes.*')
+        );
+    }
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
     function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
     function isMedicoCuidadosCriticos() {
       return isMedico()
-        && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin'];
+        && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin', 'uci_ucin'];
+    }
+    function tipoMedicoCritico() {
+      return get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico;
+    }
+    function puedeRegistrarTipoUnidad(tipoUnidad) {
+      return tipoMedicoCritico() == tipoUnidad
+        || (tipoMedicoCritico() == 'uci_ucin' && tipoUnidad in ['uci', 'ucin']);
     }
     function serviciosAsignados() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.servicios;
@@ -82,7 +97,7 @@ service cloud.firestore {
                     ])
                     && request.resource.data.medicoId == uid()
                     && request.resource.data.medicoNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
-                    && request.resource.data.tipoUnidad == get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico
+                    && puedeRegistrarTipoUnidad(request.resource.data.tipoUnidad)
                     && request.resource.data.servicio in serviciosAsignados()
                     && request.resource.data.creadoEn == request.time;
       allow update: if false;
@@ -112,7 +127,7 @@ service cloud.firestore {
                       'actualizadoPorNombre',
                       'actualizadoEn'
                     ])
-                    && request.resource.data.tipoUnidad == get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico
+                    && puedeRegistrarTipoUnidad(request.resource.data.tipoUnidad)
                     && request.resource.data.estadoEstancia in ['activa', 'egresada']
                     && request.resource.data.servicio in serviciosAsignados()
                     && request.resource.data.creadoPorId == uid()
@@ -138,6 +153,13 @@ service cloud.firestore {
     }
 
     // ─── Traslados ────────────────────────────────────────────────────────────
+    // Configuracion mensual usada para indicadores UCI/UCIN.
+    // No se deriva de camas clinicas porque el dato estadistico puede cambiar por periodo.
+    match /config_indicadores_cuidados_criticos/{id} {
+      allow read: if isAdminAlfonsoMontes();
+      allow create, update, delete: if isAdminAlfonsoMontes();
+    }
+
     match /traslados/{id} {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
