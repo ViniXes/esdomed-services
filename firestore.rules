@@ -225,6 +225,24 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ─── Consultas de ficha de paciente (auditoría "Buscar Paciente") ─────────
+    // Médicos, trabajo social, psicología y ESDOMED dejan constancia al abrir la
+    // ficha rápida de un paciente. Solo admin puede leer el historial; los
+    // registros son inmutables.
+    match /consultas_paciente/{id} {
+      allow read: if isAdmin();
+      allow create: if isAuth()
+                    && (isMedico() || isTrabajoSocial() || isPsicologia() || isEsdomed() || isAdmin())
+                    && request.resource.data.usuarioUid == uid()
+                    && request.resource.data.usuarioNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.criterio in ['expediente', 'dui', 'nombre']
+                    && request.resource.data.termino is string
+                    && request.resource.data.expedienteConsultado is string
+                    && request.resource.data.tieneIngresoActivo is bool
+                    && request.resource.data.creadoEn == request.time;
+      allow update, delete: if false;
+    }
+
     match /control_ingresos/{id} {
       allow read:   if isAuth();
       allow create: if isEsdomed() || isAdmin();

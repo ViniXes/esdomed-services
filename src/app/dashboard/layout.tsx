@@ -24,6 +24,7 @@ import {
   DoorOpen,
   CalendarClock,
   NotebookPen,
+  UserSearch,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -89,6 +90,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
 
     // ── Gestión de pacientes ──
+    ...(esTS || esEsdomed || esAdmin
+      ? [{ href: "/dashboard/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, group: G_PACIENTES }]
+      : []),
     ...(verControlIngresos
       ? [{ href: "/dashboard/control-ingresos", label: "Control ingresos", icon: FileText, group: G_PACIENTES }]
       : []),

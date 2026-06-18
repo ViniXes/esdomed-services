@@ -655,6 +655,36 @@ export interface BusquedaTelefono {
 }
 
 // ============================================================================
+// Consulta de Ficha de Paciente — auditoría del módulo "Buscar Paciente"
+// Queda constancia de quién abrió la ficha rápida de un paciente (médicos,
+// trabajo social y psicología), con qué criterio buscó y a quién consultó.
+// ============================================================================
+
+export type CriterioConsultaPaciente = "expediente" | "dui" | "nombre";
+
+export interface ConsultaPaciente {
+  id?: string;
+
+  usuarioUid: string;
+  usuarioNombre: string;
+  usuarioEmail?: string;
+  usuarioRole: UserRole;
+  usuarioJvpm?: string;
+
+  criterio: CriterioConsultaPaciente;
+  termino: string;             // texto que se buscó (tal cual lo escribió el usuario)
+
+  expedienteConsultado: string;
+  pacienteNombre: string;
+  tieneIngresoActivo: boolean;
+  servicioActual?: string;
+  camaActual?: string;
+  totalEstancias: number;      // cuántos ingresos tiene registrados la persona
+
+  creadoEn: Date;
+}
+
+// ============================================================================
 // Visitas de familiares — gestión por Trabajo Social
 // ============================================================================
 // Modelo centrado en la TARJETA de visita: cada paciente internado tiene una

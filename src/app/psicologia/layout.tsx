@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { HeartPulse, Inbox } from "lucide-react";
+import { HeartPulse, Inbox, UserSearch } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 
 const navItems = [
+  { href: "/psicologia/buscar-paciente", label: "Buscar Paciente", icon: UserSearch },
   { href: "/psicologia/fallecidos",   label: "Fallecidos",  icon: HeartPulse },
   { href: "/psicologia/recepciones",  label: "Recepciones", icon: Inbox },
 ];
