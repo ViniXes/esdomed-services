@@ -255,15 +255,32 @@ export default function EditorPlanPage() {
   const guardar = () => {
     if (!profile) return;
 
+    const advertencias: string[] = [];
+
     const diasIncompletos = conteoOperativosPorDia
       .map((count, idx) => count < 2 ? idx + 1 : null)
-      .filter(val => val !== null);
-
+      .filter((val): val is number => val !== null);
     if (diasIncompletos.length > 0) {
+      advertencias.push(`Días con menos de 2 operativos asignados: ${diasIncompletos.join(", ")}.`);
+    }
+
+    // Las vacaciones siempre son un periodo de 15 días: avisar si alguien tiene
+    // una cantidad distinta (menos o más).
+    const vacIncorrectas = filas
+      .map((f) => ({ nombre: f.nombre, vac: contarMarca(f.asignaciones, "VAC") }))
+      .filter((x) => x.vac > 0 && x.vac !== 15);
+    if (vacIncorrectas.length > 0) {
+      advertencias.push(
+        "Personal con vacaciones distintas de 15 días (deben ser exactamente 15):\n" +
+          vacIncorrectas.map((x) => `  • ${x.nombre}: ${x.vac} día(s) VAC`).join("\n"),
+      );
+    }
+
+    if (advertencias.length > 0) {
       setConfirmState({
         tipo: "alerta",
-        titulo: "Días sin cobertura mínima",
-        mensaje: `Hay días con menos de 2 operativos asignados (Días: ${diasIncompletos.join(", ")}).\n\n¿Deseas guardar el plan de todas formas?`,
+        titulo: "Revisa antes de guardar",
+        mensaje: `${advertencias.join("\n\n")}\n\n¿Deseas guardar el plan de todas formas?`,
         textoConfirmar: "Guardar igual",
         onConfirm: () => { void ejecutarGuardado(); },
       });
@@ -473,7 +490,11 @@ export default function EditorPlanPage() {
                     const vac = contarMarca(fila.asignaciones, "VAC");
                     const grupoActual = fila.grupo?.trim() || "";
                     const isAdministrativo = grupoActual.toLowerCase().includes("administrativo");
-                    const targetHoras = isAdministrativo ? metaHorasAdmin : metaHorasOperativas;
+                    const metaBase = isAdministrativo ? metaHorasAdmin : metaHorasOperativas;
+                    // Regla: un operativo con periodo de vacaciones (15 días VAC)
+                    // trabaja medio mes, así que su meta de horas baja a la mitad.
+                    const metaReducida = !isAdministrativo && vac >= 15;
+                    const targetHoras = typeof metaBase === "number" && metaReducida ? metaBase / 2 : metaBase;
                     const metaValida = typeof targetHoras === "number" && targetHoras > 0;
                     const dif = metaValida ? total - targetHoras : 0;
 
@@ -585,15 +606,29 @@ export default function EditorPlanPage() {
                             {metaValida && (
                               <div className="mt-1">
                                 {dif === 0 ? (
-                                  <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">OK</span>
+                                  <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded" title={`Meta: ${targetHoras} hrs`}>OK</span>
                                 ) : dif > 0 ? (
-                                  <span className="text-[9px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.5 rounded" title={`Excede meta por ${dif} hrs`}>+{dif} hrs</span>
+                                  <span className="text-[9px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/30 px-1.5 py-0.5 rounded" title={`Excede meta (${targetHoras} hrs) por ${dif} hrs`}>+{dif} hrs</span>
                                 ) : (
-                                  <span className="text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded" title={`Faltan ${Math.abs(dif)} hrs`}>{dif} hrs</span>
+                                  <span className="text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded" title={`Faltan ${Math.abs(dif)} hrs para la meta (${targetHoras} hrs)`}>{dif} hrs</span>
                                 )}
                               </div>
                             )}
-                            {vac > 0 && <span className="block mt-1 text-[9px] font-semibold text-amber-500 bg-amber-50 dark:bg-amber-950/30 px-1 rounded">{vac} VAC</span>}
+                            {metaReducida && (
+                              <span className="block mt-1 text-[9px] font-bold text-violet-600 bg-violet-50 dark:bg-violet-950/40 dark:text-violet-300 px-1 rounded" title={`Meta reducida a la mitad (${targetHoras} hrs) por periodo de vacaciones`}>META ½</span>
+                            )}
+                            {vac > 0 && (
+                              <span
+                                className={`block mt-1 text-[9px] font-semibold px-1 rounded ${
+                                  vac !== 15
+                                    ? "text-rose-700 bg-rose-100 dark:bg-rose-950/50 dark:text-rose-300 ring-1 ring-rose-300 dark:ring-rose-800"
+                                    : "text-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                                }`}
+                                title={vac !== 15 ? "Las vacaciones deben ser exactamente 15 días" : undefined}
+                              >
+                                {vac} VAC{vac !== 15 ? " ⚠" : ""}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       </Fragment>
