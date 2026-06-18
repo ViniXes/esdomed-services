@@ -498,6 +498,9 @@ export default function EditorPlanPage() {
                     const metaValida = typeof targetHoras === "number" && targetHoras > 0;
                     const dif = metaValida ? total - targetHoras : 0;
 
+                    // Guía de turnos cada 4 días (solo operativos).
+                    const sugerencias = isAdministrativo ? [] : casillasSugeridas(fila.asignaciones);
+
                     // ¿Hay vecino del mismo grupo arriba/abajo? (para habilitar mover)
                     const grupoVecino = (di: number) => (filasOrdenadas[di]?.f.grupo?.trim() || "") === grupoActual;
                     const puedeSubir = displayIdx > 0 && grupoVecino(displayIdx - 1);
@@ -574,6 +577,7 @@ export default function EditorPlanPage() {
                           {dias.map((d, diaIdx) => {
                             const celda = (fila.asignaciones[diaIdx] ?? "").trim();
                             const finde = iniciales[diaIdx] === "S" || iniciales[diaIdx] === "D";
+                            const sugerido = sugerencias[diaIdx] === true;
                             return (
                               <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
                                 <button
@@ -594,9 +598,14 @@ export default function EditorPlanPage() {
                                     if (dragRef.current && dragRef.current.cellsDragged > 0) return;
                                     setPicker({ filaIdx, diaIdx });
                                   }}
-                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors ${colorCelda(celda)} cursor-cell hover:ring-2 hover:ring-blue-400 hover:z-10 relative`}
+                                  title={sugerido ? "Siguiente turno sugerido (cada 4 días)" : undefined}
+                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors cursor-cell hover:ring-2 hover:ring-blue-400 hover:z-10 relative ${
+                                    sugerido
+                                      ? "bg-indigo-50 dark:bg-indigo-950/40 ring-2 ring-inset ring-indigo-400/70 dark:ring-indigo-500/50 text-indigo-400"
+                                      : colorCelda(celda)
+                                  }`}
                                 >
-                                  {celda.toUpperCase()}
+                                  {celda ? celda.toUpperCase() : sugerido ? "•" : ""}
                                 </button>
                               </td>
                             );
@@ -793,6 +802,29 @@ export default function EditorPlanPage() {
       )}
     </div>
   );
+}
+
+/**
+ * Para operativos: los turnos de 24h se repiten cada 4 días (entra el 1, vuelve
+ * el 5). A partir del último código de horario real puesto en la fila, marca las
+ * casillas VACÍAS que caen cada 4 días como "siguiente turno sugerido". Es solo
+ * una guía visual; si al final no se asigna horas ahí, no pasa nada.
+ */
+function casillasSugeridas(asignaciones: string[]): boolean[] {
+  const n = asignaciones.length;
+  const out = new Array(n).fill(false);
+  let ultimoTurno = -1; // índice del último código de horario real visto
+  for (let i = 0; i < n; i++) {
+    const celda = (asignaciones[i] ?? "").trim();
+    if (getHorario(celda)) {
+      ultimoTurno = i; // ancla: a partir de aquí se proyecta cada 4 días
+      continue;
+    }
+    if (celda === "" && ultimoTurno >= 0 && (i - ultimoTurno) % 4 === 0) {
+      out[i] = true;
+    }
+  }
+  return out;
 }
 
 function colorCelda(celda: string): string {
