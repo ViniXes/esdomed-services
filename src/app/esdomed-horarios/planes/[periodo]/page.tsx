@@ -40,6 +40,7 @@ import {
   Printer,
   RefreshCw,
   Save,
+  Trash2,
   Users,
   XCircle,
   AlertTriangle,
@@ -68,6 +69,7 @@ export default function EditorPlanPage() {
   const [prevPlanData, setPrevPlanData] = useState<PlanTrabajo | null>(null);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
+  const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void } | null>(null);
   const dragRef = useRef<{ filaIdx: number; valor: string; isDragging: boolean; cellsDragged: number } | null>(null);
 
   useEffect(() => {
@@ -156,6 +158,15 @@ export default function EditorPlanPage() {
     setGuardado(false);
   };
 
+  const limpiarFila = (filaIdx: number) => {
+    setFilas((prev) =>
+      prev.map((f, i) =>
+        i === filaIdx ? { ...f, asignaciones: f.asignaciones.map(() => "") } : f,
+      ),
+    );
+    setGuardado(false);
+  };
+
   const sincronizar = async () => {
     const lista = await cargarRoster();
     setFilas((prev) => sincronizarFilas(lista, prev, dias.length));
@@ -192,7 +203,7 @@ export default function EditorPlanPage() {
     setGuardado(false);
   };
 
-  const guardar = async () => {
+  const guardar = () => {
     if (!profile) return;
 
     const diasIncompletos = conteoOperativosPorDia
@@ -200,9 +211,21 @@ export default function EditorPlanPage() {
       .filter(val => val !== null);
 
     if (diasIncompletos.length > 0) {
-      const confirmacion = window.confirm(`⚠️ ADVERTENCIA: Hay días con menos de 2 operativos asignados (Días: ${diasIncompletos.join(", ")}).\n\n¿Estás seguro que deseas guardar el plan de todas formas?`);
-      if (!confirmacion) return;
+      setConfirmState({
+        tipo: "alerta",
+        titulo: "Días sin cobertura mínima",
+        mensaje: `Hay días con menos de 2 operativos asignados (Días: ${diasIncompletos.join(", ")}).\n\n¿Deseas guardar el plan de todas formas?`,
+        textoConfirmar: "Guardar igual",
+        onConfirm: () => { void ejecutarGuardado(); },
+      });
+      return;
     }
+
+    void ejecutarGuardado();
+  };
+
+  const ejecutarGuardado = async () => {
+    if (!profile) return;
 
     setSaving(true);
     try {
@@ -426,6 +449,19 @@ export default function EditorPlanPage() {
                             <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight">
                               {estiloGrupo && <span className={`h-2 w-2 shrink-0 rounded-full ${estiloGrupo.dot}`} />}
                               <span className="truncate" title={fila.nombre}>{fila.nombre}</span>
+                              <button
+                                onClick={() => setConfirmState({
+                                  tipo: "peligro",
+                                  titulo: "Limpiar horarios",
+                                  mensaje: `Se borrarán todas las asignaciones de ${fila.nombre} en ${labelPeriodo(periodo)}.\n\nDeberás guardar el plan para que el cambio sea permanente. ¿Continuar?`,
+                                  textoConfirmar: "Sí, limpiar",
+                                  onConfirm: () => limpiarFila(filaIdx),
+                                })}
+                                title={`Limpiar todos los horarios de ${fila.nombre}`}
+                                className="ml-auto shrink-0 p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-600 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition-colors"
+                              >
+                                <Trash2 size={13} />
+                              </button>
                             </p>
                             <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>
                               {fila.codigoMarcacion ? <span className="font-medium text-[#1c1e4d] dark:text-[#c9a892]">{fila.codigoMarcacion}</span> : <span className="text-amber-600 dark:text-amber-400">sin código</span>}
@@ -597,6 +633,49 @@ export default function EditorPlanPage() {
                   }`}
                 >
                   Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación */}
+      {confirmState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+            <div className={`p-4 border-b ${
+              confirmState.tipo === "peligro"
+                ? "bg-rose-50 border-rose-100 dark:bg-rose-950/30 dark:border-rose-900/50"
+                : "bg-amber-50 border-amber-100 dark:bg-amber-950/30 dark:border-amber-900/50"
+            }`}>
+              <div className="flex items-center gap-2">
+                {confirmState.tipo === "peligro"
+                  ? <Trash2 className="text-rose-600 dark:text-rose-400" size={20} />
+                  : <AlertTriangle className="text-amber-600 dark:text-amber-400" size={20} />}
+                <h3 className={`font-bold ${
+                  confirmState.tipo === "peligro" ? "text-rose-800 dark:text-rose-500" : "text-amber-800 dark:text-amber-500"
+                }`}>
+                  {confirmState.titulo}
+                </h3>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{confirmState.mensaje}</p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmState(null)}
+                  className="px-4 py-2 text-sm font-bold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { confirmState.onConfirm(); setConfirmState(null); }}
+                  className={`px-4 py-2 text-sm font-bold rounded-xl text-white transition-colors ${
+                    confirmState.tipo === "peligro" ? "bg-rose-600 hover:bg-rose-500" : "bg-amber-500 hover:bg-amber-400"
+                  }`}
+                >
+                  {confirmState.textoConfirmar}
                 </button>
               </div>
             </div>
