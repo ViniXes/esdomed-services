@@ -9,7 +9,7 @@
 import * as XLSX from "xlsx";
 import type { PlanTrabajo } from "@/types";
 import { getHorario, totalHorasFila } from "./horarios";
-import { diasDelMesArray, inicialesDeMes, ordenGrupo, NOMBRES_MES } from "./plan";
+import { diasDelMesArray, inicialesDeMes, compararFilasPlan, NOMBRES_MES } from "./plan";
 
 export type TipoPlan = "institucional" | "manpower";
 
@@ -23,15 +23,7 @@ function filasOrdenadas(plan: PlanExportable, tipo: TipoPlan) {
   const filas = plan.filas.filter((f) =>
     tipo === "institucional" ? !esMPW(f.codigoMarcacion) : esMPW(f.codigoMarcacion),
   );
-  return [...filas].sort((a, b) => {
-    const isJefeA = a.nombre.toLowerCase().includes("benjamin") && a.nombre.toLowerCase().includes("cardoza");
-    const isJefeB = b.nombre.toLowerCase().includes("benjamin") && b.nombre.toLowerCase().includes("cardoza");
-    const grupoDiff = ordenGrupo(a.grupo) - ordenGrupo(b.grupo);
-    if (grupoDiff !== 0) return grupoDiff;
-    if (isJefeA && !isJefeB) return -1;
-    if (!isJefeA && isJefeB) return 1;
-    return a.nombre.localeCompare(b.nombre);
-  });
+  return [...filas].sort(compararFilasPlan);
 }
 
 /** Construye y descarga el .xlsx del plan para el tipo indicado. */

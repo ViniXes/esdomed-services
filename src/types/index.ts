@@ -876,6 +876,7 @@ export interface FilaPlanTrabajo {
   nombre: string;          // NOMBRE COMPLETO (snapshot)
   puesto: string;          // PUESTO (snapshot)
   grupo?: string;          // grupo del mes: Administrativo / Grupo 1-4 / Equipo de emergencia
+  orden?: number;          // orden manual dentro del grupo (menor primero); si falta, alfabético
   // Asignación por día del mes. Índice 0 = día 1. Valor: código de horario
   // ("MA2", "TH34"), marca especial ("VAC"|"INC"|"PER") o "" (descanso).
   asignaciones: string[];

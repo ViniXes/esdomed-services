@@ -28,15 +28,17 @@ import {
   parsePeriodo,
   formatPeriodo,
   sincronizarFilas,
+  compararFilasPlan,
   GRUPOS_ESDOMED,
   COLOR_GRUPO,
-  ordenGrupo,
 } from "@/lib/esdomed/plan";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
 import { exportarPlanExcel, type TipoPlan } from "@/lib/esdomed/exportar-plan";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   FileSpreadsheet,
   Printer,
@@ -169,6 +171,28 @@ export default function EditorPlanPage() {
     setGuardado(false);
   };
 
+  // Mueve una fila arriba/abajo dentro de su mismo grupo. Renumera `orden`
+  // según el orden visible actual y luego intercambia con el vecino.
+  const moverFila = (filaIdx: number, dir: -1 | 1) => {
+    setFilas((prev) => {
+      const display = prev.map((f, i) => ({ f, i })).sort((a, b) => compararFilasPlan(a.f, b.f));
+      const pos = display.findIndex((d) => d.i === filaIdx);
+      if (pos === -1) return prev;
+      const destino = pos + dir;
+      if (destino < 0 || destino >= display.length) return prev;
+      // Solo se reordena dentro del mismo grupo.
+      const grupoActual = (display[pos].f.grupo ?? "").trim();
+      const grupoVecino = (display[destino].f.grupo ?? "").trim();
+      if (grupoActual !== grupoVecino) return prev;
+      // Posición de cada fila en el orden visible (orden manual explícito).
+      const ordenPorIdx = new Map(display.map((d, idx) => [d.i, idx]));
+      ordenPorIdx.set(display[pos].i, destino);
+      ordenPorIdx.set(display[destino].i, pos);
+      return prev.map((f, i) => ({ ...f, orden: ordenPorIdx.get(i) }));
+    });
+    setGuardado(false);
+  };
+
   const descargarExcel = (tipo: TipoPlan) => {
     exportarPlanExcel(
       {
@@ -183,6 +207,8 @@ export default function EditorPlanPage() {
           grupo: f.grupo ?? "",
           asignaciones: f.asignaciones,
           observaciones: f.observaciones ?? "",
+          // Firestore no acepta `undefined`; solo guardamos orden si es manual.
+          ...(typeof f.orden === "number" ? { orden: f.orden } : {}),
         })),
       },
       tipo,
@@ -215,6 +241,7 @@ export default function EditorPlanPage() {
           ...f,
           asignaciones: dias.map((_, j) => origen.asignaciones[j] ?? ""),
           observaciones: origen.observaciones ?? f.observaciones,
+          orden: origen.orden ?? f.orden, // conserva el orden manual del mes anterior
         };
       }),
     );
@@ -267,6 +294,8 @@ export default function EditorPlanPage() {
           grupo: f.grupo ?? "",
           asignaciones: f.asignaciones,
           observaciones: f.observaciones ?? "",
+          // Firestore no acepta `undefined`; solo guardamos orden si es manual.
+          ...(typeof f.orden === "number" ? { orden: f.orden } : {}),
         })),
         creadoEn: creadoMeta?.creadoEn ?? ahora,
         creadoPorId: creadoMeta?.creadoPorId ?? profile.uid,
@@ -292,23 +321,13 @@ export default function EditorPlanPage() {
 
   const filaActiva = picker ? filas[picker.filaIdx] : null;
 
-  // Filas ordenadas por grupo y nombre, conservando el índice original (para editar).
+  // Filas ordenadas por grupo y orden manual (con respaldo alfabético),
+  // conservando el índice original (para editar).
   const filasOrdenadas = useMemo(
     () =>
       filas
         .map((f, i) => ({ f, i }))
-        .sort((a, b) => {
-          const isJefeA = a.f.nombre.toLowerCase().includes("benjamin") && a.f.nombre.toLowerCase().includes("cardoza");
-          const isJefeB = b.f.nombre.toLowerCase().includes("benjamin") && b.f.nombre.toLowerCase().includes("cardoza");
-          
-          const grupoDiff = ordenGrupo(a.f.grupo) - ordenGrupo(b.f.grupo);
-          if (grupoDiff !== 0) return grupoDiff;
-          
-          if (isJefeA && !isJefeB) return -1;
-          if (!isJefeA && isJefeB) return 1;
-          
-          return a.f.nombre.localeCompare(b.f.nombre);
-        }),
+        .sort((a, b) => compararFilasPlan(a.f, b.f)),
     [filas],
   );
 
@@ -449,7 +468,7 @@ export default function EditorPlanPage() {
               <tbody>
                 {(() => {
                   let grupoPrev: string | null = "__init__";
-                  return filasOrdenadas.map(({ f: fila, i: filaIdx }) => {
+                  return filasOrdenadas.map(({ f: fila, i: filaIdx }, displayIdx) => {
                     const total = totalHorasFila(fila.asignaciones);
                     const vac = contarMarca(fila.asignaciones, "VAC");
                     const grupoActual = fila.grupo?.trim() || "";
@@ -457,7 +476,12 @@ export default function EditorPlanPage() {
                     const targetHoras = isAdministrativo ? metaHorasAdmin : metaHorasOperativas;
                     const metaValida = typeof targetHoras === "number" && targetHoras > 0;
                     const dif = metaValida ? total - targetHoras : 0;
-                    
+
+                    // ¿Hay vecino del mismo grupo arriba/abajo? (para habilitar mover)
+                    const grupoVecino = (di: number) => (filasOrdenadas[di]?.f.grupo?.trim() || "") === grupoActual;
+                    const puedeSubir = displayIdx > 0 && grupoVecino(displayIdx - 1);
+                    const puedeBajar = displayIdx < filasOrdenadas.length - 1 && grupoVecino(displayIdx + 1);
+
                     const mostrarHeader = grupoActual !== grupoPrev;
                     grupoPrev = grupoActual;
                     const estiloGrupo = grupoActual ? COLOR_GRUPO[grupoActual] : null;
@@ -479,19 +503,37 @@ export default function EditorPlanPage() {
                             <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight">
                               {estiloGrupo && <span className={`h-2 w-2 shrink-0 rounded-full ${estiloGrupo.dot}`} />}
                               <span className="truncate" title={fila.nombre}>{fila.nombre}</span>
-                              <button
-                                onClick={() => setConfirmState({
-                                  tipo: "peligro",
-                                  titulo: "Limpiar horarios",
-                                  mensaje: `Se borrarán todas las asignaciones de ${fila.nombre} en ${labelPeriodo(periodo)}.\n\nDeberás guardar el plan para que el cambio sea permanente. ¿Continuar?`,
-                                  textoConfirmar: "Sí, limpiar",
-                                  onConfirm: () => limpiarFila(filaIdx),
-                                })}
-                                title={`Limpiar todos los horarios de ${fila.nombre}`}
-                                className="ml-auto shrink-0 p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-600 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition-colors"
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              <span className="ml-auto shrink-0 flex items-center">
+                                <button
+                                  onClick={() => moverFila(filaIdx, -1)}
+                                  disabled={!puedeSubir}
+                                  title="Subir dentro del grupo"
+                                  className="p-1 rounded-md text-slate-300 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-600 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                >
+                                  <ChevronUp size={13} />
+                                </button>
+                                <button
+                                  onClick={() => moverFila(filaIdx, 1)}
+                                  disabled={!puedeBajar}
+                                  title="Bajar dentro del grupo"
+                                  className="p-1 rounded-md text-slate-300 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-600 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                >
+                                  <ChevronDown size={13} />
+                                </button>
+                                <button
+                                  onClick={() => setConfirmState({
+                                    tipo: "peligro",
+                                    titulo: "Limpiar horarios",
+                                    mensaje: `Se borrarán todas las asignaciones de ${fila.nombre} en ${labelPeriodo(periodo)}.\n\nDeberás guardar el plan para que el cambio sea permanente. ¿Continuar?`,
+                                    textoConfirmar: "Sí, limpiar",
+                                    onConfirm: () => limpiarFila(filaIdx),
+                                  })}
+                                  title={`Limpiar todos los horarios de ${fila.nombre}`}
+                                  className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-600 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition-colors"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </span>
                             </p>
                             <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>
                               {fila.codigoMarcacion ? <span className="font-medium text-[#1c1e4d] dark:text-[#c9a892]">{fila.codigoMarcacion}</span> : <span className="text-amber-600 dark:text-amber-400">sin código</span>}

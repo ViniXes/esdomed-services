@@ -61,6 +61,33 @@ export function ordenGrupo(grupo: string | undefined | null): number {
   return i === -1 ? 99 : i;
 }
 
+/**
+ * Criterio único para ordenar las filas del plan: primero por grupo, luego por
+ * el orden MANUAL (`orden`) si está definido, y como respaldo el jefe de primero
+ * y el resto alfabético. Lo usan el editor, la impresión y la exportación a Excel.
+ */
+export function compararFilasPlan(a: FilaPlanTrabajo, b: FilaPlanTrabajo): number {
+  const grupoDiff = ordenGrupo(a.grupo) - ordenGrupo(b.grupo);
+  if (grupoDiff !== 0) return grupoDiff;
+
+  const oa = a.orden;
+  const ob = b.orden;
+  if (typeof oa === "number" && typeof ob === "number") {
+    if (oa !== ob) return oa - ob;
+  } else if (typeof oa === "number") {
+    return -1; // las filas con orden manual van antes que las que no lo tienen
+  } else if (typeof ob === "number") {
+    return 1;
+  }
+
+  const isJefeA = a.nombre.toLowerCase().includes("benjamin") && a.nombre.toLowerCase().includes("cardoza");
+  const isJefeB = b.nombre.toLowerCase().includes("benjamin") && b.nombre.toLowerCase().includes("cardoza");
+  if (isJefeA && !isJefeB) return -1;
+  if (!isJefeA && isJefeB) return 1;
+
+  return a.nombre.localeCompare(b.nombre);
+}
+
 export const NOMBRES_MES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",

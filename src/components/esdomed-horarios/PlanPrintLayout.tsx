@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import type { PlanTrabajo } from "@/types";
 import { getHorario, totalHorasFila } from "@/lib/esdomed/horarios";
-import { diasDelMesArray, inicialesDeMes, ordenGrupo } from "@/lib/esdomed/plan";
+import { diasDelMesArray, inicialesDeMes, compararFilasPlan } from "@/lib/esdomed/plan";
 
 interface Props {
   plan: PlanTrabajo;
@@ -20,19 +20,8 @@ export function PlanPrintLayout({ plan }: Props) {
   const iniciales = inicialesDeMes(plan.anio, plan.mes);
   const colSpanTotal = dias.length + 4; // código + nombre + puesto + días + total
 
-  // Ordenadas por grupo y nombre, para subtotalizar por grupo en el PDF.
-  const filas = [...plan.filas].sort((a, b) => {
-    const isJefeA = a.nombre.toLowerCase().includes("benjamin") && a.nombre.toLowerCase().includes("cardoza");
-    const isJefeB = b.nombre.toLowerCase().includes("benjamin") && b.nombre.toLowerCase().includes("cardoza");
-
-    const grupoDiff = ordenGrupo(a.grupo) - ordenGrupo(b.grupo);
-    if (grupoDiff !== 0) return grupoDiff;
-
-    if (isJefeA && !isJefeB) return -1;
-    if (!isJefeA && isJefeB) return 1;
-
-    return a.nombre.localeCompare(b.nombre);
-  });
+  // Ordenadas por grupo y orden manual (respaldo alfabético), igual que el editor.
+  const filas = [...plan.filas].sort(compararFilasPlan);
 
   // Obtener horarios únicos presentes en TODO el plan para mostrar la leyenda unificada
   const codigosPresentes = new Set<string>();
