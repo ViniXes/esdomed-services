@@ -64,6 +64,18 @@ export interface FichaCuidadosCriticos {
   actualizadoEn: Date;
 }
 
+export interface ConfigIndicadoresCuidadosCriticos {
+  id?: string;
+  servicio: string;
+  anio: number;
+  mes: number;
+  camasAsignadas: number;
+  diasHabiles: number;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
+  actualizadoEn?: Date;
+}
+
 export type EstadoTraslado = "pendiente" | "en_revision" | "aprobado" | "rechazado";
 
 export interface SolicitudTraslado {

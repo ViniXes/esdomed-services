@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
+import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
@@ -69,6 +70,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verUsuarios = esAdmin;
   const verBusquedaTelefono = esAdmin;
   const verCuidadosCriticos = esAdmin;
+  const verIndicadoresCuidadosCriticos = puedeVerIndicadoresCuidadosCriticos(profile);
   const verReportes = esEsdomed || esAdmin;
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
@@ -101,6 +103,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verCuidadosCriticos
       ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_PACIENTES }]
+      : []),
+    ...(verIndicadoresCuidadosCriticos
+      ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, group: G_PACIENTES }]
       : []),
     ...(verBusquedaTelefono
       ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
