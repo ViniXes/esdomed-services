@@ -199,6 +199,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [
           { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, group: G_ADMIN },
           { href: "/dashboard/historial-busquedas", label: "Historial busquedas", icon: History, group: G_ADMIN },
+          { href: "/dashboard/historial-consultas", label: "Historial consultas", icon: UserSearch, group: G_ADMIN },
         ]
       : []),
   ];
