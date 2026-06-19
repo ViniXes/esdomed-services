@@ -319,7 +319,12 @@ function conteosMensuales(
 
   const totalEgresos = fichasEgresoMes.length;
   const totalIngresos = fichasIngresoMes.length;
-  const diasEstancia = suma(fichasEgresoMes, "dias_en_servicio");
+  const diasEstancia = fichasEgresoMes.reduce((total, ficha) => (
+    total + diasEntre(ficha.datos?.fecha_ingreso_al_servicio, ficha.datos?.fecha_egreso_del_servicio)
+  ), 0);
+  const diasCamaOcupados = fichasServicio.reduce((total, ficha) => (
+    total + diasCamaOcupadosEnMes(ficha, anio, mes)
+  ), 0);
   const pacientesVm = fichasMes.filter(ficha => numero(ficha.datos?.vmi_dias) > 0 || si(ficha.datos?.intubacion_en_uci) || si(ficha.datos?.intubacion_en_centro_referente)).length;
   const pacientesCvc = fichasMes.filter(ficha => si(ficha.datos?.colocacion_cvc_antes_de_uci) || si(ficha.datos?.colocacion_cvc_en_uci)).length;
   const pacientesStu = fichasMes.filter(ficha => si(ficha.datos?.coloc_stu_previo_uci) || si(ficha.datos?.coloc_stu_en_uci)).length;
@@ -328,7 +333,7 @@ function conteosMensuales(
     totalEgresos,
     totalIngresos,
     diasEstancia,
-    diasCamaOcupados: diasEstancia,
+    diasCamaOcupados,
     diasCamaDisponibles: camasAsignadas * new Date(anio, mes, 0).getDate(),
     reingresos: cuentaSi(fichasMes, "reingreso_72_horas"),
     egresosUlcera: cuentaSi(fichasEgresoMes, "ulceras_ppor_decubito_desarrolladas_en_uci") + cuentaSi(fichasEgresoMes, "alta_con_ulcera"),
@@ -375,6 +380,26 @@ function conteosMensuales(
 function fechaEnMes(value: unknown, anio: number, mes: number) {
   const fecha = fechaDato(value);
   return Boolean(fecha && fecha.getFullYear() === anio && fecha.getMonth() + 1 === mes);
+}
+
+function diasCamaOcupadosEnMes(ficha: FichaCuidadosCriticos, anio: number, mes: number) {
+  const ingreso = fechaDato(ficha.datos?.fecha_ingreso_al_servicio);
+  if (!ingreso) return 0;
+
+  const inicioPeriodo = new Date(anio, mes - 1, 1);
+  const finPeriodo = new Date(anio, mes, 1);
+  const egreso = fechaDato(ficha.datos?.fecha_egreso_del_servicio) ?? finPeriodo;
+  const inicio = new Date(Math.max(ingreso.getTime(), inicioPeriodo.getTime()));
+  const fin = new Date(Math.min(egreso.getTime(), finPeriodo.getTime()));
+
+  return Math.max(0, Math.round((fin.getTime() - inicio.getTime()) / 86_400_000));
+}
+
+function diasEntre(inicio: unknown, fin: unknown) {
+  const fechaInicio = fechaDato(inicio);
+  const fechaFin = fechaDato(fin);
+  if (!fechaInicio || !fechaFin) return 0;
+  return Math.max(0, Math.round((fechaFin.getTime() - fechaInicio.getTime()) / 86_400_000));
 }
 
 function fechaDato(value: unknown) {
