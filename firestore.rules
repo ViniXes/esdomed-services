@@ -132,9 +132,8 @@ service cloud.firestore {
                     && resource.data.servicio in serviciosAsignados()
                     && request.resource.data.servicio in serviciosAsignados()
                     && request.resource.data.pacienteId == resource.data.pacienteId
-                    && request.resource.data.tipoUnidad == resource.data.tipoUnidad
+                    && puedeRegistrarTipoUnidad(request.resource.data.tipoUnidad)
                     && request.resource.data.estadoEstancia in ['activa', 'egresada']
-                    && request.resource.data.servicio == resource.data.servicio
                     && request.resource.data.creadoPorId == resource.data.creadoPorId
                     && request.resource.data.creadoPorNombre == resource.data.creadoPorNombre
                     && request.resource.data.creadoEn == resource.data.creadoEn
