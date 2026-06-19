@@ -96,6 +96,8 @@ export default function GestionesPage() {
   const [permissionError, setPermissionError] = useState(false);
   const [texto, setTexto] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [aEliminar, setAEliminar] = useState<GestionTS | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   // Toasts
   const feedbackId = useRef(0);
@@ -212,14 +214,18 @@ export default function GestionesPage() {
     }
   };
 
-  const eliminar = async (g: GestionTS) => {
-    if (!g.id) return;
-    if (!confirm("¿Eliminar esta gestión? Esta acción no se puede deshacer.")) return;
+  const eliminar = async () => {
+    const g = aEliminar;
+    if (!g?.id) return;
+    setEliminando(true);
     try {
       await deleteDoc(doc(db, "gestiones_ts", g.id));
       notify("success", "Gestión eliminada");
+      setAEliminar(null);
     } catch {
       notify("error", "No se pudo eliminar (solo el administrador puede borrar gestiones de otros días).");
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -266,9 +272,9 @@ export default function GestionesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,400px)_1fr] gap-5 items-start">
         {/* ── Formulario de captura ── */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 lg:sticky lg:top-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 xl:sticky xl:top-4">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Nueva gestión</p>
 
           {/* Expediente + autocompletar */}
@@ -452,8 +458,8 @@ export default function GestionesPage() {
           )}
 
           {/* Filtros de la lista */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <div className="relative flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={texto}
@@ -462,7 +468,7 @@ export default function GestionesPage() {
                 className={inputCls + " pl-9"}
               />
             </div>
-            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className={selectCls + " max-w-[240px]"}>
+            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className={selectCls + " sm:w-auto sm:max-w-[260px]"}>
               <option value="todos">Todos los tipos</option>
               {GRUPOS_GESTION_TS.map((grupo) => (
                 <optgroup key={grupo} label={grupo}>
@@ -474,66 +480,147 @@ export default function GestionesPage() {
             </select>
           </div>
 
-          {/* Tabla */}
+          {/* Lista — tarjetas en móvil, tabla en escritorio */}
           {gestiones.length === 0 ? (
             <EmptyState texto="No hay gestiones registradas para este día." sub="Registra la primera con el formulario de la izquierda." />
           ) : listaFiltrada.length === 0 ? (
             <p className="text-sm text-slate-400 py-10 text-center">Ninguna gestión coincide con el filtro.</p>
           ) : (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                      {["Paciente", "Servicio / Estado", "Gestión", "Trabajadora", "Hora", ""].map((h, i) => (
-                        <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {listaFiltrada.map((g) => (
-                      <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 align-top">
-                        <td className="px-4 py-3">
-                          <p className="font-mono text-xs text-slate-500 flex items-center gap-1">
-                            {g.expediente}
-                            {g.vinculadoPadron && <Link2 size={10} className="text-emerald-500" />}
-                          </p>
-                          <p className="font-medium text-slate-800 dark:text-slate-200">{g.pacienteNombre}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-slate-700 dark:text-slate-300">{g.servicio || "—"}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
-                            {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
-                          </p>
-                          {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-md">{g.notas}</p>}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                          <span className="inline-flex items-center gap-1"><User size={12} className="text-slate-400" /> {g.trabajadoraNombre}</span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-500">{fmtHora(g.creadoEn)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => eliminar(g)}
-                            className="text-slate-400 hover:text-rose-500 transition-colors"
-                            aria-label="Eliminar gestión"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <>
+              {/* Tarjetas (móvil / tablet) */}
+              <div className="space-y-2.5 lg:hidden">
+                {listaFiltrada.map((g) => (
+                  <div key={g.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[11px] text-slate-500 flex items-center gap-1">
+                          {g.expediente}
+                          {g.vinculadoPadron && <Link2 size={10} className="text-emerald-500" />}
+                        </p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 leading-tight truncate">{g.pacienteNombre}</p>
+                      </div>
+                      <span className="shrink-0 text-xs text-slate-400 tabular-nums">{fmtHora(g.creadoEn)}</span>
+                    </div>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-2">{labelTipoGestion(g.tipo)}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 mt-1">
+                      <span>{g.servicio || "Sin servicio"}</span>
+                      <span className="text-slate-300 dark:text-slate-600">·</span>
+                      <span>{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</span>
+                      <span className="text-slate-300 dark:text-slate-600">·</span>
+                      <span>
+                        {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
+                        {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
+                      </span>
+                    </div>
+                    {g.notas && <p className="text-xs text-slate-500 mt-1.5">{g.notas}</p>}
+                    <div className="flex items-center justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                      <span className="inline-flex items-center gap-1 text-xs text-slate-500 min-w-0">
+                        <User size={12} className="text-slate-400 shrink-0" /> <span className="truncate">{g.trabajadoraNombre}</span>
+                      </span>
+                      <button
+                        onClick={() => setAEliminar(g)}
+                        className="shrink-0 text-slate-400 hover:text-rose-500 transition-colors"
+                        aria-label="Eliminar gestión"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+
+              {/* Tabla (escritorio) */}
+              <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                        {["Paciente", "Servicio / Estado", "Gestión", "Trabajadora", "Hora", ""].map((h, i) => (
+                          <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {listaFiltrada.map((g) => (
+                        <tr key={g.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 align-top">
+                          <td className="px-4 py-3">
+                            <p className="font-mono text-xs text-slate-500 flex items-center gap-1">
+                              {g.expediente}
+                              {g.vinculadoPadron && <Link2 size={10} className="text-emerald-500" />}
+                            </p>
+                            <p className="font-medium text-slate-800 dark:text-slate-200">{g.pacienteNombre}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-slate-700 dark:text-slate-300">{g.servicio || "—"}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
+                              {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
+                            </p>
+                            {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-md">{g.notas}</p>}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                            <span className="inline-flex items-center gap-1"><User size={12} className="text-slate-400" /> {g.trabajadoraNombre}</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{fmtHora(g.creadoEn)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => setAEliminar(g)}
+                              className="text-slate-400 hover:text-rose-500 transition-colors"
+                              aria-label="Eliminar gestión"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
+
+      {/* Confirmación de borrado */}
+      {aEliminar && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-6 flex flex-col items-center gap-3 text-center">
+              <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center">
+                <Trash2 size={26} className="text-rose-600 dark:text-rose-400" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Eliminar gestión</h3>
+              <p className="text-sm text-slate-500">
+                Se eliminará la gestión de <span className="font-semibold text-slate-700 dark:text-slate-300">{aEliminar.pacienteNombre}</span>. Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="p-5 pt-0 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setAEliminar(null)}
+                disabled={eliminando}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={eliminar}
+                disabled={eliminando}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 transition-colors disabled:opacity-50"
+              >
+                {eliminando ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <FeedbackStack items={feedbacks} onDismiss={dismiss} />
     </div>

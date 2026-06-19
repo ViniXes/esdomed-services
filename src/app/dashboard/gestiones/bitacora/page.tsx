@@ -96,7 +96,7 @@ export default function BitacoraPage() {
   const nombre = persona ? `${persona.apellidos}, ${persona.nombres}` : ultima?.pacienteNombre;
 
   return (
-    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
       {/* Header */}
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">

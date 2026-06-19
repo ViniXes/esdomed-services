@@ -162,17 +162,17 @@ export default function ProductividadPage() {
       ) : (
         <>
           {/* Resumen: modalidad + tiempo */}
-          <div className="flex flex-wrap gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
             {(Object.keys(MODALIDAD_GESTION_LABEL) as ModalidadGestion[]).map((m) => (
-              <div key={m} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2">
-                <span className="text-xs text-slate-500">{MODALIDAD_GESTION_LABEL[m]}</span>
+              <div key={m} className="flex items-center justify-between gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5">
+                <span className="text-xs text-slate-500 truncate">{MODALIDAD_GESTION_LABEL[m]}</span>
                 <span className="text-lg font-bold font-heading tabular-nums text-slate-800 dark:text-slate-200">{porModalidad.get(m) ?? 0}</span>
               </div>
             ))}
             {totalMin > 0 && (
-              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl px-3.5 py-2">
-                <span className="text-xs text-blue-700 dark:text-blue-400">Tiempo registrado</span>
-                <span className="text-lg font-bold font-heading tabular-nums text-blue-700 dark:text-blue-400">
+              <div className="flex items-center justify-between gap-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl px-3.5 py-2.5">
+                <span className="text-xs text-blue-700 dark:text-blue-400">Tiempo</span>
+                <span className="text-lg font-bold font-heading tabular-nums text-blue-700 dark:text-blue-400 whitespace-nowrap">
                   {Math.floor(totalMin / 60)}h {totalMin % 60}m
                 </span>
               </div>

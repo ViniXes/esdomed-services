@@ -31,9 +31,10 @@ const DRY_RUN  = hasFlag("--dry-run");
 
 // Colecciones operativas a vaciar.
 // SE CONSERVAN (no se tocan nunca):
-//   - `usuarios`         → cuentas y roles (auth)
-//   - `configuracion`    → seed: catálogo de servicios/camas
-//   - `planes_trabajo`   → "Mi área" de ESDOMED (horarios mensuales)
+//   - `usuarios`           → cuentas y roles (auth)
+//   - `configuracion`      → seed: catálogo de servicios/camas
+//   - `planes_trabajo`     → "Mi área" de ESDOMED (horarios mensuales)
+//   - `tramites_personal`  → trámites/adjuntos del personal (no son datos de migración)
 const COLECCIONES = [
   "personas",
   "pacientes",
@@ -52,14 +53,13 @@ const COLECCIONES = [
   "empleados",
   "licencias",
   "registro_altas",
-  "tramites_personal",
 ];
 
 async function main() {
   console.log("\n" + "=".repeat(62));
   console.log("  LIMPIEZA DE COLECCIONES — ESDOMED Services");
   console.log("=".repeat(62));
-  console.log("  Se CONSERVAN 'usuarios', 'configuracion' y 'planes_trabajo'.\n");
+  console.log("  Se CONSERVAN 'usuarios', 'configuracion', 'planes_trabajo' y 'tramites_personal'.\n");
   if (DRY_RUN) console.log("  ⚠  SIMULACIÓN — no se borrará nada\n");
 
   if (!existsSync(KEY_PATH)) {
@@ -108,7 +108,7 @@ async function main() {
     process.stdout.write(`\r  ✅ ${nombre} vaciada (${conteos[nombre]} docs)        \n`);
   }
 
-  console.log("\n🎉 Limpieza completa. ('usuarios', 'configuracion' y 'planes_trabajo' intactas).\n");
+  console.log("\n🎉 Limpieza completa. ('usuarios', 'configuracion', 'planes_trabajo' y 'tramites_personal' intactas).\n");
 }
 
 function confirmar(prompt) {
