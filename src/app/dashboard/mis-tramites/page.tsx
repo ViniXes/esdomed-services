@@ -64,6 +64,16 @@ const ESTADO_LABEL: Record<EstadoTramitePersonal, string> = {
 
 const inputCls = "w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
+const MAX_ADJUNTOS = 5;
+
+// Lista de adjuntos de un trámite, compatible con el campo legado de un solo archivo.
+const docsDe = (t: TramitePersonal): { url: string; nombre: string }[] =>
+  t.documentos?.length
+    ? t.documentos
+    : t.documentoUrl
+      ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
+      : [];
+
 export default function MisTramitesPage() {
   const { user, profile } = useAuth();
   const [tramites, setTramites] = useState<TramitePersonal[]>([]);
@@ -76,11 +86,11 @@ export default function MisTramitesPage() {
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [horas, setHoras] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [docActual, setDocActual] = useState<{ url?: string; nombre?: string }>({});
+  const [docsActuales, setDocsActuales] = useState<{ url: string; nombre: string }[]>([]);
   const [feedback, setFeedback] = useState<{ tipo: "exito" | "error"; mensaje: string } | null>(null);
 
   useEffect(() => {
@@ -96,32 +106,52 @@ export default function MisTramitesPage() {
     });
   }, [user]);
 
+  const agregarArchivos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const elegidos = Array.from(e.target.files ?? []);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!elegidos.length) return;
+    const espacio = MAX_ADJUNTOS - docsActuales.length - files.length;
+    if (espacio <= 0) {
+      setFeedback({ tipo: "error", mensaje: `Solo se permiten hasta ${MAX_ADJUNTOS} adjuntos.` });
+      return;
+    }
+    if (elegidos.length > espacio) {
+      setFeedback({ tipo: "error", mensaje: `Solo se permiten hasta ${MAX_ADJUNTOS} adjuntos. Se agregaron los primeros ${espacio}.` });
+    }
+    setFiles(prev => [...prev, ...elegidos.slice(0, espacio)]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile) return;
+
+    const isAprobacion = REQUIERE_APROBACION(categoria);
+    const totalAdjuntos = docsActuales.length + files.length;
+    if (!isAprobacion && totalAdjuntos === 0) {
+      setFeedback({ tipo: "error", mensaje: "Debes adjuntar al menos un documento." });
+      return;
+    }
+
     setSaving(true);
-
     try {
-      let documentoUrl = docActual.url || "";
-      let documentoNombre = docActual.nombre || "";
-
-      if (file) {
-        const fileRef = ref(storage, `tramites/${user.uid}/${Date.now()}_${file.name}`);
-        await uploadBytes(fileRef, file);
-        documentoUrl = await getDownloadURL(fileRef);
-        documentoNombre = file.name;
+      const subidos: { url: string; nombre: string }[] = [];
+      for (const f of files) {
+        const fileRef = ref(storage, `tramites/${user.uid}/${Date.now()}_${f.name}`);
+        await uploadBytes(fileRef, f);
+        const url = await getDownloadURL(fileRef);
+        subidos.push({ url, nombre: f.name });
       }
-
-      const isAprobacion = REQUIERE_APROBACION(categoria);
+      const documentos = [...docsActuales, ...subidos];
 
       if (editId) {
-        // Edición de una solicitud existente (solo si sigue editable).
+        // Edición de una solicitud existente.
         await updateDoc(doc(db, "tramites_personal", editId), {
           categoria,
           estado: isAprobacion ? "pendiente" : "subido",
           notas: notas.trim() || deleteField(),
-          documentoUrl: documentoUrl || deleteField(),
-          documentoNombre: documentoNombre || deleteField(),
+          documentos: documentos.length ? documentos : deleteField(),
+          documentoUrl: deleteField(),    // limpia el campo legado
+          documentoNombre: deleteField(),
           fechaInicio: isAprobacion && fechaInicio ? Timestamp.fromDate(new Date(fechaInicio)) : deleteField(),
           fechaFin: isAprobacion && fechaFin ? Timestamp.fromDate(new Date(fechaFin)) : deleteField(),
           horas: isAprobacion && horas ? Number(horas) : deleteField(),
@@ -137,10 +167,7 @@ export default function MisTramitesPage() {
           creadoEn: Timestamp.now(),
         };
         if (notas.trim()) payload.notas = notas.trim();
-        if (documentoUrl) {
-          payload.documentoUrl = documentoUrl;
-          payload.documentoNombre = documentoNombre;
-        }
+        if (documentos.length) payload.documentos = documentos;
         if (isAprobacion) {
           if (fechaInicio) {
             payload.fechaInicio = Timestamp.fromDate(new Date(fechaInicio));
@@ -174,8 +201,8 @@ export default function MisTramitesPage() {
     setFechaInicio("");
     setFechaFin("");
     setHoras("");
-    setFile(null);
-    setDocActual({});
+    setFiles([]);
+    setDocsActuales([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -192,8 +219,8 @@ export default function MisTramitesPage() {
     setFechaInicio(toLocalInput(t.fechaInicio));
     setFechaFin(toLocalInput(t.fechaFin));
     setHoras(t.horas != null ? String(t.horas) : "");
-    setDocActual({ url: t.documentoUrl, nombre: t.documentoNombre });
-    setFile(null);
+    setDocsActuales(docsDe(t));
+    setFiles([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
     setShowModal(true);
   };
@@ -246,6 +273,7 @@ export default function MisTramitesPage() {
             const isAprobacion = REQUIERE_APROBACION(t.categoria);
             const d = t.creadoEn as any as { toDate: () => Date };
             const fecha = d.toDate ? d.toDate() : new Date(t.creadoEn as unknown as string);
+            const docs = docsDe(t);
 
             return (
               <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-blue-300 dark:hover:border-blue-900/50 shadow-sm">
@@ -297,13 +325,15 @@ export default function MisTramitesPage() {
                   )}
                 </div>
 
-                <div className="shrink-0 flex flex-col items-end gap-2 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 pt-3 md:pt-0 md:pl-5">
-                  {t.documentoUrl ? (
-                    <a href={t.documentoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-300 hover:text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto">
-                      <File size={16} /> Ver Documento
-                    </a>
+                <div className="shrink-0 flex flex-col items-stretch md:items-end gap-2 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 pt-3 md:pt-0 md:pl-5 w-full md:w-auto">
+                  {docs.length > 0 ? (
+                    docs.map((doc, i) => (
+                      <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" title={doc.nombre} className="flex items-center justify-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-300 hover:text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto max-w-[220px]">
+                        <File size={16} className="shrink-0" /> <span className="truncate">{docs.length > 1 ? `Documento ${i + 1}` : "Ver Documento"}</span>
+                      </a>
+                    ))
                   ) : (
-                    <span className="text-xs font-medium text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <span className="text-xs font-medium text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 text-center">
                       Sin anexo
                     </span>
                   )}
@@ -374,32 +404,55 @@ export default function MisTramitesPage() {
               )}
 
               <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl p-5 border border-slate-100 dark:border-slate-800/60">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
-                  Documento Adjunto {!requiereAprobacionActual && <span className="text-rose-500">*</span>}
+                <label className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">
+                  <span>Documentos Adjuntos {!requiereAprobacionActual && <span className="text-rose-500">*</span>}</span>
+                  <span className="text-[11px] font-semibold normal-case text-slate-400">{docsActuales.length + files.length}/{MAX_ADJUNTOS}</span>
                 </label>
-                <div className="flex items-center gap-3">
+
+                {(docsActuales.length > 0 || files.length > 0) && (
+                  <ul className="space-y-1.5 mb-3">
+                    {docsActuales.map((doc, i) => (
+                      <li key={`a-${i}`} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                        <File size={14} className="text-blue-500 shrink-0" />
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-700 dark:text-slate-300 truncate flex-1 hover:underline">{doc.nombre}</a>
+                        <button type="button" onClick={() => setDocsActuales(prev => prev.filter((_, idx) => idx !== i))} className="p-1 text-slate-400 hover:text-rose-500 transition-colors shrink-0" aria-label="Quitar adjunto">
+                          <X size={14} />
+                        </button>
+                      </li>
+                    ))}
+                    {files.map((f, i) => (
+                      <li key={`n-${i}`} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                        <Upload size={14} className="text-emerald-500 shrink-0" />
+                        <span className="text-xs text-slate-700 dark:text-slate-300 truncate flex-1">{f.name}</span>
+                        <button type="button" onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} className="p-1 text-slate-400 hover:text-rose-500 transition-colors shrink-0" aria-label="Quitar archivo">
+                          <X size={14} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {docsActuales.length + files.length < MAX_ADJUNTOS ? (
                   <input
                     type="file"
+                    multiple
                     ref={fileInputRef}
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    onChange={agregarArchivos}
                     className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 dark:file:bg-blue-600 dark:hover:file:bg-blue-500 transition-colors file:cursor-pointer cursor-pointer"
-                    required={!requiereAprobacionActual && !docActual.url}
                   />
-                </div>
-                {docActual.nombre && (
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-2 flex items-center gap-1.5">
-                    <File size={12} className="text-blue-500" /> Archivo actual: <span className="font-semibold">{docActual.nombre}</span>. Sube uno nuevo para reemplazarlo.
-                  </p>
-                )}
-                {requiereAprobacionActual ? (
-                  <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
-                    <CheckCircle2 size={12} className="text-emerald-500" /> Opcional: Adjunta constancia o respaldo.
-                  </p>
                 ) : (
-                  <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
-                    <Upload size={12} className="text-blue-500" /> Obligatorio: Sube el formulario o evidencia.
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <CheckCircle2 size={12} className="text-blue-500" /> Llegaste al máximo de {MAX_ADJUNTOS} adjuntos. Quita uno para agregar otro.
                   </p>
                 )}
+
+                <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
+                  {requiereAprobacionActual ? (
+                    <><CheckCircle2 size={12} className="text-emerald-500" /> Opcional: Adjunta constancia o respaldo (hasta {MAX_ADJUNTOS} archivos).</>
+                  ) : (
+                    <><Upload size={12} className="text-blue-500" /> Obligatorio: Sube el formulario o evidencia (hasta {MAX_ADJUNTOS} archivos).</>
+                  )}
+                </p>
               </div>
 
               <div>

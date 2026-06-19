@@ -974,8 +974,9 @@ export interface TramitePersonal {
   empleadoNombre: string;
   
   // Documentos
-  documentoUrl?: string;
-  documentoNombre?: string;
+  documentoUrl?: string;    // legado: un solo adjunto
+  documentoNombre?: string; // legado
+  documentos?: { url: string; nombre: string }[]; // hasta 5 adjuntos
   notas?: string;
 
   // Solicitudes (A1, A2)

@@ -396,7 +396,7 @@ service cloud.firestore {
           && request.resource.data.estado in ['subido', 'pendiente']
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'categoria', 'notas', 'fechaInicio', 'fechaFin', 'horas', 'tipoSolicitud',
-            'documentoUrl', 'documentoNombre', 'estado', 'actualizadoEn'
+            'documentoUrl', 'documentoNombre', 'documentos', 'estado', 'actualizadoEn'
           ])
         );
       allow delete: if isAdmin();

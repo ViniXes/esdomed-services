@@ -33,6 +33,14 @@ const ESTADO_BADGE: Record<EstadoTramitePersonal, string> = {
   "rechazado": "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
 };
 
+// Lista de adjuntos, compatible con el campo legado de un solo archivo.
+const docsDe = (t: TramitePersonal): { url: string; nombre: string }[] =>
+  t.documentos?.length
+    ? t.documentos
+    : t.documentoUrl
+      ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
+      : [];
+
 export default function AprobacionTramitesPage() {
   const { user, profile } = useAuth();
   const [tramites, setTramites] = useState<TramitePersonal[]>([]);
@@ -196,11 +204,11 @@ export default function AprobacionTramitesPage() {
                         )}
                       </td>
                       <td className="py-3.5 px-4 align-top whitespace-nowrap text-right space-x-2">
-                        {t.documentoUrl && (
-                          <a href={t.documentoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors" title="Ver Documento">
+                        {docsDe(t).map((docu, i) => (
+                          <a key={i} href={docu.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors" title={docu.nombre}>
                             <File size={14} />
                           </a>
-                        )}
+                        ))}
                         {t.estado === "pendiente" && (
                           <button
                             onClick={() => setTramiteAprobando(t)}
@@ -251,6 +259,17 @@ export default function AprobacionTramitesPage() {
                         {tramiteAprobando.fechaFin && ` → ${toDate(tramiteAprobando.fechaFin)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}`}
                       </span>
                     )}
+                  </div>
+                )}
+
+                {docsDe(tramiteAprobando).length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-xs text-slate-500">Adjuntos</p>
+                    {docsDe(tramiteAprobando).map((docu, i) => (
+                      <a key={i} href={docu.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline">
+                        <File size={13} className="shrink-0" /> <span className="truncate">{docu.nombre}</span>
+                      </a>
+                    ))}
                   </div>
                 )}
               </div>
