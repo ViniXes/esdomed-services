@@ -94,19 +94,10 @@ export default function IndicadoresCuidadosCriticosPage() {
     [anio, camasSistema, configs, fichas, servicio],
   );
   const fichasPeriodo = useMemo(() => {
-    const nombreMes = MESES_INDICADORES[mes - 1];
-    const fichasServicio = fichas.filter(ficha => {
+    return fichas.filter(ficha => {
       if (servicio !== "todos" && ficha.servicio !== servicio) return false;
-      return String(ficha.datos?.mes ?? "").toUpperCase() === nombreMes;
-    });
-    const fichasConIngreso = fichasServicio.filter(ficha => {
       const ingreso = toDate(ficha.datos?.fecha_ingreso_al_servicio);
       return ingreso?.getFullYear() === anio && ingreso.getMonth() + 1 === mes;
-    });
-
-    return fichasConIngreso.length || fichasServicio.filter(ficha => {
-      const fechaFicha = toDate(ficha.datos?.fecha_egreso_del_servicio) ?? toDate(ficha.creadoEn);
-      return fechaFicha?.getFullYear() === anio;
     }).length;
   }, [anio, fichas, mes, servicio]);
 
