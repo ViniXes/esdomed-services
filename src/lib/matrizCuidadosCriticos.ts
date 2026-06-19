@@ -497,7 +497,7 @@ function diferenciaDias(desde: string, hasta: string) {
   const inicio = new Date(`${desde}T00:00:00`);
   const fin = new Date(`${hasta}T00:00:00`);
   if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime()) || fin < inicio) return "";
-  return Math.max(1, Math.round((fin.getTime() - inicio.getTime()) / 86_400_000));
+  return Math.round((fin.getTime() - inicio.getTime()) / 86_400_000) + 1;
 }
 
 export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): DatosMatrizCuidadosCriticos {
