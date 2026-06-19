@@ -7,8 +7,10 @@ function normalizarIdentidad(value: string) {
     .toLowerCase();
 }
 
-export function puedeVerIndicadoresCuidadosCriticos(profile?: UserProfile | null) {
+export function puedeVerModuloCuidadosCriticos(profile?: UserProfile | null) {
   if (profile?.role !== "admin") return false;
   const identidad = normalizarIdentidad(`${profile.nombre ?? ""} ${profile.email ?? ""} ${profile.username ?? ""}`);
   return identidad.includes("alfonso") && identidad.includes("montes");
 }
+
+export const puedeVerIndicadoresCuidadosCriticos = puedeVerModuloCuidadosCriticos;
