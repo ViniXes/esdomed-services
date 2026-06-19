@@ -395,7 +395,7 @@ service cloud.firestore {
           && request.resource.data.empleadoId == resource.data.empleadoId
           && request.resource.data.estado in ['subido', 'pendiente']
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'categoria', 'notas', 'fechaInicio', 'fechaFin', 'horas',
+            'categoria', 'notas', 'fechaInicio', 'fechaFin', 'horas', 'tipoSolicitud',
             'documentoUrl', 'documentoNombre', 'estado', 'actualizadoEn'
           ])
         );

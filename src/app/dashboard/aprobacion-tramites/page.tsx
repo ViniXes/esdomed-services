@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, Filter, AlertTriangle } from "lucide-react";
 import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
+import { toDate } from "@/lib/pacientes/helpers";
 
 const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
   "A1_permiso_con_goce": "A.1 - Permisos con goce de sueldo",
@@ -176,9 +177,12 @@ export default function AprobacionTramitesPage() {
                       <td className="py-3.5 px-4 align-top max-w-xs">
                         <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[t.categoria]}</p>
                         {(t.fechaInicio || t.horas) && (
-                          <div className="mt-1 flex flex-wrap gap-1.5">
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {t.tipoSolicitud && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${t.tipoSolicitud === "diferido" ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"}`}>{t.tipoSolicitud}</span>
+                            )}
                             {t.horas && <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 font-bold">{t.horas} hrs</span>}
-                            {t.fechaInicio && <span className="text-[10px] text-slate-500">Inicia: {new Date(t.fechaInicio as any).toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" })}</span>}
+                            {t.fechaInicio && <span className="text-[10px] text-slate-500">Inicia: {toDate(t.fechaInicio)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}</span>}
                           </div>
                         )}
                         {t.notas && <p className="text-[11px] text-slate-500 italic mt-1 line-clamp-1 group-hover:line-clamp-none">"{t.notas}"</p>}
@@ -232,6 +236,23 @@ export default function AprobacionTramitesPage() {
                 
                 <p className="text-xs text-slate-500 mb-1">Trámite solicitado</p>
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[tramiteAprobando.categoria]}</p>
+
+                {(tramiteAprobando.fechaInicio || tramiteAprobando.horas || tramiteAprobando.tipoSolicitud) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {tramiteAprobando.tipoSolicitud && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${tramiteAprobando.tipoSolicitud === "diferido" ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"}`}>{tramiteAprobando.tipoSolicitud}</span>
+                    )}
+                    {tramiteAprobando.horas && (
+                      <span className="text-[11px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 font-bold">{tramiteAprobando.horas} hrs</span>
+                    )}
+                    {tramiteAprobando.fechaInicio && (
+                      <span className="text-[11px] text-slate-500">
+                        {toDate(tramiteAprobando.fechaInicio)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}
+                        {tramiteAprobando.fechaFin && ` → ${toDate(tramiteAprobando.fechaFin)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}`}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

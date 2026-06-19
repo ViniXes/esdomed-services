@@ -16,6 +16,17 @@ const toLocalInput = (val: unknown): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// El permiso es "diferido" si se solicita un día posterior al de inicio
+// (permiso retroactivo); "ordinario" si se solicita ese mismo día o antes.
+const clasificarSolicitud = (inicioLocal: string): "ordinario" | "diferido" => {
+  const inicio = new Date(inicioLocal);
+  if (isNaN(inicio.getTime())) return "ordinario";
+  const hoy = new Date();
+  const diaInicio = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+  const diaHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  return diaHoy > diaInicio ? "diferido" : "ordinario";
+};
+
 const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
   "A1_permiso_con_goce": "A.1 - Permisos personales con goce de sueldo",
   "A2_permiso_sin_goce": "A.2 - Permisos personales sin goce de sueldo",
@@ -114,6 +125,7 @@ export default function MisTramitesPage() {
           fechaInicio: isAprobacion && fechaInicio ? Timestamp.fromDate(new Date(fechaInicio)) : deleteField(),
           fechaFin: isAprobacion && fechaFin ? Timestamp.fromDate(new Date(fechaFin)) : deleteField(),
           horas: isAprobacion && horas ? Number(horas) : deleteField(),
+          tipoSolicitud: isAprobacion && fechaInicio ? clasificarSolicitud(fechaInicio) : deleteField(),
           actualizadoEn: Timestamp.now(),
         });
       } else {
@@ -130,7 +142,10 @@ export default function MisTramitesPage() {
           payload.documentoNombre = documentoNombre;
         }
         if (isAprobacion) {
-          if (fechaInicio) payload.fechaInicio = Timestamp.fromDate(new Date(fechaInicio));
+          if (fechaInicio) {
+            payload.fechaInicio = Timestamp.fromDate(new Date(fechaInicio));
+            payload.tipoSolicitud = clasificarSolicitud(fechaInicio);
+          }
           if (fechaFin) payload.fechaFin = Timestamp.fromDate(new Date(fechaFin));
           if (horas) payload.horas = Number(horas);
         }
@@ -239,6 +254,11 @@ export default function MisTramitesPage() {
                     <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${ESTADO_BADGE[t.estado]}`}>
                       {ESTADO_LABEL[t.estado]}
                     </span>
+                    {t.tipoSolicitud && (
+                      <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${t.tipoSolicitud === "diferido" ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"}`}>
+                        {t.tipoSolicitud}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                       <Clock size={12} />
                       {fecha.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -257,7 +277,12 @@ export default function MisTramitesPage() {
                       )}
                       {t.fechaInicio && (
                         <span className="inline-flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700">
-                          Inicio: {new Date(t.fechaInicio as any).toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" })}
+                          Inicio: {toDate(t.fechaInicio)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}
+                        </span>
+                      )}
+                      {t.fechaFin && (
+                        <span className="inline-flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700">
+                          Fin: {toDate(t.fechaFin)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}
                         </span>
                       )}
                     </div>

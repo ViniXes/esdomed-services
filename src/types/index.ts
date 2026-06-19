@@ -982,6 +982,9 @@ export interface TramitePersonal {
   fechaInicio?: Date;
   fechaFin?: Date;
   horas?: number;
+  // "ordinario" si se solicita en o antes de la fecha del permiso;
+  // "diferido" si se solicita después (permiso retroactivo).
+  tipoSolicitud?: "ordinario" | "diferido";
   
   estado: EstadoTramitePersonal;
   
