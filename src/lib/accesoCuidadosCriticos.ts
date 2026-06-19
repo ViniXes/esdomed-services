@@ -10,7 +10,9 @@ function normalizarIdentidad(value: string) {
 export function puedeVerModuloCuidadosCriticos(profile?: UserProfile | null) {
   if (profile?.role !== "admin") return false;
   const identidad = normalizarIdentidad(`${profile.nombre ?? ""} ${profile.email ?? ""} ${profile.username ?? ""}`);
-  return identidad.includes("alfonso") && identidad.includes("montes");
+  return identidad.includes("amontes")
+    || identidad.includes("alfonso")
+    || (identidad.includes("montes") && identidad.includes("gutierrez"));
 }
 
 export const puedeVerIndicadoresCuidadosCriticos = puedeVerModuloCuidadosCriticos;

@@ -24,7 +24,11 @@ service cloud.firestore {
         && (
           get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*Alfonso.*Montes.*')
           || get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*ALFONSO.*MONTES.*')
+          || get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*Alfonso.*')
+          || get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*ALFONSO.*')
           || get(/databases/$(database)/documents/usuarios/$(uid())).data.email.matches('.*alfonso.*montes.*')
+          || get(/databases/$(database)/documents/usuarios/$(uid())).data.email.matches('.*alfonso.*')
+          || get(/databases/$(database)/documents/usuarios/$(uid())).data.email.matches('.*amontes.*')
         );
     }
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
