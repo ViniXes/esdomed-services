@@ -109,3 +109,26 @@ export const MODALIDAD_GESTION_LABEL: Record<ModalidadGestion, string> = {
   llamada:      "Llamada",
   videollamada: "Videollamada",
 };
+
+// Resultado de una gestión del grupo "Visitas" (realizada / suspendida /
+// autorizada / no procede). Solo aplica cuando el tipo pertenece a ese grupo.
+export type ResultadoVisita = "realizada" | "suspendida" | "autorizada" | "no_procede";
+
+export const RESULTADO_VISITA_LABEL: Record<ResultadoVisita, string> = {
+  realizada:  "Realizada",
+  suspendida: "Suspendida",
+  autorizada: "Autorizada",
+  no_procede: "No procede",
+};
+
+export const RESULTADO_VISITA_COLOR: Record<ResultadoVisita, string> = {
+  realizada:  "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900",
+  autorizada: "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-900",
+  suspendida: "text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900",
+  no_procede: "text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+};
+
+/** ¿El tipo de gestión pertenece al grupo de Visitas? Habilita el campo de resultado. */
+export function esTipoVisita(id: string): boolean {
+  return TIPOS_GESTION_TS.find((t) => t.id === id)?.grupo === "Visitas";
+}

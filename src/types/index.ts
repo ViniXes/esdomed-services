@@ -626,6 +626,7 @@ export interface GestionTS {
 
   // Intervención
   tipo: string;                // id del catálogo TIPOS_GESTION_TS
+  resultadoVisita?: import("@/lib/trabajosocial/catalogos").ResultadoVisita; // solo para tipos del grupo "Visitas"
   modalidad: import("@/lib/trabajosocial/catalogos").ModalidadGestion; // presencial | llamada | videollamada
   duracionMin?: number;        // duración de la intervención en minutos (opcional)
   notas?: string;

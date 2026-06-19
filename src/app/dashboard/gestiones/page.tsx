@@ -10,9 +10,9 @@ import { useServicios } from "@/contexts/ServiciosContext";
 import { getPersona } from "@/lib/pacientes/persona";
 import { GestionesTabs } from "./_components/GestionesTabs";
 import {
-  ESTADO_PACIENTE_GESTION_LABEL, GRUPOS_GESTION_TS, labelTipoGestion,
-  MODALIDAD_GESTION_LABEL, TIPOS_GESTION_TS,
-  type EstadoPacienteGestion, type ModalidadGestion,
+  ESTADO_PACIENTE_GESTION_LABEL, esTipoVisita, GRUPOS_GESTION_TS, labelTipoGestion,
+  MODALIDAD_GESTION_LABEL, RESULTADO_VISITA_COLOR, RESULTADO_VISITA_LABEL, TIPOS_GESTION_TS,
+  type EstadoPacienteGestion, type ModalidadGestion, type ResultadoVisita,
 } from "@/lib/trabajosocial/catalogos";
 import type { EstadoPaciente, GestionTS, Paciente } from "@/types";
 import {
@@ -64,6 +64,7 @@ interface FormValue {
   estadoPaciente: EstadoPacienteGestion;
   vinculadoPadron: boolean;
   tipo: string;
+  resultadoVisita: ResultadoVisita;
   modalidad: ModalidadGestion;
   duracionMin: string;
   notas: string;
@@ -76,6 +77,7 @@ const formVacio = (fecha: string): FormValue => ({
   estadoPaciente: "actual",
   vinculadoPadron: false,
   tipo: "",
+  resultadoVisita: "realizada",
   modalidad: "presencial",
   duracionMin: "",
   notas: "",
@@ -192,6 +194,7 @@ export default function GestionesPage() {
         estadoPaciente: form.estadoPaciente,
         vinculadoPadron: form.vinculadoPadron,
         tipo: form.tipo,
+        resultadoVisita: esTipoVisita(form.tipo) ? form.resultadoVisita : undefined,
         modalidad: form.modalidad,
         duracionMin: Number.isFinite(dur) && dur > 0 ? dur : undefined,
         notas: form.notas.trim() || undefined,
@@ -367,6 +370,22 @@ export default function GestionesPage() {
             </select>
           </div>
 
+          {/* Resultado de la visita (solo para tipos del grupo Visitas) */}
+          {esTipoVisita(form.tipo) && (
+            <div>
+              <label className={labelCls}>Resultado de la visita</label>
+              <select
+                value={form.resultadoVisita}
+                onChange={(e) => setForm((f) => ({ ...f, resultadoVisita: e.target.value as ResultadoVisita }))}
+                className={selectCls}
+              >
+                {(Object.keys(RESULTADO_VISITA_LABEL) as ResultadoVisita[]).map((r) => (
+                  <option key={r} value={r}>{RESULTADO_VISITA_LABEL[r]}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Modalidad + duración */}
           <div className="grid grid-cols-2 gap-2.5">
             <div>
@@ -504,7 +523,14 @@ export default function GestionesPage() {
                       </div>
                       <span className="shrink-0 text-xs text-slate-400 tabular-nums">{fmtHora(g.creadoEn)}</span>
                     </div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-2 break-words">{labelTipoGestion(g.tipo)}</p>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
+                      {g.resultadoVisita && (
+                        <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${RESULTADO_VISITA_COLOR[g.resultadoVisita]}`}>
+                          {RESULTADO_VISITA_LABEL[g.resultadoVisita]}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 mt-1">
                       <span className="break-words min-w-0">{g.servicio || "Sin servicio"}</span>
                       <span className="text-slate-300 dark:text-slate-600">·</span>
@@ -558,7 +584,14 @@ export default function GestionesPage() {
                             <p className="text-xs text-slate-500 mt-0.5">{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</p>
                           </td>
                           <td className="px-4 py-3 max-w-[460px]">
-                            <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
+                              {g.resultadoVisita && (
+                                <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${RESULTADO_VISITA_COLOR[g.resultadoVisita]}`}>
+                                  {RESULTADO_VISITA_LABEL[g.resultadoVisita]}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
                               {g.duracionMin ? ` · ${g.duracionMin} min` : ""}

@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { getPersona } from "@/lib/pacientes/persona";
 import {
   ESTADO_PACIENTE_GESTION_LABEL, labelTipoGestion, MODALIDAD_GESTION_LABEL,
+  RESULTADO_VISITA_COLOR, RESULTADO_VISITA_LABEL,
   type EstadoPacienteGestion,
 } from "@/lib/trabajosocial/catalogos";
 import type { GestionTS, Persona } from "@/types";
@@ -168,7 +169,14 @@ export default function BitacoraPage() {
                         <span className="absolute -left-[21px] top-4 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-950" />
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
-                            <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
+                              {g.resultadoVisita && (
+                                <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${RESULTADO_VISITA_COLOR[g.resultadoVisita]}`}>
+                                  {RESULTADO_VISITA_LABEL[g.resultadoVisita]}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1"><User size={11} className="text-slate-400" /> {g.trabajadoraNombre}</span>
                               <span className="text-slate-300 dark:text-slate-600">·</span>
