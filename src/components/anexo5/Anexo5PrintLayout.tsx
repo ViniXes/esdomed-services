@@ -56,7 +56,7 @@ export function Anexo5PrintLayout({ data }: Props) {
         <div className="anexo5-fields">
           <div className="field-row">
             <span className="field-label">Fecha</span>
-            <span className="field-value">{data.fecha}</span>
+            <span className="field-value">{data.fecha ?? ""}</span>
           </div>
           <div className="field-row">
             <span className="field-label">1. Nombre</span>

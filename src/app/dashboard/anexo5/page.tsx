@@ -37,7 +37,7 @@ export default function BandejaAnexo5Page() {
     const term = busqueda.toLowerCase();
     return (
       s.nombrePaciente.toLowerCase().includes(term) ||
-      s.fecha.includes(term) ||
+      (s.fecha ?? "").includes(term) ||
       (s.expediente ?? "").toLowerCase().includes(term)
     );
   });
@@ -214,7 +214,7 @@ export default function BandejaAnexo5Page() {
                   <div className="space-y-6 text-sm">
                     <div className="flex justify-between border-b border-black pb-1">
                       <span className="font-bold w-1/3">Fecha</span>
-                      <span className="w-2/3">{selectedItem.fecha}</span>
+                      <span className="w-2/3">{selectedItem.fecha || "— (a llenar a mano)"}</span>
                     </div>
                     <div className="flex justify-between border-b border-black pb-1">
                       <span className="font-bold w-1/3">1. Nombre</span>

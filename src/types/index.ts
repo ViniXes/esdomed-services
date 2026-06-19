@@ -233,7 +233,7 @@ export interface SolicitudAnexo5 {
   
   expediente?: string; // Solo referencia interna, no aparece en el impreso
 
-  fecha: string; // formato YYYY-MM-DD
+  fecha?: string; // formato YYYY-MM-DD — opcional, a veces se llena a mano en el impreso
   nombrePaciente: string;
   referidoDe: string;
   establecimientoReferencia: string;

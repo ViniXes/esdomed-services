@@ -62,10 +62,8 @@ export default function NuevaAnexo5Page() {
   const router = useRouter();
   const { user, profile } = useAuth();
 
-  const hoy = new Date().toISOString().split("T")[0];
-
   const [form, setForm] = useState({
-    fecha: hoy,
+    fecha: "",
     expediente: "",
     nombrePaciente: "",
     referidoDe: "",
@@ -168,7 +166,7 @@ export default function NuevaAnexo5Page() {
 
         ...(form.expediente.trim() && { expediente: form.expediente.trim().toUpperCase() }),
 
-        fecha: form.fecha,
+        ...(form.fecha && { fecha: form.fecha }),
         nombrePaciente: form.nombrePaciente.toUpperCase(),
         referidoDe: form.referidoDe.toUpperCase(),
         establecimientoReferencia: form.establecimientoReferencia.toUpperCase(),
@@ -195,7 +193,7 @@ export default function NuevaAnexo5Page() {
 
   const resetForm = () => {
     setForm({
-      fecha: hoy,
+      fecha: "",
       expediente: "",
       nombrePaciente: "",
       referidoDe: "",
@@ -281,7 +279,7 @@ export default function NuevaAnexo5Page() {
 
             {/* Fila 1: Fecha + Expediente */}
             <div>
-              <label className={lbl}>Fecha</label>
+              <label className={lbl}>Fecha <span className="font-normal text-slate-400">(opcional — puede llenarse a mano)</span></label>
               <input type="date" className={inputCls} value={form.fecha}
                 onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
             </div>
