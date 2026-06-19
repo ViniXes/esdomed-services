@@ -22,9 +22,9 @@ import {
 
 // ── Estilos compartidos (acento ámbar, igual que el resto de vistas de TS) ──────
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition";
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 const selectCls =
-  "w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 transition cursor-pointer";
+  "w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer";
 const labelCls = "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5";
 
 // ── Utilidades de fecha ─────────────────────────────────────────────────────────
@@ -250,14 +250,12 @@ export default function GestionesPage() {
   return (
     <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-900">
-          <NotebookPen size={17} className="text-amber-600 dark:text-amber-400" />
+      <div>
+        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
+          <NotebookPen size={13} /> Trabajo Social
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Registro de gestiones</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Intervenciones de Trabajo Social — reemplaza el formulario de intervenciones presenciales</p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Registro de gestiones</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Intervenciones de Trabajo Social — reemplaza el formulario de intervenciones presenciales</p>
       </div>
 
       <GestionesTabs />
@@ -295,7 +293,7 @@ export default function GestionesPage() {
                   <Link2 size={11} /> Vinculado al padrón de pacientes
                 </p>
               ) : (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1">
                   Expediente fuera del padrón — captura el nombre manualmente
                 </p>
               )
@@ -416,7 +414,7 @@ export default function GestionesPage() {
           <button
             onClick={registrar}
             disabled={!valido || guardando}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
             {guardando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
             Registrar gestión
@@ -432,7 +430,7 @@ export default function GestionesPage() {
                 type="date"
                 value={fechaLista}
                 onChange={(e) => setFechaLista(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </label>
             <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 capitalize">{fmtFechaStr(fechaLista)}</span>
@@ -445,7 +443,7 @@ export default function GestionesPage() {
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Productividad del día</p>
               <div className="flex flex-wrap gap-2">
                 {productividad.map(([nombre, n]) => (
-                  <span key={nombre} className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300">
+                  <span key={nombre} className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300">
                     {nombre} <span className="font-bold">{n}</span>
                   </span>
                 ))}

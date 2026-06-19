@@ -191,7 +191,7 @@ export default function AprobacionTramitesPage() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${ESTADO_BADGE[t.estado]}`}>
                           {t.estado === "subido" ? "Info Subida" : t.estado}
                         </span>
-                        {t.revisadoPorNombre && (
+                        {t.revisadoPorNombre && (t.estado === "aprobado" || t.estado === "rechazado") && (
                           <span className="block text-[9px] text-slate-400 mt-1 uppercase">Por: {t.revisadoPorNombre}</span>
                         )}
                       </td>
@@ -275,12 +275,11 @@ export default function AprobacionTramitesPage() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  Comentario / Respuesta {accionAdmin === "rechazado" && <span className="text-rose-500">*</span>}
+                  Comentario / Respuesta <span className="text-slate-400 font-normal normal-case">(opcional)</span>
                 </label>
                 <textarea
                   value={comentarioAdmin}
                   onChange={e => setComentarioAdmin(e.target.value)}
-                  required={accionAdmin === "rechazado"}
                   rows={3}
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
                   placeholder="Justificación de la resolución..."

@@ -12,7 +12,7 @@ import { BarChart3, Download } from "lucide-react";
 import { GestionesTabs } from "../_components/GestionesTabs";
 
 const selectCls =
-  "appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 transition cursor-pointer";
+  "appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer";
 
 function mesActualStr(): string {
   const d = new Date();
@@ -122,14 +122,12 @@ export default function ProductividadPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-900">
-          <BarChart3 size={17} className="text-amber-600 dark:text-amber-400" />
+      <div>
+        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
+          <BarChart3 size={13} /> Trabajo Social
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Productividad</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Gestiones por trabajadora y día — producción diaria del mes</p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Productividad</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Gestiones por trabajadora y día — producción diaria del mes</p>
       </div>
 
       <GestionesTabs />
@@ -172,9 +170,9 @@ export default function ProductividadPage() {
               </div>
             ))}
             {totalMin > 0 && (
-              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl px-3.5 py-2">
-                <span className="text-xs text-amber-700 dark:text-amber-400">Tiempo registrado</span>
-                <span className="text-lg font-bold font-heading tabular-nums text-amber-700 dark:text-amber-400">
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl px-3.5 py-2">
+                <span className="text-xs text-blue-700 dark:text-blue-400">Tiempo registrado</span>
+                <span className="text-lg font-bold font-heading tabular-nums text-blue-700 dark:text-blue-400">
                   {Math.floor(totalMin / 60)}h {totalMin % 60}m
                 </span>
               </div>
@@ -193,7 +191,7 @@ export default function ProductividadPage() {
                     {diasArr.map((d) => (
                       <th key={d} className="px-2 py-2.5 text-xs font-semibold text-slate-500 text-center w-9">{d}</th>
                     ))}
-                    <th className="px-3 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 text-center bg-amber-50/60 dark:bg-amber-950/30">Total</th>
+                    <th className="px-3 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 text-center bg-blue-50/60 dark:bg-blue-950/30">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -208,7 +206,7 @@ export default function ProductividadPage() {
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2 text-center font-bold tabular-nums text-amber-700 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-950/30">
+                      <td className="px-3 py-2 text-center font-bold tabular-nums text-blue-700 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30">
                         {totalPorTrabajadora.get(t) ?? 0}
                       </td>
                     </tr>
@@ -220,7 +218,7 @@ export default function ProductividadPage() {
                     {diasArr.map((d) => (
                       <td key={d} className="px-2 py-2.5 text-center tabular-nums text-slate-600 dark:text-slate-400">{totalPorDia.get(d) ?? 0}</td>
                     ))}
-                    <td className="px-3 py-2.5 text-center tabular-nums text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-950/50">{totalMes}</td>
+                    <td className="px-3 py-2.5 text-center tabular-nums text-blue-700 dark:text-blue-400 bg-blue-100/70 dark:bg-blue-950/50">{totalMes}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -236,7 +234,7 @@ export default function ProductividadPage() {
                 if (tiposGrupo.length === 0) return null;
                 return (
                   <div key={grupo} className="break-inside-avoid">
-                    <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-500 uppercase tracking-wide mt-2 mb-1">{grupo}</p>
+                    <p className="text-[11px] font-semibold text-blue-700 dark:text-blue-500 uppercase tracking-wide mt-2 mb-1">{grupo}</p>
                     {tiposGrupo.map((t) => (
                       <div key={t.id} className="flex items-center justify-between gap-3 text-sm py-0.5">
                         <span className="text-slate-600 dark:text-slate-400 truncate">{labelTipoGestion(t.id)}</span>

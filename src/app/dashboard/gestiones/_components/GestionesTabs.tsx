@@ -23,7 +23,7 @@ export function GestionesTabs() {
             href={href}
             className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               activo
-                ? "bg-white dark:bg-slate-900 shadow-sm text-amber-700 dark:text-amber-300"
+                ? "bg-white dark:bg-slate-900 shadow-sm text-blue-700 dark:text-blue-300"
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             }`}
           >

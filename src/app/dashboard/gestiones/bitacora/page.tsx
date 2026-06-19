@@ -13,7 +13,7 @@ import { FileClock, Loader2, Search, User } from "lucide-react";
 import { GestionesTabs } from "../_components/GestionesTabs";
 
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition";
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
 function toDate(ts: unknown): Date | null {
   if (!ts) return null;
@@ -98,14 +98,12 @@ export default function BitacoraPage() {
   return (
     <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950/40 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-900">
-          <FileClock size={17} className="text-amber-600 dark:text-amber-400" />
+      <div>
+        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
+          <FileClock size={13} /> Trabajo Social
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Bitácora del paciente</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Historial de todas las gestiones de un expediente</p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Bitácora del paciente</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Historial de todas las gestiones de un expediente</p>
       </div>
 
       <GestionesTabs />
@@ -151,7 +149,7 @@ export default function BitacoraPage() {
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold font-heading text-amber-600 dark:text-amber-400">{gestiones.length}</p>
+                <p className="text-2xl font-bold font-heading text-blue-600 dark:text-blue-400">{gestiones.length}</p>
                 <p className="text-xs text-slate-500">gestión(es)</p>
               </div>
             </div>
@@ -167,7 +165,7 @@ export default function BitacoraPage() {
                   <div className="space-y-2 border-l-2 border-slate-200 dark:border-slate-800 pl-4 ml-1">
                     {items.map((g) => (
                       <div key={g.id} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
-                        <span className="absolute -left-[21px] top-4 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-950" />
+                        <span className="absolute -left-[21px] top-4 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-950" />
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
                             <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
