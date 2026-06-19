@@ -182,14 +182,14 @@ export default function IndicadoresCuidadosCriticosPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(320px,420px)_1fr]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="font-heading font-bold text-slate-900 dark:text-slate-100">Configuracion del periodo</h2>
-          <p className="mt-1 text-xs text-slate-500">
+      <section className="grid items-start gap-3 lg:grid-cols-[minmax(280px,380px)_1fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">Configuracion del periodo</h2>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">
             Las camas se toman automaticamente del catalogo actual del servicio. Los dias habiles 2026 ya quedan fijos desde la tabla oficial.
           </p>
-          <div className="mt-4 space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+          <div className="mt-3 space-y-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
               Camas del sistema para el filtro actual: <span className="font-bold text-slate-900 dark:text-slate-100">{camasSistema}</span>
             </div>
             <label>
@@ -205,7 +205,7 @@ export default function IndicadoresCuidadosCriticosPage() {
             </label>
             <div className="flex flex-wrap gap-2">
               {diasHabilesOficial ? (
-                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
                   Dato oficial {anio}
                 </span>
               ) : editandoDiasHabiles ? (
@@ -253,7 +253,7 @@ export default function IndicadoresCuidadosCriticosPage() {
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid self-start gap-3 sm:grid-cols-3">
           <Stat label="Pacientes registrados" value={fichasPeriodo} />
           <Stat label="Camas del sistema" value={camasSistema || "Sin camas"} />
           <Stat label="Dias habiles" value={configParaCalculo?.diasHabiles ?? "Sin config."} />
@@ -363,9 +363,9 @@ function TablaDatosBase({ datos }: { datos: DatoBaseCuidadosCriticos[] }) {
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+      <p className="text-[11px] font-medium text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-bold leading-none text-slate-900 dark:text-slate-100">{value}</p>
     </div>
   );
 }

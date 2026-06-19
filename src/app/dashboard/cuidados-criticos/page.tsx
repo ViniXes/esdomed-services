@@ -5,6 +5,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { Activity, AlertCircle, FileSpreadsheet, Users } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { camposPendientesCierreCuidadosCriticos, fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
@@ -24,7 +25,7 @@ export default function CuidadosCriticosDashboardPage() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [filtroCierre, setFiltroCierre] = useState<FiltroCierre>("todos");
 
-  const puedeVer = profile?.role === "admin";
+  const puedeVer = puedeVerModuloCuidadosCriticos(profile);
 
   useEffect(() => {
     if (!puedeVer) return;
@@ -55,7 +56,7 @@ export default function CuidadosCriticosDashboardPage() {
     return (
       <div className="mx-auto max-w-3xl p-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          No tienes permisos para ver el consolidado UCI / UCIN.
+          Esta vista UCI / UCIN esta habilitada temporalmente solo para el usuario administrador autorizado.
         </div>
       </div>
     );

@@ -19,14 +19,6 @@ service cloud.firestore {
     function isAsistenteEsdomed() { return isAuth() && getRole() == 'asistente_esdomed'; }
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
-    function isAdminAlfonsoMontes() {
-      return isAdmin()
-        && (
-          get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*Alfonso.*Montes.*')
-          || get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre.matches('.*ALFONSO.*MONTES.*')
-          || get(/databases/$(database)/documents/usuarios/$(uid())).data.email.matches('.*alfonso.*montes.*')
-        );
-    }
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
@@ -156,8 +148,8 @@ service cloud.firestore {
     // Configuracion mensual usada para indicadores UCI/UCIN.
     // No se deriva de camas clinicas porque el dato estadistico puede cambiar por periodo.
     match /config_indicadores_cuidados_criticos/{id} {
-      allow read: if isAdminAlfonsoMontes();
-      allow create, update, delete: if isAdminAlfonsoMontes();
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /traslados/{id} {
