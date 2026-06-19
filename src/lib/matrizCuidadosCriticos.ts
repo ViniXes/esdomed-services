@@ -506,7 +506,7 @@ export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): Dato
   const egreso = esValorRegistrado(resultado.fecha_egreso_del_servicio) ? valorComoTexto(resultado.fecha_egreso_del_servicio) : "";
   const muerte = esValorRegistrado(resultado.fecha_de_muerte) ? valorComoTexto(resultado.fecha_de_muerte) : "";
 
-  resultado.dias_en_servicio = ingreso && egreso ? diferenciaDias(ingreso, egreso) : "";
+  resultado.dias_en_servicio = ingreso ? diferenciaDias(ingreso, egreso || fechaActualInput()) : "";
   if (ingreso && muerte) {
     const fechaIngreso = new Date(`${ingreso}T00:00:00`);
     const fechaMuerte = new Date(`${muerte}T00:00:00`);
@@ -516,6 +516,14 @@ export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): Dato
   }
 
   return resultado;
+}
+
+function fechaActualInput() {
+  const hoy = new Date();
+  const anio = hoy.getFullYear();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  return `${anio}-${mes}-${dia}`;
 }
 
 export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCriticos, tipo: TipoMedicoCuidadosCriticos): DatosMatrizCuidadosCriticos {
