@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
-import { camposPendientesCierreCuidadosCriticos, fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type Filtro = "todos" | TipoMedicoCuidadosCriticos;
@@ -111,30 +111,6 @@ export default function CuidadosCriticosDashboardPage() {
             </select>
           </div>
         </div>
-        {pendientesCierre > 0 && (
-          <div className="overflow-hidden rounded-xl border border-amber-200 dark:border-amber-900">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                <tr>
-                  <th className="px-3 py-2">Expediente</th>
-                  <th className="px-3 py-2">Paciente</th>
-                  <th className="px-3 py-2">Responsable</th>
-                  <th className="px-3 py-2">Falta</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-amber-100 dark:divide-amber-900/60">
-                {fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).slice(0, 8).map(ficha => (
-                  <tr key={ficha.id} className="text-slate-700 dark:text-slate-300">
-                    <td className="px-3 py-2 font-mono">{ficha.pacienteExpediente}</td>
-                    <td className="px-3 py-2">{ficha.pacienteNombre}</td>
-                    <td className="px-3 py-2">{ficha.creadoPorNombre || "No registrado"}</td>
-                    <td className="px-3 py-2 text-amber-700 dark:text-amber-300">{camposPendientesCierreCuidadosCriticos(ficha.datos).map(campo => campo.label).join(", ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
         <LienzoMatrizCuidadosCriticos tipo={filtro === "uci" ? "uci" : "ucin"} fichas={fichasFiltradas} />
       </section>
     </div>
