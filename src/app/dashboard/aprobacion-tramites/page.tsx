@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, Filter } from "lucide-react";
+import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, Filter, AlertTriangle } from "lucide-react";
 import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
 
 const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
@@ -43,6 +43,7 @@ export default function AprobacionTramitesPage() {
   const [comentarioAdmin, setComentarioAdmin] = useState("");
   const [accionAdmin, setAccionAdmin] = useState<"aprobado" | "rechazado">("aprobado");
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -72,7 +73,7 @@ export default function AprobacionTramitesPage() {
       setComentarioAdmin("");
     } catch (err) {
       console.error(err);
-      alert("Error al guardar la resolución.");
+      setErrorMsg("No se pudo guardar la resolución. Por favor intenta de nuevo.");
     } finally {
       setSaving(false);
     }
@@ -287,6 +288,30 @@ export default function AprobacionTramitesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de error */}
+      {errorMsg && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-6 flex flex-col items-center gap-3 bg-rose-50 dark:bg-rose-950/30">
+              <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center">
+                <AlertTriangle size={28} className="text-rose-600 dark:text-rose-400" />
+              </div>
+              <h3 className="text-lg font-bold text-rose-800 dark:text-rose-300">No se pudo guardar</h3>
+              <p className="text-sm text-center text-rose-700 dark:text-rose-300">{errorMsg}</p>
+            </div>
+            <div className="p-5">
+              <button
+                type="button"
+                onClick={() => setErrorMsg(null)}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors"
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}

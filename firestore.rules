@@ -386,7 +386,20 @@ service cloud.firestore {
     match /tramites_personal/{id} {
       allow read:   if isAuth() && (resource.data.empleadoId == uid() || isEsdomed() || isAsistenteEsdomed() || isAdmin());
       allow create: if isAuth() && request.resource.data.empleadoId == uid();
-      allow update: if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      // Revisores resuelven cualquier trámite; el dueño puede editar el suyo
+      // mientras no esté resuelto, sin tocar los campos de revisión ni el estado final.
+      allow update: if isEsdomed() || isAsistenteEsdomed() || isAdmin()
+        || (
+          isAuth()
+          && resource.data.empleadoId == uid()
+          && resource.data.estado in ['subido', 'pendiente']
+          && request.resource.data.empleadoId == resource.data.empleadoId
+          && request.resource.data.estado in ['subido', 'pendiente']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'categoria', 'notas', 'fechaInicio', 'fechaFin', 'horas',
+            'documentoUrl', 'documentoNombre', 'estado', 'actualizadoEn'
+          ])
+        );
       allow delete: if isAdmin();
     }
 

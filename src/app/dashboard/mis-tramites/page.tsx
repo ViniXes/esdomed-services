@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, query, where, orderBy, onSnapshot, addDoc, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, deleteField, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, Upload, X, CheckCircle2, Clock, XCircle, File } from "lucide-react";
+import { FileText, Plus, Upload, X, CheckCircle2, Clock, XCircle, File, Pencil, AlertTriangle } from "lucide-react";
 import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
+import { toDate } from "@/lib/pacientes/helpers";
+
+const toLocalInput = (val: unknown): string => {
+  const d = toDate(val);
+  if (!d) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
   "A1_permiso_con_goce": "A.1 - Permisos personales con goce de sueldo",
@@ -60,6 +68,9 @@ export default function MisTramitesPage() {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [docActual, setDocActual] = useState<{ url?: string; nombre?: string }>({});
+  const [feedback, setFeedback] = useState<{ tipo: "exito" | "error"; mensaje: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -78,11 +89,11 @@ export default function MisTramitesPage() {
     e.preventDefault();
     if (!user || !profile) return;
     setSaving(true);
-    
+
     try {
-      let documentoUrl = "";
-      let documentoNombre = "";
-      
+      let documentoUrl = docActual.url || "";
+      let documentoNombre = docActual.nombre || "";
+
       if (file) {
         const fileRef = ref(storage, `tramites/${user.uid}/${Date.now()}_${file.name}`);
         await uploadBytes(fileRef, file);
@@ -91,33 +102,52 @@ export default function MisTramitesPage() {
       }
 
       const isAprobacion = REQUIERE_APROBACION(categoria);
-      
-      const payload: Partial<TramitePersonal> = {
-        categoria,
-        empleadoId: user.uid,
-        empleadoNombre: profile.nombre,
-        notas: notas.trim() || undefined,
-        estado: isAprobacion ? "pendiente" : "subido",
-        creadoEn: Timestamp.now() as any,
-      };
 
-      if (documentoUrl) {
-        payload.documentoUrl = documentoUrl;
-        payload.documentoNombre = documentoNombre;
+      if (editId) {
+        // Edición de una solicitud existente (solo si sigue editable).
+        await updateDoc(doc(db, "tramites_personal", editId), {
+          categoria,
+          estado: isAprobacion ? "pendiente" : "subido",
+          notas: notas.trim() || deleteField(),
+          documentoUrl: documentoUrl || deleteField(),
+          documentoNombre: documentoNombre || deleteField(),
+          fechaInicio: isAprobacion && fechaInicio ? Timestamp.fromDate(new Date(fechaInicio)) : deleteField(),
+          fechaFin: isAprobacion && fechaFin ? Timestamp.fromDate(new Date(fechaFin)) : deleteField(),
+          horas: isAprobacion && horas ? Number(horas) : deleteField(),
+          actualizadoEn: Timestamp.now(),
+        });
+      } else {
+        const payload: Record<string, unknown> = {
+          categoria,
+          empleadoId: user.uid,
+          empleadoNombre: profile.nombre,
+          estado: isAprobacion ? "pendiente" : "subido",
+          creadoEn: Timestamp.now(),
+        };
+        if (notas.trim()) payload.notas = notas.trim();
+        if (documentoUrl) {
+          payload.documentoUrl = documentoUrl;
+          payload.documentoNombre = documentoNombre;
+        }
+        if (isAprobacion) {
+          if (fechaInicio) payload.fechaInicio = Timestamp.fromDate(new Date(fechaInicio));
+          if (fechaFin) payload.fechaFin = Timestamp.fromDate(new Date(fechaFin));
+          if (horas) payload.horas = Number(horas);
+        }
+        await addDoc(collection(db, "tramites_personal"), payload);
       }
 
-      if (isAprobacion) {
-        if (fechaInicio) payload.fechaInicio = Timestamp.fromDate(new Date(fechaInicio)) as any;
-        if (fechaFin) payload.fechaFin = Timestamp.fromDate(new Date(fechaFin)) as any;
-        if (horas) payload.horas = Number(horas);
-      }
-
-      await addDoc(collection(db, "tramites_personal"), payload);
-      setShowModal(false);
-      resetForm();
+      const fueEdicion = !!editId;
+      cerrarModal();
+      setFeedback({
+        tipo: "exito",
+        mensaje: fueEdicion
+          ? "Tu solicitud se actualizó correctamente."
+          : "Tu trámite se envió correctamente.",
+      });
     } catch (err) {
       console.error(err);
-      alert("Error al enviar el trámite. Por favor intenta de nuevo.");
+      setFeedback({ tipo: "error", mensaje: "No se pudo guardar el trámite. Por favor intenta de nuevo." });
     } finally {
       setSaving(false);
     }
@@ -130,7 +160,33 @@ export default function MisTramitesPage() {
     setFechaFin("");
     setHoras("");
     setFile(null);
+    setDocActual({});
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const abrirNuevo = () => {
+    resetForm();
+    setEditId(null);
+    setShowModal(true);
+  };
+
+  const abrirEditar = (t: TramitePersonal) => {
+    setEditId(t.id ?? null);
+    setCategoria(t.categoria);
+    setNotas(t.notas ?? "");
+    setFechaInicio(toLocalInput(t.fechaInicio));
+    setFechaFin(toLocalInput(t.fechaFin));
+    setHoras(t.horas != null ? String(t.horas) : "");
+    setDocActual({ url: t.documentoUrl, nombre: t.documentoNombre });
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setShowModal(true);
+  };
+
+  const cerrarModal = () => {
+    setShowModal(false);
+    setEditId(null);
+    resetForm();
   };
 
   const requiereAprobacionActual = REQUIERE_APROBACION(categoria);
@@ -148,7 +204,7 @@ export default function MisTramitesPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={abrirNuevo}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm"
         >
           <Plus size={18} /> Nuevo Trámite
@@ -226,6 +282,14 @@ export default function MisTramitesPage() {
                       Sin anexo
                     </span>
                   )}
+                  {(t.estado === "subido" || t.estado === "pendiente") && (
+                    <button
+                      onClick={() => abrirEditar(t)}
+                      className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto"
+                    >
+                      <Pencil size={14} /> Editar
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -239,9 +303,9 @@ export default function MisTramitesPage() {
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden mb-10 transform transition-all">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50">
               <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <FileText size={20} className="text-blue-500" /> Nuevo Trámite
+                <FileText size={20} className="text-blue-500" /> {editId ? "Editar Trámite" : "Nuevo Trámite"}
               </h2>
-              <button onClick={() => { setShowModal(false); resetForm(); }} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">
+              <button onClick={cerrarModal} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -296,9 +360,14 @@ export default function MisTramitesPage() {
                     ref={fileInputRef}
                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                     className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 dark:file:bg-blue-600 dark:hover:file:bg-blue-500 transition-colors file:cursor-pointer cursor-pointer"
-                    required={!requiereAprobacionActual}
+                    required={!requiereAprobacionActual && !docActual.url}
                   />
                 </div>
+                {docActual.nombre && (
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-2 flex items-center gap-1.5">
+                    <File size={12} className="text-blue-500" /> Archivo actual: <span className="font-semibold">{docActual.nombre}</span>. Sube uno nuevo para reemplazarlo.
+                  </p>
+                )}
                 {requiereAprobacionActual ? (
                   <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1.5">
                     <CheckCircle2 size={12} className="text-emerald-500" /> Opcional: Adjunta constancia o respaldo.
@@ -326,7 +395,7 @@ export default function MisTramitesPage() {
               <div className="pt-2 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => { setShowModal(false); resetForm(); }}
+                  onClick={cerrarModal}
                   disabled={saving}
                   className="px-5 py-3 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
                 >
@@ -342,6 +411,8 @@ export default function MisTramitesPage() {
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       Procesando...
                     </>
+                  ) : editId ? (
+                    "Guardar Cambios"
                   ) : requiereAprobacionActual ? (
                     "Enviar Solicitud"
                   ) : (
@@ -350,6 +421,38 @@ export default function MisTramitesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de feedback (éxito / error) */}
+      {feedback && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className={`p-6 flex flex-col items-center gap-3 ${feedback.tipo === "exito" ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30"}`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${feedback.tipo === "exito" ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-rose-100 dark:bg-rose-900/50"}`}>
+                {feedback.tipo === "exito" ? (
+                  <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <AlertTriangle size={28} className="text-rose-600 dark:text-rose-400" />
+                )}
+              </div>
+              <h3 className={`text-lg font-bold ${feedback.tipo === "exito" ? "text-emerald-800 dark:text-emerald-300" : "text-rose-800 dark:text-rose-300"}`}>
+                {feedback.tipo === "exito" ? "Listo" : "No se pudo guardar"}
+              </h3>
+              <p className={`text-sm text-center ${feedback.tipo === "exito" ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                {feedback.mensaje}
+              </p>
+            </div>
+            <div className="p-5">
+              <button
+                type="button"
+                onClick={() => setFeedback(null)}
+                className={`w-full py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${feedback.tipo === "exito" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"}`}
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}
