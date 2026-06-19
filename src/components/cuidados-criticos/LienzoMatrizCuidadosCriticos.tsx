@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { useState } from "react";
-import { camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 interface Props {
@@ -16,7 +16,11 @@ interface Props {
 export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas, expedienteHref }: Props) {
   const [exportando, setExportando] = useState(false);
   const campos = camposMatrizPorTipo(tipo);
-  const filas = fichas ?? (datos ? [{ id: "vista", datos } as FichaCuidadosCriticos] : []);
+  const fichasOriginales = fichas ?? (datos ? [{ id: "vista", datos } as FichaCuidadosCriticos] : []);
+  const filas = fichasOriginales.map(ficha => ({
+    ...ficha,
+    datos: aplicarCalculosBasicos(ficha.datos ?? {}),
+  }));
 
   const exportarExcel = async () => {
     if (filas.length === 0 || exportando) return;

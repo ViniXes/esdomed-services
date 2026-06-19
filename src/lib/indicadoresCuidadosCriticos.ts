@@ -387,19 +387,27 @@ function diasCamaOcupadosEnMes(ficha: FichaCuidadosCriticos, anio: number, mes: 
   if (!ingreso) return 0;
 
   const inicioPeriodo = new Date(anio, mes - 1, 1);
-  const finPeriodo = new Date(anio, mes, 1);
-  const egreso = fechaDato(ficha.datos?.fecha_egreso_del_servicio) ?? finPeriodo;
+  const finPeriodo = new Date(anio, mes, 0);
+  const hoy = new Date();
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const finSinEgreso = hoySinHora < finPeriodo ? hoySinHora : finPeriodo;
+  const egreso = fechaDato(ficha.datos?.fecha_egreso_del_servicio) ?? finSinEgreso;
   const inicio = new Date(Math.max(ingreso.getTime(), inicioPeriodo.getTime()));
   const fin = new Date(Math.min(egreso.getTime(), finPeriodo.getTime()));
 
-  return Math.max(0, Math.round((fin.getTime() - inicio.getTime()) / 86_400_000));
+  return diasEntreFechasInclusivo(inicio, fin);
 }
 
 function diasEntre(inicio: unknown, fin: unknown) {
   const fechaInicio = fechaDato(inicio);
   const fechaFin = fechaDato(fin);
   if (!fechaInicio || !fechaFin) return 0;
-  return Math.max(0, Math.round((fechaFin.getTime() - fechaInicio.getTime()) / 86_400_000));
+  return diasEntreFechasInclusivo(fechaInicio, fechaFin);
+}
+
+function diasEntreFechasInclusivo(inicio: Date, fin: Date) {
+  const diferencia = Math.round((fin.getTime() - inicio.getTime()) / 86_400_000);
+  return diferencia >= 0 ? diferencia + 1 : 0;
 }
 
 function fechaDato(value: unknown) {
