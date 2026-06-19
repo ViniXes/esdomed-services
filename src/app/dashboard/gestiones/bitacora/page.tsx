@@ -168,7 +168,7 @@ export default function BitacoraPage() {
                         <span className="absolute -left-[21px] top-4 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-950" />
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
-                            <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1"><User size={11} className="text-slate-400" /> {g.trabajadoraNombre}</span>
                               <span className="text-slate-300 dark:text-slate-600">·</span>
@@ -182,7 +182,7 @@ export default function BitacoraPage() {
                             {ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}
                           </span>
                         </div>
-                        {g.notas && <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">{g.notas}</p>}
+                        {g.notas && <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 break-words whitespace-pre-wrap">{g.notas}</p>}
                       </div>
                     ))}
                   </div>

@@ -254,9 +254,9 @@ export default function GestionesPage() {
   }, [gestiones]);
 
   return (
-    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto flex flex-col gap-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
       {/* Header */}
-      <div>
+      <div className="shrink-0">
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
           <NotebookPen size={13} /> Trabajo Social
         </div>
@@ -264,17 +264,19 @@ export default function GestionesPage() {
         <p className="text-xs text-slate-500 mt-0.5">Intervenciones de Trabajo Social — reemplaza el formulario de intervenciones presenciales</p>
       </div>
 
-      <GestionesTabs />
+      <div className="shrink-0">
+        <GestionesTabs />
+      </div>
 
       {permissionError && (
-        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+        <div className="shrink-0 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
           Sin permisos para leer las gestiones. Pide al administrador que despliegue la regla de la colección <strong>gestiones_ts</strong>.
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,400px)_1fr] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,400px)_1fr] xl:grid-rows-1 gap-5 items-start xl:items-stretch xl:flex-1 xl:min-h-0">
         {/* ── Formulario de captura ── */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 xl:sticky xl:top-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 xl:h-full xl:overflow-y-auto">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Nueva gestión</p>
 
           {/* Expediente + autocompletar */}
@@ -428,8 +430,8 @@ export default function GestionesPage() {
         </div>
 
         {/* ── Lista del día ── */}
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="space-y-4 xl:space-y-0 xl:gap-4 xl:h-full xl:min-h-0 xl:flex xl:flex-col">
+          <div className="shrink-0 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <CalendarDays size={15} />
               <input
@@ -445,7 +447,7 @@ export default function GestionesPage() {
 
           {/* Productividad del día */}
           {productividad.length > 0 && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5">
+            <div className="shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5">
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Productividad del día</p>
               <div className="flex flex-wrap gap-2">
                 {productividad.map(([nombre, n]) => (
@@ -458,7 +460,7 @@ export default function GestionesPage() {
           )}
 
           {/* Filtros de la lista */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+          <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-2.5">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -480,7 +482,8 @@ export default function GestionesPage() {
             </select>
           </div>
 
-          {/* Lista — tarjetas en móvil, tabla en escritorio */}
+          {/* Lista — tarjetas en móvil, tabla en escritorio (scroll propio en xl) */}
+          <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
           {gestiones.length === 0 ? (
             <EmptyState texto="No hay gestiones registradas para este día." sub="Registra la primera con el formulario de la izquierda." />
           ) : listaFiltrada.length === 0 ? (
@@ -501,9 +504,9 @@ export default function GestionesPage() {
                       </div>
                       <span className="shrink-0 text-xs text-slate-400 tabular-nums">{fmtHora(g.creadoEn)}</span>
                     </div>
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-2">{labelTipoGestion(g.tipo)}</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mt-2 break-words">{labelTipoGestion(g.tipo)}</p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 mt-1">
-                      <span>{g.servicio || "Sin servicio"}</span>
+                      <span className="break-words min-w-0">{g.servicio || "Sin servicio"}</span>
                       <span className="text-slate-300 dark:text-slate-600">·</span>
                       <span>{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</span>
                       <span className="text-slate-300 dark:text-slate-600">·</span>
@@ -512,7 +515,7 @@ export default function GestionesPage() {
                         {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
                       </span>
                     </div>
-                    {g.notas && <p className="text-xs text-slate-500 mt-1.5">{g.notas}</p>}
+                    {g.notas && <p className="text-xs text-slate-500 mt-1.5 break-words whitespace-pre-wrap">{g.notas}</p>}
                     <div className="flex items-center justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
                       <span className="inline-flex items-center gap-1 text-xs text-slate-500 min-w-0">
                         <User size={12} className="text-slate-400 shrink-0" /> <span className="truncate">{g.trabajadoraNombre}</span>
@@ -554,13 +557,13 @@ export default function GestionesPage() {
                             <p className="text-slate-700 dark:text-slate-300">{g.servicio || "—"}</p>
                             <p className="text-xs text-slate-500 mt-0.5">{ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}</p>
                           </td>
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-slate-800 dark:text-slate-200">{labelTipoGestion(g.tipo)}</p>
+                          <td className="px-4 py-3 max-w-[460px]">
+                            <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}
                               {g.duracionMin ? ` · ${g.duracionMin} min` : ""}
                             </p>
-                            {g.notas && <p className="text-xs text-slate-500 mt-0.5 max-w-md">{g.notas}</p>}
+                            {g.notas && <p className="text-xs text-slate-500 mt-0.5 break-words whitespace-pre-wrap">{g.notas}</p>}
                           </td>
                           <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                             <span className="inline-flex items-center gap-1"><User size={12} className="text-slate-400" /> {g.trabajadoraNombre}</span>
@@ -583,6 +586,7 @@ export default function GestionesPage() {
               </div>
             </>
           )}
+          </div>
         </div>
       </div>
 
