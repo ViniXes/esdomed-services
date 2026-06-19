@@ -308,18 +308,17 @@ function conteosMensuales(
   parametros: { anio: number; mes: number; servicio: string; tipo?: TipoMedicoCuidadosCriticos | "todos"; camasAsignadas: number }
 ): ConteosMensuales {
   const { anio, mes, servicio, tipo, camasAsignadas } = parametros;
-  const nombreMes = MESES_INDICADORES[mes - 1];
   const fichasServicio = fichas.filter(ficha => {
     if (servicio !== "todos" && ficha.servicio !== servicio) return false;
     if (tipo && tipo !== "todos" && ficha.tipoUnidad !== tipo) return false;
     return true;
   });
-  const fichasMes = fichasServicio.filter(ficha => mesFicha(ficha) === nombreMes && anioFicha(ficha) === anio);
   const fichasIngresoMes = fichasServicio.filter(ficha => fechaEnMes(ficha.datos?.fecha_ingreso_al_servicio, anio, mes));
   const fichasEgresoMes = fichasServicio.filter(ficha => fechaEnMes(ficha.datos?.fecha_egreso_del_servicio, anio, mes));
+  const fichasMes = fichasIngresoMes;
 
   const totalEgresos = fichasEgresoMes.length;
-  const totalIngresos = fichasIngresoMes.length || fichasMes.length;
+  const totalIngresos = fichasIngresoMes.length;
   const diasEstancia = suma(fichasEgresoMes, "dias_en_servicio");
   const pacientesVm = fichasMes.filter(ficha => numero(ficha.datos?.vmi_dias) > 0 || si(ficha.datos?.intubacion_en_uci) || si(ficha.datos?.intubacion_en_centro_referente)).length;
   const pacientesCvc = fichasMes.filter(ficha => si(ficha.datos?.colocacion_cvc_antes_de_uci) || si(ficha.datos?.colocacion_cvc_en_uci)).length;
@@ -373,17 +372,6 @@ function conteosMensuales(
   };
 }
 
-function mesFicha(ficha: FichaCuidadosCriticos) {
-  return valorComoTexto(ficha.datos?.mes).toUpperCase();
-}
-
-function anioFicha(ficha: FichaCuidadosCriticos) {
-  const fecha = fechaDato(ficha.datos?.fecha_ingreso_al_servicio)
-    ?? fechaDato(ficha.datos?.fecha_egreso_del_servicio)
-    ?? fechaDocumento(ficha.creadoEn);
-  return fecha?.getFullYear();
-}
-
 function fechaEnMes(value: unknown, anio: number, mes: number) {
   const fecha = fechaDato(value);
   return Boolean(fecha && fecha.getFullYear() === anio && fecha.getMonth() + 1 === mes);
@@ -393,13 +381,6 @@ function fechaDato(value: unknown) {
   const texto = valorComoTexto(value);
   if (!texto) return null;
   const fecha = new Date(`${texto}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
-}
-
-function fechaDocumento(value: unknown) {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  const fecha = timestamp.toDate?.() ?? new Date(value as string);
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 

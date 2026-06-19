@@ -35,7 +35,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [configs, setConfigs] = useState<ConfigIndicadoresCuidadosCriticos[]>([]);
   const [anio, setAnio] = useState(fecha.getFullYear());
   const [mes, setMes] = useState(fecha.getMonth() + 1);
-  const [servicio, setServicio] = useState(SERVICIOS_CRITICOS[0] ?? "todos");
+  const [servicio, setServicio] = useState("todos");
   const [diasHabiles, setDiasHabiles] = useState("");
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [vistaTabla, setVistaTabla] = useState<"indicadores" | "datos">("indicadores");
@@ -94,12 +94,12 @@ export default function IndicadoresCuidadosCriticosPage() {
     [anio, camasSistema, configs, fichas, servicio],
   );
   const fichasPeriodo = useMemo(() => {
-    const nombreMes = MESES_INDICADORES[mes - 1];
     return fichas.filter(ficha => {
       if (servicio !== "todos" && ficha.servicio !== servicio) return false;
-      return String(ficha.datos?.mes ?? "").toUpperCase() === nombreMes;
+      const ingreso = toDate(ficha.datos?.fecha_ingreso_al_servicio);
+      return ingreso?.getFullYear() === anio && ingreso.getMonth() + 1 === mes;
     }).length;
-  }, [fichas, mes, servicio]);
+  }, [anio, fichas, mes, servicio]);
 
   const guardarConfig = async () => {
     if (!user || !profile) return;
