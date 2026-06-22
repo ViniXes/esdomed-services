@@ -5,9 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { AlertTriangle, CheckCircle2, ChevronDown } from "lucide-react";
 import { useServicios } from "@/contexts/ServiciosContext";
-import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { normalizarDui } from "@/lib/dui";
-import type { TipoMedicoCuidadosCriticos } from "@/types";
 
 const inputCls =
   "w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
@@ -19,7 +17,6 @@ export default function RegistroMedicoPage() {
   const [nombre, setNombre] = useState("");
   const [dui, setDui] = useState("");
   const [jvpm, setJvpm] = useState("");
-  const [tipoMedico, setTipoMedico] = useState<TipoMedicoCuidadosCriticos | "">("");
   const [serviciosSel, setServiciosSel] = useState<string[]>([]);
   const [serviciosOpen, setServiciosOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -28,8 +25,6 @@ export default function RegistroMedicoPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [exito, setExito] = useState(false);
-
-  const serviciosAuto = tipoMedico ? serviciosPorTipoMedico(tipoMedico) : null;
 
   const toggleServicio = (servicio: string) =>
     setServiciosSel((prev) =>
@@ -48,8 +43,7 @@ export default function RegistroMedicoPage() {
       setError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
-    const serviciosFinal = serviciosAuto ?? serviciosSel;
-    if (serviciosFinal.length === 0) {
+    if (serviciosSel.length === 0) {
       setError("Selecciona al menos un servicio.");
       return;
     }
@@ -63,8 +57,7 @@ export default function RegistroMedicoPage() {
           nombre,
           dui,
           jvpm,
-          tipoMedico: tipoMedico || undefined,
-          servicios: serviciosFinal,
+          servicios: serviciosSel,
           password,
         }),
       });
@@ -141,7 +134,7 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-3">
                   <label className={labelCls}>DUI</label>
                   <input
                     type="text"
@@ -154,7 +147,7 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-3">
                   <label className={labelCls}>JVPM (será tu usuario)</label>
                   <input
                     type="text"
@@ -168,77 +161,43 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div className="lg:col-span-2">
-                  <label className={labelCls}>Tipo de médico</label>
-                  <select
-                    value={tipoMedico}
-                    onChange={(e) => {
-                      setTipoMedico(e.target.value as TipoMedicoCuidadosCriticos | "");
-                      setServiciosOpen(false);
-                    }}
-                    className={inputCls}
-                  >
-                    <option value="">Médico general</option>
-                    <option value="uci">Médico UCI</option>
-                    <option value="ucin">Médico UCIN</option>
-                    <option value="uci_ucin">Médico UCI/UCIN</option>
-                  </select>
-                </div>
-
                 <div className="sm:col-span-2 lg:col-span-6">
-                  <label className={labelCls}>
-                    {serviciosAuto ? "Servicios asignados automáticamente" : "Servicios a los que estás asignado"}
-                  </label>
-                  {serviciosAuto ? (
-                    <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                      {serviciosAuto.map((s) => (
-                        <p
-                          key={s}
-                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"
+                  <label className={labelCls}>Servicios a los que estás asignado</label>
+                  <button
+                    type="button"
+                    onClick={() => setServiciosOpen((o) => !o)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <span className="truncate text-left">
+                      {serviciosSel.length === 0
+                        ? "Seleccionar servicios..."
+                        : `${serviciosSel.length} seleccionado${serviciosSel.length !== 1 ? "s" : ""}`}
+                    </span>
+                    <ChevronDown
+                      size={15}
+                      className={`flex-shrink-0 ml-2 transition-transform ${serviciosOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {serviciosOpen && (
+                    <div className="mt-1 border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 max-h-52 overflow-y-auto shadow-lg">
+                      {servicios.map((servicio) => (
+                        <label
+                          key={servicio}
+                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm text-slate-800 dark:text-slate-200"
                         >
-                          {s}
-                        </p>
+                          <input
+                            type="checkbox"
+                            checked={serviciosSel.includes(servicio)}
+                            onChange={() => toggleServicio(servicio)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
+                          />
+                          {servicio}
+                        </label>
                       ))}
                     </div>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setServiciosOpen((o) => !o)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                      >
-                        <span className="truncate text-left">
-                          {serviciosSel.length === 0
-                            ? "Seleccionar servicios..."
-                            : `${serviciosSel.length} seleccionado${serviciosSel.length !== 1 ? "s" : ""}`}
-                        </span>
-                        <ChevronDown
-                          size={15}
-                          className={`flex-shrink-0 ml-2 transition-transform ${serviciosOpen ? "rotate-180" : ""}`}
-                        />
-                      </button>
-                      {serviciosOpen && (
-                        <div className="mt-1 border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 max-h-52 overflow-y-auto shadow-lg">
-                          {servicios.map((servicio) => (
-                            <label
-                              key={servicio}
-                              className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer text-sm text-slate-800 dark:text-slate-200"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={serviciosSel.includes(servicio)}
-                                onChange={() => toggleServicio(servicio)}
-                                className="w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600"
-                              />
-                              {servicio}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                      {serviciosSel.length > 0 && (
-                        <p className="mt-1.5 text-[11px] text-slate-400">{serviciosSel.join(", ")}</p>
-                      )}
-                    </>
+                  )}
+                  {serviciosSel.length > 0 && (
+                    <p className="mt-1.5 text-[11px] text-slate-400">{serviciosSel.join(", ")}</p>
                   )}
                 </div>
 
