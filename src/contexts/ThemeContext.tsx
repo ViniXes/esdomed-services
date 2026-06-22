@@ -7,17 +7,19 @@ interface ThemeContextValue {
   toggle: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({ dark: true, toggle: () => {} });
+const ThemeContext = createContext<ThemeContextValue>({ dark: false, toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [dark, setDark] = useState(true);
+  // El tema por defecto es el claro; solo se usa oscuro si el usuario lo eligió.
+  const [dark, setDark] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved === "light") {
-      setDark(false);
-      document.documentElement.classList.remove("dark");
-    }
+    const isDark = localStorage.getItem("theme") === "dark";
+    // Lectura post-montaje de localStorage (no existe en SSR); sincroniza el
+    // estado con la clase que el script en línea ya aplicó al <html>.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
   }, []);
 
   const toggle = () => {
