@@ -82,7 +82,7 @@ export default function RegistroMedicoPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950 px-4 py-10">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-4xl">
         <div className="flex flex-col items-center mb-8">
           <Image
             src="/logo_hnes.png"
@@ -127,8 +127,8 @@ export default function RegistroMedicoPage() {
                 Tu cuenta debe ser aprobada por ESDOMED antes de poder ingresar.
               </p>
 
-              <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="sm:col-span-2 lg:col-span-6">
                   <label className={labelCls}>Nombre completo</label>
                   <input
                     type="text"
@@ -141,7 +141,7 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div>
+                <div className="lg:col-span-2">
                   <label className={labelCls}>DUI</label>
                   <input
                     type="text"
@@ -154,7 +154,7 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div>
+                <div className="lg:col-span-2">
                   <label className={labelCls}>JVPM (será tu usuario)</label>
                   <input
                     type="text"
@@ -168,7 +168,7 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div>
+                <div className="lg:col-span-2">
                   <label className={labelCls}>Tipo de médico</label>
                   <select
                     value={tipoMedico}
@@ -185,12 +185,12 @@ export default function RegistroMedicoPage() {
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 lg:col-span-6">
                   <label className={labelCls}>
                     {serviciosAuto ? "Servicios asignados automáticamente" : "Servicios a los que estás asignado"}
                   </label>
                   {serviciosAuto ? (
-                    <div className="grid gap-1.5 sm:grid-cols-2">
+                    <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                       {serviciosAuto.map((s) => (
                         <p
                           key={s}
@@ -242,7 +242,7 @@ export default function RegistroMedicoPage() {
                   )}
                 </div>
 
-                <div>
+                <div className="lg:col-span-3">
                   <label className={labelCls}>Contraseña</label>
                   <input
                     type="password"
@@ -256,7 +256,7 @@ export default function RegistroMedicoPage() {
                   />
                 </div>
 
-                <div>
+                <div className="lg:col-span-3">
                   <label className={labelCls}>Repetir contraseña</label>
                   <input
                     type="password"
@@ -271,7 +271,7 @@ export default function RegistroMedicoPage() {
                 </div>
 
                 {error && (
-                  <div className="sm:col-span-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-3 py-2.5">
+                  <div className="sm:col-span-2 lg:col-span-6 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-3 py-2.5">
                     <AlertTriangle size={15} className="flex-shrink-0" /> {error}
                   </div>
                 )}
@@ -279,12 +279,12 @@ export default function RegistroMedicoPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="sm:col-span-2 w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all active:scale-[0.98]"
+                  className="sm:col-span-2 lg:col-span-6 w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all active:scale-[0.98]"
                 >
                   {submitting ? "Enviando..." : "Registrarme"}
                 </button>
 
-                <p className="sm:col-span-2 text-center text-xs text-slate-500">
+                <p className="sm:col-span-2 lg:col-span-6 text-center text-xs text-slate-500">
                   ¿Ya tienes cuenta?{" "}
                   <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
                     Iniciar sesión
