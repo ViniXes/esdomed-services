@@ -132,3 +132,65 @@ export const RESULTADO_VISITA_COLOR: Record<ResultadoVisita, string> = {
 export function esTipoVisita(id: string): boolean {
   return TIPOS_GESTION_TS.find((t) => t.id === id)?.grupo === "Visitas";
 }
+
+// ── Rastreo ──────────────────────────────────────────────────────────────────
+// El rastreo es el paso 0 del flujo de Trabajo Social: localizar al paciente y a
+// su familiar a partir del expediente activo (creado por ESDOMED). Regla de
+// negocio de la UTS: NADIE pasa a seguimiento/visita si no fue CONTACTADO en
+// rastreo primero. Reemplaza el archivo "RASTREO" y su hoja "ESCALA DE COLORES".
+
+export type EstadoRastreo =
+  | "en_gestion"   // se está intentando localizar
+  | "contactado"   // contacto efectivo logrado → habilita seguimiento
+  | "no_efectivo"  // agotados los canales, no se logró contacto
+  | "alta"         // egresó antes de lograr el rastreo
+  | "defuncion"    // falleció
+  | "no_aplica";   // no requiere rastreo
+
+export const ESTADO_RASTREO_LABEL: Record<EstadoRastreo, string> = {
+  en_gestion:  "En gestión",
+  contactado:  "Contactado",
+  no_efectivo: "No efectivo",
+  alta:        "Alta",
+  defuncion:   "Defunción",
+  no_aplica:   "No aplica",
+};
+
+export const ESTADO_RASTREO_COLOR: Record<EstadoRastreo, string> = {
+  en_gestion:  "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900",
+  contactado:  "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900",
+  no_efectivo: "text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900",
+  alta:        "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-900",
+  defuncion:   "text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+  no_aplica:   "text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700",
+};
+
+/** Regla UTS: solo un paciente CONTACTADO en rastreo puede pasar a seguimiento/visita. */
+export function habilitaSeguimiento(estado?: EstadoRastreo): boolean {
+  return estado === "contactado";
+}
+
+// Canales/medios usados para localizar al paciente (la "escala de colores").
+export type CanalRastreo =
+  | "hoja_identificacion"
+  | "chat_esdomed"
+  | "hospital_referente"
+  | "entrevista_px"
+  | "instituciones"
+  | "pnc"
+  | "telefonia_interna";
+
+export const CANAL_RASTREO_LABEL: Record<CanalRastreo, string> = {
+  hoja_identificacion: "Hoja de identificación",
+  chat_esdomed:        "Chat / ingresos ESDOMED",
+  hospital_referente:  "Hospital referente",
+  entrevista_px:       "Entrevista al paciente",
+  instituciones:       "Alcaldía / promotores de salud",
+  pnc:                 "PNC / Sub-inspector",
+  telefonia_interna:   "Telefonía interna / jefatura",
+};
+
+export const CANALES_RASTREO: CanalRastreo[] = [
+  "hoja_identificacion", "chat_esdomed", "hospital_referente",
+  "entrevista_px", "instituciones", "pnc", "telefonia_interna",
+];

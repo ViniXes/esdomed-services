@@ -51,6 +51,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Autoregistro de médicos (solicitudes pendientes) ─────────────────────
+    // El alta la hace el endpoint público /api/registro-medico con Admin SDK
+    // (que ignora estas reglas); aquí solo permitimos que el admin las lea y
+    // gestione desde el dashboard. Ningún rol puede escribir directamente.
+    match /registros_medicos_pendientes/{uid} {
+      allow read:   if isAdmin();
+      allow write:  if false;
+    }
+
     // Registros clínicos inmutables de UCI y UCIN. Los médicos solo pueden
     // registrar y consultar actividad de sus servicios asignados.
     match /atenciones_cuidados_criticos/{id} {
@@ -334,6 +343,16 @@ service cloud.firestore {
                     || (isTrabajoSocial() && resource.data.trabajadoraId == uid());
       allow delete: if isAdmin()
                     || (isTrabajoSocial() && resource.data.trabajadoraId == uid());
+    }
+
+    // Rastreo de pacientes (paso 0 de Trabajo Social). Worklist compartida: cualquier
+    // trabajadora social puede crear/actualizar, sellándose como última en tocarlo.
+    match /rastreos_ts/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create, update: if (isTrabajoSocial() || isAdmin())
+                    && request.resource.data.trabajadoraId == uid()
+                    && request.resource.data.trabajadoraNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre;
+      allow delete: if isAdmin();
     }
 
     // ─── Anexo 5 ──────────────────────────────────────────────────────────────

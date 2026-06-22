@@ -11,9 +11,29 @@ export interface UserProfile {
   servicios?: string[]; // solo médicos — multi-servicio (campo nuevo)
   tipoMedico?: TipoMedicoCuidadosCriticos; // médicos de cuidados críticos
   jvpm?: string;        // solo médicos — sello/firma
+  dui?: string;         // solo médicos — documento único de identidad (########-#)
   codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
   puesto?: string;          // solo personal ESDOMED — cargo que aparece en el plan (ej. "TECNICO EN ...")
   createdAt: Date;
+}
+
+// ============================================================================
+// Autoregistro de médicos — solicitud pendiente de aprobación del admin
+// ============================================================================
+// Un médico se registra solo desde /registro-medico. Mientras no lo apruebe el
+// admin, NO existe su documento en `usuarios` (sin rol = sin acceso) y su usuario
+// de Firebase Auth queda deshabilitado. Los datos de la solicitud viven aquí
+// (docId = uid del Auth user deshabilitado) hasta que se aprueba o se rechaza.
+export interface RegistroMedicoPendiente {
+  uid: string;          // = uid del usuario de Auth (deshabilitado) y docId
+  nombre: string;       // NOMBRE COMPLETO EN MAYÚSCULAS
+  dui: string;          // ########-#
+  jvpm: string;         // número de junta — también se usa como username de login
+  username: string;     // = jvpm normalizado (login)
+  email: string;        // correo sintético {username}@medico.esdomed.local
+  tipoMedico?: TipoMedicoCuidadosCriticos; // UCI/UCIN/ambos; ausente = médico general
+  servicios: string[];  // servicios asignados
+  creadoEn: Date;
 }
 
 export type TipoAtencionCuidadosCriticos =
@@ -638,6 +658,48 @@ export interface GestionTS {
 
   // Metadata
   creadoEn: Date;
+}
+
+// ============================================================================
+// Rastreo de pacientes (Trabajo Social) — paso 0 del flujo
+// ============================================================================
+// Un documento por expediente (docId = expediente). Se deriva de los pacientes
+// activos creados por ESDOMED. Regla: sin `estado === "contactado"` el paciente
+// NO puede pasar a seguimiento/visita.
+
+export interface RastreoTS {
+  id?: string;                 // = expediente
+
+  // Identidad — snapshot del paciente activo
+  expediente: string;
+  pacienteId?: string;         // id del ingreso en `pacientes`
+  pacienteNombre: string;
+  genero?: string;
+  servicio?: string;
+  cama?: string;
+  vinculadoPadron: boolean;    // true si el expediente existe en el padrón
+
+  // Datos de contacto que se rastrean (prellenados desde el paciente, editables)
+  familiarNombre?: string;
+  parentesco?: string;
+  telefono?: string;
+  direccionActual?: string;
+  duiPaciente?: "menor" | "no_dui" | null; // motivo si el paciente no tiene DUI
+
+  // Proceso
+  estado: import("@/lib/trabajosocial/catalogos").EstadoRastreo;
+  canalesIntentados?: import("@/lib/trabajosocial/catalogos").CanalRastreo[];
+  intentos?: number;           // nº de intentos de contacto
+  fechaContacto?: string;      // "YYYY-MM-DD" del contacto efectivo
+  horaContacto?: string;
+  duracionMin?: number;
+  notas?: string;
+
+  // Autoría (último que registró/actualizó el rastreo)
+  trabajadoraId: string;
+  trabajadoraNombre: string;
+  creadoEn: Date;
+  actualizadoEn?: Date;
 }
 
 // ============================================================================

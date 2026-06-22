@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { Clock, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -131,6 +132,13 @@ export default function LoginPage() {
               {submitting ? "Verificando..." : "Ingresar"}
             </button>
           </form>
+
+          <p className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
+            ¿Eres médico y no tienes cuenta?{" "}
+            <Link href="/registro-medico" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
+              Regístrate aquí
+            </Link>
+          </p>
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
-import { ChevronDown, ChevronLeft, ChevronRight, KeyRound, Pencil, Search, Trash2, Users, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Pencil, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 
 const PAGE_SIZE = 10;
 import { useServicios } from "@/contexts/ServiciosContext";
@@ -26,6 +26,20 @@ interface NuevoUsuario {
 }
 
 type EditableUsuario = Omit<NuevoUsuario, "password">;
+
+// Solicitud de autoregistro de médico pendiente de aprobación (la API serializa
+// creadoEn como ISO string).
+interface PendienteMedico {
+  uid: string;
+  nombre: string;
+  dui: string;
+  jvpm: string;
+  username: string;
+  email: string;
+  tipoMedico?: TipoMedicoCuidadosCriticos;
+  servicios: string[];
+  creadoEn: string | null;
+}
 
 const DEFAULT_PASSWORD = "123456";
 const EMPTY_FORM: NuevoUsuario = {
@@ -77,9 +91,12 @@ const roleOptions: { value: UserRole; label: string }[] = [
 ];
 
 export default function DashboardUsuariosPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { servicios } = useServicios();
+  const esAdmin = profile?.role === "admin";
   const [usuarios, setUsuarios] = useState<UserProfile[]>([]);
+  const [pendientes, setPendientes] = useState<PendienteMedico[]>([]);
+  const [procesandoUid, setProcesandoUid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NuevoUsuario>(EMPTY_FORM);
@@ -122,13 +139,48 @@ export default function DashboardUsuariosPage() {
     setLoading(false);
   };
 
+  const fetchPendientes = async () => {
+    if (!esAdmin) return;
+    const token = await getToken();
+    const res = await fetch("/api/registros-medicos", { headers: { Authorization: `Bearer ${token}` } });
+    setPendientes(res.ok ? await res.json() : []);
+  };
+
   useEffect(() => {
     if (!user) return;
     const timeout = window.setTimeout(() => {
       void fetchUsuarios();
+      void fetchPendientes();
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAprobar = async (p: PendienteMedico) => {
+    setProcesandoUid(p.uid);
+    setError("");
+    const token = await getToken();
+    const res = await fetch(`/api/registros-medicos/${p.uid}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) setError((await res.json()).error ?? "No se pudo aprobar la solicitud");
+    setProcesandoUid(null);
+    await Promise.all([fetchPendientes(), fetchUsuarios()]);
+  };
+
+  const handleRechazar = async (p: PendienteMedico) => {
+    if (!confirm(`Rechazar la solicitud de ${p.nombre}? Se eliminara su registro.`)) return;
+    setProcesandoUid(p.uid);
+    setError("");
+    const token = await getToken();
+    const res = await fetch(`/api/registros-medicos/${p.uid}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) setError((await res.json()).error ?? "No se pudo rechazar la solicitud");
+    setProcesandoUid(null);
+    await fetchPendientes();
+  };
 
   const setField = (field: keyof NuevoUsuario) =>
     (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -346,6 +398,50 @@ export default function DashboardUsuariosPage() {
           {showForm ? "Cancelar" : "+ Nuevo usuario"}
         </button>
       </div>
+
+      {esAdmin && pendientes.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <UserPlus size={17} className="text-amber-600 dark:text-amber-400" />
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Solicitudes de médicos pendientes ({pendientes.length})
+            </p>
+          </div>
+          <div className="space-y-3">
+            {pendientes.map((p) => (
+              <div
+                key={p.uid}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 rounded-xl px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{p.nombre}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    DUI {p.dui} · JVPM {p.jvpm}
+                    {p.tipoMedico ? ` · ${TIPO_MEDICO_CRITICO_LABEL[p.tipoMedico]}` : ""}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">{p.servicios.join(", ")}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleAprobar(p)}
+                    disabled={procesandoUid === p.uid}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors"
+                  >
+                    <Check size={14} /> Aprobar
+                  </button>
+                  <button
+                    onClick={() => handleRechazar(p)}
+                    disabled={procesandoUid === p.uid}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950 text-red-600 dark:text-red-400 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-50 transition-colors"
+                  >
+                    <X size={14} /> Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-6 space-y-4">
