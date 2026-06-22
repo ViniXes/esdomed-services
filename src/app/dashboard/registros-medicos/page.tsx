@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
-import { CheckCircle2, ClipboardList, Search, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardList, Download, Search, UserPlus, XCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toDate } from "@/lib/pacientes/helpers";
@@ -80,6 +80,27 @@ export default function RegistrosMedicosHistorialPage() {
     [registros]
   );
 
+  const exportar = async () => {
+    const XLSX = await import("xlsx");
+    const filas = filtrados.map((r) => ({
+      NOMBRE: r.nombre,
+      DUI: r.dui,
+      JVPM: r.jvpm,
+      USUARIO: r.username,
+      TIPO: r.tipoMedico ? TIPO_MEDICO_CRITICO_LABEL[r.tipoMedico] : "Médico general",
+      SERVICIOS: (r.servicios ?? []).join(", "),
+      ESTADO: r.estado === "aprobado" ? "Aprobado" : "Rechazado",
+      MOTIVO: r.motivo ?? "",
+      "FECHA SOLICITUD": formatFechaHora(r.solicitadoEn),
+      "FECHA RESOLUCIÓN": formatFechaHora(r.resueltoEn),
+      "RESUELTO POR": r.resueltoPorNombre ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Registros de médicos");
+    XLSX.writeFile(wb, `registros-medicos-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const filtroBtn = (value: Filtro, label: string) => (
     <button
       onClick={() => setFiltro(value)}
@@ -107,12 +128,21 @@ export default function RegistrosMedicosHistorialPage() {
             <p className="text-xs text-slate-500">Historial de aceptaciones y rechazos</p>
           </div>
         </div>
-        <Link
-          href="/dashboard/usuarios"
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors self-start sm:self-auto"
-        >
-          <UserPlus size={15} /> Solicitudes pendientes
-        </Link>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={exportar}
+            disabled={filtrados.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Download size={15} /> Exportar Excel
+          </button>
+          <Link
+            href="/dashboard/usuarios"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <UserPlus size={15} /> Solicitudes pendientes
+          </Link>
+        </div>
       </div>
 
       {/* Resumen */}
