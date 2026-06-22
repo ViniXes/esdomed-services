@@ -31,6 +31,12 @@ function puedeTenerCodigoPlan(role: UserRole) {
   return esPersonalEsdomed(role) || role === "admin";
 }
 
+// Roles colegiados que llevan número de junta (JVPM): médicos, psicología y
+// trabajo social (también están colegiados y firman/sellan documentos).
+function puedeTenerJvpm(role: UserRole) {
+  return role === "medico" || role === "psicologia" || role === "trabajo_social";
+}
+
 async function getCallerRole(req: NextRequest): Promise<string | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
@@ -123,7 +129,7 @@ export async function POST(req: NextRequest) {
     servicios: serviciosArr,
     servicio: serviciosArr[0] ?? "",
     ...(tipoMedicoValido ? { tipoMedico: tipoMedicoValido } : {}),
-    ...(userRole === "medico" && jvpm ? { jvpm } : {}),
+    ...(puedeTenerJvpm(userRole as UserRole) && jvpm ? { jvpm } : {}),
     ...(conCodigoPlan && codigoMarcacion ? { codigoMarcacion: String(codigoMarcacion).trim() } : {}),
     ...(conCodigoPlan && puesto ? { puesto: String(puesto).trim() } : {}),
     createdAt: FieldValue.serverTimestamp(),

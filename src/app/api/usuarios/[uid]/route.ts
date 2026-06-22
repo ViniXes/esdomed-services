@@ -27,6 +27,11 @@ function puedeTenerCodigoPlan(role: string | undefined) {
   return esPersonalEsdomed(role) || role === "admin";
 }
 
+// Roles colegiados con número de junta (JVPM): médicos, psicología y trabajo social.
+function puedeTenerJvpm(role: string | undefined) {
+  return role === "medico" || role === "psicologia" || role === "trabajo_social";
+}
+
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
   return value === "uci" || value === "ucin" || value === "uci_ucin";
 }
@@ -132,7 +137,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
 
   if ("jvpm" in body || nextRole) {
     const jvpm = String(body.jvpm ?? "").trim();
-    update.jvpm = targetRole === "medico" && jvpm ? jvpm : FieldValue.delete();
+    update.jvpm = puedeTenerJvpm(targetRole) && jvpm ? jvpm : FieldValue.delete();
   }
 
   if ("codigoMarcacion" in body || nextRole) {

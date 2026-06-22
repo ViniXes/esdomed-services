@@ -533,6 +533,13 @@ export default function DashboardUsuariosPage() {
               </>
             )}
 
+            {(form.userRole === "psicologia" || form.userRole === "trabajo_social") && (
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Número de junta (JVPM)</label>
+                <input type="text" value={form.jvpm} onChange={setField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
+              </div>
+            )}
+
             {(form.userRole === "esdomed" || form.userRole === "asistente_esdomed" || form.userRole === "admin") && (
               <>
                 {form.userRole === "admin" && (
@@ -795,6 +802,13 @@ export default function DashboardUsuariosPage() {
                     ) : renderServiciosPicker(editForm.servicios, editServiciosOpen, setEditServiciosOpen, toggleEditServicio)}
                   </div>
                 </>
+              )}
+
+              {(editForm.userRole === "psicologia" || editForm.userRole === "trabajo_social") && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Número de junta (JVPM)</label>
+                  <input type="text" value={editForm.jvpm} onChange={setEditField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
+                </div>
               )}
 
               {(editForm.userRole === "esdomed" || editForm.userRole === "asistente_esdomed" || editForm.userRole === "admin") && (

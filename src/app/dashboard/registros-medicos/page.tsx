@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
-import { CheckCircle2, ClipboardList, Download, Search, UserPlus, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Download, Search, UserPlus, XCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toDate } from "@/lib/pacientes/helpers";
@@ -29,6 +29,8 @@ function formatFechaHora(ts: unknown): string {
 
 type Filtro = "todos" | "aprobado" | "rechazado";
 
+const PAGE_SIZE = 10;
+
 export default function RegistrosMedicosHistorialPage() {
   const { profile, loading } = useAuth();
   const router = useRouter();
@@ -36,6 +38,7 @@ export default function RegistrosMedicosHistorialPage() {
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     if (!loading && profile?.role !== "admin") router.replace("/dashboard");
@@ -79,6 +82,18 @@ export default function RegistrosMedicosHistorialPage() {
     }),
     [registros]
   );
+
+  // Al cambiar filtros/búsqueda, volver a la página 1 (ajuste en render, sin efecto).
+  const filtrosKey = `${busqueda}|${filtro}`;
+  const [prevFiltros, setPrevFiltros] = useState(filtrosKey);
+  if (filtrosKey !== prevFiltros) {
+    setPrevFiltros(filtrosKey);
+    setPagina(1);
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const filtradosPagina = filtrados.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
   const exportar = async () => {
     const XLSX = await import("xlsx");
@@ -186,7 +201,7 @@ export default function RegistrosMedicosHistorialPage() {
         </div>
       ) : (
         <div className="space-y-2.5">
-          {filtrados.map((r) => {
+          {filtradosPagina.map((r) => {
             const aprobado = r.estado === "aprobado";
             return (
               <div
@@ -227,6 +242,34 @@ export default function RegistrosMedicosHistorialPage() {
               </div>
             );
           })}
+
+          {/* Paginación */}
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-between pt-3">
+              <p className="text-xs text-slate-500">
+                Mostrando {(paginaActual - 1) * PAGE_SIZE + 1}–{Math.min(paginaActual * PAGE_SIZE, filtrados.length)} de {filtrados.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual === 1}
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="px-3 text-xs font-medium text-slate-600 dark:text-slate-400 tabular-nums">
+                  {paginaActual} / {totalPaginas}
+                </span>
+                <button
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual === totalPaginas}
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
