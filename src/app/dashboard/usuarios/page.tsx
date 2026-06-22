@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Pencil, Search, Trash2, UserPlus, Users, X } from "lucide-react";
@@ -97,6 +98,9 @@ export default function DashboardUsuariosPage() {
   const [usuarios, setUsuarios] = useState<UserProfile[]>([]);
   const [pendientes, setPendientes] = useState<PendienteMedico[]>([]);
   const [procesandoUid, setProcesandoUid] = useState<string | null>(null);
+  // Modal de confirmación para aprobar/rechazar una solicitud de médico.
+  const [accionPend, setAccionPend] = useState<{ tipo: "aprobar" | "rechazar"; p: PendienteMedico } | null>(null);
+  const [motivoRechazo, setMotivoRechazo] = useState("");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NuevoUsuario>(EMPTY_FORM);
@@ -155,31 +159,30 @@ export default function DashboardUsuariosPage() {
     return () => window.clearTimeout(timeout);
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAprobar = async (p: PendienteMedico) => {
-    setProcesandoUid(p.uid);
-    setError("");
-    const token = await getToken();
-    const res = await fetch(`/api/registros-medicos/${p.uid}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) setError((await res.json()).error ?? "No se pudo aprobar la solicitud");
-    setProcesandoUid(null);
-    await Promise.all([fetchPendientes(), fetchUsuarios()]);
+  const abrirAccion = (tipo: "aprobar" | "rechazar", p: PendienteMedico) => {
+    setMotivoRechazo("");
+    setAccionPend({ tipo, p });
   };
 
-  const handleRechazar = async (p: PendienteMedico) => {
-    if (!confirm(`Rechazar la solicitud de ${p.nombre}? Se eliminara su registro.`)) return;
+  const confirmarAccion = async () => {
+    if (!accionPend) return;
+    const { tipo, p } = accionPend;
     setProcesandoUid(p.uid);
     setError("");
     const token = await getToken();
     const res = await fetch(`/api/registros-medicos/${p.uid}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      method: tipo === "aprobar" ? "POST" : "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      ...(tipo === "rechazar" ? { body: JSON.stringify({ motivo: motivoRechazo.trim() }) } : {}),
     });
-    if (!res.ok) setError((await res.json()).error ?? "No se pudo rechazar la solicitud");
+    if (!res.ok) {
+      setError((await res.json()).error ?? `No se pudo ${tipo === "aprobar" ? "aprobar" : "rechazar"} la solicitud`);
+    }
     setProcesandoUid(null);
-    await fetchPendientes();
+    setAccionPend(null);
+    setMotivoRechazo("");
+    // Aprobar mueve el médico a `usuarios`; rechazar solo limpia pendientes.
+    await (tipo === "aprobar" ? Promise.all([fetchPendientes(), fetchUsuarios()]) : fetchPendientes());
   };
 
   const setField = (field: keyof NuevoUsuario) =>
@@ -401,11 +404,17 @@ export default function DashboardUsuariosPage() {
 
       {esAdmin && pendientes.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl p-5 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <UserPlus size={17} className="text-amber-600 dark:text-amber-400" />
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Solicitudes de médicos pendientes ({pendientes.length})
-            </p>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <UserPlus size={17} className="text-amber-600 dark:text-amber-400" />
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Solicitudes de médicos pendientes ({pendientes.length})
+              </p>
+            </div>
+            <Link href="/dashboard/registros-medicos"
+              className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline whitespace-nowrap">
+              Ver historial
+            </Link>
           </div>
           <div className="space-y-3">
             {pendientes.map((p) => (
@@ -423,14 +432,14 @@ export default function DashboardUsuariosPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={() => handleAprobar(p)}
+                    onClick={() => abrirAccion("aprobar", p)}
                     disabled={procesandoUid === p.uid}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors"
                   >
                     <Check size={14} /> Aprobar
                   </button>
                   <button
-                    onClick={() => handleRechazar(p)}
+                    onClick={() => abrirAccion("rechazar", p)}
                     disabled={procesandoUid === p.uid}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950 text-red-600 dark:text-red-400 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-50 transition-colors"
                   >
@@ -524,8 +533,13 @@ export default function DashboardUsuariosPage() {
               </>
             )}
 
-            {(form.userRole === "esdomed" || form.userRole === "asistente_esdomed") && (
+            {(form.userRole === "esdomed" || form.userRole === "asistente_esdomed" || form.userRole === "admin") && (
               <>
+                {form.userRole === "admin" && (
+                  <p className="sm:col-span-2 text-[11px] text-slate-400 -mb-1">
+                    Opcional. Solo si este superusuario también es personal de ESDOMED y debe aparecer en el plan de horarios.
+                  </p>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">Código de marcación</label>
                   <input
@@ -783,8 +797,13 @@ export default function DashboardUsuariosPage() {
                 </>
               )}
 
-              {(editForm.userRole === "esdomed" || editForm.userRole === "asistente_esdomed") && (
+              {(editForm.userRole === "esdomed" || editForm.userRole === "asistente_esdomed" || editForm.userRole === "admin") && (
                 <>
+                  {editForm.userRole === "admin" && (
+                    <p className="sm:col-span-2 text-[11px] text-slate-400 -mb-1">
+                      Opcional. Solo si este superusuario también es personal de ESDOMED y debe aparecer en el plan de horarios.
+                    </p>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">Código de marcación</label>
                     <input
@@ -823,6 +842,83 @@ export default function DashboardUsuariosPage() {
           </form>
         </div>
       )}
+
+      {/* Modal: confirmar aprobación / rechazo de una solicitud de médico. */}
+      {accionPend && (() => {
+        const { tipo, p } = accionPend;
+        const aprobar = tipo === "aprobar";
+        const procesando = procesandoUid === p.uid;
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className={`w-11 h-11 flex-shrink-0 rounded-full flex items-center justify-center border ${
+                  aprobar
+                    ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900"
+                    : "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900"
+                }`}>
+                  {aprobar
+                    ? <Check size={20} className="text-emerald-600 dark:text-emerald-400" />
+                    : <X size={20} className="text-red-600 dark:text-red-400" />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">
+                    {aprobar ? "Aprobar solicitud" : "Rechazar solicitud"}
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    {aprobar
+                      ? "Se creará la cuenta y el médico podrá iniciar sesión con su JVPM."
+                      : "Se eliminará la solicitud y su acceso. Esta acción no se puede deshacer."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-4 py-3 mb-4 text-sm">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{p.nombre}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  DUI {p.dui} · JVPM {p.jvpm}
+                  {p.tipoMedico ? ` · ${TIPO_MEDICO_CRITICO_LABEL[p.tipoMedico]}` : ""}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">{p.servicios.join(", ")}</p>
+              </div>
+
+              {!aprobar && (
+                <div className="mb-4">
+                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Motivo del rechazo (opcional)</label>
+                  <textarea
+                    value={motivoRechazo}
+                    onChange={(e) => setMotivoRechazo(e.target.value)}
+                    rows={2}
+                    placeholder="Ej: JVPM no verificado, datos incompletos..."
+                    className={`${inputCls} resize-none`}
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAccionPend(null); setMotivoRechazo(""); }}
+                  disabled={procesando}
+                  className="flex-1 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarAccion}
+                  disabled={procesando}
+                  className={`flex-1 py-2.5 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition-colors ${
+                    aprobar ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
+                  }`}
+                >
+                  {procesando ? "Procesando..." : aprobar ? "Aprobar" : "Rechazar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal: el correo ya pertenece a un usuario existente. */}
       {duplicadoMsg && (

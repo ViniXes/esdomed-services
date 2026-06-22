@@ -153,9 +153,15 @@ export function periodosCercanos(atras = 12, adelante = 2): string[] {
   return out;
 }
 
-/** Roster: usuarios que deben aparecer en el plan (personal ESDOMED). */
-export function esPersonalPlan(role: string): boolean {
-  return role === "esdomed" || role === "asistente_esdomed";
+/**
+ * Roster: usuarios que deben aparecer en el plan. Es el personal ESDOMED y,
+ * además, un admin (superusuario) que también sea personal de ESDOMED — en cuyo
+ * caso se identifica porque tiene código de marcación.
+ */
+export function esPersonalPlan(role: string, codigoMarcacion?: string): boolean {
+  if (role === "esdomed" || role === "asistente_esdomed") return true;
+  if (role === "admin") return Boolean(codigoMarcacion?.trim());
+  return false;
 }
 
 /**

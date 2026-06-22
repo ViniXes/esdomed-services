@@ -21,6 +21,12 @@ function esPersonalEsdomed(role: string | undefined) {
   return role === "esdomed" || role === "asistente_esdomed";
 }
 
+// El personal ESDOMED y un admin que además sea personal de ESDOMED pueden tener
+// código de marcación / puesto (para aparecer en el plan de horarios).
+function puedeTenerCodigoPlan(role: string | undefined) {
+  return esPersonalEsdomed(role) || role === "admin";
+}
+
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
   return value === "uci" || value === "ucin" || value === "uci_ucin";
 }
@@ -131,12 +137,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
 
   if ("codigoMarcacion" in body || nextRole) {
     const codigo = String(body.codigoMarcacion ?? "").trim();
-    update.codigoMarcacion = esPersonalEsdomed(targetRole) && codigo ? codigo : FieldValue.delete();
+    update.codigoMarcacion = puedeTenerCodigoPlan(targetRole) && codigo ? codigo : FieldValue.delete();
   }
 
   if ("puesto" in body || nextRole) {
     const puesto = String(body.puesto ?? "").trim();
-    update.puesto = esPersonalEsdomed(targetRole) && puesto ? puesto : FieldValue.delete();
+    update.puesto = puedeTenerCodigoPlan(targetRole) && puesto ? puesto : FieldValue.delete();
   }
 
   if (Object.keys(update).length === 0) {

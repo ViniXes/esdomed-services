@@ -194,7 +194,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
     // ── Administración ──
     ...(verUsuarios
-      ? [{ href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN }]
+      ? [
+          { href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN },
+          { href: "/dashboard/registros-medicos", label: "Registros de médicos", icon: ClipboardList, group: G_ADMIN },
+        ]
       : []),
     ...(verAprobacionTramites
       ? [{ href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck, group: G_ADMIN }]

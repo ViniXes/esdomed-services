@@ -88,10 +88,17 @@ export default function EditorPlanPage() {
   }, []);
 
   const cargarRoster = useCallback(async (): Promise<RosterUser[]> => {
+    // Incluimos admin además del personal ESDOMED: un superusuario que también es
+    // personal de ESDOMED debe aparecer en el plan. Para no traer admins de TI
+    // (sin relación con el plan), el admin solo cuenta si tiene código de marcación.
     const snap = await getDocs(
-      query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed"])),
+      query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])),
     );
     const lista = snap.docs
+      .filter((d) => {
+        const data = d.data();
+        return data.role !== "admin" || Boolean(data.codigoMarcacion);
+      })
       .map((d) => {
         const data = d.data();
         return {

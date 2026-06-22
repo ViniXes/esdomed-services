@@ -59,6 +59,12 @@ service cloud.firestore {
       allow read:   if isAdmin();
       allow write:  if false;
     }
+    // Historial de resoluciones (aprobado/rechazado). Lo escribe el Admin SDK; el
+    // admin solo lo consulta desde el dashboard.
+    match /registros_medicos_historial/{id} {
+      allow read:   if isAdmin();
+      allow write:  if false;
+    }
 
     // Registros clínicos inmutables de UCI y UCIN. Los médicos solo pueden
     // registrar y consultar actividad de sus servicios asignados.

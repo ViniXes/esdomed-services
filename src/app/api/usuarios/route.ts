@@ -25,6 +25,12 @@ function esPersonalEsdomed(role: UserRole) {
   return role === "esdomed" || role === "asistente_esdomed";
 }
 
+// Quién puede tener código de marcación / puesto: el personal ESDOMED y también
+// un admin que además sea personal de ESDOMED (para que aparezca en el plan).
+function puedeTenerCodigoPlan(role: UserRole) {
+  return esPersonalEsdomed(role) || role === "admin";
+}
+
 async function getCallerRole(req: NextRequest): Promise<string | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
@@ -107,7 +113,7 @@ export async function POST(req: NextRequest) {
     ? serviciosPorTipoMedico(tipoMedicoValido)
     : Array.isArray(servicios) ? servicios.map(String) : [];
 
-  const esEsdomed = esPersonalEsdomed(userRole as UserRole);
+  const conCodigoPlan = puedeTenerCodigoPlan(userRole as UserRole);
 
   await adminDb.collection("usuarios").doc(userRecord.uid).set({
     nombre,
@@ -118,8 +124,8 @@ export async function POST(req: NextRequest) {
     servicio: serviciosArr[0] ?? "",
     ...(tipoMedicoValido ? { tipoMedico: tipoMedicoValido } : {}),
     ...(userRole === "medico" && jvpm ? { jvpm } : {}),
-    ...(esEsdomed && codigoMarcacion ? { codigoMarcacion: String(codigoMarcacion).trim() } : {}),
-    ...(esEsdomed && puesto ? { puesto: String(puesto).trim() } : {}),
+    ...(conCodigoPlan && codigoMarcacion ? { codigoMarcacion: String(codigoMarcacion).trim() } : {}),
+    ...(conCodigoPlan && puesto ? { puesto: String(puesto).trim() } : {}),
     createdAt: FieldValue.serverTimestamp(),
   });
 

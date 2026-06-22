@@ -36,6 +36,27 @@ export interface RegistroMedicoPendiente {
   creadoEn: Date;
 }
 
+// Resolución de una solicitud de autoregistro (aprobada o rechazada). Se guarda
+// en `registros_medicos_historial` con id autogenerado para poder consultar el
+// histórico de aceptaciones y rechazos.
+export interface RegistroMedicoResuelto {
+  id?: string;
+  uid: string;          // uid original de la solicitud
+  nombre: string;
+  dui: string;
+  jvpm: string;
+  username: string;
+  email: string;
+  tipoMedico?: TipoMedicoCuidadosCriticos;
+  servicios: string[];
+  estado: "aprobado" | "rechazado";
+  motivo?: string;      // solo en rechazos
+  solicitadoEn?: Date;  // cuándo se registró el médico
+  resueltoEn: Date;     // cuándo se resolvió
+  resueltoPorId: string;
+  resueltoPorNombre: string;
+}
+
 export type TipoAtencionCuidadosCriticos =
   | "evaluacion_ingreso"
   | "seguimiento_clinico"
