@@ -1,17 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, onSnapshot, addDoc, getDocs, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido } from "@/types";
-import type { Paciente } from "@/types";
+import type { Paciente, AtencionEmergencia } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
+import { toDate } from "@/lib/pacientes/helpers";
+import { condicionEgreso, CONDICION_LABEL } from "@/lib/emergencia/helpers";
 import {
   HeartPulse, Plus, CheckCircle2, AlertCircle, X,
-  Search, Loader2, BedDouble,
+  Search, Loader2, BedDouble, Ambulance,
 } from "lucide-react";
+
+// Origen del fallecido: paciente hospitalizado (activo) o atención de emergencia.
+type FuenteFallecido = "activo" | "emergencia";
+interface SeleccionFallecido {
+  nombre: string;
+  expediente: string;
+  servicio: string;
+  cama: string;
+  origen: FuenteFallecido;
+  pacienteId?: string;
+  atencionEmergenciaId?: string;
+}
+
+const toDtLocal = (d?: Date | null) => {
+  if (!d) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
@@ -28,11 +48,35 @@ export default function MedicoFallecidosPage() {
   const [modal, setModal] = useState<ModalState>(null);
 
   // Estado de búsqueda de paciente
+  const [fuente, setFuente] = useState<FuenteFallecido>("activo");
   const [expBusqueda, setExpBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [resultados, setResultados] = useState<Paciente[]>([]);
   const [paciente, setPaciente] = useState<Paciente | null>(null);
+  const [atencion, setAtencion] = useState<AtencionEmergencia | null>(null);
+  const [atencionResultados, setAtencionResultados] = useState<AtencionEmergencia[]>([]);
   const [errorBusqueda, setErrorBusqueda] = useState("");
+
+  // Selección unificada (venga de activos o de emergencia).
+  const sel: SeleccionFallecido | null = paciente
+    ? {
+        nombre: `${paciente.apellidos}, ${paciente.nombres}`,
+        expediente: paciente.expediente,
+        servicio: paciente.servicioActual,
+        cama: paciente.camaActual || "",
+        origen: "activo",
+        pacienteId: paciente.id,
+      }
+    : atencion
+    ? {
+        nombre: atencion.pacienteNombre,
+        expediente: atencion.expediente,
+        servicio: "Emergencia",
+        cama: "",
+        origen: "emergencia",
+        atencionEmergenciaId: atencion.id,
+      }
+    : null;
 
   // Campos de la notificación
   const [fechaDefuncion, setFechaDefuncion] = useState("");
@@ -56,34 +100,72 @@ export default function MedicoFallecidosPage() {
     setExpBusqueda("");
     setResultados([]);
     setPaciente(null);
+    setAtencion(null);
+    setAtencionResultados([]);
     setErrorBusqueda("");
     setFechaDefuncion("");
     setCausaMuerte("");
   };
 
-  const buscarPaciente = async () => {
+  const cambiarFuente = (f: FuenteFallecido) => {
+    setFuente(f);
+    setExpBusqueda("");
+    setResultados([]);
+    setAtencionResultados([]);
+    setPaciente(null);
+    setAtencion(null);
+    setErrorBusqueda("");
+  };
+
+  // Al elegir una atención de emergencia, precarga fecha (de alta/egreso) y causa (diagnóstico).
+  const elegirAtencion = (a: AtencionEmergencia) => {
+    setAtencion(a);
+    setAtencionResultados([]);
+    setFechaDefuncion(toDtLocal(a.fechaHoraAltaIngreso));
+    setCausaMuerte(a.diagnostico ?? "");
+  };
+
+  const buscar = async () => {
     const val = expBusqueda.trim();
     if (!val) return;
     setBuscando(true);
     setErrorBusqueda("");
     setResultados([]);
+    setAtencionResultados([]);
     setPaciente(null);
+    setAtencion(null);
 
     try {
-      const q = query(
-        collection(db, "pacientes"),
-        where("expediente", "==", val),
-        where("estado", "==", "activo"),
-      );
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        setErrorBusqueda(`No se encontró ningún paciente activo con el expediente "${val}".`);
-      } else {
-        const found = snap.docs.map(d => ({ id: d.id, ...d.data() } as Paciente));
-        if (found.length === 1) {
-          setPaciente(found[0]);
+      if (fuente === "activo") {
+        const snap = await getDocs(query(
+          collection(db, "pacientes"),
+          where("expediente", "==", val),
+          where("estado", "==", "activo"),
+        ));
+        if (snap.empty) {
+          setErrorBusqueda(`No se encontró ningún paciente activo con el expediente "${val}". Si murió en emergencia (sin haber ingresado), cambia el origen a "Emergencia".`);
         } else {
-          setResultados(found);
+          const found = snap.docs.map(d => ({ id: d.id, ...d.data() } as Paciente));
+          if (found.length === 1) setPaciente(found[0]); else setResultados(found);
+        }
+      } else {
+        const snap = await getDocs(query(
+          collection(db, "atenciones_emergencia"),
+          where("expediente", "==", val),
+          orderBy("fechaHoraIngreso", "desc"),
+        ));
+        if (snap.empty) {
+          setErrorBusqueda(`No se encontró ninguna atención de emergencia con el expediente "${val}". Verifica que el reporte de emergencia ya se haya importado.`);
+        } else {
+          const found = snap.docs.map(d => {
+            const data = d.data();
+            return {
+              id: d.id, ...data,
+              fechaHoraIngreso: toDate(data.fechaHoraIngreso) ?? new Date(),
+              fechaHoraAltaIngreso: toDate(data.fechaHoraAltaIngreso),
+            } as AtencionEmergencia;
+          });
+          if (found.length === 1) elegirAtencion(found[0]); else setAtencionResultados(found);
         }
       }
     } catch {
@@ -95,15 +177,14 @@ export default function MedicoFallecidosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !profile || !paciente || !fechaDefuncion) return;
+    if (!user || !profile || !sel || !fechaDefuncion) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, "notificaciones_fallecidos"), {
-        pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
-        pacienteExpediente: paciente.expediente,
-        pacienteId: paciente.id,
-        servicio: paciente.servicioActual,
-        cama: paciente.camaActual || "",
+      const payload: Record<string, unknown> = {
+        pacienteNombre: sel.nombre,
+        pacienteExpediente: sel.expediente,
+        servicio: sel.servicio,
+        cama: sel.cama || "",
         fechaDefuncion: Timestamp.fromDate(new Date(fechaDefuncion)),
         causaMuerte: causaMuerte.trim() || null,
         medicoId: user.uid,
@@ -111,13 +192,13 @@ export default function MedicoFallecidosPage() {
         medicoJvpm: profile.jvpm || null,
         medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
         estado: "pendiente",
+        origen: sel.origen,
         creadoEn: Timestamp.now(),
-      });
-      setModal({
-        type: "success",
-        expediente: paciente.expediente,
-        nombre: `${paciente.apellidos}, ${paciente.nombres}`,
-      });
+      };
+      if (sel.pacienteId) payload.pacienteId = sel.pacienteId;
+      if (sel.atencionEmergenciaId) payload.atencionEmergenciaId = sel.atencionEmergenciaId;
+      await addDoc(collection(db, "notificaciones_fallecidos"), payload);
+      setModal({ type: "success", expediente: sel.expediente, nombre: sel.nombre });
       resetForm();
       setShowForm(false);
     } catch (err) {
@@ -169,20 +250,45 @@ export default function MedicoFallecidosPage() {
           <div className="space-y-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Identificar al paciente</p>
 
-            {!paciente ? (
+            {!sel && (
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 w-fit">
+                {([
+                  { v: "activo", l: "Hospitalización", icon: BedDouble },
+                  { v: "emergencia", l: "Emergencia", icon: Ambulance },
+                ] as { v: FuenteFallecido; l: string; icon: typeof BedDouble }[]).map(({ v, l, icon: Icon }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => cambiarFuente(v)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      fuente === v ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400"
+                    }`}
+                  >
+                    <Icon size={13} /> {l}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!sel ? (
               <>
+                {fuente === "emergencia" && (
+                  <p className="text-xs text-slate-500 -mt-1">
+                    Para quien falleció en emergencia sin haber ingresado a un servicio. Se toma de las atenciones de emergencia importadas.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={expBusqueda}
                     onChange={e => { setExpBusqueda(e.target.value); setErrorBusqueda(""); }}
-                    onKeyDown={e => e.key === "Enter" && buscarPaciente()}
+                    onKeyDown={e => e.key === "Enter" && buscar()}
                     placeholder="Número de expediente (ej: 1234-26)"
                     className={inputCls}
                   />
                   <button
                     type="button"
-                    onClick={buscarPaciente}
+                    onClick={buscar}
                     disabled={buscando || !expBusqueda.trim()}
                     className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 dark:disabled:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-all disabled:cursor-not-allowed whitespace-nowrap"
                   >
@@ -214,29 +320,66 @@ export default function MedicoFallecidosPage() {
                     ))}
                   </div>
                 )}
+
+                {atencionResultados.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Atenciones de emergencia — selecciona una:</p>
+                    {atencionResultados.map(a => {
+                      const cond = condicionEgreso(a.tipoEgreso);
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => elegirAtencion(a)}
+                          className="w-full text-left border border-slate-200 dark:border-slate-700 rounded-xl p-4 hover:border-rose-400 dark:hover:border-rose-600 hover:bg-rose-50/50 dark:hover:bg-rose-900/20 transition-all"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{a.pacienteNombre}</p>
+                            <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${cond === "fallecido" ? "bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}>
+                              {CONDICION_LABEL[cond]}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Ingreso a emergencia: {a.fechaHoraIngreso.toLocaleString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
+                            {a.diagnostico ? ` · ${a.diagnostico}` : ""}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             ) : (
               <div className="space-y-3">
                 <div className="flex items-start gap-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4">
                   <CheckCircle2 size={18} className="text-rose-500 dark:text-rose-400 mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{paciente.apellidos}, {paciente.nombres}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Exp. {paciente.expediente}</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">{sel.nombre}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Exp. {sel.expediente}</p>
                     <div className="mt-2 flex items-center gap-2 text-sm">
-                      <BedDouble size={13} className="text-slate-400 shrink-0" />
-                      <span className="text-slate-700 dark:text-slate-300">
-                        <span className="font-medium">{paciente.servicioActual}</span>
-                        {paciente.camaActual
-                          ? <> — Cama <span className="font-medium">{paciente.camaActual}</span></>
-                          : <span className="text-amber-600 dark:text-amber-400"> — sin cama asignada</span>
-                        }
-                      </span>
+                      {sel.origen === "emergencia" ? (
+                        <>
+                          <Ambulance size={13} className="text-rose-400 shrink-0" />
+                          <span className="text-slate-700 dark:text-slate-300 font-medium">Emergencia</span>
+                          <span className="text-xs text-slate-400">· sin ingreso a hospitalización</span>
+                        </>
+                      ) : (
+                        <>
+                          <BedDouble size={13} className="text-slate-400 shrink-0" />
+                          <span className="text-slate-700 dark:text-slate-300">
+                            <span className="font-medium">{sel.servicio}</span>
+                            {sel.cama
+                              ? <> — Cama <span className="font-medium">{sel.cama}</span></>
+                              : <span className="text-amber-600 dark:text-amber-400"> — sin cama asignada</span>}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setPaciente(null); setExpBusqueda(""); }}
+                  onClick={() => { setPaciente(null); setAtencion(null); setExpBusqueda(""); }}
                   className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline transition-colors"
                 >
                   Buscar otro expediente
@@ -246,7 +389,7 @@ export default function MedicoFallecidosPage() {
           </div>
 
           {/* Paso 2: Detalles de la defunción */}
-          {paciente && (
+          {sel && (
             <form onSubmit={handleSubmit} className="space-y-4 border-t border-slate-200 dark:border-slate-800 pt-5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Datos de la defunción</p>
 

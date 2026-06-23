@@ -156,6 +156,11 @@ export interface NotificacionFallecido {
   medicoNombre: string;
   medicoJvpm?: string;
   medicoServicio: string;
+  pacienteId?: string;          // doc id en /pacientes (solo si venía de un ingreso activo)
+  // Origen del fallecido: "activo" = paciente hospitalizado; "emergencia" = falleció
+  // en emergencia sin haber ingresado a un servicio (se toma de atenciones_emergencia).
+  origen?: "activo" | "emergencia";
+  atencionEmergenciaId?: string; // ref a la atención de emergencia (si origen=emergencia)
   pacienteNombre: string;
   pacienteExpediente: string;
   servicio: string;
