@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, onSnapshot, addDoc, getDocs, Timestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido } from "@/types";
@@ -149,10 +149,11 @@ export default function MedicoFallecidosPage() {
           if (found.length === 1) setPaciente(found[0]); else setResultados(found);
         }
       } else {
+        // Sin orderBy en la consulta para no depender de un índice compuesto
+        // (expediente + fechaHoraIngreso); se ordena en cliente (pocas visitas).
         const snap = await getDocs(query(
           collection(db, "atenciones_emergencia"),
           where("expediente", "==", val),
-          orderBy("fechaHoraIngreso", "desc"),
         ));
         if (snap.empty) {
           setErrorBusqueda(`No se encontró ninguna atención de emergencia con el expediente "${val}". Verifica que el reporte de emergencia ya se haya importado.`);
@@ -165,6 +166,7 @@ export default function MedicoFallecidosPage() {
               fechaHoraAltaIngreso: toDate(data.fechaHoraAltaIngreso),
             } as AtencionEmergencia;
           });
+          found.sort((a, b) => b.fechaHoraIngreso.getTime() - a.fechaHoraIngreso.getTime());
           if (found.length === 1) elegirAtencion(found[0]); else setAtencionResultados(found);
         }
       }
