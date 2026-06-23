@@ -175,6 +175,8 @@ export interface NotificacionFallecido {
   recibeDePs?: string;          // psicología / trabajo social
   recibeDePsEn?: Date;
   recibeDePsUid?: string;       // uid del usuario asignado (set by ESDOMED)
+  recibeDePsEntregadoPor?: string;   // nombre del ESDOMED que hizo la entrega
+  recibeDePsEntregadoPorUid?: string;
   recibeDePsConfirmado?: boolean;
   recibeDePsConfirmadoEn?: Date;
   tramitaDefuncion?: string;

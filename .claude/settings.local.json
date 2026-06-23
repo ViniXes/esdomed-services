@@ -84,7 +84,8 @@
       "Bash(grep -iE \"\\\\.\\(png|jpg|jpeg|svg|webp\\)$\")",
       "Bash(claude update *)",
       "Bash(grep -A6 \"gestiones\\\\\\\\\\\\\\\\page.tsx:125\")",
-      "Bash(PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python scripts/_explore_ts.py)"
+      "Bash(PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python scripts/_explore_ts.py)",
+      "Bash(xargs grep -l \"useNotificaciones\")"
     ]
   }
 }

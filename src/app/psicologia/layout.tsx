@@ -4,22 +4,25 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, HeartPulse, Inbox, UserSearch } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sidebar } from "@/components/Sidebar";
+import { Sidebar, type NavItem } from "@/components/Sidebar";
+import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
+import { ToastContainer } from "@/components/ui/ToastContainer";
 
-const navItems = [
-  { href: "/psicologia/buscar-paciente",  label: "Buscar Paciente",   icon: UserSearch },
-  { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },
-  { href: "/psicologia/fallecidos",   label: "Fallecidos",  icon: HeartPulse },
-  { href: "/psicologia/recepciones",  label: "Recepciones", icon: Inbox },
-];
-
-export default function PsicologiaLayout({ children }: { children: React.ReactNode }) {
+function PsicologiaContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
+  const { pendientes } = useNotificaciones();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading && profile?.role !== "psicologia") router.replace("/login");
   }, [loading, profile, router]);
+
+  const navItems: NavItem[] = [
+    { href: "/psicologia/buscar-paciente",   label: "Buscar Paciente",   icon: UserSearch },
+    { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },
+    { href: "/psicologia/fallecidos",        label: "Fallecidos",        icon: HeartPulse, badge: pendientes.fallecidos },
+    { href: "/psicologia/recepciones",       label: "Recepciones",       icon: Inbox,      badge: pendientes.recepciones },
+  ];
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
@@ -31,6 +34,15 @@ export default function PsicologiaLayout({ children }: { children: React.ReactNo
           </div>
         ) : children}
       </main>
+      <ToastContainer />
     </div>
+  );
+}
+
+export default function PsicologiaLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <NotificacionesProvider>
+      <PsicologiaContent>{children}</PsicologiaContent>
+    </NotificacionesProvider>
   );
 }

@@ -91,6 +91,11 @@ export default function RecepcionesView() {
                   <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-base">{r.pacienteExpediente}</p>
                   <p className="text-xs text-slate-500 mt-0.5">{r.pacienteNombre}</p>
                   <p className="text-xs text-slate-500 mt-1">{r.servicio} · Cama {r.cama} · {formatFecha(r.fechaDefuncion)}</p>
+                  {r.recibeDePsEntregadoPor && (
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                      Entregado por <span className="font-medium">{r.recibeDePsEntregadoPor}</span> (ESDOMED)
+                    </p>
+                  )}
                 </div>
                 <span className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-1 rounded-lg">
                   <Clock size={11} /> Pendiente
@@ -118,6 +123,9 @@ export default function RecepcionesView() {
               <div>
                 <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-sm">{r.pacienteExpediente}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{r.pacienteNombre} · {r.servicio}</p>
+                {r.recibeDePsEntregadoPor && (
+                  <p className="text-xs text-slate-500 mt-0.5">Entregado por {r.recibeDePsEntregadoPor} (ESDOMED)</p>
+                )}
               </div>
               <span className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 px-2 py-1 rounded-lg">
                 <CheckCircle2 size={11} /> Confirmado

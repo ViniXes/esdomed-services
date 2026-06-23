@@ -142,6 +142,8 @@ export default function DashboardFallecidosPage() {
     if (campo === "recibeDePs") {
       const persona = personalPsTs.find(p => p.nombre === nombre);
       data.recibeDePsUid = persona?.uid ?? null;
+      data.recibeDePsEntregadoPor = nombre ? (profile?.nombre ?? null) : null;
+      data.recibeDePsEntregadoPorUid = nombre ? (profile?.uid ?? null) : null;
       data.recibeDePsConfirmado = false;
       data.recibeDePsConfirmadoEn = null;
     }
@@ -559,6 +561,12 @@ export default function DashboardFallecidosPage() {
                           </select>
                           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         </div>
+                        {valor && selectedLive.recibeDePsEntregadoPor && (
+                          <p className="text-[11px] mt-1.5 flex items-center gap-1.5 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md w-fit">
+                            Entregado por {selectedLive.recibeDePsEntregadoPor}
+                            {selectedLive.recibeDePsEn && <> · {formatHora(selectedLive.recibeDePsEn)}</>}
+                          </p>
+                        )}
                         {valor && (
                           <div className="mt-1.5">
                             {selectedLive.recibeDePsConfirmado ? (

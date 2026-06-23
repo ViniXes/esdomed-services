@@ -15,7 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export type TipoNotif =
   | "fallecido" | "traslado" | "alta" | "psicologia"
-  | "incapacidad" | "anexo5" | "impresion";
+  | "incapacidad" | "anexo5" | "impresion" | "recepcion";
 
 export interface NotifToast {
   id: string;
@@ -31,6 +31,7 @@ interface Pendientes {
   incapacidades: number;
   anexo5: number;
   impresiones: number;
+  recepciones: number;
   total: number;
 }
 
@@ -41,7 +42,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -55,6 +56,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const [countIncapacidades, setCountIncapacidades] = useState(0);
   const [countAnexo5, setCountAnexo5]         = useState(0);
   const [countImpresiones, setCountImpresiones] = useState(0);
+  const [countRecepciones, setCountRecepciones] = useState(0);
   const [toasts, setToasts]                   = useState<NotifToast[]>([]);
 
   const knownFallecidos = useRef<Set<string> | null>(null);
@@ -64,9 +66,13 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const knownIncapacidades = useRef<Set<string> | null>(null);
   const knownAnexo5     = useRef<Set<string> | null>(null);
   const knownImpresiones = useRef<Set<string> | null>(null);
+  const knownRecepciones = useRef<Set<string> | null>(null);
+  const knownVistos      = useRef<Set<string> | null>(null);
 
-  const esEsdomed   = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
-  const puedeAltas  = esEsdomed || profile?.role === "trabajo_social";
+  const esEsdomed    = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+  const puedeAltas   = esEsdomed || profile?.role === "trabajo_social";
+  const esPsicologia = profile?.role === "psicologia";
+  const psUid        = profile?.uid;
 
   const addToast = useCallback((toast: Omit<NotifToast, "id">) => {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -297,6 +303,71 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [esEsdomed, addToast]);
 
+  // Recepciones asignadas a este usuario de Psicología (entregadas por ESDOMED) — toast + badge
+  useEffect(() => {
+    if (!esPsicologia || !psUid) return;
+    knownRecepciones.current = null;
+
+    const q = query(
+      collection(db, "notificaciones_fallecidos"),
+      where("recibeDePsUid", "==", psUid),
+    );
+    return onSnapshot(q, snap => {
+      const porConfirmar = snap.docs.filter(d => !d.data().recibeDePsConfirmado);
+      const ids = new Set(porConfirmar.map(d => d.id));
+
+      if (knownRecepciones.current === null) {
+        knownRecepciones.current = ids;
+      } else {
+        porConfirmar.forEach(doc => {
+          if (!knownRecepciones.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "recepcion",
+              titulo: "Nueva recepción asignada",
+              mensaje: `${d.recibeDePsEntregadoPor ? `Entregado por ${d.recibeDePsEntregadoPor} · ` : ""}${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
+            });
+          }
+        });
+        knownRecepciones.current = ids;
+      }
+      setCountRecepciones(porConfirmar.length);
+    });
+  }, [esPsicologia, psUid, addToast]);
+
+  // Fallecidos por revisar (sin "visto" del área) — Psicología
+  useEffect(() => {
+    if (!esPsicologia) return;
+    knownVistos.current = null;
+
+    const q = query(
+      collection(db, "notificaciones_fallecidos"),
+      orderBy("creadoEn", "desc"),
+      limit(200),
+    );
+    return onSnapshot(q, snap => {
+      const sinVisto = snap.docs.filter(d => !d.data().recibeDePs);
+      const ids = new Set(sinVisto.map(d => d.id));
+
+      if (knownVistos.current === null) {
+        knownVistos.current = ids;
+      } else {
+        sinVisto.forEach(doc => {
+          if (!knownVistos.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "fallecido",
+              titulo: "Nuevo fallecido por revisar",
+              mensaje: `${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
+            });
+          }
+        });
+        knownVistos.current = ids;
+      }
+      setCountFallecidos(sinVisto.length);
+    });
+  }, [esPsicologia, addToast]);
+
   const pendientes: Pendientes = {
     fallecidos:    countFallecidos,
     traslados:     countTraslados,
@@ -304,7 +375,8 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     incapacidades: countIncapacidades,
     anexo5:        countAnexo5,
     impresiones:   countImpresiones,
-    total:         countFallecidos + countTraslados + countAltas + countIncapacidades + countAnexo5 + countImpresiones,
+    recepciones:   countRecepciones,
+    total:         countFallecidos + countTraslados + countAltas + countIncapacidades + countAnexo5 + countImpresiones + countRecepciones,
   };
 
   return (

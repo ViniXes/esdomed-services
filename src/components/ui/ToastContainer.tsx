@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, X } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -42,6 +42,11 @@ const CONFIG: Record<
     icon: Printer,
     borderColor: "border-l-indigo-500",
     iconColor: "text-indigo-400",
+  },
+  recepcion: {
+    icon: Inbox,
+    borderColor: "border-l-teal-500",
+    iconColor: "text-teal-400",
   },
 };
 
