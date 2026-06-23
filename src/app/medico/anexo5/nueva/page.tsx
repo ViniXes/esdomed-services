@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, getDocs, limit, orderBy, query, Timestamp, where } from "firebase/firestore";
@@ -90,12 +90,6 @@ export default function NuevaAnexo5Page() {
       )
     : establecimientosReferencia;
 
-  useEffect(() => {
-    if (profile?.nombre && !form.medicoRefiere) {
-      setForm((prev) => ({ ...prev, medicoRefiere: profile.nombre }));
-    }
-  }, [profile]);
-
   const buscarPorExpediente = async () => {
     const exp = form.expediente.trim();
     if (!exp) return;
@@ -169,7 +163,8 @@ export default function NuevaAnexo5Page() {
         // Solo se incluye si viene; Firestore rechaza valores undefined.
         ...(form.fechaHoraCita && { fechaHoraCita: form.fechaHoraCita }),
         especialidad: form.especialidad.toUpperCase(),
-        medicoRefiere: form.medicoRefiere.toUpperCase(),
+        // Médico que refiere: opcional y libre (no se ata al usuario logueado).
+        ...(form.medicoRefiere.trim() && { medicoRefiere: form.medicoRefiere.trim().toUpperCase() }),
         establecimientoQueRefiere: form.establecimientoQueRefiere.toUpperCase(),
         telefonoEstablecimiento: form.telefonoEstablecimiento,
 
@@ -196,7 +191,7 @@ export default function NuevaAnexo5Page() {
       establecimientoReferencia: "",
       fechaHoraCita: "",
       especialidad: "",
-      medicoRefiere: profile?.nombre || "",
+      medicoRefiere: "",
       establecimientoQueRefiere: "HOSPITAL NACIONAL EL SALVADOR",
       telefonoEstablecimiento: "7788-5522, 2594-2100, 2594-2139",
     });
@@ -415,7 +410,7 @@ export default function NuevaAnexo5Page() {
                 placeholder="Ej. CIRUGÍA GENERAL" />
             </div>
             <div>
-              <label className={lbl}>6. Médico que refiere</label>
+              <label className={lbl}>6. Médico que refiere <span className="font-normal text-slate-400">(opcional)</span></label>
               <input type="text" className={inputCls} value={form.medicoRefiere}
                 onChange={(e) => setForm({ ...form, medicoRefiere: e.target.value })} />
             </div>

@@ -283,7 +283,7 @@ export interface SolicitudAnexo5 {
   establecimientoReferencia: string;
   fechaHoraCita?: string; // Opcional
   especialidad: string;
-  medicoRefiere: string;
+  medicoRefiere?: string; // Opcional — libre, no se ata al usuario logueado
   establecimientoQueRefiere: string;
   telefonoEstablecimiento: string;
 
