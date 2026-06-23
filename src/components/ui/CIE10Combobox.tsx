@@ -78,10 +78,6 @@ export function CIE10Combobox({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
-    // Reset code if user edits after a catalog selection
-    if (valueRef.current.codigo) {
-      onChange({ codigo: "", descripcion: val });
-    }
     setOpen(true);
     cargarSiNecesario();
   };
@@ -105,11 +101,8 @@ export function CIE10Combobox({
   const handleBlur = () => {
     setTimeout(() => {
       setOpen(false);
-      // Save free text if user didn't pick from catalog
-      const cur = valueRef.current;
-      if (!cur.codigo && query.trim() !== cur.descripcion) {
-        onChange({ codigo: "", descripcion: query.trim() });
-      }
+      // The query only filters CIE-10. A diagnosis is saved after selection.
+      setQuery(valueRef.current.descripcion);
     }, 150);
   };
 
@@ -169,7 +162,7 @@ export function CIE10Combobox({
             </div>
           ) : resultados.length === 0 ? (
             <div className="px-4 py-3 text-xs text-slate-400 italic">
-              Sin coincidencias — se guardará como texto libre.
+              Sin coincidencias en CIE-10. Selecciona una opcion del catalogo.
             </div>
           ) : (
             <ul className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
