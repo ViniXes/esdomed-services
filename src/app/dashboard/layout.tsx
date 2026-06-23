@@ -23,6 +23,7 @@ import {
   Printer,
   Settings,
   Syringe,
+  Table2,
   Users,
   DoorOpen,
   CalendarClock,
@@ -200,6 +201,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verReportes
       ? [
           { href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES },
+          { href: "/dashboard/reportes/tabuladores", label: "Tabuladores", icon: Table2, group: G_REPORTES },
           { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid, group: G_REPORTES },
         ]
       : []),
