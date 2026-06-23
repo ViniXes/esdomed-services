@@ -1,0 +1,112 @@
+<!--
+  Banner de redirección para el Google Sites antiguo de ESDOMED.
+  Cómo usarlo en Google Sites:
+    1. Edita la página del Sites.
+    2. Insertar  →  "Insertar código" (Embed code)  →  pega TODO este archivo.
+    3. Ajusta el alto del recuadro a ~180 px (o el que se vea bien) y publica.
+  El botón abre el nuevo portal en una pestaña nueva (target="_blank").
+-->
+<div class="esd-banner">
+  <a class="esd-card" href="https://esdomed-services.vercel.app" target="_blank" rel="noopener">
+    <img
+      class="esd-logo"
+      src="https://esdomed-services.vercel.app/logoEsdomed.png"
+      alt="ESDOMED"
+      onerror="this.style.display='none'"
+    />
+    <div class="esd-text">
+      <span class="esd-tag">Nuevo portal en línea</span>
+      <h2 class="esd-title">ESDOMED Services se mudó a un nuevo sitio</h2>
+      <p class="esd-sub">
+        Traslados, fallecidos e impresiones ahora se gestionan en la nueva plataforma.
+      </p>
+    </div>
+    <span class="esd-btn">
+      Ir al nuevo sitio
+      <span class="esd-arrow">&#8594;</span>
+    </span>
+  </a>
+</div>
+
+<style>
+  .esd-banner * { box-sizing: border-box; }
+  .esd-banner {
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 4px;
+  }
+  .esd-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    text-decoration: none;
+    background: linear-gradient(135deg, #1c1e4d 0%, #2f48aa 100%);
+    border: 1px solid #c9a892;
+    border-radius: 18px;
+    padding: 20px 26px;
+    box-shadow: 0 10px 30px rgba(28, 30, 77, 0.25);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .esd-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(28, 30, 77, 0.35);
+  }
+  .esd-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #fff;
+    padding: 4px;
+    flex-shrink: 0;
+    object-fit: contain;
+  }
+  .esd-text { flex: 1; min-width: 0; }
+  .esd-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #1c1e4d;
+    background: #c9a892;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .esd-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .esd-sub {
+    margin: 6px 0 0;
+    color: #d7dcf0;
+    font-size: 13.5px;
+    line-height: 1.4;
+  }
+  .esd-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #c9a892;
+    color: #1c1e4d;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 12px;
+    white-space: nowrap;
+    transition: background .18s ease;
+  }
+  .esd-card:hover .esd-btn { background: #e0c6b3; }
+  .esd-arrow { transition: transform .18s ease; }
+  .esd-card:hover .esd-arrow { transform: translateX(4px); }
+
+  /* Responsivo: en pantallas angostas apila el contenido */
+  @media (max-width: 560px) {
+    .esd-card { flex-direction: column; text-align: center; gap: 14px; padding: 18px; }
+    .esd-text { text-align: center; }
+    .esd-btn { width: 100%; justify-content: center; }
+  }
+</style>
