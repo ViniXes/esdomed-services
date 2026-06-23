@@ -34,6 +34,45 @@ export interface IndicadorCuidadosCriticos {
   nota?: string;
 }
 
+export const FORMULAS_INDICADORES: Record<number, string> = {
+  1: "Total de egresos / Numero de camas asignadas",
+  2: "Dias cama ocupados / Dias cama disponibles x 100",
+  3: "Dias estancia de pacientes egresados / Total de egresos",
+  4: "(Dias cama disponibles - Dias cama ocupados) / Total de egresos",
+  5: "Reingresos a UCI <= 72 horas / Total de pacientes ingresados en UCI x 100",
+  6: "Egresos con ulcera por presion / Total de egresos x 100",
+  7: "Pacientes reintubados precozmente / Total de pacientes extubados x 100",
+  8: "Pacientes con extubacion exitosa / Total de pacientes extubados x 100",
+  9: "Pacientes con extubacion fallida / Total de pacientes extubados x 100",
+  10: "Pacientes evaluados con escala de severidad / Total de pacientes ingresados en UCI x 100",
+  11: "Pacientes con extubacion accidental / Total de pacientes con VM x 100",
+  12: "Complicaciones pleuro/pulmonares por CVC / Total de pacientes con CVC x 100",
+  13: "Infecciones asociadas a CVC / Total de pacientes con CVC x 100",
+  14: "Retiros accidentales de CVC / Total de pacientes con CVC x 100",
+  15: "Complicaciones pleuro/pulmonares por VM / Total de pacientes con VM x 100",
+  16: "Neumonias asociadas a VM / Total de pacientes con VM x 100",
+  17: "Infecciones asociadas a la atencion sanitaria / Total de egresos x 100",
+  18: "Caidas de pacientes / Dias cama ocupados x 1,000",
+  19: "Infecciones asociadas a STU / Total de pacientes con STU x 100",
+  20: "Retiros accidentales de STU / Total de pacientes con STU x 100",
+  21: "Retiros accidentales de SNG / Total de pacientes con SNG x 100",
+  22: "Retiros accidentales de traqueostomia / Total de pacientes con traqueostomia x 100",
+  23: "Retiros accidentales de gastrostomia / Total de pacientes con gastrostomia x 100",
+  24: "Pacientes no admitidos oportunamente / (Pacientes ingresados + Pacientes no admitidos oportunamente) x 100",
+  25: "Muertes hospitalarias del servicio / Total de egresos x 100",
+  26: "Muertes hospitalarias despues de 48 horas / Total de egresos x 100",
+  27: "Muertes observadas / Muertes esperadas segun MORTALIDAD II",
+  28: "Muertes de pacientes con VM egresados en el mes / Pacientes con VM egresados en el mes x 100",
+  29: "Muertes asociadas a neumonia / Egresos por neumonia x 100",
+  30: "Neumonias asociadas a VM / Total de egresos x 100",
+  31: "Muertes asociadas a COVID-19 / Egresos por COVID-19 x 100",
+  32: "Episodios de neumonia asociada a VM / Dias de ventilacion mecanica invasiva x 1,000",
+  33: "Muertes asociadas a diarrea / Egresos por diarrea x 100",
+  34: "Muertes asociadas a enfermedad renal / Egresos por enfermedad renal x 100",
+  35: "Muertes asociadas a diabetes mellitus / Egresos por diabetes mellitus x 100",
+  36: "Muertes asociadas a trastornos hipertensivos / Egresos por trastornos hipertensivos x 100",
+};
+
 export interface DatoBaseCuidadosCriticos {
   descriptor: string;
   valores: Array<number | string>;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { Activity, AlertCircle, Calculator, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +13,7 @@ import {
   calcularIndicadoresCuidadosCriticos,
   configDiasHabilesIndicadoresId,
   diasHabilesOficiales,
+  FORMULAS_INDICADORES,
   MESES_INDICADORES,
   type DatoBaseCuidadosCriticos,
   type IndicadorCuidadosCriticos,
@@ -36,13 +37,15 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [anio, setAnio] = useState(fecha.getFullYear());
   const [mes, setMes] = useState(fecha.getMonth() + 1);
   const [servicio, setServicio] = useState("todos");
-  const [diasHabiles, setDiasHabiles] = useState("");
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
+  const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
   const [vistaTabla, setVistaTabla] = useState<"indicadores" | "datos">("indicadores");
+  const [mostrarFormulas, setMostrarFormulas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   const puedeVer = puedeVerIndicadoresCuidadosCriticos(profile);
+  const esAdmin = profile?.role === "admin";
 
   useEffect(() => {
     if (!puedeVer) return;
@@ -67,13 +70,6 @@ export default function IndicadoresCuidadosCriticosPage() {
     ? camasServicio(servicio)
     : SERVICIOS_CRITICOS.reduce((total, item) => total + camasServicio(item), 0);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setDiasHabiles(diasHabilesParaCalculo ? String(diasHabilesParaCalculo) : "");
-      setEditandoDiasHabiles(!diasHabilesOficial && !configDiasHabiles?.diasHabiles);
-    });
-  }, [configDiasHabiles?.diasHabiles, diasHabilesOficial, diasHabilesParaCalculo, mes, anio]);
-
   const configParaCalculo = useMemo(() => {
     if (!diasHabilesParaCalculo || camasSistema <= 0) return null;
     return {
@@ -93,34 +89,54 @@ export default function IndicadoresCuidadosCriticosPage() {
     () => calcularDatosBaseCuidadosCriticos(fichas, { anio, servicio, configs, camasAsignadas: camasSistema }),
     [anio, camasSistema, configs, fichas, servicio],
   );
-  const fichasPeriodo = useMemo(() => {
-    return fichas.filter(ficha => {
-      if (servicio !== "todos" && ficha.servicio !== servicio) return false;
-      const ingreso = toDate(ficha.datos?.fecha_ingreso_al_servicio);
-      return ingreso?.getFullYear() === anio && ingreso.getMonth() + 1 === mes;
-    }).length;
-  }, [anio, fichas, mes, servicio]);
+  const iniciarEdicionDiasHabiles = () => {
+    const valores = Object.fromEntries(MESES_INDICADORES.map((_, indice) => {
+      const numeroMes = indice + 1;
+      const oficial = diasHabilesOficiales(anio, numeroMes);
+      const configurado = configs.find(item => item.anio === anio && item.mes === numeroMes && item.servicio === "__periodo__")?.diasHabiles;
+      return [numeroMes, oficial ? "" : configurado ? String(configurado) : ""];
+    }));
+    setDiasHabilesEdicion(valores);
+    setMessage("");
+    setEditandoDiasHabiles(true);
+  };
 
-  const guardarConfig = async () => {
-    if (!user || !profile) return;
-    const habiles = Number(diasHabiles);
-    if (!Number.isFinite(habiles) || habiles <= 0) {
-      setMessage("Configura los dias habiles del periodo con un valor mayor a 0.");
+  const guardarDiasHabiles = async () => {
+    if (!user || !profile || !esAdmin) return;
+    const cambios = MESES_INDICADORES.map((_, indice) => {
+      const numeroMes = indice + 1;
+      const valor = diasHabilesEdicion[numeroMes]?.trim() ?? "";
+      if (diasHabilesOficiales(anio, numeroMes) || !valor) return null;
+      const diasHabiles = Number(valor);
+      return { numeroMes, diasHabiles };
+    }).filter((item): item is { numeroMes: number; diasHabiles: number } => item !== null);
+
+    if (cambios.some(item => !Number.isFinite(item.diasHabiles) || item.diasHabiles <= 0)) {
+      setMessage("Los dias habiles deben ser valores mayores que 0.");
       return;
     }
+    if (!cambios.length) {
+      setMessage("Ingresa al menos un mes antes de guardar.");
+      return;
+    }
+
     setSaving(true);
     setMessage("");
     try {
-      await setDoc(doc(db, "config_indicadores_cuidados_criticos", configDiasHabilesIndicadoresId(anio, mes)), {
-        servicio: "__periodo__",
-        anio,
-        mes,
-        camasAsignadas: 0,
-        diasHabiles: habiles,
-        actualizadoPorId: user.uid,
-        actualizadoPorNombre: profile.nombre,
-        actualizadoEn: serverTimestamp(),
+      const batch = writeBatch(db);
+      cambios.forEach(({ numeroMes, diasHabiles }) => {
+        batch.set(doc(db, "config_indicadores_cuidados_criticos", configDiasHabilesIndicadoresId(anio, numeroMes)), {
+          servicio: "__periodo__",
+          anio,
+          mes: numeroMes,
+          camasAsignadas: 0,
+          diasHabiles,
+          actualizadoPorId: user.uid,
+          actualizadoPorNombre: profile.nombre,
+          actualizadoEn: serverTimestamp(),
+        });
       });
+      await batch.commit();
       setMessage("Dias habiles guardados.");
       setEditandoDiasHabiles(false);
     } catch (error) {
@@ -182,84 +198,6 @@ export default function IndicadoresCuidadosCriticosPage() {
         </div>
       </section>
 
-      <section className="grid items-start gap-3 lg:grid-cols-[minmax(280px,380px)_1fr]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">Configuracion del periodo</h2>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500">
-            Las camas se toman automaticamente del catalogo actual del servicio. Los dias habiles 2026 ya quedan fijos desde la tabla oficial.
-          </p>
-          <div className="mt-3 space-y-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
-              Camas del sistema para el filtro actual: <span className="font-bold text-slate-900 dark:text-slate-100">{camasSistema}</span>
-            </div>
-            <label>
-              <span className="mb-1 block text-xs font-semibold text-slate-500">Dias habiles del periodo</span>
-              <input
-                type="number"
-                min={1}
-                value={diasHabiles}
-                onChange={event => setDiasHabiles(event.target.value)}
-                disabled={Boolean(diasHabilesOficial) || !editandoDiasHabiles}
-                className={inputCls}
-              />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {diasHabilesOficial ? (
-                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
-                  Dato oficial {anio}
-                </span>
-              ) : editandoDiasHabiles ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={guardarConfig}
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-                  >
-                    <Save size={16} /> {saving ? "Guardando..." : "Guardar dias habiles"}
-                  </button>
-                  {configDiasHabiles?.diasHabiles ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDiasHabiles(String(configDiasHabiles.diasHabiles));
-                        setEditandoDiasHabiles(false);
-                        setMessage("");
-                      }}
-                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                    >
-                      Cancelar
-                    </button>
-                  ) : null}
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditandoDiasHabiles(true);
-                    setMessage("");
-                  }}
-                  className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950"
-                >
-                  Editar dias habiles
-                </button>
-              )}
-            </div>
-          </div>
-          {message && (
-            <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
-              {message}
-            </p>
-          )}
-        </div>
-
-        <div className="grid self-start gap-3 sm:grid-cols-3">
-          <Stat label="Pacientes registrados" value={fichasPeriodo} />
-          <Stat label="Camas del sistema" value={camasSistema || "Sin camas"} />
-          <Stat label="Dias habiles" value={configParaCalculo?.diasHabiles ?? "Sin config."} />
-        </div>
-      </section>
-
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -292,20 +230,48 @@ export default function IndicadoresCuidadosCriticosPage() {
             </button>
           </div>
         </div>
-        {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} /> : <TablaDatosBase datos={datosBase} />}
+        {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} mostrarFormulas={mostrarFormulas} onCambiarFormulas={() => setMostrarFormulas(actual => !actual)} /> : (
+          <TablaDatosBase
+            datos={datosBase}
+            anio={anio}
+            esAdmin={esAdmin}
+            editandoDiasHabiles={editandoDiasHabiles}
+            diasHabilesEdicion={diasHabilesEdicion}
+            saving={saving}
+            message={message}
+            onEditarDiasHabiles={iniciarEdicionDiasHabiles}
+            onCambiarDiasHabiles={(numeroMes, valor) => setDiasHabilesEdicion(actual => ({ ...actual, [numeroMes]: valor }))}
+            onGuardarDiasHabiles={guardarDiasHabiles}
+            onCancelarDiasHabiles={() => {
+              setEditandoDiasHabiles(false);
+              setMessage("");
+            }}
+          />
+        )}
       </section>
     </div>
   );
 }
 
-function TablaIndicadores({ indicadores }: { indicadores: IndicadorCuidadosCriticos[] }) {
+function TablaIndicadores({ indicadores, mostrarFormulas, onCambiarFormulas }: { indicadores: IndicadorCuidadosCriticos[]; mostrarFormulas: boolean; onCambiarFormulas: () => void }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
       <table className="min-w-full text-left text-xs">
         <thead className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
           <tr>
             <th className="px-3 py-2">ID</th>
-            <th className="px-3 py-2">Indicador</th>
+            <th className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span>Indicador</span>
+                <button
+                  type="button"
+                  onClick={onCambiarFormulas}
+                  className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  {mostrarFormulas ? "Ocultar formulas" : "Ver formulas"}
+                </button>
+              </div>
+            </th>
             <th className="px-3 py-2 text-right">Numerador</th>
             <th className="px-3 py-2 text-right">Denominador</th>
             <th className="px-3 py-2 text-right">Resultado</th>
@@ -316,7 +282,11 @@ function TablaIndicadores({ indicadores }: { indicadores: IndicadorCuidadosCriti
           {indicadores.map(indicador => (
             <tr key={indicador.id} className="text-slate-700 dark:text-slate-300">
               <td className="px-3 py-2 font-mono">{indicador.id}</td>
-              <td className="max-w-xl px-3 py-2">{indicador.nombre}{indicador.nota && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">{indicador.nota}</p>}</td>
+              <td className="max-w-xl px-3 py-2">
+                {indicador.nombre}
+                {mostrarFormulas && <p className="mt-1 font-mono text-[10px] leading-4 text-slate-500 dark:text-slate-400">{FORMULAS_INDICADORES[indicador.id]}</p>}
+                {indicador.nota && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">{indicador.nota}</p>}
+              </td>
               <td className="px-3 py-2 text-right font-mono">{numeroTabla(indicador.numerador)}</td>
               <td className="px-3 py-2 text-right font-mono">{numeroTabla(indicador.denominador)}</td>
               <td className="px-3 py-2 text-right font-mono font-semibold">{resultadoTabla(indicador)}</td>
@@ -329,7 +299,31 @@ function TablaIndicadores({ indicadores }: { indicadores: IndicadorCuidadosCriti
   );
 }
 
-function TablaDatosBase({ datos }: { datos: DatoBaseCuidadosCriticos[] }) {
+function TablaDatosBase({
+  datos,
+  anio,
+  esAdmin,
+  editandoDiasHabiles,
+  diasHabilesEdicion,
+  saving,
+  message,
+  onEditarDiasHabiles,
+  onCambiarDiasHabiles,
+  onGuardarDiasHabiles,
+  onCancelarDiasHabiles,
+}: {
+  datos: DatoBaseCuidadosCriticos[];
+  anio: number;
+  esAdmin: boolean;
+  editandoDiasHabiles: boolean;
+  diasHabilesEdicion: Record<number, string>;
+  saving: boolean;
+  message: string;
+  onEditarDiasHabiles: () => void;
+  onCambiarDiasHabiles: (numeroMes: number, valor: string) => void;
+  onGuardarDiasHabiles: () => void;
+  onCancelarDiasHabiles: () => void;
+}) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
       <table className="min-w-[1320px] text-left text-xs">
@@ -342,30 +336,52 @@ function TablaDatosBase({ datos }: { datos: DatoBaseCuidadosCriticos[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-          {datos.map(row => (
+          {datos.map(row => {
+            const esFilaDiasHabiles = row.descriptor === "Total de dias habiles del periodo";
+            const tieneTablaOficial = MESES_INDICADORES.some((_, indice) => diasHabilesOficiales(anio, indice + 1));
+            return (
             <tr key={row.descriptor} className="text-slate-700 dark:text-slate-300">
               <td className="sticky left-0 z-10 max-w-[420px] bg-white px-3 py-2 font-semibold dark:bg-slate-900">
                 {row.descriptor}
                 {row.nota && <p className="mt-1 text-[11px] font-normal text-amber-600 dark:text-amber-300">{row.nota}</p>}
+                {esFilaDiasHabiles && esAdmin && !tieneTablaOficial && (
+                  <div className="mt-1 flex flex-wrap gap-1.5 font-normal">
+                    {editandoDiasHabiles ? (
+                      <>
+                        <button type="button" onClick={onGuardarDiasHabiles} disabled={saving} className="inline-flex items-center gap-1 rounded border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950">
+                          <Save size={12} /> {saving ? "Guardando" : "Guardar"}
+                        </button>
+                        <button type="button" onClick={onCancelarDiasHabiles} className="rounded border border-slate-200 px-2 py-1 text-[11px] dark:border-slate-700">Cancelar</button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={onEditarDiasHabiles} className="rounded border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950">Editar</button>
+                    )}
+                    {message && <span className="text-[11px] text-slate-500">{message}</span>}
+                  </div>
+                )}
               </td>
-              {row.valores.map((valor, index) => (
-                <td key={`${row.descriptor}-${index}`} className="px-3 py-2 text-right font-mono">
-                  {valor}
-                </td>
-              ))}
+              {row.valores.map((valor, index) => {
+                const numeroMes = index + 1;
+                const puedeEditarCelda = esFilaDiasHabiles && editandoDiasHabiles && !diasHabilesOficiales(anio, numeroMes);
+                return (
+                  <td key={`${row.descriptor}-${index}`} className="px-3 py-2 text-right font-mono">
+                    {puedeEditarCelda ? (
+                      <input
+                        type="number"
+                        min={1}
+                        value={diasHabilesEdicion[numeroMes] ?? (valor === "-" ? "" : String(valor))}
+                        onChange={event => onCambiarDiasHabiles(numeroMes, event.target.value)}
+                        className="w-14 rounded border border-slate-300 bg-white px-1 py-0.5 text-right text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    ) : valor}
+                  </td>
+                );
+              })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
-      <p className="text-[11px] font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold leading-none text-slate-900 dark:text-slate-100">{value}</p>
     </div>
   );
 }
