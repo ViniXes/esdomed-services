@@ -106,6 +106,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/dashboard/emergencia", label: "Atendidos en emergencia", icon: Ambulance, group: G_PACIENTES }]
       : []),
     ...(verPacientes
+      ? [{ href: "/dashboard/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse, group: G_PACIENTES }]
+      : []),
+    ...(verPacientes
       ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
       : []),
     ...(verCuidadosCriticos

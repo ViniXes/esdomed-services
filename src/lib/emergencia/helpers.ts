@@ -16,6 +16,35 @@ export const INGRESO_BADGE: Record<IngresoHospitalizacion, string> = {
   sin_dato: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700",
 };
 
+// ── Condición de egreso de emergencia (columna "Tipo de egreso") ──────────────
+// El reporte trae "Vivo" cuando egresa de emergencia; vacío cuando ingresó a
+// hospitalización (no egresó de emergencia). El término de defunción se normaliza
+// de forma defensiva (no hubo muestra en el reporte de ejemplo).
+
+export type CondicionEgresoEmergencia = "vivo" | "fallecido" | "otro" | "sin_dato";
+
+export function condicionEgreso(tipoEgreso?: string): CondicionEgresoEmergencia {
+  const s = (tipoEgreso ?? "").toLowerCase().trim();
+  if (!s) return "sin_dato";
+  if (s.includes("vivo")) return "vivo";
+  if (/falleci|muert|defun|[óo]bito/.test(s)) return "fallecido";
+  return "otro";
+}
+
+export const CONDICION_LABEL: Record<CondicionEgresoEmergencia, string> = {
+  vivo:      "Vivo",
+  fallecido: "Fallecido",
+  otro:      "Otro",
+  sin_dato:  "Sin dato",
+};
+
+export const CONDICION_BADGE: Record<CondicionEgresoEmergencia, string> = {
+  vivo:      "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900",
+  fallecido: "bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900",
+  otro:      "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900",
+  sin_dato:  "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700",
+};
+
 /**
  * Color de triage según el texto de "Categorización" ("3 - Verde", "2 - Amarillo"…).
  * Devuelve clases tailwind para un punto/badge; null si no se reconoce.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   collection, query, orderBy, onSnapshot, limit, where, getDocs,
@@ -8,23 +8,33 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Ambulance, Search, ChevronLeft, ChevronRight, Upload, X,
+  Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
   ArrowUpRight, Stethoscope,
 } from "lucide-react";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
 import { toDate, formatFechaHora } from "@/lib/pacientes/helpers";
-import { INGRESO_BADGE, INGRESO_LABEL, triageBadge } from "@/lib/emergencia/helpers";
+import {
+  INGRESO_BADGE, INGRESO_LABEL, triageBadge,
+  condicionEgreso, CONDICION_BADGE, CONDICION_LABEL, type CondicionEgresoEmergencia,
+} from "@/lib/emergencia/helpers";
 
-type FiltroIngreso = "no" | "si" | "todos";
-
-const FILTROS: { value: FiltroIngreso; label: string }[] = [
-  { value: "no",     label: "No ingresaron" },
-  { value: "si",     label: "Ingresaron" },
-  { value: "todos",  label: "Todos" },
-];
+type Vista = "atendidos" | "egresos";
 
 const LIMIT = 500;
 const PAGE_SIZE = 50;
+
+const FILTROS_ATENDIDOS: { value: string; label: string }[] = [
+  { value: "no",    label: "No ingresaron" },
+  { value: "si",    label: "Ingresaron" },
+  { value: "todos", label: "Todos" },
+];
+
+const FILTROS_EGRESOS: { value: string; label: string }[] = [
+  { value: "todos",     label: "Todos" },
+  { value: "vivo",      label: "Vivos" },
+  { value: "fallecido", label: "Fallecidos" },
+  { value: "otro",      label: "Otros" },
+];
 
 interface Props {
   /** Muestra el botón "Importar reporte" (solo ESDOMED/admin). */
@@ -32,13 +42,17 @@ interface Props {
   /** Construye el enlace a la ficha del paciente activo (trazabilidad). Si no se
    *  pasa, solo se muestra la insignia sin enlace (p. ej. en el portal médico). */
   fichaHref?: (pacienteId: string) => string;
+  /** "atendidos" = todos los atendidos (filtro por ingreso). "egresos" = solo los
+   *  que NO ingresaron, filtrados por condición de egreso (vivo / fallecido). */
+  vista?: Vista;
 }
 
-export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Props) {
+export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista = "atendidos" }: Props) {
   const { profile } = useAuth();
+  const esEgresos = vista === "egresos";
   const [atenciones, setAtenciones] = useState<AtencionEmergencia[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtro, setFiltro] = useState<FiltroIngreso>("no");
+  const [filtro, setFiltro] = useState<string>(esEgresos ? "todos" : "no");
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -83,7 +97,6 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
             query(collection(db, "pacientes"), where("expediente", "in", chunk)),
           );
           snap.forEach((d) => {
-            // Basta un ingreso cualquiera para enlazar a la ficha de la persona.
             if (!mapa.has(d.data().expediente)) mapa.set(d.data().expediente, d.id);
           });
         }
@@ -95,14 +108,31 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
     return () => { cancelado = true; };
   }, [profile, atenciones]);
 
+  // En egresos, el universo son los que NO ingresaron a hospitalización (egresaron
+  // de emergencia). En atendidos, son todas las atenciones.
+  const base = useMemo(
+    () => (esEgresos ? atenciones.filter((a) => a.ingresoHospitalizacion !== "si") : atenciones),
+    [atenciones, esEgresos],
+  );
+
+  // En egresos la fecha relevante es la de alta; en atendidos, la de ingreso a emergencia.
+  const fechaDe = useCallback(
+    (a: AtencionEmergencia) => (esEgresos ? (a.fechaHoraAltaIngreso ?? a.fechaHoraIngreso) : a.fechaHoraIngreso),
+    [esEgresos],
+  );
+
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
     const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
     const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
-    return atenciones.filter((a) => {
-      if (filtro !== "todos" && a.ingresoHospitalizacion !== filtro) return false;
-      if (desde && a.fechaHoraIngreso < desde) return false;
-      if (hasta && a.fechaHoraIngreso > hasta) return false;
+    return base.filter((a) => {
+      if (filtro !== "todos") {
+        if (esEgresos) { if (condicionEgreso(a.tipoEgreso) !== filtro) return false; }
+        else if (a.ingresoHospitalizacion !== filtro) return false;
+      }
+      const fecha = fechaDe(a);
+      if (desde && fecha < desde) return false;
+      if (hasta && fecha > hasta) return false;
       if (!term) return true;
       return (
         a.expediente?.toLowerCase().includes(term) ||
@@ -110,7 +140,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
         a.pacienteNombre?.toLowerCase().includes(term)
       ) ?? false;
     });
-  }, [atenciones, filtro, busqueda, fechaDesde, fechaHasta]);
+  }, [base, filtro, busqueda, fechaDesde, fechaHasta, esEgresos, fechaDe]);
 
   // Reset de página al cambiar filtros.
   const filtrosKey = `${filtro}|${busqueda}|${fechaDesde}|${fechaHasta}`;
@@ -120,27 +150,48 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const paginados = filtrados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const conteo = useMemo(() => {
+  const conteoAtendidos = useMemo(() => {
     const c: Record<IngresoHospitalizacion, number> = { no: 0, si: 0, sin_dato: 0 };
-    atenciones.forEach((a) => { c[a.ingresoHospitalizacion]++; });
+    base.forEach((a) => { c[a.ingresoHospitalizacion]++; });
     return c;
-  }, [atenciones]);
+  }, [base]);
+
+  const conteoEgresos = useMemo(() => {
+    const c: Record<CondicionEgresoEmergencia, number> = { vivo: 0, fallecido: 0, otro: 0, sin_dato: 0 };
+    base.forEach((a) => { c[condicionEgreso(a.tipoEgreso)]++; });
+    return c;
+  }, [base]);
+
+  const filtros = esEgresos ? FILTROS_EGRESOS : FILTROS_ATENDIDOS;
+  const contarTab = (value: string): number => {
+    if (value === "todos") return base.length;
+    return esEgresos
+      ? conteoEgresos[value as CondicionEgresoEmergencia]
+      : conteoAtendidos[value as IngresoHospitalizacion];
+  };
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900">
-            <Ambulance size={17} className="text-rose-600 dark:text-rose-400" />
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+            esEgresos
+              ? "bg-violet-50 dark:bg-violet-950 border-violet-200 dark:border-violet-900"
+              : "bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900"
+          }`}>
+            {esEgresos
+              ? <HeartPulse size={17} className="text-violet-600 dark:text-violet-400" />
+              : <Ambulance size={17} className="text-rose-600 dark:text-rose-400" />}
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
-              Atendidos en emergencia
+              {esEgresos ? "Egresos de emergencia" : "Atendidos en emergencia"}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Pacientes que pasaron por emergencia. Por defecto se muestran los que
-              <span className="font-medium"> no ingresaron</span> a hospitalización.
+              {esEgresos
+                ? "Pacientes que egresaron desde emergencia (sin ingresar), por condición de alta."
+                : <>Pacientes que pasaron por emergencia. Por defecto se muestran los que <span className="font-medium">no ingresaron</span> a hospitalización.</>}
             </p>
           </div>
         </div>
@@ -157,7 +208,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        {FILTROS.map((f) => (
+        {filtros.map((f) => (
           <button
             key={f.value}
             onClick={() => setFiltro(f.value)}
@@ -168,9 +219,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
             }`}
           >
             {f.label}
-            <span className="ml-1.5 text-xs opacity-70 tabular-nums">
-              {f.value === "todos" ? atenciones.length : conteo[f.value]}
-            </span>
+            <span className="ml-1.5 text-xs opacity-70 tabular-nums">{contarTab(f.value)}</span>
           </button>
         ))}
       </div>
@@ -188,7 +237,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Ingreso desde</span>
+          <span className="text-xs text-slate-500 shrink-0">{esEgresos ? "Alta desde" : "Ingreso desde"}</span>
           <input
             type="date"
             value={fechaDesde}
@@ -237,16 +286,17 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                   <Th>Expediente</Th>
                   <Th>Paciente</Th>
-                  <Th>Ingreso a emergencia</Th>
-                  <Th>Triage</Th>
+                  <Th>{esEgresos ? "Fecha de alta" : "Ingreso a emergencia"}</Th>
+                  {!esEgresos && <Th>Triage</Th>}
                   <Th>Diagnóstico</Th>
-                  <Th>Hospitalización</Th>
+                  <Th>{esEgresos ? "Condición" : "Hospitalización"}</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginados.map((a) => {
                   const pacienteId = ingresosPorExp.get(a.expediente);
                   const triage = triageBadge(a.categorizacion);
+                  const cond = condicionEgreso(a.tipoEgreso);
                   return (
                     <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors align-top">
                       <td className="px-4 py-3">
@@ -261,38 +311,48 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref }: Pro
                         </p>
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs whitespace-nowrap">
-                        {formatFechaHora(a.fechaHoraIngreso)}
-                        {a.llegaReferido && (
+                        {formatFechaHora(fechaDe(a))}
+                        {!esEgresos && a.llegaReferido && (
                           <span className="block text-[11px] text-sky-600 dark:text-sky-400 mt-0.5">Referido</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {a.categorizacion ? (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${triage ?? "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
-                            {a.categorizacion}
-                          </span>
-                        ) : <span className="text-slate-400 text-xs">—</span>}
-                      </td>
+                      {!esEgresos && (
+                        <td className="px-4 py-3">
+                          {a.categorizacion ? (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${triage ?? "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
+                              {a.categorizacion}
+                            </span>
+                          ) : <span className="text-slate-400 text-xs">—</span>}
+                        </td>
+                      )}
                       <td className="px-4 py-3 max-w-[240px]">
                         <p className="text-slate-700 dark:text-slate-300 text-xs line-clamp-2">{a.diagnostico || "—"}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${INGRESO_BADGE[a.ingresoHospitalizacion]}`}>
-                          {INGRESO_LABEL[a.ingresoHospitalizacion]}
-                        </span>
-                        {pacienteId && (
-                          fichaHref ? (
-                            <Link
-                              href={fichaHref(pacienteId)}
-                              className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 mt-1"
-                            >
-                              <ArrowUpRight size={11} /> Ver ficha
-                            </Link>
-                          ) : (
-                            <span className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
-                              <Stethoscope size={11} /> Registrado en padrón
+                        {esEgresos ? (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${CONDICION_BADGE[cond]}`}>
+                            {CONDICION_LABEL[cond]}
+                          </span>
+                        ) : (
+                          <>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${INGRESO_BADGE[a.ingresoHospitalizacion]}`}>
+                              {INGRESO_LABEL[a.ingresoHospitalizacion]}
                             </span>
-                          )
+                            {pacienteId && (
+                              fichaHref ? (
+                                <Link
+                                  href={fichaHref(pacienteId)}
+                                  className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 mt-1"
+                                >
+                                  <ArrowUpRight size={11} /> Ver ficha
+                                </Link>
+                              ) : (
+                                <span className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
+                                  <Stethoscope size={11} /> Registrado en padrón
+                                </span>
+                              )
+                            )}
+                          </>
                         )}
                       </td>
                     </tr>
