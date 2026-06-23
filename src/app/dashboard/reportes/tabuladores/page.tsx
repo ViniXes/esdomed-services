@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Table2, Download, AlertTriangle, HeartPulse, LogOut, BedDouble } from "lucide-react";
 import type { EstadoPaciente, Genero, Paciente } from "@/types";
 import { DateField } from "@/components/ui/DateField";
+import { calcularEdad, diasEstancia, formatFecha, nombreCompleto, toDate, ESTADO_LABEL } from "@/lib/pacientes/helpers";
 
 type Tab = "vivos" | "fallecidos" | "activos";
 
@@ -103,7 +104,15 @@ export default function TabuladoresPage() {
         );
         const snap = await getDocs(q);
         if (cancelado) return;
-        setEgresos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Paciente)));
+        setEgresos(snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id, ...data,
+            fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+            fechaEgreso: toDate(data.fechaEgreso),
+            fechaNacimiento: toDate(data.fechaNacimiento),
+          } as Paciente;
+        }));
       } catch (e) {
         if (!cancelado) setError(`No se pudo cargar el reporte: ${e instanceof Error ? e.message : "error"}`);
       } finally {
@@ -117,24 +126,45 @@ export default function TabuladoresPage() {
   useEffect(() => {
     if (!esEsdomed) return;
     const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    return onSnapshot(q, (snap) => setActivos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Paciente))));
+    return onSnapshot(q, (snap) => setActivos(snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id, ...data,
+        fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+        fechaNacimiento: toDate(data.fechaNacimiento),
+      } as Paciente;
+    })));
   }, [esEsdomed]);
 
-  // Pivote según la pestaña activa.
-  const { columnas, pivote, titulo } = useMemo(() => {
+  // Filtro de detalle por servicio (se setea al hacer clic en una fila del tabulador).
+  const [servicioFiltro, setServicioFiltro] = useState("");
+  const resetKey = `${tab}|${fechaDesde}|${fechaHasta}`;
+  const [resetKeyPrev, setResetKeyPrev] = useState(resetKey);
+  if (resetKeyPrev !== resetKey) { setResetKeyPrev(resetKey); setServicioFiltro(""); }
+
+  // Pivote + lista de pacientes (items) según la pestaña activa.
+  const { items, columnas, pivote, titulo } = useMemo(() => {
     if (tab === "vivos") {
       const items = egresos.filter((p) => ESTADOS_VIVO.includes(p.estado));
       const columnas: ColDef[] = MODALIDADES_VIVO.map((m) => ({ key: m.key, label: m.label }));
-      return { columnas, pivote: pivotar(items, columnas, (p) => p.estado), titulo: "Egresos vivos por servicio y modalidad" };
+      return { items, columnas, pivote: pivotar(items, columnas, (p) => p.estado), titulo: "Egresos vivos por servicio y modalidad" };
     }
     if (tab === "fallecidos") {
       const items = egresos.filter((p) => p.estado === "alta_fallecido");
       const columnas = sexoCols(items);
-      return { columnas, pivote: pivotar(items, columnas, (p) => generoDe(p.genero)), titulo: "Egresos fallecidos por servicio y sexo" };
+      return { items, columnas, pivote: pivotar(items, columnas, (p) => generoDe(p.genero)), titulo: "Egresos fallecidos por servicio y sexo" };
     }
     const columnas = sexoCols(activos);
-    return { columnas, pivote: pivotar(activos, columnas, (p) => generoDe(p.genero)), titulo: "Pacientes activos por servicio y sexo" };
+    return { items: activos, columnas, pivote: pivotar(activos, columnas, (p) => generoDe(p.genero)), titulo: "Pacientes activos por servicio y sexo" };
   }, [tab, egresos, activos]);
+
+  const detalle = useMemo(() => {
+    const lista = servicioFiltro
+      ? items.filter((p) => (p.servicioActual || "Sin servicio").trim() === servicioFiltro)
+      : items;
+    const fechaOrden = (p: Paciente) => (esActivos ? p.fechaIngreso : p.fechaEgreso ?? p.fechaIngreso);
+    return [...lista].sort((a, b) => (fechaOrden(b)?.getTime() ?? 0) - (fechaOrden(a)?.getTime() ?? 0));
+  }, [items, servicioFiltro, esActivos]);
 
   const exportarExcel = async () => {
     setExportando(true);
@@ -149,9 +179,35 @@ export default function TabuladoresPage() {
       ];
       pivote.filas.forEach((f) => aoa.push([f.servicio, ...columnas.map((c) => f.cols[c.key] ?? 0), f.total]));
       aoa.push(["Total", ...columnas.map((c) => pivote.totCols[c.key] ?? 0), pivote.totalGeneral]);
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, tab === "vivos" ? "Egresos vivos" : tab === "fallecidos" ? "Egresos fallecidos" : "Activos");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Resumen");
+
+      // Hoja Detalle — un renglón por paciente (los que generan los números).
+      const detalleRows = items.map((p) => {
+        const edad = calcularEdad(p.fechaNacimiento);
+        const estancia = esActivos
+          ? diasEstancia(p.fechaIngreso)
+          : (p.diasEstancia ?? (p.fechaEgreso ? diasEstancia(p.fechaIngreso, p.fechaEgreso) : ""));
+        const fila: Record<string, string | number> = {
+          Expediente: p.expediente,
+          Paciente: nombreCompleto(p),
+          Sexo: p.genero === "masculino" ? "M" : p.genero === "femenino" ? "F" : "O",
+          Edad: edad ?? "",
+          Servicio: p.servicioActual ?? "",
+          Cama: p.camaActual ?? "",
+          "Fecha de ingreso": p.fechaIngreso ? formatFecha(p.fechaIngreso) : "",
+        };
+        if (!esActivos) {
+          fila["Fecha de egreso"] = p.fechaEgreso ? formatFecha(p.fechaEgreso) : "";
+          fila["Tipo de alta"] = ESTADO_LABEL[p.estado];
+          fila["Diagnóstico de egreso"] = p.diagnosticoEgreso?.descripcion ?? "";
+          fila["Médico de egreso"] = p.medicoEgresoNombre ?? "";
+        }
+        fila["Estancia (días)"] = estancia;
+        return fila;
+      });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalleRows), "Detalle");
+
       const nombre = esActivos ? "activos_por_servicio" : `${tab}_${fechaDesde}_a_${fechaHasta}`;
       XLSX.writeFile(wb, `${nombre}.xlsx`);
     } catch (e) {
@@ -261,8 +317,12 @@ export default function TabuladoresPage() {
               </p>
             </div>
           ) : (
+            <>
             <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-4 pt-4 pb-3 font-heading">{titulo}</h3>
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-4 pt-4 pb-3 font-heading">
+                {titulo}
+                <span className="ml-2 font-normal text-slate-400">· toca un servicio para ver su detalle</span>
+              </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -274,7 +334,13 @@ export default function TabuladoresPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {pivote.filas.map((f) => (
-                      <tr key={f.servicio} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <tr
+                        key={f.servicio}
+                        onClick={() => setServicioFiltro((s) => (s === f.servicio ? "" : f.servicio))}
+                        className={`cursor-pointer transition-colors ${
+                          servicioFiltro === f.servicio ? "bg-blue-50 dark:bg-blue-950/40" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                        }`}
+                      >
                         <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">{f.servicio}</td>
                         {columnas.map((c) => (
                           <td key={c.key} className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-400 tabular-nums">{f.cols[c.key] ?? 0}</td>
@@ -295,10 +361,97 @@ export default function TabuladoresPage() {
                 </table>
               </div>
             </section>
+
+            {/* Detalle: los pacientes que generan los números */}
+            <DetalleTabla
+              items={detalle}
+              esActivos={esActivos}
+              servicioFiltro={servicioFiltro}
+              totalItems={items.length}
+              onClear={() => setServicioFiltro("")}
+            />
+            </>
           )}
         </>
       )}
     </div>
+  );
+}
+
+function DetalleTabla({
+  items, esActivos, servicioFiltro, totalItems, onClear,
+}: {
+  items: Paciente[];
+  esActivos: boolean;
+  servicioFiltro: string;
+  totalItems: number;
+  onClear: () => void;
+}) {
+  return (
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
+          Detalle de pacientes
+          <span className="ml-2 font-normal text-slate-400">
+            {servicioFiltro ? `· ${servicioFiltro}` : "· todos los servicios"} ({items.length}{!servicioFiltro && items.length !== totalItems ? ` de ${totalItems}` : ""})
+          </span>
+        </h3>
+        {servicioFiltro && (
+          <button onClick={onClear} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500">
+            Ver todos
+          </button>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-y border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+              <Th>Expediente</Th>
+              <Th>Paciente</Th>
+              <Th>Servicio / Cama</Th>
+              <Th>{esActivos ? "Ingreso" : "Egreso"}</Th>
+              <Th center>Estancia</Th>
+              {!esActivos && <Th>Tipo de alta</Th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {items.map((p) => {
+              const edad = calcularEdad(p.fechaNacimiento);
+              const dias = esActivos
+                ? diasEstancia(p.fechaIngreso)
+                : (p.diasEstancia ?? (p.fechaEgreso ? diasEstancia(p.fechaIngreso, p.fechaEgreso) : null));
+              return (
+                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-4 py-2.5 font-mono text-slate-700 dark:text-slate-300">{p.expediente}</td>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-slate-800 dark:text-slate-200">{nombreCompleto(p)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {edad !== null ? `${edad} años` : "—"}
+                      {p.genero && <> · {p.genero === "masculino" ? "M" : p.genero === "femenino" ? "F" : "O"}</>}
+                    </p>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <p className="text-slate-700 dark:text-slate-300">{p.servicioActual}</p>
+                    {p.camaActual && <p className="text-xs text-slate-500 mt-0.5">Cama {p.camaActual}</p>}
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400 text-xs whitespace-nowrap">
+                    {formatFecha(esActivos ? p.fechaIngreso : p.fechaEgreso)}
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-400 text-xs">
+                    {dias !== null ? `${dias} ${dias === 1 ? "día" : "días"}` : "—"}
+                  </td>
+                  {!esActivos && (
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs text-slate-600 dark:text-slate-300">{ESTADO_LABEL[p.estado]}</span>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
