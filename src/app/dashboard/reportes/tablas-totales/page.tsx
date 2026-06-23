@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LayoutGrid, Users, Download, AlertTriangle, BedDouble } from "lucide-react";
+import { LayoutGrid, Users, Download, AlertTriangle, BedDouble, Printer, ArrowLeft } from "lucide-react";
 import type { Genero, Paciente } from "@/types";
 
 interface FilaServicio {
@@ -42,6 +42,7 @@ export default function TablasTotalesPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
+  const [mostrarPDF, setMostrarPDF] = useState(false);
 
   useEffect(() => {
     if (!authLoading && profile && !esEsdomed) router.replace("/dashboard");
@@ -115,7 +116,8 @@ export default function TablasTotalesPage() {
   if (!esEsdomed) return null;
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <>
+    <div className={`p-4 md:p-6 max-w-7xl mx-auto space-y-5 ${mostrarPDF ? "print:hidden" : ""}`}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -130,15 +132,26 @@ export default function TablasTotalesPage() {
             <p className="text-xs text-slate-500">Pacientes ingresados por servicio, con desglose por sexo</p>
           </div>
         </div>
-        <button
-          onClick={exportarExcel}
-          disabled={exportando || cargando || filas.length === 0}
-          className="flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-opacity hover:opacity-90 disabled:opacity-50 shadow-sm"
-          style={{ background: NAVY }}
-        >
-          <Download size={15} />
-          {exportando ? "Generando..." : "Exportar a Excel"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMostrarPDF(true)}
+            disabled={cargando || filas.length === 0}
+            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl border transition-colors disabled:opacity-50"
+            style={{ borderColor: `${NAVY}40`, color: dark ? ARENA : NAVY }}
+          >
+            <Printer size={15} />
+            Exportar PDF
+          </button>
+          <button
+            onClick={exportarExcel}
+            disabled={exportando || cargando || filas.length === 0}
+            className="flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-opacity hover:opacity-90 disabled:opacity-50 shadow-sm"
+            style={{ background: NAVY }}
+          >
+            <Download size={15} />
+            {exportando ? "Generando..." : "Exportar a Excel"}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -223,6 +236,64 @@ export default function TablasTotalesPage() {
         </>
       )}
     </div>
+
+    {/* ── Vista PDF: SOLO las tarjetas (sin la tabla del final) ── */}
+    {mostrarPDF && (
+      <div className="fixed inset-0 z-50 bg-slate-200 overflow-y-auto print:bg-white print:static print:inset-auto print:overflow-visible">
+        {/* Toolbar — oculta al imprimir */}
+        <div className="print:hidden sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <button onClick={() => setMostrarPDF(false)} className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors">
+              <ArrowLeft size={15} /> Cerrar
+            </button>
+            <p className="text-xs text-slate-500">Vista previa — Tarjetas por servicio</p>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+              <Printer size={14} /> Imprimir / Guardar PDF
+            </button>
+          </div>
+        </div>
+
+        {/* Hoja */}
+        <div className="py-6 px-4 print:p-0">
+          <div className="tablas-pdf bg-white shadow-lg max-w-[27cm] mx-auto print:shadow-none print:max-w-none p-8 print:p-0 text-slate-900">
+            <div className="flex items-end justify-between border-b-2 pb-3 mb-4" style={{ borderColor: NAVY }}>
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: NAVY }}>Pacientes ingresados por servicio</h2>
+                <p className="text-xs text-slate-500">
+                  Hospital Nacional El Salvador · {new Date().toLocaleDateString("es-SV", { day: "2-digit", month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-3xl font-bold leading-none text-slate-900 tabular-nums">{totales.total}</p>
+                <p className="text-[11px] text-slate-500">ingresados · {filas.length} servicios</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-slate-600 mb-4">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: PALETA.light.m }} /> Masculino {totales.masculino}</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: PALETA.light.f }} /> Femenino {totales.femenino}</span>
+              {tieneOtro && <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: PALETA.light.otro }} /> Otro {totales.otro}</span>}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {filas.map((f) => <TarjetaPrint key={f.servicio} fila={f} tieneOtro={tieneOtro} />)}
+            </div>
+          </div>
+        </div>
+
+        <style jsx global>{`
+          @media print {
+            @page { size: A4 landscape; margin: 12mm; }
+            aside, [class*="md:hidden fixed top-0"] { display: none !important; }
+            main { padding: 0 !important; overflow: visible !important; }
+            html, body { background: white !important; }
+          }
+          .tablas-pdf, .tablas-pdf * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        `}</style>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -249,7 +320,9 @@ function TarjetaServicio({ fila, tieneOtro, col }: { fila: FilaServicio; tieneOt
   );
 }
 
-function Donut({ m, f, otro, total, col }: { m: number; f: number; otro: number; total: number; col: Col }) {
+function Donut({ m, f, otro, total, col, textClassName = "fill-slate-900 dark:fill-slate-100" }: {
+  m: number; f: number; otro: number; total: number; col: Col; textClassName?: string;
+}) {
   const size = 76, sw = 10, r = (size - sw) / 2, c = 2 * Math.PI * r, cx = size / 2;
   const segs = [
     { v: m, color: col.m },
@@ -275,7 +348,7 @@ function Donut({ m, f, otro, total, col }: { m: number; f: number; otro: number;
       <text
         x={cx} y={cx} transform={`rotate(90 ${cx} ${cx})`}
         textAnchor="middle" dominantBaseline="central"
-        className="fill-slate-900 dark:fill-slate-100 font-bold" fontSize="20"
+        className={`${textClassName} font-bold`} fontSize="20"
       >
         {total}
       </text>
@@ -289,6 +362,35 @@ function Leyenda({ color, label, value }: { color: string; label: string; value:
       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
       <span className="text-slate-500 flex-1">{label}</span>
       <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+// Tarjeta para la vista PDF: colores fijos claros (independiente del tema) para
+// que el impreso salga siempre legible sobre hoja blanca.
+function TarjetaPrint({ fila, tieneOtro }: { fila: FilaServicio; tieneOtro: boolean }) {
+  return (
+    <div className="border border-slate-300 rounded-xl p-3 flex items-center gap-3 break-inside-avoid">
+      <Donut m={fila.masculino} f={fila.femenino} otro={fila.otro} total={fila.total} col={PALETA.light} textClassName="fill-slate-900" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-slate-900 text-[13px] leading-snug truncate" title={fila.servicio}>{fila.servicio}</p>
+        <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">{fila.total} ingresado{fila.total === 1 ? "" : "s"}</p>
+        <div className="flex flex-col gap-1">
+          <LeyendaPrint color={PALETA.light.m} label="Masculino" value={fila.masculino} />
+          <LeyendaPrint color={PALETA.light.f} label="Femenino" value={fila.femenino} />
+          {tieneOtro && fila.otro > 0 && <LeyendaPrint color={PALETA.light.otro} label="Otro" value={fila.otro} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeyendaPrint({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+      <span className="text-slate-500 flex-1">{label}</span>
+      <span className="font-semibold text-slate-900 tabular-nums">{value}</span>
     </div>
   );
 }
