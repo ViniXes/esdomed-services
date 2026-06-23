@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown, Search, User2, X } from "lucide-react";
 import type { Paciente, SolicitudAnexo5 } from "@/types";
-import { CIRCUNSTANCIA_LABEL, calcularEdad, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
+import { calcularEdad, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
@@ -63,7 +63,6 @@ export default function NuevaAnexo5Page() {
   const { user, profile } = useAuth();
 
   const [form, setForm] = useState({
-    fecha: "",
     expediente: "",
     nombrePaciente: "",
     referidoDe: "",
@@ -126,19 +125,16 @@ export default function NuevaAnexo5Page() {
       } as Paciente;
       setPacienteEncontrado(p);
 
-      // "Referido de": si vino referido y tenemos el establecimiento de procedencia
-      // lo usamos; si no, la circunstancia de ingreso (demanda espontánea / emergencia).
-      const referido =
-        p.circunstanciaIngreso === "referido" && p.establecimientoProcedencia
-          ? p.establecimientoProcedencia
-          : p.circunstanciaIngreso
-            ? CIRCUNSTANCIA_LABEL[p.circunstanciaIngreso]
-            : "";
+      // "Referido de": si el paciente trae hospital de referencia (establecimiento
+      // de procedencia) lo usamos; si no, por defecto "DEMANDA ESPONTANEA".
+      const referido = p.establecimientoProcedencia?.trim()
+        ? p.establecimientoProcedencia
+        : "DEMANDA ESPONTANEA";
 
       setForm((prev) => ({
         ...prev,
         nombrePaciente: nombreCompleto(p),
-        ...(referido && !prev.referidoDe.trim() ? { referidoDe: referido } : {}),
+        referidoDe: referido,
       }));
     } catch (e) {
       setBusquedaExpInfo(`Error al buscar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -166,7 +162,6 @@ export default function NuevaAnexo5Page() {
 
         ...(form.expediente.trim() && { expediente: form.expediente.trim().toUpperCase() }),
 
-        ...(form.fecha && { fecha: form.fecha }),
         nombrePaciente: form.nombrePaciente.toUpperCase(),
         referidoDe: form.referidoDe.toUpperCase(),
         establecimientoReferencia: form.establecimientoReferencia.toUpperCase(),
@@ -193,7 +188,6 @@ export default function NuevaAnexo5Page() {
 
   const resetForm = () => {
     setForm({
-      fecha: "",
       expediente: "",
       nombrePaciente: "",
       referidoDe: "",
@@ -277,13 +271,8 @@ export default function NuevaAnexo5Page() {
         <div className="flex-1 overflow-y-auto p-5 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-5 gap-y-4">
 
-            {/* Fila 1: Fecha + Expediente */}
-            <div>
-              <label className={lbl}>Fecha <span className="font-normal text-slate-400">(opcional — puede llenarse a mano)</span></label>
-              <input type="date" className={inputCls} value={form.fecha}
-                onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-            </div>
-            <div className="md:col-span-2">
+            {/* Fila 1: Expediente */}
+            <div className="md:col-span-3">
               <label className={lbl}>
                 Expediente
                 <span className="ml-1.5 font-normal text-slate-400">(autocompleta los datos del paciente — no aparece en el impreso)</span>

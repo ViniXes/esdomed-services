@@ -15,12 +15,23 @@ export function parseDateInput(s: string): Date {
 
 // ── Cálculo de fechas ────────────────────────────────────────────────────────
 
+/** Devuelve una copia de la fecha a medianoche local (sin hora). */
+function aMedianocheLocal(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 /**
  * Días de hospitalización contados de forma inclusiva (ingreso + alta ambos cuentan).
  * Ej: ingreso 1/1, alta 10/1 → 10 días.
+ *
+ * Se comparan solo los días calendario (medianoche local): `fechaIngreso` suele
+ * traer hora de ingreso (p.ej. 14:30), y al restarla contra una `fechaAlta` a
+ * medianoche el redondeo perdía un día — el día de alta no se contaba.
  */
 export function calcularDiasHospitalizacion(fechaIngreso: Date, fechaAlta: Date): number {
-  return Math.round((fechaAlta.getTime() - fechaIngreso.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const ingreso = aMedianocheLocal(fechaIngreso);
+  const alta = aMedianocheLocal(fechaAlta);
+  return Math.round((alta.getTime() - ingreso.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
 /**
