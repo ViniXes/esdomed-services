@@ -40,6 +40,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
   const [vistaTabla, setVistaTabla] = useState<"indicadores" | "datos">("indicadores");
+  const [mostrarFormulas, setMostrarFormulas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -212,26 +213,7 @@ export default function IndicadoresCuidadosCriticosPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {vistaTabla === "indicadores" && (
-              <details className="rounded-xl border border-slate-200 bg-slate-50 text-xs dark:border-slate-700 dark:bg-slate-950">
-                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 font-semibold text-slate-600 marker:content-none hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
-                  <Calculator size={14} /> Formulas
-                </summary>
-                <div className="max-h-80 w-[min(680px,calc(100vw-3rem))] overflow-y-auto border-t border-slate-200 px-3 py-2 dark:border-slate-700">
-                  <p className="mb-2 text-[11px] text-slate-500">Referencia del calculo aplicado al mes y servicio seleccionados.</p>
-                  <ol className="space-y-1.5 text-[11px] leading-4 text-slate-600 dark:text-slate-300">
-                    {indicadores.map(indicador => (
-                      <li key={`formula-${indicador.id}`}>
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">{indicador.id}. {indicador.nombre}:</span>{" "}
-                        <span className="font-mono">{FORMULAS_INDICADORES[indicador.id]}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              </details>
-            )}
-            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
+          <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
             <button
               type="button"
               onClick={() => setVistaTabla("indicadores")}
@@ -246,10 +228,9 @@ export default function IndicadoresCuidadosCriticosPage() {
             >
               Datos base
             </button>
-            </div>
           </div>
         </div>
-        {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} /> : (
+        {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} mostrarFormulas={mostrarFormulas} onCambiarFormulas={() => setMostrarFormulas(actual => !actual)} /> : (
           <TablaDatosBase
             datos={datosBase}
             anio={anio}
@@ -272,14 +253,25 @@ export default function IndicadoresCuidadosCriticosPage() {
   );
 }
 
-function TablaIndicadores({ indicadores }: { indicadores: IndicadorCuidadosCriticos[] }) {
+function TablaIndicadores({ indicadores, mostrarFormulas, onCambiarFormulas }: { indicadores: IndicadorCuidadosCriticos[]; mostrarFormulas: boolean; onCambiarFormulas: () => void }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
       <table className="min-w-full text-left text-xs">
         <thead className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
           <tr>
             <th className="px-3 py-2">ID</th>
-            <th className="px-3 py-2">Indicador</th>
+            <th className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span>Indicador</span>
+                <button
+                  type="button"
+                  onClick={onCambiarFormulas}
+                  className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  {mostrarFormulas ? "Ocultar formulas" : "Ver formulas"}
+                </button>
+              </div>
+            </th>
             <th className="px-3 py-2 text-right">Numerador</th>
             <th className="px-3 py-2 text-right">Denominador</th>
             <th className="px-3 py-2 text-right">Resultado</th>
@@ -290,7 +282,11 @@ function TablaIndicadores({ indicadores }: { indicadores: IndicadorCuidadosCriti
           {indicadores.map(indicador => (
             <tr key={indicador.id} className="text-slate-700 dark:text-slate-300">
               <td className="px-3 py-2 font-mono">{indicador.id}</td>
-              <td className="max-w-xl px-3 py-2">{indicador.nombre}{indicador.nota && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">{indicador.nota}</p>}</td>
+              <td className="max-w-xl px-3 py-2">
+                {indicador.nombre}
+                {mostrarFormulas && <p className="mt-1 font-mono text-[10px] leading-4 text-slate-500 dark:text-slate-400">{FORMULAS_INDICADORES[indicador.id]}</p>}
+                {indicador.nota && <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">{indicador.nota}</p>}
+              </td>
               <td className="px-3 py-2 text-right font-mono">{numeroTabla(indicador.numerador)}</td>
               <td className="px-3 py-2 text-right font-mono">{numeroTabla(indicador.denominador)}</td>
               <td className="px-3 py-2 text-right font-mono font-semibold">{resultadoTabla(indicador)}</td>
