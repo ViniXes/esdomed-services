@@ -73,6 +73,7 @@ interface ConteosMensuales {
   pacientesEscala: number;
   extubacionAccidental: number;
   pacientesVm: number;
+  pacientesVmEgresados: number;
   complicacionesCvc: number;
   pacientesCvc: number;
   infeccionesCvc: number;
@@ -200,7 +201,7 @@ export function calcularIndicadoresCuidadosCriticos(
     indicador(25, porcentaje(conteos.fallecidos, conteos.totalEgresos), conteos.fallecidos, conteos.totalEgresos),
     indicador(26, porcentaje(conteos.fallecidos48, conteos.totalEgresos), conteos.fallecidos48, conteos.totalEgresos),
     indicador(27, conteos.esperadoApache > 0 ? razon(conteos.fallecidos, conteos.esperadoApache) : null, conteos.fallecidos, conteos.esperadoApache),
-    indicador(28, porcentaje(conteos.muertesVm, conteos.pacientesVm), conteos.muertesVm, conteos.pacientesVm),
+    indicador(28, porcentaje(conteos.muertesVm, conteos.pacientesVmEgresados), conteos.muertesVm, conteos.pacientesVmEgresados),
     indicador(29, porcentaje(conteos.neumonia.muertes, conteos.neumonia.egresos), conteos.neumonia.muertes, conteos.neumonia.egresos),
     indicador(30, porcentaje(conteos.neumoniaVm, conteos.totalEgresos), conteos.neumoniaVm, conteos.totalEgresos),
     indicador(31, porcentaje(conteos.covid.muertes, conteos.covid.egresos), conteos.covid.muertes, conteos.covid.egresos),
@@ -325,7 +326,13 @@ function conteosMensuales(
   const diasCamaOcupados = fichasServicio.reduce((total, ficha) => (
     total + diasCamaOcupadosEnMes(ficha, anio, mes)
   ), 0);
-  const pacientesVm = fichasMes.filter(ficha => numero(ficha.datos?.vmi_dias) > 0 || si(ficha.datos?.intubacion_en_uci) || si(ficha.datos?.intubacion_en_centro_referente)).length;
+  const recibioVm = (ficha: FichaCuidadosCriticos) => (
+    numero(ficha.datos?.vmi_dias) > 0
+    || si(ficha.datos?.intubacion_en_uci)
+    || si(ficha.datos?.intubacion_en_centro_referente)
+  );
+  const pacientesVm = fichasMes.filter(recibioVm).length;
+  const fichasEgresoVm = fichasEgresoMes.filter(recibioVm);
   const pacientesCvc = fichasMes.filter(ficha => si(ficha.datos?.colocacion_cvc_antes_de_uci) || si(ficha.datos?.colocacion_cvc_en_uci)).length;
   const pacientesStu = fichasMes.filter(ficha => si(ficha.datos?.coloc_stu_previo_uci) || si(ficha.datos?.coloc_stu_en_uci)).length;
 
@@ -344,6 +351,7 @@ function conteosMensuales(
     pacientesEscala: fichasMes.filter(ficha => numero(ficha.datos?.apache_ii_ingreso) > 0 || numero(ficha.datos?.apache_iv) > 0 || numero(ficha.datos?.sofa) > 0).length,
     extubacionAccidental: cuentaSi(fichasMes, "extubacion_accidental"),
     pacientesVm,
+    pacientesVmEgresados: fichasEgresoVm.length,
     complicacionesCvc: cuentaSi(fichasMes, "complicaciones_por_colocacion_cvc"),
     pacientesCvc,
     infeccionesCvc: cuentaSi(fichasMes, "infeccion_sitio_cvc"),
@@ -365,7 +373,7 @@ function conteosMensuales(
     fallecidos: fichasEgresoMes.filter(ficha => valorComoTexto(ficha.datos?.alta).toUpperCase() === "FALLECIDO").length,
     fallecidos48: cuentaSi(fichasEgresoMes, "muerte_48_horas"),
     esperadoApache: suma(fichasEgresoMes, "mortalidad_ii") / 100,
-    muertesVm: fichasEgresoMes.filter(ficha => valorComoTexto(ficha.datos?.alta).toUpperCase() === "FALLECIDO" && (numero(ficha.datos?.vmi_dias) > 0 || si(ficha.datos?.intubacion_en_uci))).length,
+    muertesVm: fichasEgresoVm.filter(ficha => valorComoTexto(ficha.datos?.alta).toUpperCase() === "FALLECIDO").length,
     neumonia: diagnosticoGrupo(fichasEgresoMes, ["neumonia", "neumon"]),
     covid: diagnosticoGrupo(fichasEgresoMes, ["covid"]),
     diarrea: diagnosticoGrupo(fichasEgresoMes, ["diarrea"]),
