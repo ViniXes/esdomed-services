@@ -13,6 +13,7 @@ import {
   calcularIndicadoresCuidadosCriticos,
   configDiasHabilesIndicadoresId,
   diasHabilesOficiales,
+  FORMULAS_INDICADORES,
   MESES_INDICADORES,
   type DatoBaseCuidadosCriticos,
   type IndicadorCuidadosCriticos,
@@ -275,7 +276,26 @@ export default function IndicadoresCuidadosCriticosPage() {
               </p>
             </div>
           </div>
-          <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
+          <div className="flex flex-wrap items-center gap-2">
+            {vistaTabla === "indicadores" && (
+              <details className="rounded-xl border border-slate-200 bg-slate-50 text-xs dark:border-slate-700 dark:bg-slate-950">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 font-semibold text-slate-600 marker:content-none hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
+                  <Calculator size={14} /> Formulas
+                </summary>
+                <div className="max-h-80 w-[min(680px,calc(100vw-3rem))] overflow-y-auto border-t border-slate-200 px-3 py-2 dark:border-slate-700">
+                  <p className="mb-2 text-[11px] text-slate-500">Referencia del calculo aplicado al mes y servicio seleccionados.</p>
+                  <ol className="space-y-1.5 text-[11px] leading-4 text-slate-600 dark:text-slate-300">
+                    {indicadores.map(indicador => (
+                      <li key={`formula-${indicador.id}`}>
+                        <span className="font-semibold text-slate-900 dark:text-slate-100">{indicador.id}. {indicador.nombre}:</span>{" "}
+                        <span className="font-mono">{FORMULAS_INDICADORES[indicador.id]}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </details>
+            )}
+            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
             <button
               type="button"
               onClick={() => setVistaTabla("indicadores")}
@@ -290,6 +310,7 @@ export default function IndicadoresCuidadosCriticosPage() {
             >
               Datos base
             </button>
+            </div>
           </div>
         </div>
         {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} /> : <TablaDatosBase datos={datosBase} />}
