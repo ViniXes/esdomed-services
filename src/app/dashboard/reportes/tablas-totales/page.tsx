@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { LayoutGrid, Users, Download, AlertTriangle, BedDouble } from "lucide-react";
 import type { Genero, Paciente } from "@/types";
 
@@ -19,9 +20,21 @@ interface FilaServicio {
 const generoDe = (g?: Genero): "masculino" | "femenino" | "otro" =>
   g === "masculino" ? "masculino" : g === "femenino" ? "femenino" : "otro";
 
+// Paleta institucional: azul navy (masculino) + dorado/arena (femenino). En modo
+// oscuro el navy se aclara para que contraste sobre las tarjetas oscuras.
+const PALETA = {
+  light: { m: "#1c1e4d", f: "#c9a892", otro: "#94a3b8", track: "#eef1f4" },
+  dark:  { m: "#8c90df", f: "#cbb19c", otro: "#64748b", track: "#33414f" },
+};
+
+const NAVY = "var(--color-institutional-navy)";
+const ARENA = "var(--color-institutional-warm)";
+
 export default function TablasTotalesPage() {
   const { profile, loading: authLoading } = useAuth();
+  const { dark } = useTheme();
   const router = useRouter();
+  const col = dark ? PALETA.dark : PALETA.light;
   const esEsdomed =
     profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
@@ -34,7 +47,6 @@ export default function TablasTotalesPage() {
     if (!authLoading && profile && !esEsdomed) router.replace("/dashboard");
   }, [authLoading, profile, esEsdomed, router]);
 
-  // Pacientes ingresados (estado activo) — en vivo.
   useEffect(() => {
     if (!esEsdomed) return;
     const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
@@ -62,16 +74,16 @@ export default function TablasTotalesPage() {
       fila.total++; fila[g]++;
       tot.total++; tot[g]++;
     }
-    // Orden: por total descendente, luego alfabético.
     const filas = Array.from(mapa.values()).sort((x, y) => y.total - x.total || x.servicio.localeCompare(y.servicio));
     return { filas, totales: tot };
   }, [activos]);
+
+  const tieneOtro = totales.otro > 0;
 
   const exportarExcel = async () => {
     setExportando(true);
     try {
       const XLSX = await import("xlsx");
-      const tieneOtro = totales.otro > 0;
       const aoa: (string | number)[][] = [
         ["Pacientes ingresados por servicio"],
         [`Generado: ${new Date().toLocaleString("es-SV", { hour12: false })}`],
@@ -102,15 +114,16 @@ export default function TablasTotalesPage() {
   }
   if (!esEsdomed) return null;
 
-  const tieneOtro = totales.otro > 0;
-
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-50 dark:bg-indigo-950 rounded-xl flex items-center justify-center border border-indigo-200 dark:border-indigo-900">
-            <LayoutGrid size={17} className="text-indigo-600 dark:text-indigo-400" />
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center border"
+            style={{ background: `${col.m}1a`, borderColor: `${col.m}40`, color: dark ? ARENA : NAVY }}
+          >
+            <LayoutGrid size={17} />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Tablas totales</h1>
@@ -120,7 +133,8 @@ export default function TablasTotalesPage() {
         <button
           onClick={exportarExcel}
           disabled={exportando || cargando || filas.length === 0}
-          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-opacity hover:opacity-90 disabled:opacity-50 shadow-sm"
+          style={{ background: NAVY }}
         >
           <Download size={15} />
           {exportando ? "Generando..." : "Exportar a Excel"}
@@ -142,10 +156,10 @@ export default function TablasTotalesPage() {
         <>
           {/* Resumen */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Kpi icon={Users} label="Total ingresados" value={totales.total} color="text-slate-600 dark:text-slate-300" />
-            <Kpi label="Masculino" value={totales.masculino} color="text-blue-600 dark:text-blue-400" dot="bg-blue-500" />
-            <Kpi label="Femenino" value={totales.femenino} color="text-pink-600 dark:text-pink-400" dot="bg-pink-500" />
-            <Kpi icon={BedDouble} label="Servicios ocupados" value={filas.length} color="text-emerald-600 dark:text-emerald-400" />
+            <Kpi icon={Users} label="Total ingresados" value={totales.total} accent={dark ? "#a2acba" : "#313945"} />
+            <Kpi label="Masculino" value={totales.masculino} dot={col.m} accent={dark ? ARENA : NAVY} />
+            <Kpi label="Femenino" value={totales.femenino} dot={col.f} accent={col.f} />
+            <Kpi icon={BedDouble} label="Servicios ocupados" value={filas.length} accent={dark ? ARENA : NAVY} />
           </div>
 
           {filas.length === 0 ? (
@@ -158,13 +172,16 @@ export default function TablasTotalesPage() {
               {/* Tarjetas por servicio */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filas.map((f) => (
-                  <TarjetaServicio key={f.servicio} fila={f} tieneOtro={tieneOtro} />
+                  <TarjetaServicio key={f.servicio} fila={f} tieneOtro={tieneOtro} col={col} />
                 ))}
               </div>
 
               {/* Tabla de totales */}
               <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-4 pt-4 pb-3 font-heading">
+                <h3
+                  className="text-sm font-semibold px-4 pt-4 pb-3 font-heading"
+                  style={{ color: dark ? ARENA : NAVY }}
+                >
                   Totales por servicio
                 </h3>
                 <div className="overflow-x-auto">
@@ -182,8 +199,8 @@ export default function TablasTotalesPage() {
                       {filas.map((f) => (
                         <tr key={f.servicio} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                           <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">{f.servicio}</td>
-                          <td className="px-4 py-2.5 text-center text-blue-600 dark:text-blue-400 tabular-nums">{f.masculino}</td>
-                          <td className="px-4 py-2.5 text-center text-pink-600 dark:text-pink-400 tabular-nums">{f.femenino}</td>
+                          <td className="px-4 py-2.5 text-center tabular-nums font-medium" style={{ color: col.m }}>{f.masculino}</td>
+                          <td className="px-4 py-2.5 text-center tabular-nums font-medium" style={{ color: dark ? col.f : "#9a7b5f" }}>{f.femenino}</td>
                           {tieneOtro && <td className="px-4 py-2.5 text-center text-slate-500 tabular-nums">{f.otro}</td>}
                           <td className="px-4 py-2.5 text-center font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{f.total}</td>
                         </tr>
@@ -192,8 +209,8 @@ export default function TablasTotalesPage() {
                     <tfoot>
                       <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 font-semibold">
                         <td className="px-4 py-2.5 text-slate-900 dark:text-slate-100">Total</td>
-                        <td className="px-4 py-2.5 text-center text-blue-600 dark:text-blue-400 tabular-nums">{totales.masculino}</td>
-                        <td className="px-4 py-2.5 text-center text-pink-600 dark:text-pink-400 tabular-nums">{totales.femenino}</td>
+                        <td className="px-4 py-2.5 text-center tabular-nums" style={{ color: col.m }}>{totales.masculino}</td>
+                        <td className="px-4 py-2.5 text-center tabular-nums" style={{ color: dark ? col.f : "#9a7b5f" }}>{totales.femenino}</td>
                         {tieneOtro && <td className="px-4 py-2.5 text-center text-slate-500 tabular-nums">{totales.otro}</td>}
                         <td className="px-4 py-2.5 text-center text-slate-900 dark:text-slate-100 tabular-nums">{totales.total}</td>
                       </tr>
@@ -209,52 +226,80 @@ export default function TablasTotalesPage() {
   );
 }
 
-function TarjetaServicio({ fila, tieneOtro }: { fila: FilaServicio; tieneOtro: boolean }) {
-  const pct = (n: number) => (fila.total ? (n / fila.total) * 100 : 0);
+type Col = typeof PALETA.light;
+
+function TarjetaServicio({ fila, tieneOtro, col }: { fila: FilaServicio; tieneOtro: boolean; col: Col }) {
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-snug">{fila.servicio}</p>
-        <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-none">{fila.total}</span>
-      </div>
-
-      {/* Barra de proporción M / F / Otro */}
-      <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 flex">
-        <div className="bg-blue-500 h-full" style={{ width: `${pct(fila.masculino)}%` }} />
-        <div className="bg-pink-500 h-full" style={{ width: `${pct(fila.femenino)}%` }} />
-        {tieneOtro && <div className="bg-slate-400 h-full" style={{ width: `${pct(fila.otro)}%` }} />}
-      </div>
-
-      <div className="flex items-center gap-4 text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-          <span className="text-slate-500">M</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{fila.masculino}</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-pink-500" />
-          <span className="text-slate-500">F</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{fila.femenino}</span>
-        </span>
-        {tieneOtro && (
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-            <span className="text-slate-500">Otro</span>
-            <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{fila.otro}</span>
-          </span>
-        )}
+    <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-4 transition-colors hover:border-[var(--color-institutional-warm)]/60">
+      <Donut m={fila.masculino} f={fila.femenino} otro={fila.otro} total={fila.total} col={col} />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-slate-800 dark:text-slate-100 leading-snug truncate" title={fila.servicio}>
+          {fila.servicio}
+        </p>
+        <p className="text-[11px] uppercase tracking-wider text-slate-400 mb-2.5">
+          {fila.total} ingresado{fila.total === 1 ? "" : "s"}
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <Leyenda color={col.m} label="Masculino" value={fila.masculino} />
+          <Leyenda color={col.f} label="Femenino" value={fila.femenino} />
+          {tieneOtro && fila.otro > 0 && <Leyenda color={col.otro} label="Otro" value={fila.otro} />}
+        </div>
       </div>
     </div>
   );
 }
 
-function Kpi({ icon: Icon, label, value, color, dot }: {
-  icon?: typeof Users; label: string; value: string | number; color: string; dot?: string;
+function Donut({ m, f, otro, total, col }: { m: number; f: number; otro: number; total: number; col: Col }) {
+  const size = 76, sw = 10, r = (size - sw) / 2, c = 2 * Math.PI * r, cx = size / 2;
+  const segs = [
+    { v: m, color: col.m },
+    { v: f, color: col.f },
+    { v: otro, color: col.otro },
+  ].filter((s) => s.v > 0);
+  let acc = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0 -rotate-90">
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke={col.track} strokeWidth={sw} />
+      {total > 0 && segs.map((s, i) => {
+        const len = (s.v / total) * c;
+        const el = (
+          <circle
+            key={i} cx={cx} cy={cx} r={r} fill="none"
+            stroke={s.color} strokeWidth={sw} strokeLinecap="butt"
+            strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-acc}
+          />
+        );
+        acc += len;
+        return el;
+      })}
+      <text
+        x={cx} y={cx} transform={`rotate(90 ${cx} ${cx})`}
+        textAnchor="middle" dominantBaseline="central"
+        className="fill-slate-900 dark:fill-slate-100 font-bold" fontSize="20"
+      >
+        {total}
+      </text>
+    </svg>
+  );
+}
+
+function Leyenda({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+      <span className="text-slate-500 flex-1">{label}</span>
+      <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function Kpi({ icon: Icon, label, value, accent, dot }: {
+  icon?: typeof Users; label: string; value: string | number; accent: string; dot?: string;
 }) {
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-      <div className="flex items-center gap-1.5 text-slate-500 mb-1.5">
-        {Icon ? <Icon size={13} className={color} /> : dot ? <span className={`w-2.5 h-2.5 rounded-full ${dot}`} /> : null}
+      <div className="flex items-center gap-1.5 mb-1.5" style={{ color: accent }}>
+        {Icon ? <Icon size={13} /> : dot ? <span className="w-2.5 h-2.5 rounded-full" style={{ background: dot }} /> : null}
         <p className="text-[11px] font-medium uppercase tracking-wider">{label}</p>
       </div>
       <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">{value}</p>

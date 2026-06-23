@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   collection, query, orderBy, onSnapshot,
   addDoc, Timestamp,
@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LogIn, Plus, X, CheckCircle2, AlertCircle, Search,
-  Check, MessageSquareWarning, Pencil,
+  Check, MessageSquareWarning, Pencil, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
 import { DateField } from "@/components/ui/DateField";
@@ -63,6 +63,23 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   recibida:   "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada:  "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
 };
+
+const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
+  pendiente:  "bg-amber-500",
+  observada:  "bg-rose-500",
+  deposito:   "bg-slate-400",
+  suspendida: "bg-slate-400",
+  procesada:  "bg-green-500",
+  recibida:   "bg-sky-500",
+  duplicada:  "bg-slate-400",
+};
+
+// Orden de los contadores por estado (también funcionan como filtro rápido).
+const COUNTER_ESTADOS: EstadoNotificacionAlta[] = [
+  "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada",
+];
+
+const PAGE_SIZE = 12;
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
   cama_expediente: "Datos de cama o expediente no coinciden",
@@ -533,6 +550,32 @@ function RectificacionModal({
   );
 }
 
+function ChipContador({
+  label, count, active, onClick, dot,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  dot?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+        active
+          ? "border-teal-500 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 ring-1 ring-teal-500/30"
+          : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+      }`}
+    >
+      {dot && <span className={`w-2 h-2 rounded-full ${dot}`} />}
+      <span>{label}</span>
+      <span className="tabular-nums font-bold text-slate-900 dark:text-slate-100">{count}</span>
+    </button>
+  );
+}
+
 export default function AltasVivosPage() {
   const { user, profile } = useAuth();
   const isTS = profile?.role === "trabajo_social";
@@ -543,6 +586,7 @@ export default function AltasVivosPage() {
   const [filtroEstado, setFiltroEstado] = useState<EstadoNotificacionAlta | "todas">("todas");
   const [fechaDesde, setFechaDesde] = useState(() => new Date().toISOString().split("T")[0]);
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split("T")[0]);
+  const [page, setPage] = useState(1);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createdBanner, setCreatedBanner] = useState(false);
@@ -562,12 +606,12 @@ export default function AltasVivosPage() {
     });
   }, []);
 
-  const displayList = notificaciones.filter(n => {
+  // Base: búsqueda + rango de fecha (sin filtrar por estado, para los contadores).
+  const baseList = useMemo(() => notificaciones.filter(n => {
     if (busqueda) {
       const b = busqueda.toLowerCase();
       if (!n.pacienteNombre.toLowerCase().includes(b) && !n.pacienteExpediente.toLowerCase().includes(b)) return false;
     }
-    if (filtroEstado !== "todas" && n.estado !== filtroEstado) return false;
     if (fechaDesde || fechaHasta) {
       const d = toDate(n.creadoEn);
       if (!d) return false;
@@ -575,7 +619,27 @@ export default function AltasVivosPage() {
       if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
     }
     return true;
-  });
+  }), [notificaciones, busqueda, fechaDesde, fechaHasta]);
+
+  const conteos = useMemo(() => {
+    const c: Record<string, number> = { todas: baseList.length };
+    COUNTER_ESTADOS.forEach((e) => { c[e] = 0; });
+    baseList.forEach((n) => { c[n.estado] = (c[n.estado] ?? 0) + 1; });
+    return c;
+  }, [baseList]);
+
+  const displayList = useMemo(
+    () => (filtroEstado === "todas" ? baseList : baseList.filter((n) => n.estado === filtroEstado)),
+    [baseList, filtroEstado],
+  );
+
+  // Reset de página al cambiar filtros.
+  const filterKey = `${busqueda}|${filtroEstado}|${fechaDesde}|${fechaHasta}`;
+  const [filterKeyPrev, setFilterKeyPrev] = useState(filterKey);
+  if (filterKeyPrev !== filterKey) { setFilterKeyPrev(filterKey); setPage(1); }
+
+  const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
+  const pageItems = displayList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const procesarNotificacion = async () => {
     if (!procesandoId || !user || !profile) return;
@@ -676,17 +740,6 @@ export default function AltasVivosPage() {
             value={busqueda} onChange={e => setBusqueda(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
         </div>
-        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoNotificacionAlta | "todas")}
-          className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100">
-          <option value="todas">Todos los estados</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="observada">Requiere correccion</option>
-          <option value="procesada">Alta efectiva</option>
-          <option value="recibida">Acusada de recibido</option>
-          <option value="duplicada">Duplicada</option>
-          <option value="deposito">En depósito</option>
-          <option value="suspendida">Suspendida</option>
-        </select>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Desde</span>
           <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
@@ -703,6 +756,21 @@ export default function AltasVivosPage() {
         )}
       </div>
 
+      {/* Contadores por estado (clic para filtrar) */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <ChipContador label="Todas" count={conteos.todas} active={filtroEstado === "todas"} onClick={() => setFiltroEstado("todas")} />
+        {COUNTER_ESTADOS.map((e) => (
+          <ChipContador
+            key={e}
+            label={ESTADO_LABEL[e]}
+            dot={ESTADO_DOT[e]}
+            count={conteos[e] ?? 0}
+            active={filtroEstado === e}
+            onClick={() => setFiltroEstado(e)}
+          />
+        ))}
+      </div>
+
       {/* Lista */}
       <div className="space-y-2">
         {displayList.length === 0 && (
@@ -711,7 +779,7 @@ export default function AltasVivosPage() {
           </p>
         )}
 
-        {displayList.map(n => {
+        {pageItems.map(n => {
           const requiereSoloAcuse = esSoloAcuseRecibido(n.tipoAlta);
           const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida" || n.estado === "duplicada";
           const mostrarNombresEsdomed = isEsdomed;
@@ -847,6 +915,33 @@ export default function AltasVivosPage() {
           );
         })}
       </div>
+
+      {/* Paginación */}
+      {displayList.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-4 mt-4 px-1">
+          <span className="text-xs text-slate-500">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, displayList.length)} de{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">{displayList.length}</span>
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="text-xs text-slate-500 px-2 tabular-nums">{page} / {totalPages}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create modal */}
       {showCreate && (
