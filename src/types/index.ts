@@ -649,6 +649,56 @@ export interface Paciente {
 }
 
 // ============================================================================
+// Atendidos en Emergencia — pacientes que pasaron por emergencia
+// ============================================================================
+// Módulo APARTE de pacientes/activos. Cada documento es una atención (visita) en
+// emergencia, importada del reporte del SIS "Pacientes Atendidos En Emergencia".
+// Se importa TODO el reporte (haya o no ingresado a hospitalización) para tener la
+// trazabilidad de quien pasó por emergencia y además ingresó como activo. La ruta
+// consulta por defecto a los que NO ingresaron.
+//
+// La identidad se comparte con el padrón por `expediente` (misma persona estable),
+// pero este módulo SOLO LEE personas/pacientes para enriquecer/enlazar — nunca los
+// escribe (el reporte trae muy pocos datos personales y ensuciaría el padrón).
+
+// ¿Ingresó a hospitalización? — columna del reporte. "sin_dato" = celda vacía.
+export type IngresoHospitalizacion = "si" | "no" | "sin_dato";
+
+export interface AtencionEmergencia {
+  id?: string;                  // == dedup determinista: `${expediente}__${YYYYMMDDHHmmss}`
+
+  // ── Identidad (snapshot del reporte; referencia a personas por expediente) ──
+  expediente: string;           // llave estable de persona (la misma del padrón)
+  pacienteNombre: string;       // nombre completo tal como viene del reporte
+  dui?: string;
+  genero: Genero;
+  edadTexto?: string;           // "30 años 11 meses 2 días" — texto crudo del reporte
+  edadAnios?: number;           // años extraídos del texto (si se pudo)
+
+  // ── Atención ──
+  fechaHoraIngreso: Date;                  // llave temporal de la visita
+  ingresoHospitalizacion: IngresoHospitalizacion; // ← filtro principal de la ruta
+  tipoEgreso?: string;          // "Vivo" | "" | ...
+  diagnostico?: string;         // texto libre (el reporte no trae CIE)
+  categorizacion?: string;      // triage: "3 - Verde", "2 - Amarillo", ...
+  llegaReferido: boolean;
+  veteranoGuerra: boolean;
+  medicoTriage?: string;
+  especialidadTriage?: string;
+  medicoAtiende?: string;
+  especialidadAtiende?: string;
+  fechaHoraAltaIngreso?: Date;  // "Fecha hora alta o ingreso"
+  tiempoTotalEmergencia?: string; // "01:26:15"
+  establecimientoProcedencia?: string;
+
+  // ── Metadata de importación ──
+  importadoEn: Date;
+  importadoPorId: string;
+  importadoPorNombre: string;
+  archivoOrigen?: string;
+}
+
+// ============================================================================
 // Gestiones de Trabajo Social (UTS) — registro transversal de intervenciones
 // Reemplaza el Google Form "INTERVENCIONES PRESENCIALES". Un documento por
 // intervención, ligado al paciente por expediente. De aquí salen como vistas las

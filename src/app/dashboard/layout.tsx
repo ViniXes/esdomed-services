@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Ambulance,
   ArrowRightLeft,
   Activity,
   BarChart3,
@@ -99,6 +100,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verPacientes
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
+      : []),
+    ...(verPacientes
+      ? [{ href: "/dashboard/emergencia", label: "Atendidos en emergencia", icon: Ambulance, group: G_PACIENTES }]
       : []),
     ...(verCuidadosCriticos
       ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_PACIENTES }]

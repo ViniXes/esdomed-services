@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch } from "lucide-react";
+import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
@@ -12,6 +12,7 @@ const baseNavItems = [
   { href: "/medico",                 label: "Inicio",          icon: LayoutDashboard, exact: true },
   { href: "/medico/cola-expedientes", label: "Cola de expedientes", icon: FileStack },
   { href: "/medico/buscar-paciente", label: "Buscar Paciente", icon: UserSearch },
+  { href: "/medico/emergencia",      label: "Atendidos en emergencia", icon: Ambulance },
   { href: "/medico/busqueda-telefono", label: "Busqueda de telefono", icon: Phone },
   { href: "/medico/traslados",       label: "Traslados",       icon: ArrowRightLeft },
   { href: "/medico/fallecidos",      label: "Fallecidos",      icon: HeartPulse },

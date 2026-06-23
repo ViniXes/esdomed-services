@@ -85,7 +85,11 @@
       "Bash(claude update *)",
       "Bash(grep -A6 \"gestiones\\\\\\\\\\\\\\\\page.tsx:125\")",
       "Bash(PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python scripts/_explore_ts.py)",
-      "Bash(xargs grep -l \"useNotificaciones\")"
+      "Bash(xargs grep -l \"useNotificaciones\")",
+      "Bash(grep -iE \"^xlsx$|^exceljs$\")",
+      "Bash(xxd)",
+      "Bash(ls node_modules/pdfjs-dist/legacy/build/)",
+      "Bash(ls node_modules/pdfjs-dist/build/)"
     ]
   }
 }

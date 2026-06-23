@@ -211,6 +211,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Atendidos en Emergencia ──────────────────────────────────────────────
+    // Atenciones de emergencia importadas del reporte del SIS. Módulo aparte de
+    // pacientes. Consulta: personal + médicos (solo lectura). Importación: solo
+    // ESDOMED/admin. No escribe en personas/pacientes.
+    match /atenciones_emergencia/{id} {
+      allow read:   if isStaff() || isMedico();
+      allow create: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Control de ingresos ──────────────────────────────────────────────────
     // Los médicos tienen acceso de solo lectura para ver la cola.
     // Solo el personal ESDOMED puede registrar ingresos.
