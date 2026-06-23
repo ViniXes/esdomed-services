@@ -71,7 +71,7 @@ export default function IndicadoresCuidadosCriticosPage() {
     : SERVICIOS_CRITICOS.reduce((total, item) => total + camasServicio(item), 0);
 
   const configParaCalculo = useMemo(() => {
-    if (!diasHabilesParaCalculo || camasSistema <= 0) return null;
+    if (camasSistema <= 0) return null;
     return {
       servicio,
       anio,

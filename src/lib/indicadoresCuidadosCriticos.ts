@@ -209,8 +209,7 @@ export function calcularIndicadoresCuidadosCriticos(
 ): IndicadorCuidadosCriticos[] {
   const { anio, mes, servicio, tipo, config } = parametros;
   const camas = numeroConfig(config?.camasAsignadas);
-  const diasHabiles = numeroConfig(config?.diasHabiles);
-  const faltaConfig = !camas || !diasHabiles;
+  const faltaConfig = !camas;
   const conteos = conteosMensuales(fichas, { anio, mes, servicio, tipo, camasAsignadas: camas });
 
   return [

@@ -68,7 +68,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
     const valor = valorComoTexto(datosParaPorcentaje[campo.key]).trim();
     if (valor) return true;
     const alta = valorComoTexto(datosParaPorcentaje.alta).trim();
-    return alta !== "FALLECIDO" && (campo.key === "fecha_de_muerte" || campo.key === "muerte_48_horas");
+    return alta !== "FALLECIDO" && (campo.key === "fecha_de_muerte" || campo.key === "hora_de_muerte" || campo.key === "muerte_48_horas");
   };
   const camposPendientes = todosLosCampos.filter(campo => !campoCompleto(campo));
   const completados = todosLosCampos.length - camposPendientes.length;
