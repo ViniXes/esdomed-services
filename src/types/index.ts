@@ -687,9 +687,17 @@ export interface AtencionEmergencia {
   especialidadTriage?: string;
   medicoAtiende?: string;
   especialidadAtiende?: string;
+  fechaHoraEntradaTriage?: Date;  // "Fecha hora entrada triage"
   fechaHoraAltaIngreso?: Date;  // "Fecha hora alta o ingreso"
+  // Tiempos del proceso de emergencia (texto crudo del reporte, ej. "00:03:03 hrs")
+  tiempoLlegadaEstablecimiento?: string;
+  tiempoDuracionTriage?: string;
+  tiempoEsperaConsulta?: string;
+  tiempoConsulta?: string;
+  tiempoEvaluacion?: string;
   tiempoTotalEmergencia?: string; // "01:26:15"
   establecimientoProcedencia?: string;
+  distanciaEntreEstablecimientos?: string;
 
   // ── Metadata de importación ──
   importadoEn: Date;

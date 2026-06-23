@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
-  ArrowUpRight, Stethoscope,
+  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog,
 } from "lucide-react";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
 import { toDate, formatFechaHora } from "@/lib/pacientes/helpers";
@@ -59,6 +59,8 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   const [page, setPage] = useState(1);
   // Mapa expediente → id del ingreso en `pacientes` (trazabilidad).
   const [ingresosPorExp, setIngresosPorExp] = useState<Map<string, string>>(new Map());
+  // Atención seleccionada para la ficha de detalle (todos los campos del informe).
+  const [seleccion, setSeleccion] = useState<AtencionEmergencia | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -75,6 +77,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           ...data,
           fechaHoraIngreso: toDate(data.fechaHoraIngreso) ?? new Date(),
           fechaHoraAltaIngreso: toDate(data.fechaHoraAltaIngreso),
+          fechaHoraEntradaTriage: toDate(data.fechaHoraEntradaTriage),
           importadoEn: toDate(data.importadoEn) ?? new Date(),
         } as AtencionEmergencia;
       }));
@@ -298,7 +301,11 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
                   const triage = triageBadge(a.categorizacion);
                   const cond = condicionEgreso(a.tipoEgreso);
                   return (
-                    <tr key={a.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors align-top">
+                    <tr
+                      key={a.id}
+                      onClick={() => setSeleccion(a)}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors align-top cursor-pointer"
+                    >
                       <td className="px-4 py-3">
                         <p className="font-semibold font-mono text-slate-900 dark:text-slate-100">{a.expediente}</p>
                         {a.dui && <p className="text-[11px] text-slate-500 mt-0.5 font-mono">{a.dui}</p>}
@@ -342,6 +349,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
                               fichaHref ? (
                                 <Link
                                   href={fichaHref(pacienteId)}
+                                  onClick={(e) => e.stopPropagation()}
                                   className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 mt-1"
                                 >
                                   <ArrowUpRight size={11} /> Ver ficha
@@ -395,6 +403,137 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           </div>
         </div>
       )}
+
+      {/* Ficha de detalle — todos los campos del informe */}
+      {seleccion && (
+        <FichaEmergencia
+          atencion={seleccion}
+          pacienteId={ingresosPorExp.get(seleccion.expediente)}
+          fichaHref={fichaHref}
+          onClose={() => setSeleccion(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function FichaEmergencia({
+  atencion: a, pacienteId, fichaHref, onClose,
+}: {
+  atencion: AtencionEmergencia;
+  pacienteId?: string;
+  fichaHref?: (pacienteId: string) => string;
+  onClose: () => void;
+}) {
+  const cond = condicionEgreso(a.tipoEgreso);
+  const fechaHora = (d?: Date) => (d ? formatFechaHora(d) : undefined);
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-900 dark:text-slate-100">{a.pacienteNombre || "—"}</p>
+            <p className="text-xs text-slate-500 mt-0.5 font-mono">
+              {a.expediente}{a.dui ? ` · ${a.dui}` : ""}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${INGRESO_BADGE[a.ingresoHospitalizacion]}`}>
+                {INGRESO_LABEL[a.ingresoHospitalizacion]}
+              </span>
+              {a.tipoEgreso && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${CONDICION_BADGE[cond]}`}>
+                  {CONDICION_LABEL[cond]}
+                </span>
+              )}
+              {/* Enlace al padrón si el paciente está ingresado/registrado */}
+              {pacienteId && (
+                fichaHref ? (
+                  <Link href={fichaHref(pacienteId)} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500">
+                    <ArrowUpRight size={12} /> Ver ficha en padrón
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                    <Stethoscope size={12} /> Registrado en padrón
+                  </span>
+                )
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 flex-shrink-0" aria-label="Cerrar">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Cuerpo */}
+        <div className="p-5 space-y-5">
+          <SeccionFicha icon={Ambulance} titulo="Atención">
+            <Campo label="Sexo" value={a.genero ? (a.genero === "masculino" ? "Masculino" : a.genero === "femenino" ? "Femenino" : "Otro") : undefined} />
+            <Campo label="Edad" value={a.edadTexto} />
+            <Campo label="Ingreso a emergencia" value={fechaHora(a.fechaHoraIngreso)} />
+            <Campo label="Categorización (triage)" value={a.categorizacion} />
+            <Campo label="Llega referido" value={a.llegaReferido ? "Sí" : "No"} />
+            <Campo label="Veterano de guerra" value={a.veteranoGuerra ? "Sí" : "No"} />
+            <Campo label="Diagnóstico" value={a.diagnostico} full />
+          </SeccionFicha>
+
+          <SeccionFicha icon={UserCog} titulo="Personal médico">
+            <Campo label="Médico que realiza el triage" value={a.medicoTriage} />
+            <Campo label="Especialidad (triage)" value={a.especialidadTriage} />
+            <Campo label="Médico que atiende" value={a.medicoAtiende} />
+            <Campo label="Especialidad (atiende)" value={a.especialidadAtiende} />
+          </SeccionFicha>
+
+          <SeccionFicha icon={HeartPulse} titulo="Egreso / Hospitalización">
+            <Campo label="Ingresó a hospitalización" value={INGRESO_LABEL[a.ingresoHospitalizacion]} />
+            <Campo label="Tipo de egreso (condición)" value={a.tipoEgreso} />
+            <Campo label="Fecha y hora de alta o ingreso" value={fechaHora(a.fechaHoraAltaIngreso)} />
+          </SeccionFicha>
+
+          <SeccionFicha icon={Clock} titulo="Tiempos">
+            <Campo label="Entrada a triage" value={fechaHora(a.fechaHoraEntradaTriage)} />
+            <Campo label="Llegada al establecimiento" value={a.tiempoLlegadaEstablecimiento} />
+            <Campo label="Duración del triage" value={a.tiempoDuracionTriage} />
+            <Campo label="Espera a consulta" value={a.tiempoEsperaConsulta} />
+            <Campo label="Consulta" value={a.tiempoConsulta} />
+            <Campo label="Evaluación" value={a.tiempoEvaluacion} />
+            <Campo label="Total en emergencia" value={a.tiempoTotalEmergencia} />
+          </SeccionFicha>
+
+          <SeccionFicha icon={MapPin} titulo="Procedencia">
+            <Campo label="Establecimiento de procedencia" value={a.establecimientoProcedencia} full />
+            <Campo label="Distancia entre establecimientos" value={a.distanciaEntreEstablecimientos} />
+          </SeccionFicha>
+
+          <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+            Importado por {a.importadoPorNombre} · {formatFechaHora(a.importadoEn)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeccionFicha({ icon: Icon, titulo, children }: { icon: typeof Ambulance; titulo: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+        <Icon size={13} className="text-slate-400" /> {titulo}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5">{children}</div>
+    </div>
+  );
+}
+
+function Campo({ label, value, full }: { label: string; value?: React.ReactNode; full?: boolean }) {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <div className={full ? "sm:col-span-2" : ""}>
+      <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">{label}</p>
+      <p className="text-sm text-slate-800 dark:text-slate-200 mt-0.5">{value}</p>
     </div>
   );
 }

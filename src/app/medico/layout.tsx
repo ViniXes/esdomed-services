@@ -12,8 +12,14 @@ const baseNavItems = [
   { href: "/medico",                 label: "Inicio",          icon: LayoutDashboard, exact: true },
   { href: "/medico/cola-expedientes", label: "Cola de expedientes", icon: FileStack },
   { href: "/medico/buscar-paciente", label: "Buscar Paciente", icon: UserSearch },
-  { href: "/medico/emergencia",      label: "Atendidos en emergencia", icon: Ambulance },
-  { href: "/medico/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
+  {
+    href: "/medico/emergencia",
+    label: "Atendidos en emergencia",
+    icon: Ambulance,
+    children: [
+      { href: "/medico/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
+    ],
+  },
   { href: "/medico/busqueda-telefono", label: "Busqueda de telefono", icon: Phone },
   { href: "/medico/traslados",       label: "Traslados",       icon: ArrowRightLeft },
   { href: "/medico/fallecidos",      label: "Fallecidos",      icon: HeartPulse },

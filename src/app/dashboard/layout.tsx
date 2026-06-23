@@ -103,10 +103,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
       : []),
     ...(verPacientes
-      ? [{ href: "/dashboard/emergencia", label: "Atendidos en emergencia", icon: Ambulance, group: G_PACIENTES }]
-      : []),
-    ...(verPacientes
-      ? [{ href: "/dashboard/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse, group: G_PACIENTES }]
+      ? [{
+          href: "/dashboard/emergencia",
+          label: "Atendidos en emergencia",
+          icon: Ambulance,
+          group: G_PACIENTES,
+          children: [
+            { href: "/dashboard/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
+          ],
+        }]
       : []),
     ...(verPacientes
       ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]

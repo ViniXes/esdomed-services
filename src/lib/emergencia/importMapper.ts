@@ -101,9 +101,16 @@ export const COL = {
   tipoEgreso: "Tipo de egreso",
   diagnostico: "Diagnóstico",
   categorizacion: "Categorización",
+  fechaHoraEntradaTriage: "Fecha hora entrada triage",
+  tiempoLlegada: "Tiempo llegada a establecimiento",
+  tiempoDuracionTriage: "Tiempo duración triage",
+  tiempoEsperaConsulta: "Tiempo espera consulta",
+  tiempoConsulta: "Tiempo consulta",
+  tiempoEvaluacion: "Tiempo evaluación",
   fechaHoraAlta: "Fecha hora alta o ingreso",
   tiempoTotal: "Tiempo total emergencia",
   establecimiento: "Establecimiento procedencia",
+  distancia: "Distancia entre establecimientos",
 } as const;
 
 /**
@@ -129,6 +136,7 @@ export function mapearFilaEmergencia(row: FilaReporteEmergencia): FilaEmergencia
   const ingresoHospitalizacion = normalizarIngreso(row[COL.ingreso]);
   const genero: Genero = normalizarGenero(txt(row[COL.sexo]));
   const fechaHoraAlta = parseFechaHoraEmergencia(row[COL.fechaHoraAlta]);
+  const fechaHoraEntradaTriage = parseFechaHoraEmergencia(row[COL.fechaHoraEntradaTriage]);
 
   // Construcción del doc: solo claves definidas (Firestore rechaza undefined).
   const datos: DatosAtencion = {
@@ -155,9 +163,16 @@ export function mapearFilaEmergencia(row: FilaReporteEmergencia): FilaEmergencia
   asignar("especialidadTriage", row[COL.especialidadTriage]);
   asignar("medicoAtiende", row[COL.medicoAtiende]);
   asignar("especialidadAtiende", row[COL.especialidadAtiende]);
+  asignar("tiempoLlegadaEstablecimiento", row[COL.tiempoLlegada]);
+  asignar("tiempoDuracionTriage", row[COL.tiempoDuracionTriage]);
+  asignar("tiempoEsperaConsulta", row[COL.tiempoEsperaConsulta]);
+  asignar("tiempoConsulta", row[COL.tiempoConsulta]);
+  asignar("tiempoEvaluacion", row[COL.tiempoEvaluacion]);
   asignar("tiempoTotalEmergencia", row[COL.tiempoTotal]);
   asignar("establecimientoProcedencia", row[COL.establecimiento]);
+  asignar("distanciaEntreEstablecimientos", row[COL.distancia]);
   if (fechaHoraAlta) datos.fechaHoraAltaIngreso = fechaHoraAlta;
+  if (fechaHoraEntradaTriage) datos.fechaHoraEntradaTriage = fechaHoraEntradaTriage;
 
   return {
     valido: true,

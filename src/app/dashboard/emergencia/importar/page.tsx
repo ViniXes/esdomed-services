@@ -45,6 +45,7 @@ function aFirestore(datos: DatosAtencion): Record<string, unknown> {
     fechaHoraIngreso: Timestamp.fromDate(datos.fechaHoraIngreso),
   };
   if (datos.fechaHoraAltaIngreso) out.fechaHoraAltaIngreso = Timestamp.fromDate(datos.fechaHoraAltaIngreso);
+  if (datos.fechaHoraEntradaTriage) out.fechaHoraEntradaTriage = Timestamp.fromDate(datos.fechaHoraEntradaTriage);
   return out;
 }
 

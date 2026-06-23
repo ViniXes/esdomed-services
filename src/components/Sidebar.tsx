@@ -22,6 +22,8 @@ export interface NavItem {
   badge?: number;
   /** Encabezado de sección. Los ítems consecutivos con el mismo grupo se muestran juntos. */
   group?: string;
+  /** Sub-ítems que se despliegan (submenú) al expandir este ítem. */
+  children?: NavItem[];
 }
 
 interface SidebarProps {
@@ -50,6 +52,79 @@ function Badge({ count }: { count: number }) {
   );
 }
 
+const ACTIVE_CLS =
+  "bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 shadow-sm shadow-blue-100 dark:bg-[var(--color-institutional-navy)] dark:text-white dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15";
+const IDLE_CLS =
+  "text-slate-600 dark:text-slate-300 hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white";
+
+function NavLink({
+  item, active, onNavigate, nested = false,
+}: {
+  item: NavItem;
+  active: boolean;
+  onNavigate?: () => void;
+  nested?: boolean;
+}) {
+  const { href, label, icon: Icon, badge } = item;
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`flex items-center gap-3 rounded-xl font-medium transition-all duration-150 ${
+        nested ? "px-3 py-2 text-[13px]" : "px-3 py-2.5 text-sm"
+      } ${active ? ACTIVE_CLS : IDLE_CLS}`}
+    >
+      <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+      <span className="flex-1">{label}</span>
+      <Badge count={badge ?? 0} />
+    </Link>
+  );
+}
+
+/** Ítem con submenú: navega a su propia ruta y despliega los hijos con la flecha. */
+function NavExpandable({
+  item, isActive, onNavigate,
+}: {
+  item: NavItem;
+  isActive: (item: NavItem) => boolean;
+  onNavigate?: () => void;
+}) {
+  const { href, label, icon: Icon, children = [] } = item;
+  const childActive = children.some(isActive);
+  const active = isActive(item) || childActive;
+  // null = sigue el estado de la ruta (abierto si un hijo está activo); luego respeta
+  // la preferencia manual del usuario. Sin efectos para no romper la regla de lint.
+  const [openManual, setOpenManual] = useState<boolean | null>(null);
+  const open = openManual ?? childActive;
+
+  return (
+    <div>
+      <div className={`flex items-center rounded-xl transition-all duration-150 ${active ? ACTIVE_CLS : IDLE_CLS}`}>
+        <Link href={href} onClick={onNavigate} className="flex items-center gap-3 pl-3 pr-1 py-2.5 text-sm font-medium flex-1 min-w-0">
+          <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+          <span className="flex-1 truncate">{label}</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpenManual(!open)}
+          aria-expanded={open}
+          aria-label={open ? "Contraer submenú" : "Expandir submenú"}
+          className="px-2 self-stretch flex items-center text-current/70 hover:text-current"
+        >
+          <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "" : "-rotate-90"}`} />
+        </button>
+      </div>
+      {open && (
+        <div className="mt-0.5 ml-5 pl-2 border-l border-slate-200 dark:border-[#c9a892]/25 space-y-0.5">
+          {children.map((c) => (
+            <NavLink key={c.href} item={c} active={isActive(c)} onNavigate={onNavigate} nested />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SidebarBody({
   navItems,
   roleLabel,
@@ -63,26 +138,10 @@ function SidebarBody({
   onChangePassword,
   onLogout,
 }: SidebarBodyProps) {
-  const renderLink = (item: NavItem) => {
-    const { href, label, icon: Icon, badge } = item;
-    const active = isActive(item);
-    return (
-      <Link
-        key={href}
-        href={href}
-        onClick={onNavigate}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-          active
-            ? "bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 shadow-sm shadow-blue-100 dark:bg-[var(--color-institutional-navy)] dark:text-white dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15"
-            : "text-slate-600 dark:text-slate-300 hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white"
-        }`}
-      >
-        <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
-        <span className="flex-1">{label}</span>
-        <Badge count={badge ?? 0} />
-      </Link>
-    );
-  };
+  const renderItem = (item: NavItem) =>
+    item.children?.length
+      ? <NavExpandable key={item.href} item={item} isActive={isActive} onNavigate={onNavigate} />
+      : <NavLink key={item.href} item={item} active={isActive(item)} onNavigate={onNavigate} />;
 
   // Ítems sin grupo (p. ej. Inicio) arriba; el resto agrupado por sección colapsable.
   const sinGrupo = navItems.filter((i) => !i.group);
@@ -126,7 +185,7 @@ function SidebarBody({
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {sinGrupo.map(renderLink)}
+        {sinGrupo.map(renderItem)}
 
         {grupos.map((group) => {
           const items = navItems.filter((i) => i.group === group);
@@ -146,7 +205,7 @@ function SidebarBody({
                 <span className="flex-1 text-left">{group}</span>
                 {isCollapsed && <Badge count={groupBadge} />}
               </button>
-              {!isCollapsed && items.map(renderLink)}
+              {!isCollapsed && items.map(renderItem)}
             </div>
           );
         })}
