@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  collection, query, orderBy, onSnapshot, limit, where, getDocs,
+  collection, query, orderBy, onSnapshot, limit, where, getDocs, documentId,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,8 +57,10 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [page, setPage] = useState(1);
-  // Mapa expediente → id del ingreso en `pacientes` (trazabilidad).
+  // Mapa expediente → id del ingreso en `pacientes` (para enlazar a la ficha clínica).
   const [ingresosPorExp, setIngresosPorExp] = useState<Map<string, string>>(new Map());
+  // Expedientes que existen en el padrón `personas` (registrado en padrón).
+  const [registradosPadron, setRegistradosPadron] = useState<Set<string>>(new Set());
   // Atención seleccionada para la ficha de detalle (todos los campos del informe).
   const [seleccion, setSeleccion] = useState<AtencionEmergencia | null>(null);
 
@@ -86,24 +88,29 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
     return unsub;
   }, [profile]);
 
-  // ── Trazabilidad: ¿cuáles expedientes existen como ingreso en `pacientes`? ──
+  // ── Trazabilidad con el padrón ──────────────────────────────────────────────
+  // `personas` (docId = expediente) define "registrado en padrón"; `pacientes` da
+  // el id del ingreso para enlazar a la ficha clínica cuando existe.
   useEffect(() => {
     if (!profile || atenciones.length === 0) return;
     let cancelado = false;
     (async () => {
       const exps = Array.from(new Set(atenciones.map((a) => a.expediente))).filter(Boolean);
       const mapa = new Map<string, string>();
+      const padron = new Set<string>();
       try {
         for (let i = 0; i < exps.length; i += 30) {
           const chunk = exps.slice(i, i + 30);
-          const snap = await getDocs(
-            query(collection(db, "pacientes"), where("expediente", "in", chunk)),
-          );
-          snap.forEach((d) => {
+          const [snapPac, snapPer] = await Promise.all([
+            getDocs(query(collection(db, "pacientes"), where("expediente", "in", chunk))),
+            getDocs(query(collection(db, "personas"), where(documentId(), "in", chunk))),
+          ]);
+          snapPac.forEach((d) => {
             if (!mapa.has(d.data().expediente)) mapa.set(d.data().expediente, d.id);
           });
+          snapPer.forEach((d) => padron.add(d.id));
         }
-        if (!cancelado) setIngresosPorExp(mapa);
+        if (!cancelado) { setIngresosPorExp(mapa); setRegistradosPadron(padron); }
       } catch {
         // Best-effort: sin permisos o error de red, simplemente no se muestran enlaces.
       }
@@ -298,6 +305,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginados.map((a) => {
                   const pacienteId = ingresosPorExp.get(a.expediente);
+                  const enPadron = pacienteId != null || registradosPadron.has(a.expediente);
                   const triage = triageBadge(a.categorizacion);
                   const cond = condicionEgreso(a.tipoEgreso);
                   return (
@@ -341,27 +349,11 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
                             {CONDICION_LABEL[cond]}
                           </span>
                         ) : (
-                          <>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${INGRESO_BADGE[a.ingresoHospitalizacion]}`}>
-                              {INGRESO_LABEL[a.ingresoHospitalizacion]}
-                            </span>
-                            {pacienteId && (
-                              fichaHref ? (
-                                <Link
-                                  href={fichaHref(pacienteId)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 mt-1"
-                                >
-                                  <ArrowUpRight size={11} /> Ver ficha
-                                </Link>
-                              ) : (
-                                <span className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
-                                  <Stethoscope size={11} /> Registrado en padrón
-                                </span>
-                              )
-                            )}
-                          </>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${INGRESO_BADGE[a.ingresoHospitalizacion]}`}>
+                            {INGRESO_LABEL[a.ingresoHospitalizacion]}
+                          </span>
                         )}
+                        <EnlacePadron pacienteId={pacienteId} enPadron={enPadron} fichaHref={fichaHref} />
                       </td>
                     </tr>
                   );
@@ -409,6 +401,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         <FichaEmergencia
           atencion={seleccion}
           pacienteId={ingresosPorExp.get(seleccion.expediente)}
+          enPadron={ingresosPorExp.has(seleccion.expediente) || registradosPadron.has(seleccion.expediente)}
           fichaHref={fichaHref}
           onClose={() => setSeleccion(null)}
         />
@@ -418,10 +411,11 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
 }
 
 function FichaEmergencia({
-  atencion: a, pacienteId, fichaHref, onClose,
+  atencion: a, pacienteId, enPadron, fichaHref, onClose,
 }: {
   atencion: AtencionEmergencia;
   pacienteId?: string;
+  enPadron: boolean;
   fichaHref?: (pacienteId: string) => string;
   onClose: () => void;
 }) {
@@ -449,18 +443,16 @@ function FichaEmergencia({
                   {CONDICION_LABEL[cond]}
                 </span>
               )}
-              {/* Enlace al padrón si el paciente está ingresado/registrado */}
-              {pacienteId && (
-                fichaHref ? (
-                  <Link href={fichaHref(pacienteId)} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500">
-                    <ArrowUpRight size={12} /> Ver ficha en padrón
-                  </Link>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                    <Stethoscope size={12} /> Registrado en padrón
-                  </span>
-                )
-              )}
+              {/* Enlace al padrón si el paciente está registrado en personas */}
+              {pacienteId && fichaHref ? (
+                <Link href={fichaHref(pacienteId)} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500">
+                  <ArrowUpRight size={12} /> Ver ficha en padrón
+                </Link>
+              ) : enPadron ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                  <Stethoscope size={12} /> Registrado en padrón
+                </span>
+              ) : null}
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 flex-shrink-0" aria-label="Cerrar">
@@ -536,6 +528,36 @@ function Campo({ label, value, full }: { label: string; value?: React.ReactNode;
       <p className="text-sm text-slate-800 dark:text-slate-200 mt-0.5">{value}</p>
     </div>
   );
+}
+
+// Indicador de padrón para la fila: enlace a la ficha si hay ingreso, o etiqueta
+// "Registrado en padrón" si existe en personas pero no se puede enlazar (o sin permiso).
+function EnlacePadron({
+  pacienteId, enPadron, fichaHref,
+}: {
+  pacienteId?: string;
+  enPadron: boolean;
+  fichaHref?: (pacienteId: string) => string;
+}) {
+  if (pacienteId && fichaHref) {
+    return (
+      <Link
+        href={fichaHref(pacienteId)}
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 mt-1"
+      >
+        <ArrowUpRight size={11} /> Ver ficha
+      </Link>
+    );
+  }
+  if (enPadron) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
+        <Stethoscope size={11} /> Registrado en padrón
+      </span>
+    );
+  }
+  return null;
 }
 
 function Th({ children }: { children: React.ReactNode }) {

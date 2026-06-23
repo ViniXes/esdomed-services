@@ -16,6 +16,7 @@ import {
   History,
   Inbox,
   LayoutDashboard,
+  LayoutGrid,
   ListChecks,
   LogIn,
   Phone,
@@ -197,7 +198,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
     // ── Reportes ──
     ...(verReportes
-      ? [{ href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES }]
+      ? [
+          { href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES },
+          { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid, group: G_REPORTES },
+        ]
       : []),
 
     // ── Mi área (horarios) ──
