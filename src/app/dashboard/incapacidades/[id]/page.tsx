@@ -155,6 +155,16 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
 
   const yaEmitida = incapacidad.estado === "emitida";
 
+  // Desglose de días: los "adicionales" son los que el médico otorga post-alta
+  // (fechaAlta → fechaHasta). No se guardan aparte; se derivan comparando solo
+  // el día calendario. El resto del total corresponde a la hospitalización.
+  const DIA_MS = 1000 * 60 * 60 * 24;
+  const aMedianoche = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diasAdicionales = Math.max(0, Math.round(
+    (aMedianoche(incapacidad.fechaHasta).getTime() - aMedianoche(incapacidad.fechaAlta).getTime()) / DIA_MS,
+  ));
+  const diasHospitalizacion = Math.max(0, incapacidad.diasIncapacidad - diasAdicionales);
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
@@ -252,13 +262,21 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
           <Row label="Servicio" value={incapacidad.medicoServicio} />
 
           <Row label="Fecha de alta" value={formatFecha(incapacidad.fechaAlta)} />
-          <Row label="Días incapacidad" value={`${incapacidad.diasIncapacidad} (${numeroALetras(incapacidad.diasIncapacidad)})`} />
+          <Row label="Total días" value={`${incapacidad.diasIncapacidad} (${numeroALetras(incapacidad.diasIncapacidad)})`} />
           <Row label="Condición egreso" value={incapacidad.condicionEgreso === "muerto" ? "Muerto" : "Vivo"} />
+
+          <Row label="Días hospitalización" value={`${diasHospitalizacion} ${diasHospitalizacion === 1 ? "día" : "días"}`} />
+          <Row label="Días adicionales (médico)" value={`${diasAdicionales} ${diasAdicionales === 1 ? "día" : "días"}`} />
+          <div />
 
           <Row label="Desde" value={formatFechaConstanciaCorta(incapacidad.fechaDesde)} mono />
           <Row label="Hasta" value={formatFechaConstanciaCorta(incapacidad.fechaHasta)} mono />
           <div />
         </div>
+        <p className="mt-3 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
+          <span className="font-semibold text-slate-700 dark:text-slate-300">{incapacidad.diasIncapacidad} días en total</span>
+          {" = "}{diasHospitalizacion} de hospitalización + <span className="font-semibold text-slate-700 dark:text-slate-300">{diasAdicionales} adicionales</span> que otorgó el médico.
+        </p>
         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
           <BlockRow label="Diagnóstico de egreso" value={incapacidad.diagnosticoEgreso} />
           <BlockRow label="Tratamiento al alta" value={incapacidad.tratamientoAlta} />

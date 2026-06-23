@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "importar:dry": "node scripts/importar-pacientes.mjs --dry-run",
-    "importar": "node scripts/importar-pacientes.mjs"
+    "importar": "node scripts/importar-pacientes.mjs",
+    "recalcular-dias:dry": "node scripts/recalcular-dias-incapacidad.mjs --dry-run",
+    "recalcular-dias": "node scripts/recalcular-dias-incapacidad.mjs"
   },
   "dependencies": {
     "claude": "^0.1.1",

@@ -35,18 +35,19 @@ export function ConstanciaPrintLayout({ incapacidad, paciente }: Props) {
 
   return (
     <div className="constancia text-black bg-white">
-      {/* ── Header con logo + número de junta ── */}
-      <div className="flex items-start justify-between mb-4 px-4 pt-4">
-        <div className="flex-1 flex justify-center">
-          <Image
-            src="/logo_minsal.png"
-            alt="Ministerio de Salud"
-            width={260}
-            height={90}
-            className="object-contain"
-            priority
-          />
-        </div>
+      {/* ── Header con logo + título ── */}
+      <div className="flex flex-col items-center mb-4 px-4 pt-4">
+        <Image
+          src="/logo_minsal.png"
+          alt="Ministerio de Salud"
+          width={260}
+          height={90}
+          className="object-contain"
+          priority
+        />
+        <h1 className="mt-2 text-center text-[13px] font-bold uppercase tracking-wide">
+          Constancia de Hospitalización e Incapacidad
+        </h1>
       </div>
 
       <table className="constancia-table w-full border-collapse text-[10px]">
