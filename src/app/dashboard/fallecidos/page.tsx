@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { HeartPulse, Clock, X, ChevronDown, CheckCircle2, FileWarning, Lock, LockOpen, Search } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, CheckCircle2, FileWarning, Lock, LockOpen, Search, MessageCircle } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -170,6 +170,15 @@ export default function DashboardFallecidosPage() {
     setSavingFamiliar(false);
     setSavedFamiliar(true);
     setTimeout(() => setSavedFamiliar(false), 3000);
+  };
+
+  const enviarWhatsApp = (n: NotificacionFallecido) => {
+    const mensaje =
+      `Esdomed Notifica defuncion!\n\n` +
+      `Expediente: ${n.pacienteExpediente ?? ""}\n` +
+      `Servicio: ${n.servicio ?? ""}\n` +
+      `Cama: ${n.cama ?? ""}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener");
   };
 
   const formatFecha = (ts: unknown) => {
@@ -486,17 +495,25 @@ export default function DashboardFallecidosPage() {
 
               {/* ── Tab: Expediente ── */}
               {activeTab === "expediente" && (
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-x-6 gap-y-3">
-                  <InfoCell label="Fecha defunción" value={formatFecha(selectedLive.fechaDefuncion)} />
-                  <InfoCell label="Servicio" value={selectedLive.servicio} />
-                  <div className="col-span-2">
-                    <InfoCell label="Notificado por" value={`Dr. ${selectedLive.medicoNombre}`} />
-                  </div>
-                  {selectedLive.causaMuerte && (
+                <div className="space-y-3">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-x-6 gap-y-3">
+                    <InfoCell label="Fecha defunción" value={formatFecha(selectedLive.fechaDefuncion)} />
+                    <InfoCell label="Servicio" value={selectedLive.servicio} />
                     <div className="col-span-2">
-                      <InfoCell label="Causa de muerte" value={selectedLive.causaMuerte} />
+                      <InfoCell label="Notificado por" value={`Dr. ${selectedLive.medicoNombre}`} />
                     </div>
-                  )}
+                    {selectedLive.causaMuerte && (
+                      <div className="col-span-2">
+                        <InfoCell label="Causa de muerte" value={selectedLive.causaMuerte} />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => enviarWhatsApp(selectedLive)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-500 transition-colors"
+                  >
+                    <MessageCircle size={15} /> Generar mensaje de WhatsApp
+                  </button>
                 </div>
               )}
 
