@@ -205,6 +205,7 @@ export interface SolicitudImpresion {
   medicoId: string;
   medicoNombre: string;
   medicoServicio: string;
+  medicoJvpm?: string;
   pacienteExpediente?: string;
   descripcion: string;
   copias: number;

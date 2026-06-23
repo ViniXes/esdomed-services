@@ -102,6 +102,7 @@ export default function MedicoImpresionesPage() {
         medicoId: user.uid, 
         medicoNombre: profile.nombre,
         medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
+        medicoJvpm: profile.jvpm || "",
         pacienteExpediente,
         descripcion, 
         copias: parseInt(copias), 

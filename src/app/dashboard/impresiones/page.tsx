@@ -126,7 +126,7 @@ export default function DashboardImpresionesPage() {
                 )}
                 
                 <div className="text-sm text-slate-500 space-y-0.5">
-                  <p>Dr. {s.medicoNombre} · {s.medicoServicio}</p>
+                  <p>Dr. {s.medicoNombre}{s.medicoJvpm ? ` · JVPM ${s.medicoJvpm}` : ""}</p>
                   <p>{s.copias} copia(s) · Solicitado {formatFecha(s.creadoEn)}</p>
                 </div>
                 
