@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudImpresion } from "@/types";
 import { Badge } from "@/components/ui/Badge";
+import { DateField } from "@/components/ui/DateField";
 import { Printer, Clock, Search, X } from "lucide-react";
 
 export default function DashboardImpresionesPage() {
@@ -90,13 +91,11 @@ export default function DashboardImpresionesPage() {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
-            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]" />
+          <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Desde" />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
-            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]" />
+          <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Hasta" />
         </div>
         {(busquedaExpediente || fechaDesde || fechaHasta) && (
           <button onClick={() => { setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta(""); }}

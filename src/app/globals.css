@@ -75,3 +75,26 @@ body {
   from { opacity: 0; transform: translateX(1.5rem); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+/* ── react-day-picker (componente DateField) ── */
+.rdp-tailwind {
+  --rdp-accent-color: #2563eb;              /* blue-600 */
+  --rdp-accent-background-color: #eff6ff;   /* blue-50  */
+  --rdp-today-color: #2563eb;
+  --rdp-font-family: var(--font-body);
+  --rdp-day-width: 2.25rem;
+  --rdp-day-height: 2.25rem;
+  --rdp-day_button-width: 2.25rem;
+  --rdp-day_button-height: 2.25rem;
+  --rdp-day_button-border-radius: 0.5rem;
+  --rdp-weekday-opacity: 0.6;
+  margin: 0;
+}
+.dark .rdp-tailwind {
+  --rdp-accent-color: #3b82f6;              /* blue-500 */
+  --rdp-accent-background-color: #1e3a5f;
+  --rdp-today-color: #60a5fa;
+}
+.rdp-tailwind .rdp-month_caption { font-weight: 600; }
+.rdp-tailwind .rdp-chevron { fill: currentColor; }
+.rdp-tailwind .rdp-dropdowns select { color: inherit; cursor: pointer; }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DateField } from "@/components/ui/DateField";
 import {
   ArrowLeft, Save, UserPlus, CreditCard, Building, Mail, Phone, Hash, DollarSign
 } from "lucide-react";
@@ -127,7 +128,8 @@ export default function NuevoEmpleadoPage() {
             </div>
             <div>
               <label className={labelCls}>Fecha de Ingreso</label>
-              <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} className={`${inputCls} [color-scheme:light] dark:[color-scheme:dark]`} />
+              <DateField value={fechaIngreso} onChange={setFechaIngreso}
+                placeholder="Fecha de ingreso" ariaLabel="Fecha de ingreso" />
             </div>
             <div>
               <label className={labelCls}>Cargo / Puesto</label>

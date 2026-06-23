@@ -11,6 +11,7 @@ import {
   Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
   ArrowUpRight, Stethoscope, Clock, MapPin, UserCog,
 } from "lucide-react";
+import { DateField } from "@/components/ui/DateField";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
 import { toDate, formatFechaHora } from "@/lib/pacientes/helpers";
 import {
@@ -248,20 +249,22 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">{esEgresos ? "Alta desde" : "Ingreso desde"}</span>
-          <input
-            type="date"
+          <DateField
             value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={setFechaDesde}
+            clearable
+            placeholder={esEgresos ? "Alta desde" : "Ingreso desde"}
+            ariaLabel={esEgresos ? "Alta desde" : "Ingreso desde"}
           />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <input
-            type="date"
+          <DateField
             value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={setFechaHasta}
+            clearable
+            placeholder="Hasta"
+            ariaLabel="Hasta"
           />
         </div>
         {(busqueda || fechaDesde || fechaHasta) && (

@@ -6,6 +6,7 @@ import {
   doc, getDocs, where, limit, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { Genero, RegistroAlta, TipoAlta } from "@/types";
@@ -312,8 +313,8 @@ export default function RegistroAltasPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className={labelCls}>Fecha del alta</label>
-              <input type="date" value={form.fecha} onChange={e => setF("fecha", e.target.value)} required
-                className={`${inputCls} [color-scheme:light] dark:[color-scheme:dark]`} />
+              <DateField value={form.fecha} onChange={v => setF("fecha", v)}
+                placeholder="Fecha del alta" ariaLabel="Fecha del alta" />
             </div>
             <div>
               <label className={labelCls}>Expediente</label>
@@ -428,13 +429,13 @@ export default function RegistroAltasPage() {
         </select>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
-            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]" />
+          <DateField value={fechaDesde} onChange={setFechaDesde} clearable
+            placeholder="Desde" ariaLabel="Fecha desde" />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
-            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]" />
+          <DateField value={fechaHasta} onChange={setFechaHasta} clearable
+            placeholder="Hasta" ariaLabel="Fecha hasta" />
         </div>
         {hayFiltros && (
           <button onClick={() => { setBusqueda(""); setFiltroServicio(""); setFiltroTipo(""); setFechaDesde(""); setFechaHasta(""); }}

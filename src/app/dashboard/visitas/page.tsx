@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { PARENTESCOS } from "@/lib/parentescos";
+import { DateField } from "@/components/ui/DateField";
 import type { Paciente, TarjetaVisita, Visita, VisitanteInfo } from "@/types";
 import {
   DoorOpen, Plus, X, LogIn, LogOut, User, UserPlus, IdCard,
@@ -551,8 +552,8 @@ export default function VisitasPage() {
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <CalendarDays size={15} />
-              <input type="date" value={histFecha} onChange={e => setHistFecha(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <DateField value={histFecha} onChange={v => setHistFecha(v)}
+                placeholder="Fecha" ariaLabel="Filtrar visitas por fecha" />
             </label>
             <div className="relative flex-1 min-w-[220px]">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

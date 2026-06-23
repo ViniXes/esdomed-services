@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { BusquedaTelefono } from "@/types";
 import { ESTADO_LABEL, toDate } from "@/lib/pacientes/helpers";
+import { DateField } from "@/components/ui/DateField";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -139,8 +140,8 @@ export default function HistorialBusquedasPage() {
               </button>
             )}
           </div>
-          <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className={inputCls} />
-          <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className={inputCls} />
+          <DateField value={desde} onChange={v => setDesde(v)} placeholder="Desde" ariaLabel="Filtrar desde" clearable />
+          <DateField value={hasta} onChange={v => setHasta(v)} placeholder="Hasta" ariaLabel="Filtrar hasta" clearable />
           <select value={estado} onChange={e => setEstado(e.target.value as typeof estado)} className={inputCls}>
             <option value="todos">Todos</option>
             <option value="encontrado">Encontrados</option>

@@ -598,6 +598,9 @@ export interface Paciente {
   servicioIngreso: string;
   medicoIngresoNombre?: string;
   diagnosticoIngreso?: DiagnosticoCIE;
+  // Último diagnóstico conocido del reporte (se actualiza en cada importación;
+  // puede diferir del de ingreso a medida que avanza la estancia).
+  ultimoDiagnostico?: DiagnosticoCIE;
 
   // Ubicación actual
   servicioActual: string;

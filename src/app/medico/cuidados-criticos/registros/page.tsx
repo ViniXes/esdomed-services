@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
+import { DateField } from "@/components/ui/DateField";
 import { db } from "@/lib/firebase";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
@@ -174,11 +175,11 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
             <>
               <label>
                 <span className="mb-1 block text-xs font-semibold text-slate-500">Desde ingreso UCI/UCIN</span>
-                <input type="date" value={desde} onChange={event => setDesde(event.target.value)} className={inputCls} />
+                <DateField value={desde} onChange={setDesde} placeholder="Desde" ariaLabel="Desde ingreso UCI/UCIN" clearable />
               </label>
               <label>
                 <span className="mb-1 block text-xs font-semibold text-slate-500">Hasta ingreso UCI/UCIN</span>
-                <input type="date" value={hasta} onChange={event => setHasta(event.target.value)} className={inputCls} />
+                <DateField value={hasta} onChange={setHasta} placeholder="Hasta" ariaLabel="Hasta ingreso UCI/UCIN" clearable />
               </label>
             </>
           )}

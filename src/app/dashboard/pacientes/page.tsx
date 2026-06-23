@@ -7,6 +7,7 @@ import {
   collection, query, where, orderBy, onSnapshot, limit, QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload, X } from "lucide-react";
 import type { EstadoPaciente, Paciente } from "@/types";
@@ -210,20 +211,22 @@ export default function PacientesPage() {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">{labelFecha} desde</span>
-          <input
-            type="date"
+          <DateField
             value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={setFechaDesde}
+            clearable
+            placeholder={`${labelFecha} desde`}
+            ariaLabel={`${labelFecha} desde`}
           />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <input
-            type="date"
+          <DateField
             value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={setFechaHasta}
+            clearable
+            placeholder="Hasta"
+            ariaLabel="Fecha hasta"
           />
         </div>
         {(busqueda || servicioFiltro || fechaDesde || fechaHasta) && (

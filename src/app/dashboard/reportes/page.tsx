@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { DateField } from "@/components/ui/DateField";
 import {
   BarChart3, Download, AlertTriangle, HeartPulse, Activity, Users, CalendarClock,
 } from "lucide-react";
@@ -26,8 +27,6 @@ type TipoVivo = "todos" | "alta_vivo" | "alta_voluntaria" | "referido" | "fuga" 
 const pad = (n: number) => String(n).padStart(2, "0");
 const toInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-const inputDateCls =
-  "px-2 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 shadow-sm [color-scheme:light] dark:[color-scheme:dark]";
 const selectCls =
   "px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-200 shadow-sm cursor-pointer";
 
@@ -256,11 +255,11 @@ export default function ReportesPage() {
       <div className="flex flex-wrap items-end gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Egreso desde</span>
-          <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className={inputDateCls} />
+          <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Egreso desde" ariaLabel="Egreso desde" clearable />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className={inputDateCls} />
+          <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Egreso hasta" clearable />
         </div>
 
         <div className="flex flex-col gap-1">

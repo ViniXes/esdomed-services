@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase";
 import { FileText, Clock, CheckCircle2, Search, X, AlertTriangle } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { formatFecha, toDate } from "@/lib/pacientes/helpers";
+import { DateField } from "@/components/ui/DateField";
 
 type Filtro = EstadoIncapacidad | "todos";
 
@@ -140,20 +141,22 @@ export default function IncapacidadesPage() {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Alta desde</span>
-          <input
-            type="date"
+          <DateField
             value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={(v) => setFechaDesde(v)}
+            placeholder="Alta desde"
+            ariaLabel="Filtrar alta desde"
+            clearable
           />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <input
-            type="date"
+          <DateField
             value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+            onChange={(v) => setFechaHasta(v)}
+            placeholder="Alta hasta"
+            ariaLabel="Filtrar alta hasta"
+            clearable
           />
         </div>
         {(busqueda || fechaDesde || fechaHasta) && (

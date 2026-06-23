@@ -105,6 +105,12 @@ export function construirDocIngreso(
       descripcion: (form.diagnosticoIngreso.descripcion ?? "").trim(),
     };
   }
+  if (form.ultimoDiagnostico?.codigo || form.ultimoDiagnostico?.descripcion) {
+    doc.ultimoDiagnostico = {
+      codigo:      (form.ultimoDiagnostico.codigo ?? "").trim(),
+      descripcion: (form.ultimoDiagnostico.descripcion ?? "").trim(),
+    };
+  }
   return doc;
 }
 

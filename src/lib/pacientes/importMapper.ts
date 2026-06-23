@@ -132,7 +132,7 @@ function toDatetimeLocalInput(d: Date): string {
 
 /**
  * Convierte una fila del reporte en un PacienteFormValue + clasificación.
- * Ignora: Edad, Estancia(días), Tipo Ingreso, Último diagnóstico y la columna vacía.
+ * Ignora: Edad, Estancia(días), Tipo Ingreso y la columna vacía.
  */
 export function mapearFilaReporte(
   row: FilaReporte,
@@ -202,6 +202,7 @@ export function mapearFilaReporte(
     camaActual: cama ?? undefined,
     medicoIngresoNombre: parsearNombreMedico(row["Médico Ingreso"]),
     diagnosticoIngreso: parsearDiagnostico(row["Diagnóstico de ingreso"]),
+    ultimoDiagnostico: parsearDiagnostico(row["Último diagnóstico"]),
   };
 
   return { expediente, form, valido: true, servicioReconocido, servicioExcel, advertenciaCama: advertencia };

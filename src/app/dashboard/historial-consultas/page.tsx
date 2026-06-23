@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { AlertTriangle, History, Search, X } from "lucide-react";
+import { DateField } from "@/components/ui/DateField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ConsultaPaciente, CriterioConsultaPaciente, UserRole } from "@/types";
@@ -152,8 +153,8 @@ export default function HistorialConsultasPage() {
               </button>
             )}
           </div>
-          <input type="date" value={desde} onChange={e => setDesde(e.target.value)} className={inputCls} />
-          <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} className={inputCls} />
+          <DateField value={desde} onChange={setDesde} clearable placeholder="Desde" ariaLabel="Desde" />
+          <DateField value={hasta} onChange={setHasta} clearable placeholder="Hasta" ariaLabel="Hasta" />
           <select value={criterio} onChange={e => setCriterio(e.target.value as typeof criterio)} className={inputCls}>
             <option value="todos">Todos los criterios</option>
             <option value="expediente">Expediente</option>

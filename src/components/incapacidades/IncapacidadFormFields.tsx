@@ -2,6 +2,7 @@
 
 import type { CondicionEgresoIncapacidad } from "@/types";
 import { calcularDiasHospitalizacion, calcularFechaHasta, formatFechaCorta, parseDateInput } from "@/lib/incapacidades/helpers";
+import { DateField } from "@/components/ui/DateField";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
@@ -56,12 +57,12 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, disabled 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label className={labelCls}>Fecha de alta *</label>
-          <input
-            type="date"
+          <DateField
             value={value.fechaAlta}
-            onChange={(e) => set("fechaAlta", e.target.value)}
+            onChange={(v) => set("fechaAlta", v)}
+            placeholder="Fecha de alta"
+            ariaLabel="Fecha de alta"
             disabled={disabled}
-            className={inputCls}
           />
           {altaAntesDqIngreso && (
             <p className="text-xs text-red-600 dark:text-red-400 mt-1">

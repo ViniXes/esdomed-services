@@ -15,6 +15,7 @@ import type { DiagnosticoCIE, Empleado, Licencia } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 import { parseDateInput } from "@/lib/incapacidades/helpers";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
+import { DateField } from "@/components/ui/DateField";
 import { CATEGORIAS, CATEGORIAS_ORDEN, metaCategoria, BOLSA_LABEL, unidadCategoria } from "@/lib/rrhh/catalogo";
 import { evaluarLicencia, diasInclusivos } from "@/lib/rrhh/saldos";
 import { OPCIONES_HORA, horasEntre, formatCantidad, formatHoras } from "@/lib/rrhh/formato";
@@ -268,7 +269,7 @@ export default function NuevaLicenciaPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Fecha</label>
-                <input type="date" value={fechaInicial} onChange={(e) => setFechaInicial(e.target.value)} className={inputCls} />
+                <DateField value={fechaInicial} onChange={setFechaInicial} placeholder="Fecha" ariaLabel="Fecha" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -294,11 +295,11 @@ export default function NuevaLicenciaPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Desde</label>
-                <input type="date" value={fechaInicial} onChange={(e) => setFechaInicial(e.target.value)} className={inputCls} />
+                <DateField value={fechaInicial} onChange={setFechaInicial} placeholder="Desde" ariaLabel="Fecha desde" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Hasta</label>
-                <input type="date" value={fechaFinal} onChange={(e) => setFechaFinal(e.target.value)} className={inputCls} />
+                <DateField value={fechaFinal} onChange={setFechaFinal} placeholder="Hasta" ariaLabel="Fecha hasta" />
               </div>
             </div>
           )}

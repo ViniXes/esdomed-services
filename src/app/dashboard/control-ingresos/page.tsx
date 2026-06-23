@@ -7,6 +7,7 @@ import Image from "next/image";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { DateField } from "@/components/ui/DateField";
 import { ClipboardList, CheckCircle2, Search, X, Pencil } from "lucide-react";
 
 type ControlIngreso = {
@@ -371,21 +372,11 @@ export default function ControlIngresosPage() {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500 shrink-0">Desde</span>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={e => setFechaDesde(e.target.value)}
-              className="px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
-            />
+            <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={e => setFechaHasta(e.target.value)}
-              className="px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
-            />
+            <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
           </div>
           {(busqueda || fechaDesde || fechaHasta) && (
             <button

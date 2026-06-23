@@ -264,13 +264,30 @@ function TabDatos({ paciente }: { paciente: Paciente }) {
         <Row label="Médico" value={paciente.medicoIngresoNombre} />
         {paciente.diagnosticoIngreso && (
           <Row
-            label="Diagnóstico"
+            label="Diagnóstico de ingreso"
             value={
               <span>
-                <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
-                  {paciente.diagnosticoIngreso.codigo}
-                </span>
+                {paciente.diagnosticoIngreso.codigo && (
+                  <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
+                    {paciente.diagnosticoIngreso.codigo}
+                  </span>
+                )}
                 {paciente.diagnosticoIngreso.descripcion}
+              </span>
+            }
+          />
+        )}
+        {paciente.ultimoDiagnostico && (
+          <Row
+            label="Último diagnóstico"
+            value={
+              <span>
+                {paciente.ultimoDiagnostico.codigo && (
+                  <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded mr-2">
+                    {paciente.ultimoDiagnostico.codigo}
+                  </span>
+                )}
+                {paciente.ultimoDiagnostico.descripcion}
               </span>
             }
           />

@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
+import { DateField } from "@/components/ui/DateField";
 import { prealtaExistente } from "@/lib/altas/duplicados";
 import { ubicacionLabel } from "@/lib/servicios";
 import { toDate } from "@/lib/pacientes/helpers";
@@ -161,8 +162,7 @@ export default function NotificacionAltasPage() {
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
           <CalendarDays size={15} />
-          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-            className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          <DateField value={fecha} onChange={setFecha} placeholder="Fecha" ariaLabel="Fecha de notificaciones" />
         </label>
         {fecha !== hoyStr() && (
           <button onClick={() => setFecha(hoyStr())} className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-amber-500">Hoy</button>
@@ -432,7 +432,7 @@ function RegistroModal({ fecha, registro, profile, onClose, onSaved, notify }: {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Fecha del alta</label>
-                  <input type="date" className={inputCls} value={fechaAlta} onChange={e => setFechaAlta(e.target.value)} />
+                  <DateField value={fechaAlta} onChange={setFechaAlta} placeholder="Fecha del alta" ariaLabel="Fecha del alta" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Edad</label>

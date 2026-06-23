@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2, Search, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
@@ -152,20 +153,22 @@ export default function MedicoIncapacidadesPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-slate-500 shrink-0">Alta desde</span>
-              <input
-                type="date"
+              <DateField
                 value={fechaDesde}
-                onChange={(e) => { setFechaDesde(e.target.value); setPagina(1); }}
-                className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+                onChange={(v) => { setFechaDesde(v); setPagina(1); }}
+                clearable
+                placeholder="Alta desde"
+                ariaLabel="Alta desde"
               />
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-              <input
-                type="date"
+              <DateField
                 value={fechaHasta}
-                onChange={(e) => { setFechaHasta(e.target.value); setPagina(1); }}
-                className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 [color-scheme:light] dark:[color-scheme:dark]"
+                onChange={(v) => { setFechaHasta(v); setPagina(1); }}
+                clearable
+                placeholder="Hasta"
+                ariaLabel="Fecha hasta"
               />
             </div>
             {hayFiltros && (

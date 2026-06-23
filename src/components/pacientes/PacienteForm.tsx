@@ -4,6 +4,7 @@ import { ChevronDown, IdCard, MapPin, User2, BedDouble, Stethoscope } from "luci
 import type { Paciente, ResponsablePaciente, DiagnosticoCIE } from "@/types";
 import { CIRCUNSTANCIA_LABEL, GENERO_LABEL } from "@/lib/pacientes/helpers";
 import { useServicios } from "@/contexts/ServiciosContext";
+import { DateField } from "@/components/ui/DateField";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed";
@@ -93,12 +94,12 @@ export function PacienteForm({ value, onChange, disabled, hideIngreso, expedient
         </Field>
 
         <Field label="Fecha de nacimiento">
-          <input
-            type="date"
+          <DateField
             value={value.fechaNacimiento ?? ""}
-            onChange={(e) => set("fechaNacimiento", e.target.value)}
+            onChange={(v) => set("fechaNacimiento", v)}
+            placeholder="Fecha de nacimiento"
+            ariaLabel="Fecha de nacimiento"
             disabled={disabled}
-            className={inputCls}
           />
         </Field>
         <Field label="Género">

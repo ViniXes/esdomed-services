@@ -10,6 +10,7 @@ import {
   calcularEdad, diasEstancia, formatFecha, nombreCompleto, toDate,
   ESTADO_LABEL, ESTADO_BADGE,
 } from "@/lib/pacientes/helpers";
+import { DateField } from "@/components/ui/DateField";
 
 // Estados de egreso (cualquier tipo de alta efectiva que ESDOMED ya registró).
 const ESTADOS_EGRESO: EstadoPaciente[] = [
@@ -27,6 +28,8 @@ export default function AltasPsicologiaPage() {
   const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>("todos");
   const [servicioFiltro, setServicioFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
 
   useEffect(() => {
     if (!profile) return;
@@ -66,9 +69,16 @@ export default function AltasPsicologiaPage() {
 
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
+    const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
+    const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return egresos.filter((p) => {
       if (estadoFiltro !== "todos" && p.estado !== estadoFiltro) return false;
       if (servicioFiltro && p.servicioActual !== servicioFiltro) return false;
+      if (desde || hasta) {
+        if (!p.fechaEgreso) return false;
+        if (desde && p.fechaEgreso < desde) return false;
+        if (hasta && p.fechaEgreso > hasta) return false;
+      }
       if (!term) return true;
       return (
         p.expediente?.toLowerCase().includes(term) ||
@@ -76,7 +86,7 @@ export default function AltasPsicologiaPage() {
         nombreCompleto(p).toLowerCase().includes(term)
       );
     });
-  }, [egresos, estadoFiltro, servicioFiltro, busqueda]);
+  }, [egresos, estadoFiltro, servicioFiltro, busqueda, fechaDesde, fechaHasta]);
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
@@ -141,9 +151,17 @@ export default function AltasPsicologiaPage() {
           </select>
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
-        {(busqueda || servicioFiltro || estadoFiltro !== "todos") && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Egreso desde</span>
+          <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Egreso desde" clearable className="w-40" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Egreso hasta" clearable className="w-40" />
+        </div>
+        {(busqueda || servicioFiltro || estadoFiltro !== "todos" || fechaDesde || fechaHasta) && (
           <button
-            onClick={() => { setBusqueda(""); setServicioFiltro(""); setEstadoFiltro("todos"); }}
+            onClick={() => { setBusqueda(""); setServicioFiltro(""); setEstadoFiltro("todos"); setFechaDesde(""); setFechaHasta(""); }}
             className="flex items-center gap-1 px-3 py-2 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors shadow-sm"
           >
             <X size={12} /> Limpiar

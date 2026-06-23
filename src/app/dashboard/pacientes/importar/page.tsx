@@ -15,6 +15,7 @@ import {
 import { mapearFilaReporte } from "@/lib/pacientes/importMapper";
 import { construirDatosPersonales, construirDocIngreso } from "@/lib/pacientes/persona";
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";
+import type { DiagnosticoCIE } from "@/types";
 
 type Paso = "subir" | "previsualizar" | "hecho";
 
@@ -23,6 +24,8 @@ interface Actualizar {
   id: string; expediente: string; nombre: string;
   servicioAnterior: string; camaAnterior: string;
   servicioNuevo: string; camaNuevo: string;
+  ultimoDiagnostico?: DiagnosticoCIE;   // último diagnóstico del reporte (se refresca)
+  cambioDx: boolean;                    // true si el último diagnóstico cambió
 }
 interface SinCambios { expediente: string; nombre: string; }
 interface NoReconocido { expediente: string; nombre: string; servicioExcel: string; }
@@ -42,6 +45,7 @@ interface Diff {
 }
 
 const nombreDe = (f: PacienteFormValue) => `${f.nombres ?? ""} ${f.apellidos ?? ""}`.replace(/\s+/g, " ").trim();
+const dxKey = (d?: DiagnosticoCIE) => `${(d?.codigo ?? "").trim()}|${(d?.descripcion ?? "").trim()}`.toLowerCase();
 
 export default function ImportarReportePage() {
   const { profile } = useAuth();
@@ -83,7 +87,7 @@ export default function ImportarReportePage() {
 
       // Activos actuales en el sistema
       const snap = await getDocs(query(collection(db, "pacientes"), where("estado", "==", "activo")));
-      const activos = new Map<string, { id: string; servicioActual: string; camaActual: string; nombre: string }>();
+      const activos = new Map<string, { id: string; servicioActual: string; camaActual: string; nombre: string; ultimoDiagnostico?: DiagnosticoCIE }>();
       snap.forEach((d) => {
         const data = d.data();
         activos.set(String(data.expediente), {
@@ -91,6 +95,7 @@ export default function ImportarReportePage() {
           servicioActual: data.servicioActual ?? "",
           camaActual: data.camaActual ?? "",
           nombre: `${data.nombres ?? ""} ${data.apellidos ?? ""}`.replace(/\s+/g, " ").trim(),
+          ultimoDiagnostico: data.ultimoDiagnostico,
         });
       });
 
@@ -121,11 +126,14 @@ export default function ImportarReportePage() {
         if (existente) {
           const cambioServicio = existente.servicioActual !== servicioNuevo;
           const cambioCama = camaNueva !== "" && existente.camaActual !== camaNueva;
-          if (cambioServicio || cambioCama) {
+          const dxNuevo = m.form.ultimoDiagnostico;
+          const cambioDx = !!dxNuevo && dxKey(existente.ultimoDiagnostico) !== dxKey(dxNuevo);
+          if (cambioServicio || cambioCama || cambioDx) {
             d.actualizar.push({
               id: existente.id, expediente: m.expediente, nombre: nombreDe(m.form),
               servicioAnterior: existente.servicioActual, camaAnterior: existente.camaActual,
               servicioNuevo, camaNuevo: camaNueva,
+              ultimoDiagnostico: dxNuevo, cambioDx,
             });
           } else {
             d.sinCambios.push({ expediente: m.expediente, nombre: nombreDe(m.form) });
@@ -174,23 +182,34 @@ export default function ImportarReportePage() {
         await bump(2);
       }
 
-      // Actualizaciones de cama/servicio en activos (con movimiento)
+      // Actualizaciones de activos: cama/servicio (con movimiento) y/o último diagnóstico.
       for (const a of diff.actualizar) {
-        const mov: Record<string, unknown> = {
-          fecha: ahora,
-          servicioOrigen: a.servicioAnterior,
-          servicioDestino: a.servicioNuevo,
-          registradoPorNombre: registrador,
-        };
-        if (a.camaAnterior) mov.camaOrigen = a.camaAnterior;
-        if (a.camaNuevo) mov.camaDestino = a.camaNuevo;
-        batch.update(doc(db, "pacientes", a.id), {
-          servicioActual: a.servicioNuevo,
-          camaActual: a.camaNuevo || null,
-          movimientos: arrayUnion(mov),
+        const payload: Record<string, unknown> = {
           actualizadoEn: ahora,
           actualizadoPor: profile.uid,
-        });
+        };
+        const cambioServicio = a.servicioAnterior !== a.servicioNuevo;
+        const cambioCama = !!a.camaNuevo && a.camaAnterior !== a.camaNuevo;
+        if (cambioServicio || cambioCama) {
+          const mov: Record<string, unknown> = {
+            fecha: ahora,
+            servicioOrigen: a.servicioAnterior,
+            servicioDestino: a.servicioNuevo,
+            registradoPorNombre: registrador,
+          };
+          if (a.camaAnterior) mov.camaOrigen = a.camaAnterior;
+          if (a.camaNuevo) mov.camaDestino = a.camaNuevo;
+          payload.servicioActual = a.servicioNuevo;
+          payload.camaActual = a.camaNuevo || null;
+          payload.movimientos = arrayUnion(mov);
+        }
+        if (a.cambioDx && a.ultimoDiagnostico) {
+          payload.ultimoDiagnostico = {
+            codigo: (a.ultimoDiagnostico.codigo ?? "").trim(),
+            descripcion: (a.ultimoDiagnostico.descripcion ?? "").trim(),
+          };
+        }
+        batch.update(doc(db, "pacientes", a.id), payload);
         await bump(1);
       }
 
@@ -301,15 +320,17 @@ export default function ImportarReportePage() {
             ))}
           </Seccion>
 
-          <Seccion titulo="Actualizaciones de servicio / cama" vacioMsg="Ningún activo cambió de servicio o cama." items={diff.actualizar}>
-            {diff.actualizar.map((a) => (
-              <Fila
-                key={a.expediente}
-                exp={a.expediente}
-                nombre={a.nombre}
-                detalle={`${a.servicioAnterior}${a.camaAnterior ? ` (${a.camaAnterior})` : ""} → ${a.servicioNuevo}${a.camaNuevo ? ` (${a.camaNuevo})` : ""}`}
-              />
-            ))}
+          <Seccion titulo="Actualizaciones (servicio / cama / diagnóstico)" vacioMsg="Ningún activo cambió de servicio, cama o diagnóstico." items={diff.actualizar}>
+            {diff.actualizar.map((a) => {
+              const cambioUbicacion = a.servicioAnterior !== a.servicioNuevo || (!!a.camaNuevo && a.camaAnterior !== a.camaNuevo);
+              const partes = [
+                cambioUbicacion
+                  ? `${a.servicioAnterior}${a.camaAnterior ? ` (${a.camaAnterior})` : ""} → ${a.servicioNuevo}${a.camaNuevo ? ` (${a.camaNuevo})` : ""}`
+                  : null,
+                a.cambioDx ? `Dx → ${a.ultimoDiagnostico?.codigo || a.ultimoDiagnostico?.descripcion || "actualizado"}` : null,
+              ].filter(Boolean).join("  ·  ");
+              return <Fila key={a.expediente} exp={a.expediente} nombre={a.nombre} detalle={partes} />;
+            })}
           </Seccion>
 
           <Seccion titulo="Activos ausentes del reporte (revisar)" vacioMsg="Todos los activos están en el reporte." items={diff.ausentes}>

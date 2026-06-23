@@ -10,6 +10,7 @@ import {
   habilitaSeguimiento, type CanalRastreo, type EstadoRastreo,
 } from "@/lib/trabajosocial/catalogos";
 import { GestionesTabs } from "../_components/GestionesTabs";
+import { DateField } from "@/components/ui/DateField";
 import {
   AlertTriangle, CheckCircle2, Lock, Loader2, Radar, Search, X,
 } from "lucide-react";
@@ -377,7 +378,7 @@ export default function RastreoPage() {
                 <div className="grid grid-cols-3 gap-3 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40 rounded-xl p-3">
                   <div>
                     <label className={labelCls}>Fecha</label>
-                    <input type="date" value={fechaContacto} max={hoyStr()} onChange={(e) => setFechaContacto(e.target.value)} className={inputCls} />
+                    <DateField value={fechaContacto} onChange={setFechaContacto} placeholder="Fecha" ariaLabel="Fecha de contacto" />
                   </div>
                   <div>
                     <label className={labelCls}>Hora</label>
