@@ -51,7 +51,7 @@ export const FORMULAS_INDICADORES: Record<number, string> = {
   14: "Retiros accidentales de CVC / Total de pacientes con CVC x 100",
   15: "Complicaciones pleuro/pulmonares por VM / Total de pacientes con VM x 100",
   16: "Neumonias asociadas a VM / Total de pacientes con VM x 100",
-  17: "Infecciones asociadas a la atencion sanitaria / Total de egresos x 100",
+  17: "Pacientes unicos con IAAS aparecida en el mes / Total de egresos x 100",
   18: "Caidas de pacientes / Dias cama ocupados x 1,000",
   19: "Infecciones asociadas a STU / Total de pacientes con STU x 100",
   20: "Retiros accidentales de STU / Total de pacientes con STU x 100",
@@ -374,6 +374,22 @@ function conteosMensuales(
   const fichasEgresoVm = fichasEgresoMes.filter(recibioVm);
   const pacientesCvc = fichasMes.filter(ficha => si(ficha.datos?.colocacion_cvc_antes_de_uci) || si(ficha.datos?.colocacion_cvc_en_uci)).length;
   const pacientesStu = fichasMes.filter(ficha => si(ficha.datos?.coloc_stu_previo_uci) || si(ficha.datos?.coloc_stu_en_uci)).length;
+  const tieneIaas = (ficha: FichaCuidadosCriticos) => (
+    si(ficha.datos?.otras_infecciones_uci)
+    || si(ficha.datos?.neumonia_nosocom)
+    || si(ficha.datos?.neum_asoci_a_vm)
+    || si(ficha.datos?.ivu_asociada_a_stu)
+    || si(ficha.datos?.infeccion_sitio_cvc)
+  );
+  const pacientesIaas = fichasServicio.filter(ficha => {
+    if (!tieneIaas(ficha)) return false;
+    const ingreso = fechaDato(ficha.datos?.fecha_ingreso_al_servicio);
+    const diasAparicion = numero(ficha.datos?.dias_aparicion_iaas_post_ingreso_a_uci);
+    if (!ingreso || diasAparicion <= 0) return false;
+    const fechaAparicion = new Date(ingreso);
+    fechaAparicion.setDate(fechaAparicion.getDate() + diasAparicion);
+    return fechaAparicion.getFullYear() === anio && fechaAparicion.getMonth() + 1 === mes;
+  }).length;
 
   return {
     totalEgresos,
@@ -397,7 +413,7 @@ function conteosMensuales(
     retirosCvc: cuentaSi(fichasMes, "retiro_accidental_de_cvc"),
     complicacionesVm: cuentaSi(fichasMes, "complicaciones_pleuro_pulmonares_por_vm"),
     neumoniaVm: cuentaSi(fichasMes, "neum_asoci_a_vm"),
-    iaas: cuentaSi(fichasMes, "otras_infecciones_uci") + cuentaSi(fichasMes, "neumonia_nosocom") + cuentaSi(fichasMes, "neum_asoci_a_vm") + cuentaSi(fichasMes, "ivu_asociada_a_stu") + cuentaSi(fichasMes, "infeccion_sitio_cvc"),
+    iaas: pacientesIaas,
     caidas: cuentaSi(fichasMes, "caidas_de_cama"),
     pacientesStu,
     infeccionesStu: cuentaSi(fichasMes, "ivu_asociada_a_stu"),
