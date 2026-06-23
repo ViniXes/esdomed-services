@@ -21,6 +21,7 @@ import {
   Phone,
   Printer,
   Settings,
+  Syringe,
   Users,
   DoorOpen,
   CalendarClock,
@@ -103,6 +104,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verPacientes
       ? [{ href: "/dashboard/emergencia", label: "Atendidos en emergencia", icon: Ambulance, group: G_PACIENTES }]
+      : []),
+    ...(verPacientes
+      ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
       : []),
     ...(verCuidadosCriticos
       ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_PACIENTES }]

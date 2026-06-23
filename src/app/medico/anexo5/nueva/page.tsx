@@ -165,7 +165,9 @@ export default function NuevaAnexo5Page() {
         nombrePaciente: form.nombrePaciente.toUpperCase(),
         referidoDe: form.referidoDe.toUpperCase(),
         establecimientoReferencia: form.establecimientoReferencia.toUpperCase(),
-        fechaHoraCita: form.fechaHoraCita || undefined,
+        // La fecha/hora de cita es opcional (a veces la ponen a mano después).
+        // Solo se incluye si viene; Firestore rechaza valores undefined.
+        ...(form.fechaHoraCita && { fechaHoraCita: form.fechaHoraCita }),
         especialidad: form.especialidad.toUpperCase(),
         medicoRefiere: form.medicoRefiere.toUpperCase(),
         establecimientoQueRefiere: form.establecimientoQueRefiere.toUpperCase(),

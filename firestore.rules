@@ -211,6 +211,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Hospital Día ─────────────────────────────────────────────────────────
+    // Pacientes crónicos a los que solo se les crea el expediente. Marcador +
+    // lista del módulo (docId = expediente). Solo ESDOMED/admin. La persona
+    // canónica se crea en /personas (que ya permite escritura a ESDOMED/admin).
+    match /hospital_dia/{expediente} {
+      allow read:   if isEsdomed() || isAdmin();
+      allow create: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Atendidos en Emergencia ──────────────────────────────────────────────
     // Atenciones de emergencia importadas del reporte del SIS. Módulo aparte de
     // pacientes. Consulta: personal + médicos (solo lectura). Importación: solo

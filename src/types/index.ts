@@ -699,6 +699,39 @@ export interface AtencionEmergencia {
 }
 
 // ============================================================================
+// Hospital Día — pacientes crónicos que solo vienen a procedimientos
+// ============================================================================
+// Pacientes crónicos (hemodiálisis, quimioterapia, etc.) a los que SOLO se les
+// crea el expediente: no ingresan a hospitalización ni ocupan cama. Se registran
+// desde la Hoja de Identificación (reusa el parser/formulario de pacientes).
+//
+// Modelo: este registro (docId = expediente, uno por persona) es el marcador de
+// "Hospital Día" + la lista del módulo. Al guardar también se crea/actualiza
+// personas/{expediente} (el expediente canónico, vía guardarPersona). No escribe
+// en `pacientes` (no hay ingreso). El snapshot de identidad permite listar sin joins.
+
+export interface RegistroHospitalDia {
+  id?: string;              // == expediente (id del documento)
+
+  // ── Identidad (snapshot; la fuente de verdad es personas/{expediente}) ──
+  expediente: string;
+  apellidos: string;
+  nombres: string;
+  dui?: string;
+  genero: Genero;
+  fechaNacimiento?: Date;
+  telefono?: string;
+
+  // ── Trazabilidad ──
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
+}
+
+// ============================================================================
 // Gestiones de Trabajo Social (UTS) — registro transversal de intervenciones
 // Reemplaza el Google Form "INTERVENCIONES PRESENCIALES". Un documento por
 // intervención, ligado al paciente por expediente. De aquí salen como vistas las
