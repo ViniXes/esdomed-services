@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import { es } from "react-day-picker/locale";
@@ -34,8 +34,10 @@ function formatear(d?: Date): string {
   return d.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const POP_W = 290;
+// Estimaciones de tamaño solo para el primer cuadro antes de medir el real.
+const POP_W = 300;
 const POP_H = 360;
+const MARGEN = 8;
 
 export function DateField({
   value, onChange, placeholder = "Seleccionar fecha", ariaLabel, clearable, disabled, className = "",
@@ -47,24 +49,30 @@ export function DateField({
   const selected = valueToDate(value);
   const hoy = new Date();
 
-  // Posiciona el popover (fixed) respecto al campo, evitando bordes de pantalla.
-  const reposicionar = () => {
+  // Posiciona el popover (fixed) usando el tamaño REAL del calendario (si ya está
+  // montado) para no recortar la última columna ni salirse de la pantalla.
+  const reposicionar = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const abajo = window.innerHeight - r.bottom;
-    const top = abajo < POP_H && r.top > POP_H ? r.top - POP_H - 6 : r.bottom + 6;
+    const popW = popRef.current?.offsetWidth || POP_W;
+    const popH = popRef.current?.offsetHeight || POP_H;
+    const hayEspacioAbajo = window.innerHeight - r.bottom >= popH + MARGEN;
+    const top = hayEspacioAbajo || r.top < popH + MARGEN ? r.bottom + 6 : r.top - popH - 6;
     let left = r.left;
-    if (left + POP_W > window.innerWidth - 8) left = window.innerWidth - POP_W - 8;
-    setCoords({ top, left: Math.max(8, left) });
-  };
+    if (left + popW > window.innerWidth - MARGEN) left = window.innerWidth - popW - MARGEN;
+    setCoords({ top: Math.max(MARGEN, top), left: Math.max(MARGEN, left) });
+  }, []);
 
+  // Primer posicionamiento (estimado) al abrir.
   useLayoutEffect(() => {
     if (open) reposicionar();
-  }, [open]);
+  }, [open, reposicionar]);
 
   useEffect(() => {
     if (!open) return;
+    // Segundo pase tras pintar: ya se puede medir el ancho real del calendario.
+    const raf = requestAnimationFrame(reposicionar);
     const onMove = () => reposicionar();
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
@@ -77,12 +85,13 @@ export function DateField({
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onMove, true);
       window.removeEventListener("resize", onMove);
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, reposicionar]);
 
   return (
     <div ref={triggerRef} className={`relative ${className}`}>
@@ -113,7 +122,13 @@ export function DateField({
       {open && coords && typeof document !== "undefined" && createPortal(
         <div
           ref={popRef}
-          style={{ position: "fixed", top: coords.top, left: coords.left, width: POP_W }}
+          style={{
+            position: "fixed",
+            top: coords.top,
+            left: coords.left,
+            width: "max-content",
+            maxWidth: "calc(100vw - 16px)",
+          }}
           className="z-[80] rdp-tailwind bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl text-slate-900 dark:text-slate-100 p-2"
         >
           <DayPicker
