@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, where, getCountFromServer } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, NotificacionFallecido, SolicitudImpresion } from "@/types";
@@ -62,65 +62,86 @@ export default function DashboardPage() {
     if (profile?.role === "trabajo_social") router.replace("/dashboard/defunciones");
   }, [profile, router]);
 
-  const [traslados, setTraslados] = useState<SolicitudTraslado[]>([]);
-  const [fallecidos, setFallecidos] = useState<NotificacionFallecido[]>([]);
-  const [impresiones, setImpresiones] = useState<SolicitudImpresion[]>([]);
+  const [counts, setCounts] = useState({
+    traslado:  { pend: 0, total: 0 },
+    fallecido: { pend: 0, total: 0 },
+    impresion: { pend: 0, total: 0 },
+  });
+  const [recent, setRecent] = useState<RecentItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (!profile || profile.role === "medico" || profile.role === "psicologia" || profile.role === "enfermeria") return;
-    const q1 = query(collection(db, "traslados"), orderBy("creadoEn", "desc"), limit(50));
-    const q2 = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(50));
-    const q3 = query(collection(db, "solicitudes_impresion"), orderBy("creadoEn", "desc"), limit(50));
-    const u1 = onSnapshot(q1, s => setTraslados(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado))));
-    const u2 = onSnapshot(q2, s => setFallecidos(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido))));
-    const u3 = onSnapshot(q3, s => setImpresiones(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion))));
-    return () => { u1(); u2(); u3(); };
-  }, []);
+    let activo = true;
+    const FUENTES = [
+      { tipo: "traslado" as const,  coll: "traslados" },
+      { tipo: "fallecido" as const, coll: "notificaciones_fallecidos" },
+      { tipo: "impresion" as const, coll: "solicitudes_impresion" },
+    ];
+    (async () => {
+      // Contadores por agregación (no lee los documentos).
+      await Promise.all(FUENTES.map(async ({ tipo, coll }) => {
+        try {
+          const [tot, pend] = await Promise.all([
+            getCountFromServer(collection(db, coll)),
+            getCountFromServer(query(collection(db, coll), where("estado", "==", "pendiente"))),
+          ]);
+          if (activo) setCounts(prev => ({ ...prev, [tipo]: { total: tot.data().count, pend: pend.data().count } }));
+        } catch { /* ignore */ }
+      }));
+      // Actividad reciente: una sola lectura por colección (sin tiempo real).
+      try {
+        const [t, f, i] = await Promise.all([
+          getDocs(query(collection(db, "traslados"), orderBy("creadoEn", "desc"), limit(20))),
+          getDocs(query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(20))),
+          getDocs(query(collection(db, "solicitudes_impresion"), orderBy("creadoEn", "desc"), limit(20))),
+        ]);
+        if (!activo) return;
+        const items: RecentItem[] = [
+          ...t.docs.map(d => { const x = d.data() as SolicitudTraslado; return {
+            id: d.id, tipo: "traslado" as const,
+            titulo: x.pacienteNombre || `Exp. ${x.pacienteExpediente}`,
+            subtitulo: x.tipoTraslado === "intercambio" ? "Intercambio de camas" : `${x.servicioOrigen} → ${x.tipoTraslado === "interno" ? x.servicioOrigen : x.servicioDestino}`,
+            medico: x.medicoNombre, estado: x.estado, ts: x.creadoEn,
+          }; }),
+          ...f.docs.map(d => { const x = d.data() as NotificacionFallecido; return {
+            id: d.id, tipo: "fallecido" as const,
+            titulo: x.pacienteNombre, subtitulo: `${x.servicio} / Cama ${x.cama}`,
+            medico: x.medicoNombre, estado: x.estado, ts: x.creadoEn,
+          }; }),
+          ...i.docs.map(d => { const x = d.data() as SolicitudImpresion; return {
+            id: d.id, tipo: "impresion" as const,
+            titulo: x.descripcion, subtitulo: `${x.copias} copia(s)`,
+            medico: x.medicoNombre, estado: x.estado, ts: x.creadoEn,
+          }; }),
+        ].sort((a, b) => {
+          const at = (a.ts as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
+          const bt = (b.ts as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
+          return bt - at;
+        });
+        setRecent(items);
+      } catch { /* ignore */ }
+    })();
+    return () => { activo = false; };
+  }, [profile]);
 
-  const pendTraslados  = traslados.filter(t => t.estado === "pendiente").length;
-  const pendFallecidos = fallecidos.filter(f => f.estado === "pendiente").length;
-  const pendImpresiones = impresiones.filter(i => i.estado === "pendiente").length;
+  const pendTraslados   = counts.traslado.pend;
+  const pendFallecidos  = counts.fallecido.pend;
+  const pendImpresiones = counts.impresion.pend;
   const totalPendientes = pendTraslados + pendFallecidos + pendImpresiones;
 
-  const allRecent: RecentItem[] = [
-    ...traslados.map(t => ({
-      id: t.id!, tipo: "traslado" as const,
-      titulo: t.pacienteNombre || `Exp. ${t.pacienteExpediente}`, 
-      subtitulo: t.tipoTraslado === "intercambio" ? "Intercambio de camas" : `${t.servicioOrigen} → ${t.tipoTraslado === "interno" ? t.servicioOrigen : t.servicioDestino}`,
-      medico: t.medicoNombre, estado: t.estado, ts: t.creadoEn,
-    })),
-    ...fallecidos.map(f => ({
-      id: f.id!, tipo: "fallecido" as const,
-      titulo: f.pacienteNombre, subtitulo: `${f.servicio} / Cama ${f.cama}`,
-      medico: f.medicoNombre, estado: f.estado, ts: f.creadoEn,
-    })),
-    ...impresiones.map(i => ({
-      id: i.id!, tipo: "impresion" as const,
-      titulo: i.descripcion, subtitulo: `${i.copias} copia(s)`,
-      medico: i.medicoNombre, estado: i.estado, ts: i.creadoEn,
-    })),
-  ].sort((a, b) => {
-    const at = (a.ts as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
-    const bt = (b.ts as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
-    return bt - at;
-  });
+  const allRecent = recent;
 
   const ITEMS_PER_PAGE = 8;
   const totalPages = Math.ceil(allRecent.length / ITEMS_PER_PAGE) || 1;
-  const currentRecent = allRecent.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-  // Auto-correct page if items change and current page is out of bounds
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [allRecent.length, currentPage, totalPages]);
+  // Clamp en render (sin efecto): si la lista encoge, la página se ajusta sola.
+  const page = Math.min(currentPage, totalPages);
+  const currentRecent = allRecent.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const stats = [
-    { tipo: "traslado" as const,  pendientes: pendTraslados,   total: traslados.length },
-    { tipo: "fallecido" as const, pendientes: pendFallecidos,  total: fallecidos.length },
-    { tipo: "impresion" as const, pendientes: pendImpresiones, total: impresiones.length },
+    { tipo: "traslado" as const,  pendientes: counts.traslado.pend,  total: counts.traslado.total },
+    { tipo: "fallecido" as const, pendientes: counts.fallecido.pend, total: counts.fallecido.total },
+    { tipo: "impresion" as const, pendientes: counts.impresion.pend, total: counts.impresion.total },
   ];
 
   return (
@@ -219,22 +240,22 @@ export default function DashboardPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                 <span className="text-xs text-slate-500">
-                  Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, allRecent.length)} de {allRecent.length}
+                  Mostrando {(page - 1) * ITEMS_PER_PAGE + 1} a {Math.min(page * ITEMS_PER_PAGE, allRecent.length)} de {allRecent.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
                     className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft size={16} className="text-slate-600 dark:text-slate-400" />
                   </button>
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-300 px-2">
-                    Página {currentPage} de {totalPages}
+                    Página {page} de {totalPages}
                   </span>
                   <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(Math.min(totalPages, page + 1))}
+                    disabled={page === totalPages}
                     className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight size={16} className="text-slate-600 dark:text-slate-400" />

@@ -9,7 +9,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { collection, onSnapshot, query, where, orderBy, limit } from "firebase/firestore";
+import {
+  collection, onSnapshot, query, where, orderBy, limit, getCountFromServer, type Query,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -47,27 +49,20 @@ const Ctx = createContext<NotificacionesContextType>({
   dismissToast: () => {},
 });
 
+// Refresco de contadores (por agregación, no en vivo). El prompt-cache de lecturas
+// se reduce drásticamente: no se leen los documentos, solo se cuentan en el servidor.
+const POLL_MS = 120_000; // 2 min
+
+type Doc = Record<string, unknown>;
+const s = (v: unknown) => (v == null ? "" : String(v));
+
 export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
 
-  const [countFallecidos, setCountFallecidos] = useState(0);
-  const [countTraslados, setCountTraslados]   = useState(0);
-  const [countAltas, setCountAltas]           = useState(0);
-  const [countIncapacidades, setCountIncapacidades] = useState(0);
-  const [countAnexo5, setCountAnexo5]         = useState(0);
-  const [countImpresiones, setCountImpresiones] = useState(0);
-  const [countRecepciones, setCountRecepciones] = useState(0);
-  const [toasts, setToasts]                   = useState<NotifToast[]>([]);
-
-  const knownFallecidos = useRef<Set<string> | null>(null);
-  const knownTraslados  = useRef<Set<string> | null>(null);
-  const knownAltas      = useRef<Set<string> | null>(null);
-  const knownPsConfirm  = useRef<Set<string> | null>(null);
-  const knownIncapacidades = useRef<Set<string> | null>(null);
-  const knownAnexo5     = useRef<Set<string> | null>(null);
-  const knownImpresiones = useRef<Set<string> | null>(null);
-  const knownRecepciones = useRef<Set<string> | null>(null);
-  const knownVistos      = useRef<Set<string> | null>(null);
+  const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
+    fallecidos: 0, traslados: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0,
+  });
+  const [toasts, setToasts] = useState<NotifToast[]>([]);
 
   const esEsdomed    = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
   const puedeAltas   = esEsdomed || profile?.role === "trabajo_social";
@@ -78,305 +73,139 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
     setToasts(prev => [...prev.slice(-3), { ...toast, id }]);
   }, []);
+  const dismissToast = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), []);
+  const setCount = useCallback(
+    (k: keyof Omit<Pendientes, "total">, n: number) => setCounts(prev => (prev[k] === n ? prev : { ...prev, [k]: n })),
+    [],
+  );
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  // Fallecidos — solo esdomed/admin
+  // ── Contadores de pendientes por AGREGACIÓN (getCountFromServer) ──
+  // No lee los documentos (cuenta en el servidor, ~1 lectura por cada 1000).
+  // Se refresca al montar, al enfocar la ventana y cada 2 min (no en tiempo real).
   useEffect(() => {
-    if (!esEsdomed) return;
-    knownFallecidos.current = null;
-
-    const q = query(
-      collection(db, "notificaciones_fallecidos"),
-      where("estado", "==", "pendiente"),
-    );
-    return onSnapshot(q, snap => {
-      const ids = new Set(snap.docs.map(d => d.id));
-
-      if (knownFallecidos.current === null) {
-        knownFallecidos.current = ids;
-      } else {
-        snap.docs.forEach(doc => {
-          if (!knownFallecidos.current!.has(doc.id)) {
-            const d = doc.data();
-            addToast({
-              tipo: "fallecido",
-              titulo: "Nuevo fallecido notificado",
-              mensaje: `${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
-            });
-          }
-        });
-        knownFallecidos.current = ids;
+    if (!esEsdomed && !puedeAltas) return;
+    let activo = true;
+    const contar = async (k: keyof Omit<Pendientes, "total">, q: Query) => {
+      try {
+        const r = await getCountFromServer(q);
+        if (activo) setCount(k, r.data().count);
+      } catch { /* el conteo no es crítico */ }
+    };
+    const pend = (coll: string) => query(collection(db, coll), where("estado", "==", "pendiente"));
+    const refrescar = () => {
+      if (esEsdomed) {
+        contar("fallecidos", pend("notificaciones_fallecidos"));
+        contar("traslados", pend("traslados"));
+        contar("incapacidades", pend("incapacidades"));
+        contar("anexo5", pend("anexo5"));
+        contar("impresiones", pend("solicitudes_impresion"));
       }
-      setCountFallecidos(snap.size);
-    });
-  }, [esEsdomed, addToast]);
+      if (puedeAltas) contar("altas", pend("notificaciones_altas"));
+    };
+    refrescar();
+    const onFocus = () => refrescar();
+    window.addEventListener("focus", onFocus);
+    const iv = window.setInterval(refrescar, POLL_MS);
+    return () => { activo = false; window.removeEventListener("focus", onFocus); window.clearInterval(iv); };
+  }, [esEsdomed, puedeAltas, setCount]);
 
-  // Confirmación de lectura de Psicología sobre un fallecido — avisa a esdomed/admin.
-  // Detecta cuando una notificación pasa a tener `recibeDePs` (la confirma Psicología).
+  // ── Toasts de nuevos registros: 1 documento por colección (el más reciente) ──
+  // Detecta cuando aparece un id nuevo en la cima; lee solo 1 doc por colección.
+  useEffect(() => {
+    if (!esEsdomed && !puedeAltas) return;
+    const fuentes: { coll: string; gate: boolean; tipo: TipoNotif; titulo: string; msg: (d: Doc) => string }[] = [
+      { coll: "notificaciones_fallecidos", gate: esEsdomed, tipo: "fallecido", titulo: "Nuevo fallecido notificado", msg: d => `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` },
+      { coll: "traslados", gate: esEsdomed, tipo: "traslado", titulo: "Nueva solicitud de traslado", msg: d => `Exp. ${s(d.pacienteExpediente)} · ${s(d.servicioOrigen)} → ${s(d.servicioDestino) || "—"}` },
+      { coll: "incapacidades", gate: esEsdomed, tipo: "incapacidad", titulo: "Nueva solicitud de incapacidad", msg: d => `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` },
+      { coll: "anexo5", gate: esEsdomed, tipo: "anexo5", titulo: "Nueva solicitud de Anexo 5", msg: d => `${s(d.nombrePaciente)}` },
+      { coll: "solicitudes_impresion", gate: esEsdomed, tipo: "impresion", titulo: "Nueva solicitud de impresión", msg: d => `${s(d.descripcion) || "Documento"}` },
+      { coll: "notificaciones_altas", gate: puedeAltas, tipo: "alta", titulo: "Nueva notificación de alta", msg: d => `${s(d.pacienteNombre)} · ${s(d.tipoAlta)}` },
+    ];
+    const unsubs = fuentes.filter(f => f.gate).map(f => {
+      let known: string | null = null;
+      return onSnapshot(
+        query(collection(db, f.coll), orderBy("creadoEn", "desc"), limit(1)),
+        snap => {
+          const d0 = snap.docs[0];
+          if (!d0) return;
+          if (known === null) { known = d0.id; return; }
+          if (d0.id !== known) { known = d0.id; addToast({ tipo: f.tipo, titulo: f.titulo, mensaje: f.msg(d0.data()) }); }
+        },
+      );
+    });
+    return () => unsubs.forEach(u => u());
+  }, [esEsdomed, puedeAltas, addToast]);
+
+  // ── Psicología confirmó lectura de un fallecido → aviso a ESDOMED (limit 40) ──
+  const knownPsConfirm = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!esEsdomed) return;
     knownPsConfirm.current = null;
-
-    const q = query(
-      collection(db, "notificaciones_fallecidos"),
-      orderBy("creadoEn", "desc"),
-      limit(200),
-    );
+    const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(40));
     return onSnapshot(q, snap => {
-      const confirmados = new Set(
-        snap.docs.filter(d => d.data().recibeDePs).map(d => d.id),
-      );
-
-      if (knownPsConfirm.current === null) {
-        knownPsConfirm.current = confirmados;
-      } else {
-        snap.docs.forEach(doc => {
-          const d = doc.data();
-          if (d.recibeDePs && !knownPsConfirm.current!.has(doc.id)) {
-            addToast({
-              tipo: "psicologia",
-              titulo: "Psicología confirmó lectura",
-              mensaje: `${d.recibeDePs} · ${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
-            });
-          }
-        });
-        knownPsConfirm.current = confirmados;
-      }
+      const confirmados = new Set(snap.docs.filter(d => d.data().recibeDePs).map(d => d.id));
+      if (knownPsConfirm.current === null) { knownPsConfirm.current = confirmados; return; }
+      snap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.recibeDePs && !knownPsConfirm.current!.has(doc.id)) {
+          addToast({ tipo: "psicologia", titulo: "Psicología confirmó lectura", mensaje: `${s(d.recibeDePs)} · ${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` });
+        }
+      });
+      knownPsConfirm.current = confirmados;
     });
   }, [esEsdomed, addToast]);
 
-  // Traslados — solo esdomed/admin
-  useEffect(() => {
-    if (!esEsdomed) return;
-    knownTraslados.current = null;
-
-    const q = query(
-      collection(db, "traslados"),
-      where("estado", "==", "pendiente"),
-    );
-    return onSnapshot(q, snap => {
-      const ids = new Set(snap.docs.map(d => d.id));
-
-      if (knownTraslados.current === null) {
-        knownTraslados.current = ids;
-      } else {
-        snap.docs.forEach(doc => {
-          if (!knownTraslados.current!.has(doc.id)) {
-            const d = doc.data();
-            addToast({
-              tipo: "traslado",
-              titulo: "Nueva solicitud de traslado",
-              mensaje: `Exp. ${d.pacienteExpediente ?? ""} · ${d.servicioOrigen ?? ""} → ${d.servicioDestino ?? "—"}`,
-            });
-          }
-        });
-        knownTraslados.current = ids;
-      }
-      setCountTraslados(snap.size);
-    });
-  }, [esEsdomed, addToast]);
-
-  // Altas vivos — esdomed/admin/trabajo_social
-  useEffect(() => {
-    if (!puedeAltas) return;
-    knownAltas.current = null;
-
-    const q = query(
-      collection(db, "notificaciones_altas"),
-      where("estado", "==", "pendiente"),
-    );
-    return onSnapshot(q, snap => {
-      const ids = new Set(snap.docs.map(d => d.id));
-
-      if (knownAltas.current === null) {
-        knownAltas.current = ids;
-      } else {
-        snap.docs.forEach(doc => {
-          if (!knownAltas.current!.has(doc.id)) {
-            const d = doc.data();
-            addToast({
-              tipo: "alta",
-              titulo: "Nueva notificación de alta",
-              mensaje: `${d.pacienteNombre ?? ""} · ${d.tipoAlta ?? ""}`,
-            });
-          }
-        });
-        knownAltas.current = ids;
-      }
-      setCountAltas(snap.size);
-    });
-  }, [puedeAltas, addToast]);
-
-  // Incapacidades — solo esdomed/admin
-  useEffect(() => {
-    if (!esEsdomed) return;
-    knownIncapacidades.current = null;
-
-    const q = query(
-      collection(db, "incapacidades"),
-      where("estado", "==", "pendiente"),
-    );
-    return onSnapshot(q, snap => {
-      const ids = new Set(snap.docs.map(d => d.id));
-
-      if (knownIncapacidades.current === null) {
-        knownIncapacidades.current = ids;
-      } else {
-        snap.docs.forEach(doc => {
-          if (!knownIncapacidades.current!.has(doc.id)) {
-            const d = doc.data();
-            addToast({
-              tipo: "incapacidad",
-              titulo: "Nueva solicitud de incapacidad",
-              mensaje: `${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""} · ${d.diasIncapacidad ?? "—"} días`,
-            });
-          }
-        });
-        knownIncapacidades.current = ids;
-      }
-      setCountIncapacidades(snap.size);
-    });
-  }, [esEsdomed, addToast]);
-
-  // Anexo 5 — solo esdomed/admin
-  useEffect(() => {
-    if (!esEsdomed) return;
-    knownAnexo5.current = null;
-
-    const q = query(
-      collection(db, "anexo5"),
-      where("estado", "==", "pendiente"),
-    );
-    return onSnapshot(q, snap => {
-      const ids = new Set(snap.docs.map(d => d.id));
-
-      if (knownAnexo5.current === null) {
-        knownAnexo5.current = ids;
-      } else {
-        snap.docs.forEach(doc => {
-          if (!knownAnexo5.current!.has(doc.id)) {
-            const d = doc.data();
-            addToast({
-              tipo: "anexo5",
-              titulo: "Nueva solicitud de Anexo 5",
-              mensaje: `${d.nombrePaciente ?? ""}${d.especialidad ? ` · ${d.especialidad}` : ""}`,
-            });
-          }
-        });
-        knownAnexo5.current = ids;
-      }
-      setCountAnexo5(snap.size);
-    });
-  }, [esEsdomed, addToast]);
-
-  // Impresiones — solo esdomed/admin
-  useEffect(() => {
-    if (!esEsdomed) return;
-    knownImpresiones.current = null;
-
-    const q = query(
-      collection(db, "solicitudes_impresion"),
-      where("estado", "==", "pendiente"),
-    );
-    return onSnapshot(q, snap => {
-      const ids = new Set(snap.docs.map(d => d.id));
-
-      if (knownImpresiones.current === null) {
-        knownImpresiones.current = ids;
-      } else {
-        snap.docs.forEach(doc => {
-          if (!knownImpresiones.current!.has(doc.id)) {
-            const d = doc.data();
-            addToast({
-              tipo: "impresion",
-              titulo: "Nueva solicitud de impresión",
-              mensaje: `${d.descripcion ?? "Documento"}${d.pacienteExpediente ? ` · Exp. ${d.pacienteExpediente}` : ""} · ${d.copias ?? 1} copia(s)`,
-            });
-          }
-        });
-        knownImpresiones.current = ids;
-      }
-      setCountImpresiones(snap.size);
-    });
-  }, [esEsdomed, addToast]);
-
-  // Recepciones asignadas a este usuario de Psicología (entregadas por ESDOMED) — toast + badge
+  // ── Psicología: recepciones asignadas a este usuario (consulta pequeña por uid) ──
+  const knownRecepciones = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!esPsicologia || !psUid) return;
     knownRecepciones.current = null;
-
-    const q = query(
-      collection(db, "notificaciones_fallecidos"),
-      where("recibeDePsUid", "==", psUid),
-    );
+    const q = query(collection(db, "notificaciones_fallecidos"), where("recibeDePsUid", "==", psUid));
     return onSnapshot(q, snap => {
       const porConfirmar = snap.docs.filter(d => !d.data().recibeDePsConfirmado);
       const ids = new Set(porConfirmar.map(d => d.id));
-
       if (knownRecepciones.current === null) {
         knownRecepciones.current = ids;
       } else {
         porConfirmar.forEach(doc => {
           if (!knownRecepciones.current!.has(doc.id)) {
             const d = doc.data();
-            addToast({
-              tipo: "recepcion",
-              titulo: "Nueva recepción asignada",
-              mensaje: `${d.recibeDePsEntregadoPor ? `Entregado por ${d.recibeDePsEntregadoPor} · ` : ""}${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
-            });
+            addToast({ tipo: "recepcion", titulo: "Nueva recepción asignada", mensaje: `${d.recibeDePsEntregadoPor ? `Entregado por ${s(d.recibeDePsEntregadoPor)} · ` : ""}${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` });
           }
         });
         knownRecepciones.current = ids;
       }
-      setCountRecepciones(porConfirmar.length);
+      setCount("recepciones", porConfirmar.length);
     });
-  }, [esPsicologia, psUid, addToast]);
+  }, [esPsicologia, psUid, addToast, setCount]);
 
-  // Fallecidos por revisar (sin "visto" del área) — Psicología
+  // ── Psicología: fallecidos por revisar (sin "visto" del área) — limit 40 ──
+  const knownVistos = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!esPsicologia) return;
     knownVistos.current = null;
-
-    const q = query(
-      collection(db, "notificaciones_fallecidos"),
-      orderBy("creadoEn", "desc"),
-      limit(200),
-    );
+    const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(40));
     return onSnapshot(q, snap => {
       const sinVisto = snap.docs.filter(d => !d.data().recibeDePs);
       const ids = new Set(sinVisto.map(d => d.id));
-
       if (knownVistos.current === null) {
         knownVistos.current = ids;
       } else {
         sinVisto.forEach(doc => {
           if (!knownVistos.current!.has(doc.id)) {
             const d = doc.data();
-            addToast({
-              tipo: "fallecido",
-              titulo: "Nuevo fallecido por revisar",
-              mensaje: `${d.pacienteNombre ?? ""} · Exp. ${d.pacienteExpediente ?? ""}`,
-            });
+            addToast({ tipo: "fallecido", titulo: "Nuevo fallecido por revisar", mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` });
           }
         });
         knownVistos.current = ids;
       }
-      setCountFallecidos(sinVisto.length);
+      setCount("fallecidos", sinVisto.length);
     });
-  }, [esPsicologia, addToast]);
+  }, [esPsicologia, addToast, setCount]);
 
   const pendientes: Pendientes = {
-    fallecidos:    countFallecidos,
-    traslados:     countTraslados,
-    altas:         countAltas,
-    incapacidades: countIncapacidades,
-    anexo5:        countAnexo5,
-    impresiones:   countImpresiones,
-    recepciones:   countRecepciones,
-    total:         countFallecidos + countTraslados + countAltas + countIncapacidades + countAnexo5 + countImpresiones + countRecepciones,
+    ...counts,
+    total: counts.fallecidos + counts.traslados + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones,
   };
 
   return (

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LayoutGrid, Users, Download, AlertTriangle, BedDouble, Printer, ArrowLeft } from "lucide-react";
+import { LayoutGrid, Users, Download, AlertTriangle, BedDouble, Printer, ArrowLeft, RefreshCw } from "lucide-react";
 import type { Genero, Paciente } from "@/types";
 
 interface FilaServicio {
@@ -48,22 +48,28 @@ export default function TablasTotalesPage() {
     if (!authLoading && profile && !esEsdomed) router.replace("/dashboard");
   }, [authLoading, profile, esEsdomed, router]);
 
-  useEffect(() => {
+  // Una sola lectura (no en vivo) — es un reporte. Botón "Actualizar" para recargar.
+  const cargar = useCallback(async () => {
     if (!esEsdomed) return;
-    const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setActivos(snap.docs.map((d) => {
-          const data = d.data() as Paciente;
-          return { servicio: (data.servicioActual || "Sin servicio").trim(), genero: data.genero };
-        }));
-        setCargando(false);
-      },
-      (e) => { setError(`No se pudo cargar: ${e.message}`); setCargando(false); },
-    );
-    return unsub;
+    setCargando(true);
+    setError(null);
+    try {
+      const snap = await getDocs(query(collection(db, "pacientes"), where("estado", "==", "activo")));
+      setActivos(snap.docs.map((d) => {
+        const data = d.data() as Paciente;
+        return { servicio: (data.servicioActual || "Sin servicio").trim(), genero: data.genero };
+      }));
+    } catch (e) {
+      setError(`No se pudo cargar: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setCargando(false);
+    }
   }, [esEsdomed]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { cargar(); }, 0);
+    return () => clearTimeout(t);
+  }, [cargar]);
 
   const { filas, totales } = useMemo(() => {
     const mapa = new Map<string, FilaServicio>();
@@ -133,6 +139,15 @@ export default function TablasTotalesPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={cargar}
+            disabled={cargando}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+            title="Actualizar"
+          >
+            <RefreshCw size={15} className={cargando ? "animate-spin" : ""} />
+            Actualizar
+          </button>
           <button
             onClick={() => setMostrarPDF(true)}
             disabled={cargando || filas.length === 0}

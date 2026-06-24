@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, where, orderBy, getDocs, onSnapshot, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Table2, Download, AlertTriangle, HeartPulse, LogOut, BedDouble } from "lucide-react";
+import { Table2, Download, AlertTriangle, HeartPulse, LogOut, BedDouble, RefreshCw } from "lucide-react";
 import type { EstadoPaciente, Genero, Paciente } from "@/types";
 import { DateField } from "@/components/ui/DateField";
 import { calcularEdad, diasEstancia, formatFecha, nombreCompleto, toDate, ESTADO_LABEL } from "@/lib/pacientes/helpers";
@@ -86,55 +86,62 @@ export default function TabuladoresPage() {
     if (!authLoading && profile && !esEsdomed) router.replace("/dashboard");
   }, [authLoading, profile, esEsdomed, router]);
 
-  // Egresos por rango de fecha de egreso (para vivos y fallecidos).
-  useEffect(() => {
+  // Egresos por rango de fecha (una sola lectura; recarga al cambiar fechas o con "Actualizar").
+  const cargarEgresos = useCallback(async () => {
     if (!esEsdomed || !fechaDesde || !fechaHasta) return;
-    let cancelado = false;
-    (async () => {
-      setCargando(true);
-      setError(null);
-      try {
-        const desde = new Date(fechaDesde + "T00:00:00");
-        const hasta = new Date(fechaHasta + "T23:59:59");
-        const q = query(
-          collection(db, "pacientes"),
-          where("fechaEgreso", ">=", Timestamp.fromDate(desde)),
-          where("fechaEgreso", "<=", Timestamp.fromDate(hasta)),
-          orderBy("fechaEgreso", "desc"),
-        );
-        const snap = await getDocs(q);
-        if (cancelado) return;
-        setEgresos(snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id, ...data,
-            fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-            fechaEgreso: toDate(data.fechaEgreso),
-            fechaNacimiento: toDate(data.fechaNacimiento),
-          } as Paciente;
-        }));
-      } catch (e) {
-        if (!cancelado) setError(`No se pudo cargar el reporte: ${e instanceof Error ? e.message : "error"}`);
-      } finally {
-        if (!cancelado) setCargando(false);
-      }
-    })();
-    return () => { cancelado = true; };
-  }, [fechaDesde, fechaHasta, esEsdomed]);
+    setCargando(true);
+    setError(null);
+    try {
+      const desde = new Date(fechaDesde + "T00:00:00");
+      const hasta = new Date(fechaHasta + "T23:59:59");
+      const snap = await getDocs(query(
+        collection(db, "pacientes"),
+        where("fechaEgreso", ">=", Timestamp.fromDate(desde)),
+        where("fechaEgreso", "<=", Timestamp.fromDate(hasta)),
+        orderBy("fechaEgreso", "desc"),
+      ));
+      setEgresos(snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id, ...data,
+          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+          fechaEgreso: toDate(data.fechaEgreso),
+          fechaNacimiento: toDate(data.fechaNacimiento),
+        } as Paciente;
+      }));
+    } catch (e) {
+      setError(`No se pudo cargar el reporte: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setCargando(false);
+    }
+  }, [esEsdomed, fechaDesde, fechaHasta]);
 
-  // Pacientes activos (en vivo).
-  useEffect(() => {
+  // Pacientes activos (una sola lectura, no en vivo — es un reporte).
+  const cargarActivos = useCallback(async () => {
     if (!esEsdomed) return;
-    const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    return onSnapshot(q, (snap) => setActivos(snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id, ...data,
-        fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-        fechaNacimiento: toDate(data.fechaNacimiento),
-      } as Paciente;
-    })));
+    try {
+      const snap = await getDocs(query(collection(db, "pacientes"), where("estado", "==", "activo")));
+      setActivos(snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id, ...data,
+          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+          fechaNacimiento: toDate(data.fechaNacimiento),
+        } as Paciente;
+      }));
+    } catch (e) {
+      setError(`No se pudo cargar activos: ${e instanceof Error ? e.message : "error"}`);
+    }
   }, [esEsdomed]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { cargarEgresos(); }, 0);
+    return () => clearTimeout(t);
+  }, [cargarEgresos]);
+  useEffect(() => {
+    const t = setTimeout(() => { cargarActivos(); }, 0);
+    return () => clearTimeout(t);
+  }, [cargarActivos]);
 
   // Filtro de detalle por servicio (se setea al hacer clic en una fila del tabulador).
   const [servicioFiltro, setServicioFiltro] = useState("");
@@ -241,14 +248,25 @@ export default function TabuladoresPage() {
             <p className="text-xs text-slate-500">Egresos vivos, fallecidos y pacientes activos por servicio</p>
           </div>
         </div>
-        <button
-          onClick={exportarExcel}
-          disabled={exportando || cargandoVista || pivote.filas.length === 0}
-          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
-        >
-          <Download size={15} />
-          {exportando ? "Generando..." : "Exportar a Excel"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => (esActivos ? cargarActivos() : cargarEgresos())}
+            disabled={cargandoVista}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+            title="Actualizar"
+          >
+            <RefreshCw size={15} className={cargandoVista ? "animate-spin" : ""} />
+            Actualizar
+          </button>
+          <button
+            onClick={exportarExcel}
+            disabled={exportando || cargandoVista || pivote.filas.length === 0}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <Download size={15} />
+            {exportando ? "Generando..." : "Exportar a Excel"}
+          </button>
+        </div>
       </div>
 
       {/* Pestañas */}

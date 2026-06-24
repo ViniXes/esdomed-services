@@ -1,6 +1,9 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import {
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  connectFirestoreEmulator, type Firestore,
+} from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const firebaseConfig = {
@@ -15,7 +18,22 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Caché local persistente (IndexedDB) en el navegador: las lecturas servidas desde
+// caché NO se facturan y se comparten entre pestañas, reduciendo lecturas en
+// recargas y navegación. En SSR (sin window) usa el cliente normal.
+function crearDb(): Firestore {
+  if (typeof window === "undefined") return getFirestore(app);
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    // Ya inicializado (p. ej. hot reload) — reusar la instancia existente.
+    return getFirestore(app);
+  }
+}
+export const db = crearDb();
 export const storage = getStorage(app);
 
 // Conectar a emuladores locales (solo en Docker/dev, solo en el navegador)

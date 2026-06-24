@@ -13,19 +13,22 @@ import {
   UserPlus, ArrowRightLeft, MinusCircle, HelpCircle, LogOut, ChevronDown,
 } from "lucide-react";
 import { mapearFilaReporte } from "@/lib/pacientes/importMapper";
-import { construirDatosPersonales, construirDocIngreso } from "@/lib/pacientes/persona";
+import { construirDatosPersonales, construirDocIngreso, limpiarResponsable } from "@/lib/pacientes/persona";
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";
-import type { DiagnosticoCIE } from "@/types";
+import type { DiagnosticoCIE, ResponsablePaciente } from "@/types";
 
 type Paso = "subir" | "previsualizar" | "hecho";
 
 interface Nuevo { expediente: string; nombre: string; servicio: string; cama?: string; form: PacienteFormValue; }
+interface CambioPersonal { campo: string; anterior: string; nuevo: string; }
 interface Actualizar {
   id: string; expediente: string; nombre: string;
   servicioAnterior: string; camaAnterior: string;
   servicioNuevo: string; camaNuevo: string;
   ultimoDiagnostico?: DiagnosticoCIE;   // último diagnóstico del reporte (se refresca)
   cambioDx: boolean;                    // true si el último diagnóstico cambió
+  cambiosPersonales?: CambioPersonal[]; // cambios en datos personales detectados
+  datosPersonales?: Record<string, unknown>; // campos personales a actualizar (parcial)
 }
 interface SinCambios { expediente: string; nombre: string; }
 interface NoReconocido { expediente: string; nombre: string; servicioExcel: string; }
@@ -87,7 +90,11 @@ export default function ImportarReportePage() {
 
       // Activos actuales en el sistema
       const snap = await getDocs(query(collection(db, "pacientes"), where("estado", "==", "activo")));
-      const activos = new Map<string, { id: string; servicioActual: string; camaActual: string; nombre: string; ultimoDiagnostico?: DiagnosticoCIE }>();
+      const activos = new Map<string, {
+        id: string; servicioActual: string; camaActual: string; nombre: string;
+        ultimoDiagnostico?: DiagnosticoCIE;
+        dui?: string; estadoFamiliar?: string; ocupacion?: string; responsable?: ResponsablePaciente;
+      }>();
       snap.forEach((d) => {
         const data = d.data();
         activos.set(String(data.expediente), {
@@ -96,6 +103,10 @@ export default function ImportarReportePage() {
           camaActual: data.camaActual ?? "",
           nombre: `${data.nombres ?? ""} ${data.apellidos ?? ""}`.replace(/\s+/g, " ").trim(),
           ultimoDiagnostico: data.ultimoDiagnostico,
+          dui: data.dui ?? "",
+          estadoFamiliar: data.estadoFamiliar ?? "",
+          ocupacion: data.ocupacion ?? "",
+          responsable: data.responsable ?? undefined,
         });
       });
 
@@ -128,12 +139,50 @@ export default function ImportarReportePage() {
           const cambioCama = camaNueva !== "" && existente.camaActual !== camaNueva;
           const dxNuevo = m.form.ultimoDiagnostico;
           const cambioDx = !!dxNuevo && dxKey(existente.ultimoDiagnostico) !== dxKey(dxNuevo);
-          if (cambioServicio || cambioCama || cambioDx) {
+
+          // ── Cambios en datos personales ──
+          // Solo se actualiza cuando el reporte trae un valor NO vacío y distinto;
+          // nunca se borra con un campo vacío (el padrón puede estar más completo).
+          const cambiosPersonales: CambioPersonal[] = [];
+          const dp: Record<string, unknown> = {};
+          const cmp = (label: string, nuevo: string | undefined, viejo: string | undefined, key: string) => {
+            const n = (nuevo ?? "").trim();
+            const v = (viejo ?? "").trim();
+            if (n !== "" && n.toLowerCase() !== v.toLowerCase()) {
+              cambiosPersonales.push({ campo: label, anterior: v || "—", nuevo: n });
+              dp[key] = n;
+            }
+          };
+          cmp("DUI", m.form.dui, existente.dui, "dui");
+          cmp("Estado familiar", m.form.estadoFamiliar, existente.estadoFamiliar, "estadoFamiliar");
+          cmp("Ocupación", m.form.ocupacion, existente.ocupacion, "ocupacion");
+
+          // Responsable (nombre + teléfono); se reconstruye sin perder lo ya guardado.
+          const rN = m.form.responsable;
+          const rV = existente.responsable;
+          const rNombre = (rN?.nombre ?? "").trim();
+          const rTel = (rN?.telefono ?? "").trim();
+          const cambioRespNombre = rNombre !== "" && rNombre.toLowerCase() !== (rV?.nombre ?? "").trim().toLowerCase();
+          const cambioRespTel = rTel !== "" && rTel !== (rV?.telefono ?? "").trim();
+          if (cambioRespNombre) cambiosPersonales.push({ campo: "Responsable", anterior: rV?.nombre || "—", nuevo: rNombre });
+          if (cambioRespTel) cambiosPersonales.push({ campo: "Tel. responsable", anterior: rV?.telefono || "—", nuevo: rTel });
+          if (cambioRespNombre || cambioRespTel) {
+            const merged: ResponsablePaciente = { ...(rV ?? { nombre: "" }) };
+            if (rNombre) merged.nombre = rNombre;
+            if (rTel) merged.telefono = rTel;
+            if ((rN?.parentesco ?? "").trim()) merged.parentesco = rN!.parentesco!.trim();
+            const limpio = limpiarResponsable(merged);
+            if (limpio) dp.responsable = limpio;
+          }
+
+          if (cambioServicio || cambioCama || cambioDx || cambiosPersonales.length > 0) {
             d.actualizar.push({
               id: existente.id, expediente: m.expediente, nombre: nombreDe(m.form),
               servicioAnterior: existente.servicioActual, camaAnterior: existente.camaActual,
               servicioNuevo, camaNuevo: camaNueva,
               ultimoDiagnostico: dxNuevo, cambioDx,
+              cambiosPersonales: cambiosPersonales.length ? cambiosPersonales : undefined,
+              datosPersonales: Object.keys(dp).length ? dp : undefined,
             });
           } else {
             d.sinCambios.push({ expediente: m.expediente, nombre: nombreDe(m.form) });
@@ -208,6 +257,16 @@ export default function ImportarReportePage() {
             codigo: (a.ultimoDiagnostico.codigo ?? "").trim(),
             descripcion: (a.ultimoDiagnostico.descripcion ?? "").trim(),
           };
+        }
+        // Cambios de datos personales: actualiza el snapshot del ingreso y el padrón.
+        if (a.datosPersonales) {
+          Object.assign(payload, a.datosPersonales);
+          batch.set(
+            doc(db, "personas", a.expediente),
+            { ...a.datosPersonales, actualizadoEn: ahora, actualizadoPor: profile.uid },
+            { merge: true },
+          );
+          await bump(1);
         }
         batch.update(doc(db, "pacientes", a.id), payload);
         await bump(1);
@@ -320,7 +379,7 @@ export default function ImportarReportePage() {
             ))}
           </Seccion>
 
-          <Seccion titulo="Actualizaciones (servicio / cama / diagnóstico)" vacioMsg="Ningún activo cambió de servicio, cama o diagnóstico." items={diff.actualizar}>
+          <Seccion titulo="Actualizaciones (servicio / cama / diagnóstico / datos)" vacioMsg="Ningún activo cambió de servicio, cama, diagnóstico o datos personales." items={diff.actualizar}>
             {diff.actualizar.map((a) => {
               const cambioUbicacion = a.servicioAnterior !== a.servicioNuevo || (!!a.camaNuevo && a.camaAnterior !== a.camaNuevo);
               const partes = [
@@ -329,7 +388,24 @@ export default function ImportarReportePage() {
                   : null,
                 a.cambioDx ? `Dx → ${a.ultimoDiagnostico?.codigo || a.ultimoDiagnostico?.descripcion || "actualizado"}` : null,
               ].filter(Boolean).join("  ·  ");
-              return <Fila key={a.expediente} exp={a.expediente} nombre={a.nombre} detalle={partes} />;
+              return (
+                <div key={a.expediente} className="py-2 text-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-slate-500 w-20 flex-shrink-0">{a.expediente}</span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200 truncate flex-shrink-0 max-w-[40%]">{a.nombre}</span>
+                    <span className="text-xs text-slate-500 truncate flex-1">{partes}</span>
+                  </div>
+                  {a.cambiosPersonales && a.cambiosPersonales.length > 0 && (
+                    <div className="ml-[5.75rem] mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      {a.cambiosPersonales.map((c, i) => (
+                        <span key={i} className="text-[11px] text-amber-700 dark:text-amber-400">
+                          {c.campo}: <span className="line-through opacity-60">{c.anterior}</span> → <span className="font-medium">{c.nuevo}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
             })}
           </Seccion>
 
