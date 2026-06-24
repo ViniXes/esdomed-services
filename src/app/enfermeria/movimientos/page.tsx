@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  limit,
 } from "firebase/firestore";
 import {
   AlertCircle,
@@ -128,7 +129,7 @@ export default function EnfermeriaMovimientosPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"), limit(500));
     return onSnapshot(q, (snap) => {
       setRegistros(
         snap.docs

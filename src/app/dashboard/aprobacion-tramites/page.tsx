@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, Filter, AlertTriangle } from "lucide-react";
@@ -57,7 +57,8 @@ export default function AprobacionTramitesPage() {
   useEffect(() => {
     const q = query(
       collection(db, "tramites_personal"),
-      orderBy("creadoEn", "desc")
+      orderBy("creadoEn", "desc"),
+      limit(400)
     );
     return onSnapshot(q, (snap) => {
       setTramites(snap.docs.map(d => ({ id: d.id, ...d.data() } as TramitePersonal)));

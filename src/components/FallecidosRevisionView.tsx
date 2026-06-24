@@ -21,6 +21,11 @@ export default function FallecidosRevisionView({
   const areaLabel = rol === "trabajo_social" ? "Trabajo Social" : "Psicología";
   const reglaLabel = rol === "trabajo_social" ? "trabajo_social" : "psicologia";
 
+  // Área REAL del que confirmó visto (psicología o TS), no la del que está mirando.
+  // Los registros antiguos no tienen recibeDePsRol; en ese caso no asumimos área.
+  const labelAreaConfirmante = (r?: NotificacionFallecido["recibeDePsRol"]) =>
+    r === "trabajo_social" ? "Trabajo Social" : r === "psicologia" ? "Psicología" : null;
+
   const { profile } = useAuth();
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
   const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "todos">("todos");
@@ -50,8 +55,9 @@ export default function FallecidosRevisionView({
     if (!selectedLive?.id || !profile) return;
     setSavingVisto(true);
     await updateDoc(doc(db, "notificaciones_fallecidos", selectedLive.id), {
-      recibeDePs:   profile.nombre,
-      recibeDePsEn: Timestamp.now(),
+      recibeDePs:    profile.nombre,
+      recibeDePsEn:  Timestamp.now(),
+      recibeDePsRol: rol,
     });
     setSavingVisto(false);
   };
@@ -132,7 +138,7 @@ export default function FallecidosRevisionView({
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Servicio / Fecha</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Médico</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{areaLabel}</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Recepción</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -161,9 +167,15 @@ export default function FallecidosRevisionView({
                     </td>
                     <td className="px-4 py-3">
                       {n.recibeDePs ? (
-                        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                          <CheckCircle2 size={13} /> Visto
-                        </span>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                            <CheckCircle2 size={13} /> Visto
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            {n.recibeDePs}
+                            {labelAreaConfirmante(n.recibeDePsRol) && ` · ${labelAreaConfirmante(n.recibeDePsRol)}`}
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400">Pendiente</span>
                       )}
@@ -227,19 +239,22 @@ export default function FallecidosRevisionView({
 
               {/* Confirmación del área */}
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{areaLabel}</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Recepción</p>
                 {selectedLive.recibeDePs ? (
                   <p className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-3 py-2.5 rounded-lg">
                     <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
                     <span>
                       Confirmado por <span className="font-semibold">{selectedLive.recibeDePs}</span>
+                      {labelAreaConfirmante(selectedLive.recibeDePsRol) && (
+                        <span className="opacity-75"> ({labelAreaConfirmante(selectedLive.recibeDePsRol)})</span>
+                      )}
                       {selectedLive.recibeDePsEn && (
                         <><br /><span className="text-xs opacity-75">{formatHora(selectedLive.recibeDePsEn)}</span></>
                       )}
                     </span>
                   </p>
                 ) : (
-                  <p className="text-sm text-slate-500">Aún no confirmado por {areaLabel}.</p>
+                  <p className="text-sm text-slate-500">Aún no confirmado.</p>
                 )}
               </div>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FileStack, Search, X, Circle } from "lucide-react";
 
@@ -59,7 +59,7 @@ export default function ColaExpedientesPage() {
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, "control_ingresos"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "control_ingresos"), orderBy("creadoEn", "desc"), limit(400));
     return onSnapshot(q, s => {
       setIngresos(s.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
       setUltimaActualizacion(new Date());

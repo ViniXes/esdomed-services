@@ -181,6 +181,8 @@ export interface NotificacionFallecido {
   entregaCertificadoEn?: Date;
   recibeDePs?: string;          // psicología / trabajo social
   recibeDePsEn?: Date;
+  recibeDePsRol?: "psicologia" | "trabajo_social";   // área real del que confirmó visto
+
   recibeDePsUid?: string;       // uid del usuario asignado (set by ESDOMED)
   recibeDePsEntregadoPor?: string;   // nombre del ESDOMED que hizo la entrega
   recibeDePsEntregadoPorUid?: string;

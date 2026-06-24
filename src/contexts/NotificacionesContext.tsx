@@ -148,7 +148,8 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
       snap.docs.forEach(doc => {
         const d = doc.data();
         if (d.recibeDePs && !knownPsConfirm.current!.has(doc.id)) {
-          addToast({ tipo: "psicologia", titulo: "Psicología confirmó lectura", mensaje: `${s(d.recibeDePs)} · ${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` });
+          const areaConfirma = d.recibeDePsRol === "trabajo_social" ? "Trabajo Social" : "Psicología";
+          addToast({ tipo: "psicologia", titulo: `${areaConfirma} confirmó lectura`, mensaje: `${s(d.recibeDePs)} · ${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` });
         }
       });
       knownPsConfirm.current = confirmados;
