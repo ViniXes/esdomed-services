@@ -16,7 +16,7 @@ import type {
 import {
   calcularEdad, formatFecha, formatFechaHora, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { formatFechaConstanciaCorta, numeroALetras } from "@/lib/incapacidades/helpers";
+import { formatFechaConstanciaCorta, numeroALetras, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
 
 const INSTITUCIONES: InstitucionProvisional[] = ["CRECER", "CONFIA", "INPEP", "IPSFA", "ISSS"];
 const BANCOS: BancoDeposito[] = ["Promerica", "Atlantida"];
@@ -67,23 +67,33 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
 
   // Cargar paciente cuando tenemos la incapacidad
   useEffect(() => {
-    if (!incapacidad?.pacienteId) return;
+    if (!incapacidad) return;
+    const pid = incapacidad.pacienteId;
+    let cancelado = false;
     (async () => {
-      const snap = await getDoc(doc(db, "pacientes", incapacidad.pacienteId));
-      if (snap.exists()) {
-        const data = snap.data();
-        setPaciente({
-          id: snap.id,
-          ...data,
-          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-          fechaEgreso: toDate(data.fechaEgreso),
-          fechaNacimiento: toDate(data.fechaNacimiento),
-          creadoEn: toDate(data.creadoEn) ?? new Date(),
-        } as Paciente);
+      let real: Paciente | null = null;
+      if (pid) {
+        const snap = await getDoc(doc(db, "pacientes", pid));
+        if (snap.exists()) {
+          const data = snap.data();
+          real = {
+            id: snap.id,
+            ...data,
+            fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+            fechaEgreso: toDate(data.fechaEgreso),
+            fechaNacimiento: toDate(data.fechaNacimiento),
+            creadoEn: toDate(data.creadoEn) ?? new Date(),
+          } as Paciente;
+        }
       }
-      setLoading(false);
+      if (!cancelado) {
+        // Sin ingreso (emergencia) → respaldo desde el snapshot de la incapacidad.
+        setPaciente(real ?? pacienteDesdeIncapacidad(incapacidad));
+        setLoading(false);
+      }
     })();
-  }, [incapacidad?.pacienteId]);
+    return () => { cancelado = true; };
+  }, [incapacidad]);
 
   if (loading) {
     return (

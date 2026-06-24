@@ -1,3 +1,39 @@
+import type { Paciente, SolicitudIncapacidad } from "@/types";
+
+/**
+ * Construye un `Paciente` para la constancia a partir de la incapacidad cuando no
+ * hay un ingreso en /pacientes (caso emergencia). Usa el snapshot de la incapacidad
+ * y `datosConstancia` (completado al imprimir desde la Hoja de Identificación, sin
+ * tocar el padrón `personas`).
+ */
+export function pacienteDesdeIncapacidad(inc: SolicitudIncapacidad): Paciente {
+  const dc = inc.datosConstancia ?? {};
+  return {
+    id: inc.pacienteId ?? inc.id ?? "",
+    expediente: inc.pacienteExpediente,
+    apellidos: dc.apellidos ?? inc.pacienteNombre ?? "",
+    nombres: dc.nombres ?? "",
+    genero: dc.genero ?? inc.pacienteGenero ?? "otro",
+    dui: dc.dui ?? inc.pacienteDui,
+    numeroAfiliacion: dc.numeroAfiliacion,
+    ocupacion: dc.ocupacion,
+    telefono: dc.telefono,
+    otrosNumeros: dc.otrosNumeros,
+    direccion: dc.direccion,
+    municipio: dc.municipio,
+    departamento: dc.departamento,
+    responsable: dc.responsable,
+    fechaIngreso: inc.fechaDesde ?? new Date(),
+    servicioIngreso: inc.servicioPaciente,
+    servicioActual: inc.servicioPaciente,
+    camaActual: inc.camaPaciente,
+    estado: "activo",
+    creadoEn: new Date(),
+    creadoPor: "",
+    creadoPorNombre: "",
+  } as Paciente;
+}
+
 // ── Conversión de fechas de <input type="date"> ──────────────────────────────
 
 /**

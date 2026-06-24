@@ -309,6 +309,24 @@ export type CondicionEgresoIncapacidad = "vivo" | "muerto";
 export type InstitucionProvisional = "CRECER" | "CONFIA" | "INPEP" | "IPSFA" | "ISSS";
 export type BancoDeposito = "Promerica" | "Atlantida";
 
+// Datos personales para la constancia que se completan AL IMPRIMIR subiendo la
+// Hoja de Identificación. NO se guardan en `personas` (el padrón queda intacto);
+// viven solo en la incapacidad para que el documento salga completo.
+export interface DatosConstancia {
+  apellidos?: string;
+  nombres?: string;
+  genero?: Genero;
+  dui?: string;
+  numeroAfiliacion?: string;
+  telefono?: string;
+  otrosNumeros?: string;
+  direccion?: string;
+  municipio?: string;
+  departamento?: string;
+  ocupacion?: string;
+  responsable?: ResponsablePaciente;
+}
+
 export interface SolicitudIncapacidad {
   id?: string;
 
@@ -319,9 +337,17 @@ export interface SolicitudIncapacidad {
   medicoServicio: string;
 
   // ── Paciente (referencia + snapshot al crear) ──
-  pacienteId: string;        // doc id en /pacientes
+  pacienteId?: string;       // doc id en /pacientes (ausente si origen = emergencia)
   pacienteExpediente: string;
   pacienteNombre: string;
+  pacienteDui?: string;      // snapshot (emergencia trae DUI en la atención)
+  pacienteGenero?: Genero;   // snapshot (para el recuadro de sexo de la constancia)
+
+  // ── Origen: hospitalización (ingreso en /pacientes) o emergencia (atención) ──
+  origen?: "hospitalizacion" | "emergencia";
+  atencionEmergenciaId?: string;
+  // Datos personales completados al imprimir (Hoja de Identificación, ver arriba).
+  datosConstancia?: DatosConstancia;
 
   // ── Datos del ingreso/cama (snapshot del paciente al crear) ──
   servicioPaciente: string;

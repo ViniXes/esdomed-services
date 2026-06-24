@@ -89,7 +89,8 @@
       "Bash(grep -iE \"^xlsx$|^exceljs$\")",
       "Bash(xxd)",
       "Bash(ls node_modules/pdfjs-dist/legacy/build/)",
-      "Bash(ls node_modules/pdfjs-dist/build/)"
+      "Bash(ls node_modules/pdfjs-dist/build/)",
+      "Bash(grep -viE \"//|placeholder\")"
     ]
   }
 }

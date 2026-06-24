@@ -11,7 +11,7 @@ import type { Paciente, SolicitudIncapacidad } from "@/types";
 import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput } from "@/lib/incapacidades/helpers";
+import { calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -75,10 +75,12 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         }
 
         setIncapacidad(inc);
-        // Deriva los días adicionales post-alta del registro existente: fechaHasta - fechaAlta
-        const diasExtrasGuardados = Math.round(
-          (inc.fechaHasta.getTime() - inc.fechaAlta.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        // Emergencia: el campo "días" es el TOTAL prescrito. Hospitalización: días
+        // adicionales = fechaHasta - fechaAlta.
+        const esEmerg = inc.origen === "emergencia";
+        const diasExtrasGuardados = esEmerg
+          ? inc.diasIncapacidad
+          : Math.round((inc.fechaHasta.getTime() - inc.fechaAlta.getTime()) / (1000 * 60 * 60 * 24));
         setForm({
           fechaAlta: toDateInput(inc.fechaAlta),
           diasExtras: String(Math.max(0, diasExtrasGuardados)),
@@ -89,20 +91,24 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
           seguimiento: inc.seguimiento ?? "",
         });
 
-        // Cargar paciente
-        const pacSnap = await getDoc(doc(db, "pacientes", inc.pacienteId));
-        if (cancelado) return;
-        if (pacSnap.exists()) {
-          const pacData = pacSnap.data();
-          setPaciente({
-            id: pacSnap.id,
-            ...pacData,
-            fechaIngreso: toDate(pacData.fechaIngreso) ?? new Date(),
-            fechaEgreso: toDate(pacData.fechaEgreso),
-            fechaNacimiento: toDate(pacData.fechaNacimiento),
-            creadoEn: toDate(pacData.creadoEn) ?? new Date(),
-          } as Paciente);
+        // Cargar paciente (o respaldo desde la incapacidad si es de emergencia)
+        let pacReal: Paciente | null = null;
+        if (inc.pacienteId) {
+          const pacSnap = await getDoc(doc(db, "pacientes", inc.pacienteId));
+          if (cancelado) return;
+          if (pacSnap.exists()) {
+            const pacData = pacSnap.data();
+            pacReal = {
+              id: pacSnap.id,
+              ...pacData,
+              fechaIngreso: toDate(pacData.fechaIngreso) ?? new Date(),
+              fechaEgreso: toDate(pacData.fechaEgreso),
+              fechaNacimiento: toDate(pacData.fechaNacimiento),
+              creadoEn: toDate(pacData.creadoEn) ?? new Date(),
+            } as Paciente;
+          }
         }
+        setPaciente(pacReal ?? pacienteDesdeIncapacidad(inc));
         setLoading(false);
       } catch (e) {
         setBloqueoMotivo(`Error al cargar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -123,12 +129,20 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
     setGuardando(true);
     try {
       const fAlta  = parseDateInput(form.fechaAlta);
-      // Usa fechaIngreso del paciente cargado; si no está disponible, usa la fechaDesde almacenada
-      const fDesde = paciente?.fechaIngreso ?? incapacidad.fechaDesde;
-      if (fAlta < fDesde) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
-      const diasHosp  = calcularDiasHospitalizacion(fDesde, fAlta);
-      const diasTotal = diasHosp + diasExtras;
-      const fHasta    = calcularFechaHasta(fAlta, diasExtras);
+      const esEmerg = incapacidad.origen === "emergencia";
+      let fDesde: Date, diasTotal: number, fHasta: Date;
+      if (esEmerg) {
+        // Emergencia: inicio = fecha indicada; días = total prescrito.
+        if (diasExtras < 1) { setError("Los días de incapacidad deben ser 1 o más."); setGuardando(false); return; }
+        fDesde = fAlta;
+        diasTotal = diasExtras;
+        fHasta = calcularFechaHasta(fAlta, diasExtras - 1);
+      } else {
+        fDesde = paciente?.fechaIngreso ?? incapacidad.fechaDesde;
+        if (fAlta < fDesde) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
+        diasTotal = calcularDiasHospitalizacion(fDesde, fAlta) + diasExtras;
+        fHasta = calcularFechaHasta(fAlta, diasExtras);
+      }
 
       const update: Record<string, unknown> = {
         fechaAlta: Timestamp.fromDate(fAlta),
@@ -234,6 +248,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         value={form}
         onChange={setForm}
         fechaIngreso={paciente?.fechaIngreso ?? incapacidad.fechaDesde}
+        emergencia={incapacidad.origen === "emergencia"}
       />
 
       {/* Footer */}

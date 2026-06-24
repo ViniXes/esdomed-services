@@ -24,29 +24,34 @@ export interface IncapacidadFormValue {
 interface Props {
   value: IncapacidadFormValue;
   onChange: (next: IncapacidadFormValue) => void;
-  fechaIngreso: Date;
+  fechaIngreso?: Date;          // requerido en hospitalización; ausente en emergencia
+  emergencia?: boolean;          // emergencia: días = total prescrito, sin estancia
   disabled?: boolean;
 }
 
-export function IncapacidadFormFields({ value, onChange, fechaIngreso, disabled }: Props) {
+export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergencia, disabled }: Props) {
   const set = <K extends keyof IncapacidadFormValue>(k: K, v: IncapacidadFormValue[K]) =>
     onChange({ ...value, [k]: v });
 
   const fAlta = value.fechaAlta ? parseDateInput(value.fechaAlta) : null;
-  const diasExtrasNum = parseInt(value.diasExtras, 10);
-  const altaAntesDqIngreso = fAlta !== null && fAlta < fechaIngreso;
+  const diasNum = parseInt(value.diasExtras, 10);
+  const diasValido = !isNaN(diasNum) && diasNum >= 0;
 
-  const diasHosp = fAlta && !altaAntesDqIngreso
+  // Hospitalización: total = días de estancia + adicionales (fechaDesde = ingreso).
+  // Emergencia: total = solo los días prescritos (fechaDesde = la fecha de inicio).
+  const altaAntesDqIngreso = !emergencia && fAlta !== null && !!fechaIngreso && fAlta < fechaIngreso;
+
+  const diasHosp = !emergencia && fAlta && fechaIngreso && !altaAntesDqIngreso
     ? calcularDiasHospitalizacion(fechaIngreso, fAlta)
     : null;
 
-  const fechaHasta = fAlta && !isNaN(diasExtrasNum) && diasExtrasNum >= 0 && !altaAntesDqIngreso
-    ? calcularFechaHasta(fAlta, diasExtrasNum)
-    : null;
+  const fechaHasta = emergencia
+    ? (fAlta && diasValido && diasNum >= 1 ? calcularFechaHasta(fAlta, diasNum - 1) : null)
+    : (fAlta && diasValido && !altaAntesDqIngreso ? calcularFechaHasta(fAlta, diasNum) : null);
 
-  const diasTotal = diasHosp !== null && !isNaN(diasExtrasNum) && diasExtrasNum >= 0
-    ? diasHosp + diasExtrasNum
-    : null;
+  const diasTotal = emergencia
+    ? (diasValido ? diasNum : null)
+    : (diasHosp !== null && diasValido ? diasHosp + diasNum : null);
 
   return (
     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
@@ -56,12 +61,12 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, disabled 
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
-          <label className={labelCls}>Fecha de alta *</label>
+          <label className={labelCls}>{emergencia ? "Fecha de inicio *" : "Fecha de alta *"}</label>
           <DateField
             value={value.fechaAlta}
             onChange={(v) => set("fechaAlta", v)}
-            placeholder="Fecha de alta"
-            ariaLabel="Fecha de alta"
+            placeholder={emergencia ? "Fecha de inicio" : "Fecha de alta"}
+            ariaLabel={emergencia ? "Fecha de inicio" : "Fecha de alta"}
             disabled={disabled}
           />
           {altaAntesDqIngreso && (
@@ -71,7 +76,7 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, disabled 
           )}
         </div>
         <div>
-          <label className={labelCls}>Días adicionales post-alta *</label>
+          <label className={labelCls}>{emergencia ? "Días de incapacidad *" : "Días adicionales post-alta *"}</label>
           <input
             type="number"
             min="0"
@@ -106,27 +111,35 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, disabled 
           <div>
             <p className={labelCls}>Desde</p>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-              {formatFechaCorta(fechaIngreso)}
+              {emergencia
+                ? (fAlta ? formatFechaCorta(fAlta) : <span className="text-slate-400">—</span>)
+                : (fechaIngreso ? formatFechaCorta(fechaIngreso) : <span className="text-slate-400">—</span>)}
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Fecha de ingreso</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{emergencia ? "Inicio" : "Fecha de ingreso"}</p>
           </div>
           <div>
             <p className={labelCls}>Hasta</p>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
               {fechaHasta ? formatFechaCorta(fechaHasta) : <span className="text-slate-400">—</span>}
             </p>
-            {fAlta && !altaAntesDqIngreso && !isNaN(diasExtrasNum) && diasExtrasNum >= 0 && (
-              <p className="text-[10px] text-slate-400 mt-0.5">Alta + {diasExtrasNum} días</p>
-            )}
+            {emergencia
+              ? (fAlta && diasValido && diasNum >= 1 && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">Inicio + {diasNum - 1} días</p>
+                ))
+              : (fAlta && !altaAntesDqIngreso && diasValido && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">Alta + {diasNum} días</p>
+                ))}
           </div>
           <div>
             <p className={labelCls}>Total días</p>
             <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
               {diasTotal !== null ? diasTotal : <span className="text-slate-400 font-normal">—</span>}
             </p>
-            {diasHosp !== null && !isNaN(diasExtrasNum) && diasExtrasNum >= 0 && (
-              <p className="text-[10px] text-slate-400 mt-0.5">{diasHosp} hosp. + {diasExtrasNum} adic.</p>
-            )}
+            {emergencia
+              ? (diasValido && <p className="text-[10px] text-slate-400 mt-0.5">{diasNum} días de incapacidad</p>)
+              : (diasHosp !== null && diasValido && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">{diasHosp} hosp. + {diasNum} adic.</p>
+                ))}
           </div>
         </div>
       </div>
