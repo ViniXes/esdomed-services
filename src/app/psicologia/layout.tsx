@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, HeartPulse, Inbox, LogOut, UserSearch } from "lucide-react";
+import { Clock, HeartPulse, Inbox, LogOut, LogIn, UserSearch } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -21,6 +21,7 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
     { href: "/psicologia/buscar-paciente",   label: "Buscar Paciente",   icon: UserSearch },
     { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },
     { href: "/psicologia/altas",             label: "Altas efectivas",   icon: LogOut },
+    { href: "/psicologia/altas-vivos",       label: "Verificación de Altas", icon: LogIn },
     { href: "/psicologia/fallecidos",        label: "Fallecidos",        icon: HeartPulse, badge: pendientes.fallecidos },
     { href: "/psicologia/recepciones",       label: "Recepciones",       icon: Inbox,      badge: pendientes.recepciones },
   ];

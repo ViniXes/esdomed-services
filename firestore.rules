@@ -322,8 +322,8 @@ service cloud.firestore {
 
     // ─── Notificaciones de altas vivos ───────────────────────────────────────
     match /notificaciones_altas/{id} {
-      // Enfermería, TS y ESDOMED pueden leer todas.
-      allow read:   if isEnfermeria() || isTrabajoSocial() || isEsdomed() || isAdmin();
+      // Enfermería, TS, Psicología y ESDOMED pueden leer (Psicología solo consulta el informe).
+      allow read:   if isEnfermeria() || isTrabajoSocial() || isPsicologia() || isEsdomed() || isAdmin();
       // Enfermería y TS pueden crear.
       allow create: if isEnfermeria() || isTrabajoSocial();
       // TS puede editar solo las que siguen pendientes (cambiar tipo, archivar).
