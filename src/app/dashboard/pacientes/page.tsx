@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  collection, query, where, orderBy, onSnapshot, limit, QueryConstraint,
+  collection, query, where, orderBy, getDocs, limit, QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
-import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload, X } from "lucide-react";
+import { useServicios } from "@/contexts/ServiciosContext";
+import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload, X, RefreshCw } from "lucide-react";
 import type { EstadoPaciente, Paciente } from "@/types";
 import {
   ESTADO_BADGE, ESTADO_LABEL, calcularEdad, diasEstancia, formatFecha,
@@ -31,11 +32,20 @@ const FILTROS: { value: FiltroEstado; label: string }[] = [
 const LIMIT_HISTORICO = 300;
 const PAGE_SIZE = 50;
 
+// Caché de resultados por combinación estado|servicio. Persiste durante la sesión
+// del SPA (sobrevive a navegación client-side, no a recarga completa de la página).
+// Evita releer Firestore al volver a una consulta ya hecha.
+const cachePacientes = new Map<string, Paciente[]>();
+
 export default function PacientesPage() {
   const { profile } = useAuth();
   const router = useRouter();
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { servicios: catalogoServicios } = useServicios();
+  // Mount: si ya hay caché de la combinación por defecto (activo, sin servicio), se
+  // muestra sin leer Firestore; si no, vacío hasta que el usuario pulse Consultar.
+  const [pacientes, setPacientes] = useState<Paciente[]>(() => cachePacientes.get("activo|") ?? []);
+  const [loading, setLoading] = useState(false);
+  const [consultado, setConsultado] = useState(() => cachePacientes.has("activo|"));
   const [filtro, setFiltro] = useState<FiltroEstado>("activo");
   const [servicioFiltro, setServicioFiltro] = useState<string>("");
   const [busqueda, setBusqueda] = useState("");
@@ -47,40 +57,70 @@ export default function PacientesPage() {
   const usaFechaEgreso = filtro !== "activo" && filtro !== "todos";
   const labelFecha = usaFechaEgreso ? "Egreso" : "Ingreso";
 
-  useEffect(() => {
+  // El servicio se aplica en la CONSULTA a Firestore (no en cliente), así que la
+  // caché se llavea por estado + servicio.
+  const cacheKey = `${filtro}|${servicioFiltro}`;
+
+  // Al cambiar estado/servicio NO se lee Firestore: si hay caché de esa combinación
+  // se muestra al instante; si no, se deja vacío hasta que el usuario pulse Consultar.
+  // Ajuste de estado en render (patrón React para sincronizar con un valor derivado).
+  const [cacheKeyPrev, setCacheKeyPrev] = useState(cacheKey);
+  if (cacheKeyPrev !== cacheKey) {
+    setCacheKeyPrev(cacheKey);
+    const cached = cachePacientes.get(cacheKey);
+    setPacientes(cached ?? []);
+    setConsultado(!!cached);
+  }
+
+  // ── Lectura puntual bajo demanda (botón Consultar / Actualizar) ──
+  const consultar = async () => {
     if (!profile) return;
-    const constraints: QueryConstraint[] = [];
-    if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
-    constraints.push(orderBy("fechaIngreso", "desc"));
-    // Activos: sin límite (acotado por capacidad hospitalaria)
-    // Históricos: límite razonable para no descargar toda la colección
-    if (filtro !== "activo") constraints.push(limit(LIMIT_HISTORICO));
+    setLoading(true);
+    try {
+      const constraints: QueryConstraint[] = [];
+      if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
+      if (servicioFiltro) {
+        // Filtra el servicio en el servidor (lee solo ese servicio, no todo el censo).
+        // Sin orderBy para no requerir índice compuesto; se ordena en cliente.
+        constraints.push(where("servicioActual", "==", servicioFiltro));
+        if (filtro !== "activo") constraints.push(limit(LIMIT_HISTORICO));
+      } else {
+        constraints.push(orderBy("fechaIngreso", "desc"));
+        // Activos: sin límite (acotado por capacidad hospitalaria)
+        // Históricos: límite razonable para no descargar toda la colección
+        if (filtro !== "activo") constraints.push(limit(LIMIT_HISTORICO));
+      }
 
-    const q = query(collection(db, "pacientes"), ...constraints);
-    const unsub = onSnapshot(q, (snap) => {
-      const lista = snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-          fechaEgreso: toDate(data.fechaEgreso),
-          fechaNacimiento: toDate(data.fechaNacimiento),
-          creadoEn: toDate(data.creadoEn) ?? new Date(),
-        } as Paciente;
-      });
+      const snap = await getDocs(query(collection(db, "pacientes"), ...constraints));
+      const lista = snap.docs
+        .map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+            fechaEgreso: toDate(data.fechaEgreso),
+            fechaNacimiento: toDate(data.fechaNacimiento),
+            creadoEn: toDate(data.creadoEn) ?? new Date(),
+          } as Paciente;
+        })
+        // Orden garantizado en cliente (la consulta con servicio no trae orderBy).
+        .sort((a, b) => b.fechaIngreso.getTime() - a.fechaIngreso.getTime());
+
+      cachePacientes.set(cacheKey, lista);
       setPacientes(lista);
+      setConsultado(true);
+    } finally {
       setLoading(false);
-    });
-    return unsub;
-  }, [profile, filtro]);
+    }
+  };
 
-  // ── Búsqueda y filtro por servicio (en cliente, sobre lo cargado) ──
+  // ── Opciones de servicio: catálogo + los presentes en lo ya cargado ──
   const serviciosUnicos = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(catalogoServicios);
     pacientes.forEach((p) => p.servicioActual && set.add(p.servicioActual));
     return Array.from(set).sort();
-  }, [pacientes]);
+  }, [catalogoServicios, pacientes]);
 
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -134,7 +174,7 @@ export default function PacientesPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {filtro === "activo" && (
+          {filtro === "activo" && consultado && (
             <div className="flex items-center gap-1.5 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 px-3 py-1.5 rounded-xl">
               <Clock size={14} />
               {activosCount} hospitalizados
@@ -237,12 +277,38 @@ export default function PacientesPage() {
             <X size={12} /> Limpiar
           </button>
         )}
+        <button
+          onClick={consultar}
+          disabled={loading}
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm shrink-0"
+        >
+          {loading ? (
+            <RefreshCw size={15} className="animate-spin" />
+          ) : (
+            <Search size={15} />
+          )}
+          {consultado ? "Actualizar" : "Consultar"}
+          {servicioFiltro && <span className="opacity-80">· {servicioFiltro}</span>}
+        </button>
       </div>
 
       {/* Tabla */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : !consultado ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
+          <Search size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
+          <p className="text-sm text-slate-500">
+            Selecciona estado{servicioFiltro ? ` y servicio (${servicioFiltro})` : " y, si quieres, un servicio"}, luego pulsa Consultar.
+          </p>
+          <button
+            onClick={consultar}
+            className="inline-flex items-center gap-1.5 mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            <Search size={15} /> Consultar
+          </button>
         </div>
       ) : filtrados.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">

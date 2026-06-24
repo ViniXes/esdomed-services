@@ -91,7 +91,8 @@
       "Bash(ls node_modules/pdfjs-dist/legacy/build/)",
       "Bash(ls node_modules/pdfjs-dist/build/)",
       "Bash(grep -viE \"//|placeholder\")",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "PowerShell(npx eslint src/app/dashboard/pacientes/page.tsx)"
     ]
   }
 }
