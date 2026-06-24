@@ -231,7 +231,7 @@ function construirCampos(labels: string[], solo?: TipoMedicoCuidadosCriticos): C
       label: ETIQUETAS_VISIBLES[label] ?? label,
       ...inferirTipo(label),
       solo,
-      automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "DIAS EN SERVICIO", "MUERTE > 48 HORAS"].includes(label),
+      automatico: ["REGISTRO", "NOMBRES", "APELLIDOS", "SEXO", "EDAD", "CENTRO DE PROCEDENCIA", "DIAS EN SERVICIO"].includes(label),
     };
   });
 }
@@ -517,14 +517,15 @@ export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): Dato
   const muerte = esValorRegistrado(resultado.fecha_de_muerte) ? valorComoTexto(resultado.fecha_de_muerte) : "";
   const horaIngreso = esValorRegistrado(resultado.hora_ingreso_al_servicio) ? valorComoTexto(resultado.hora_ingreso_al_servicio) : "";
   const horaMuerte = esValorRegistrado(resultado.hora_de_muerte) ? valorComoTexto(resultado.hora_de_muerte) : "";
+  const muerte48Registrada = esValorRegistrado(resultado.muerte_48_horas);
 
   resultado.dias_en_servicio = ingreso ? diferenciaDias(ingreso, egreso || fechaActualInput()) : "";
-  if (ingreso && horaIngreso && muerte && horaMuerte) {
+  if (!muerte48Registrada && ingreso && horaIngreso && muerte && horaMuerte) {
     const fechaIngreso = new Date(`${ingreso}T${horaIngreso}:00`);
     const fechaMuerte = new Date(`${muerte}T${horaMuerte}:00`);
-    resultado.muerte_48_horas = fechaMuerte.getTime() - fechaIngreso.getTime() > 172_800_000 ? "SI" : "NO";
-  } else {
-    resultado.muerte_48_horas = "";
+    if (fechaMuerte.getTime() - fechaIngreso.getTime() > 172_800_000) {
+      resultado.muerte_48_horas = "SI";
+    }
   }
 
   return resultado;
