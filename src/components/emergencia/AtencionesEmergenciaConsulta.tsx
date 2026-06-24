@@ -92,11 +92,20 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   // ── Trazabilidad con el padrón ──────────────────────────────────────────────
   // `personas` (docId = expediente) define "registrado en padrón"; `pacientes` da
   // el id del ingreso para enlazar a la ficha clínica cuando existe.
+  //
+  // Clave estable del CONJUNTO de expedientes: el cruce solo se recalcula cuando
+  // cambian los expedientes (nuevo/quitado), no en cada delta del listener — antes
+  // re-consultaba pacientes+personas en cada cambio del snapshot (amplificaba lecturas).
+  const expedientesKey = useMemo(
+    () => Array.from(new Set(atenciones.map((a) => a.expediente).filter(Boolean))).sort().join("|"),
+    [atenciones],
+  );
+
   useEffect(() => {
-    if (!profile || atenciones.length === 0) return;
+    if (!profile || !expedientesKey) return;
+    const exps = expedientesKey.split("|");
     let cancelado = false;
     (async () => {
-      const exps = Array.from(new Set(atenciones.map((a) => a.expediente))).filter(Boolean);
       const mapa = new Map<string, string>();
       const padron = new Set<string>();
       try {
@@ -117,7 +126,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
       }
     })();
     return () => { cancelado = true; };
-  }, [profile, atenciones]);
+  }, [profile, expedientesKey]);
 
   // En egresos, el universo son los que NO ingresaron a hospitalización (egresaron
   // de emergencia). En atendidos, son todas las atenciones.

@@ -109,7 +109,7 @@ export default function RegistroAltasPage() {
 
   useEffect(() => {
     // Un solo orderBy para no exigir índice compuesto; el desempate por creadoEn se hace en cliente.
-    const q = query(collection(db, "registro_altas"), orderBy("fecha", "desc"));
+    const q = query(collection(db, "registro_altas"), orderBy("fecha", "desc"), limit(500));
     return onSnapshot(q, s => {
       const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as RegistroAlta));
       docs.sort((a, b) => {

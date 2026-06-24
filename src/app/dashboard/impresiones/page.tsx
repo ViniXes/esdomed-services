@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudImpresion } from "@/types";
@@ -21,7 +21,7 @@ export default function DashboardImpresionesPage() {
   const [entregadoA, setEntregadoA] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const q = query(collection(db, "solicitudes_impresion"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "solicitudes_impresion"), orderBy("creadoEn", "desc"), limit(400));
     return onSnapshot(q, s => setSolicitudes(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion))));
   }, []);
 

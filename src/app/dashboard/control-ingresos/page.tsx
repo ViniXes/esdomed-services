@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, Timestamp, query, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { addDoc, collection, Timestamp, query, orderBy, onSnapshot, limit, doc, updateDoc } from "firebase/firestore";
 import Image from "next/image";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
@@ -62,7 +62,7 @@ export default function ControlIngresosPage() {
   }, [profile, router]);
 
   useEffect(() => {
-    const q = query(collection(db, "control_ingresos"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "control_ingresos"), orderBy("creadoEn", "desc"), limit(400));
     return onSnapshot(q, s =>
       setIngresos(s.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)))
     );

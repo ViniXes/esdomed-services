@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, limit, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClipboardList, Clock, CheckCircle2, Search, Printer, ExternalLink } from "lucide-react";
@@ -18,7 +18,7 @@ export default function BandejaAnexo5Page() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "anexo5"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "anexo5"), orderBy("creadoEn", "desc"), limit(400));
     return onSnapshot(q, (snap) => {
       const lista = snap.docs.map((d) => ({
         id: d.id,

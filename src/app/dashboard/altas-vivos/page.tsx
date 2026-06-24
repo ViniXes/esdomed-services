@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, query, orderBy, onSnapshot, limit,
   addDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -600,7 +600,7 @@ export default function AltasVivosPage() {
   const [rectificando, setRectificando] = useState<NotificacionAltaVivo | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"), limit(500));
     return onSnapshot(q, snap => {
       setNotificaciones(snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo)));
     });

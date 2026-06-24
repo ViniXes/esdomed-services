@@ -34,7 +34,7 @@ export default function DashboardTrasladosPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "traslados"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "traslados"), orderBy("creadoEn", "desc"), limit(400));
     return onSnapshot(q, s => setTraslados(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado))));
   }, []);
 

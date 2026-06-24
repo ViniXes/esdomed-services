@@ -54,7 +54,7 @@ export default function DashboardFallecidosPage() {
   const [duiValidado, setDuiValidado] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(500));
     const unsub = onSnapshot(q, s =>
       setNotificaciones(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)))
     );

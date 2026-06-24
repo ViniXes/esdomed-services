@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FileText, Clock, CheckCircle2, Search, X, AlertTriangle } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
@@ -32,7 +32,7 @@ export default function IncapacidadesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "incapacidades"), orderBy("creadoEn", "desc"));
+    const q = query(collection(db, "incapacidades"), orderBy("creadoEn", "desc"), limit(400));
     return onSnapshot(q, (snap) => {
       const lista = snap.docs.map((d) => {
         const data = d.data();
