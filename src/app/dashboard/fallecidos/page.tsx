@@ -197,6 +197,22 @@ export default function DashboardFallecidosPage() {
     return d.toLocaleString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
   };
 
+  // Fecha + hora completas (para la hora de fallecimiento que indicó el médico).
+  const formatFechaHora = (ts: unknown) => {
+    if (!ts) return "—";
+    const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
+    return d.toLocaleString("es-HN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  };
+
+  // Marca/desmarca el DUI validado. Si el caso ya está confirmado, guarda de
+  // inmediato (corrección post-confirmación); si está pendiente, se guarda al confirmar.
+  const guardarDui = async (val: boolean) => {
+    setDuiValidado(val);
+    if (selected?.id && selectedLive?.estado === "confirmado") {
+      await updateDoc(doc(db, "notificaciones_fallecidos", selected.id), { duiValidado: val });
+    }
+  };
+
   const productividad = personal.map(p => ({
     nombre: p.nombre,
     simmow:      notificaciones.filter(n => n.digitaSimmow === p.nombre).length,
@@ -355,7 +371,7 @@ export default function DashboardFallecidosPage() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-slate-700 dark:text-slate-300">{n.servicio} · Cama {n.cama}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{formatFecha(n.fechaDefuncion)}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">† {formatFechaHora(n.fechaDefuncion)}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
                         Dr. {n.medicoNombre}
@@ -499,7 +515,7 @@ export default function DashboardFallecidosPage() {
               {activeTab === "expediente" && (
                 <div className="space-y-3">
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-x-6 gap-y-3">
-                    <InfoCell label="Fecha defunción" value={formatFecha(selectedLive.fechaDefuncion)} />
+                    <InfoCell label="Fecha y hora de defunción" value={formatFechaHora(selectedLive.fechaDefuncion)} />
                     <InfoCell label="Servicio" value={selectedLive.servicio} />
                     <div className="col-span-2">
                       <InfoCell label="Notificado por" value={`Dr. ${selectedLive.medicoNombre}`} />
@@ -799,24 +815,29 @@ export default function DashboardFallecidosPage() {
 
             {/* Footer */}
             <div className="px-5 pb-5 flex-shrink-0 space-y-3">
+              {/* DUI validado — disponible en pendiente y también en confirmado
+                  (en confirmado se guarda al marcar; en pendiente, al confirmar). */}
+              {!isLocked && (
+                <label className="flex items-start gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={duiValidado}
+                    onChange={(e) => guardarDui(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-green-600 shrink-0"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-200">
+                    ¿Se cuenta con foto de <strong>DUI validada</strong> (vigente o con menos de un año de vencido)?
+                    {selectedLive.estado === "confirmado" && (
+                      <span className="block text-[11px] text-slate-400 mt-0.5">Se guarda al marcar.</span>
+                    )}
+                  </span>
+                </label>
+              )}
               {selectedLive.estado === "pendiente" && !isLocked && (
-                <>
-                  <label className="flex items-start gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={duiValidado}
-                      onChange={(e) => setDuiValidado(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 accent-green-600 shrink-0"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">
-                      ¿Se cuenta con foto de <strong>DUI validada</strong> (vigente o con menos de un año de vencido)?
-                    </span>
-                  </label>
-                  <button onClick={confirmar} disabled={saving}
-                    className="w-full py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors">
-                    {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
-                  </button>
-                </>
+                <button onClick={confirmar} disabled={saving}
+                  className="w-full py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors">
+                  {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
+                </button>
               )}
               {puedeCerrar && activeTab === "entrega" && (
                 <button onClick={cerrarTramite} disabled={cerrando}

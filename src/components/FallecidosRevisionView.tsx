@@ -56,16 +56,17 @@ export default function FallecidosRevisionView({
     setSavingVisto(false);
   };
 
-  const formatFecha = (ts: unknown) => {
-    if (!ts) return "—";
-    const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
-    return d.toLocaleDateString("es-HN", { day: "2-digit", month: "short", year: "numeric" });
-  };
-
   const formatHora = (ts: unknown) => {
     if (!ts) return null;
     const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
     return d.toLocaleString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  };
+
+  // Fecha + hora completas (hora de fallecimiento que indicó el médico).
+  const formatFechaHora = (ts: unknown) => {
+    if (!ts) return "—";
+    const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
+    return d.toLocaleString("es-HN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
   };
 
   return (
@@ -144,7 +145,7 @@ export default function FallecidosRevisionView({
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-slate-700 dark:text-slate-300">{n.servicio} · Cama {n.cama}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{formatFecha(n.fechaDefuncion)}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">† {formatFechaHora(n.fechaDefuncion)}</p>
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
                       Dr. {n.medicoNombre}
@@ -215,7 +216,7 @@ export default function FallecidosRevisionView({
               {/* Datos del caso */}
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Datos del caso</p>
-                <InfoCell label="Fecha defunción"  value={formatFecha(selectedLive.fechaDefuncion)} />
+                <InfoCell label="Fecha y hora de defunción"  value={formatFechaHora(selectedLive.fechaDefuncion)} />
                 <InfoCell label="Notificado por"   value={`Dr. ${selectedLive.medicoNombre}`} />
                 <InfoCell label="Servicio"         value={selectedLive.servicio} />
                 {selectedLive.causaMuerte && <InfoCell label="Causa" value={selectedLive.causaMuerte} />}
