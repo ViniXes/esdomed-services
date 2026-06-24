@@ -21,11 +21,6 @@ export default function FallecidosRevisionView({
   const areaLabel = rol === "trabajo_social" ? "Trabajo Social" : "Psicología";
   const reglaLabel = rol === "trabajo_social" ? "trabajo_social" : "psicologia";
 
-  // Área REAL del que confirmó visto (psicología o TS), no la del que está mirando.
-  // Los registros antiguos no tienen recibeDePsRol; en ese caso no asumimos área.
-  const labelAreaConfirmante = (r?: NotificacionFallecido["recibeDePsRol"]) =>
-    r === "trabajo_social" ? "Trabajo Social" : r === "psicologia" ? "Psicología" : null;
-
   const { profile } = useAuth();
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
   const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "todos">("todos");
@@ -167,14 +162,12 @@ export default function FallecidosRevisionView({
                     </td>
                     <td className="px-4 py-3">
                       {n.recibeDePs ? (
-                        <div className="flex flex-col items-start gap-0.5">
+                        <div className="flex flex-col items-start gap-1">
                           <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                             <CheckCircle2 size={13} /> Visto
                           </span>
-                          <span className="text-[11px] text-slate-500">
-                            {n.recibeDePs}
-                            {labelAreaConfirmante(n.recibeDePsRol) && ` · ${labelAreaConfirmante(n.recibeDePsRol)}`}
-                          </span>
+                          <span className="text-[11px] text-slate-500">{n.recibeDePs}</span>
+                          <AreaBadge rol={n.recibeDePsRol} />
                         </div>
                       ) : (
                         <span className="text-xs text-slate-400">Pendiente</span>
@@ -241,18 +234,18 @@ export default function FallecidosRevisionView({
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Recepción</p>
                 {selectedLive.recibeDePs ? (
-                  <p className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-3 py-2.5 rounded-lg">
+                  <div className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-3 py-2.5 rounded-lg">
                     <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
                     <span>
                       Confirmado por <span className="font-semibold">{selectedLive.recibeDePs}</span>
-                      {labelAreaConfirmante(selectedLive.recibeDePsRol) && (
-                        <span className="opacity-75"> ({labelAreaConfirmante(selectedLive.recibeDePsRol)})</span>
+                      {selectedLive.recibeDePsRol && (
+                        <span className="ml-1.5 align-middle"><AreaBadge rol={selectedLive.recibeDePsRol} /></span>
                       )}
                       {selectedLive.recibeDePsEn && (
                         <><br /><span className="text-xs opacity-75">{formatHora(selectedLive.recibeDePsEn)}</span></>
                       )}
                     </span>
-                  </p>
+                  </div>
                 ) : (
                   <p className="text-sm text-slate-500">Aún no confirmado.</p>
                 )}
@@ -276,6 +269,24 @@ export default function FallecidosRevisionView({
       )}
     </div>
   );
+}
+
+function AreaBadge({ rol }: { rol?: NotificacionFallecido["recibeDePsRol"] }) {
+  if (rol === "trabajo_social") {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+        Trabajo Social
+      </span>
+    );
+  }
+  if (rol === "psicologia") {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+        Psicología
+      </span>
+    );
+  }
+  return null;
 }
 
 function DuiBadge({ ok }: { ok: boolean }) {
