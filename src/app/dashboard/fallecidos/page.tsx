@@ -51,6 +51,7 @@ export default function DashboardFallecidosPage() {
   const [savingFamiliar, setSavingFamiliar] = useState(false);
   const [savedFamiliar, setSavedFamiliar] = useState(false);
   const [fiehPendiente, setFiehPendiente] = useState(false);
+  const [duiValidado, setDuiValidado] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"));
@@ -73,6 +74,7 @@ export default function DashboardFallecidosPage() {
     setFamiliarDui(selected.familiarDui ?? "");
     setFamiliarTelefono(selected.familiarTelefono ?? "");
     setFamiliarParentesco(selected.familiarParentesco ?? "");
+    setDuiValidado(!!selected.duiValidado);
   }, [selected?.id]); // eslint-disable-line
 
   const filtered = filtro === "todos"       ? notificaciones
@@ -97,6 +99,7 @@ export default function DashboardFallecidosPage() {
       confirmadoPor: profile.uid,
       confirmadoPorNombre: profile.nombre,
       confirmadoEn: Timestamp.now(),
+      duiValidado,
     });
     // Propagar al módulo Pacientes si el expediente existe y está activo
     try {
@@ -797,10 +800,23 @@ export default function DashboardFallecidosPage() {
             {/* Footer */}
             <div className="px-5 pb-5 flex-shrink-0 space-y-3">
               {selectedLive.estado === "pendiente" && !isLocked && (
-                <button onClick={confirmar} disabled={saving}
-                  className="w-full py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors">
-                  {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
-                </button>
+                <>
+                  <label className="flex items-start gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={duiValidado}
+                      onChange={(e) => setDuiValidado(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-green-600 shrink-0"
+                    />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">
+                      ¿Se cuenta con foto de <strong>DUI validada</strong> (vigente o con menos de un año de vencido)?
+                    </span>
+                  </label>
+                  <button onClick={confirmar} disabled={saving}
+                    className="w-full py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors">
+                    {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
+                  </button>
+                </>
               )}
               {puedeCerrar && activeTab === "entrega" && (
                 <button onClick={cerrarTramite} disabled={cerrando}

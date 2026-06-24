@@ -172,6 +172,8 @@ export interface NotificacionFallecido {
   confirmadoEn?: Date;
   confirmadoPor?: string;
   confirmadoPorNombre?: string;
+  // ESDOMED marca al confirmar si hay foto de DUI validada (vigente o vencido <1 año).
+  duiValidado?: boolean;
   // Seguimiento de productividad ESDOMED
   digitaSimmow?: string;
   digitaSimmowEn?: Date;

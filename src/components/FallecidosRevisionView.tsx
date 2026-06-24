@@ -150,7 +150,13 @@ export default function FallecidosRevisionView({
                       Dr. {n.medicoNombre}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge estado={n.estado} />
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge estado={n.estado} />
+                        {n.estado === "confirmado" && n.confirmadoPorNombre && (
+                          <span className="text-[11px] text-slate-500">por {n.confirmadoPorNombre}</span>
+                        )}
+                        {n.estado === "confirmado" && <DuiBadge ok={!!n.duiValidado} />}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {n.recibeDePs ? (
@@ -213,6 +219,9 @@ export default function FallecidosRevisionView({
                 <InfoCell label="Notificado por"   value={`Dr. ${selectedLive.medicoNombre}`} />
                 <InfoCell label="Servicio"         value={selectedLive.servicio} />
                 {selectedLive.causaMuerte && <InfoCell label="Causa" value={selectedLive.causaMuerte} />}
+                {selectedLive.estado === "confirmado" && (
+                  <InfoCell label="DUI validado (ESDOMED)" value={selectedLive.duiValidado ? "Sí — DUI ok" : "No — Sin DUI"} />
+                )}
               </div>
 
               {/* Confirmación del área */}
@@ -250,6 +259,18 @@ export default function FallecidosRevisionView({
         </div>
       )}
     </div>
+  );
+}
+
+function DuiBadge({ ok }: { ok: boolean }) {
+  return ok ? (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+      DUI ok
+    </span>
+  ) : (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+      Sin DUI
+    </span>
   );
 }
 
