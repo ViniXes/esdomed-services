@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp, limit } from "firebase/firestore";
+import { useState } from "react";
+import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, Filter, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, RefreshCw, AlertTriangle } from "lucide-react";
 import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 
@@ -41,10 +41,15 @@ const docsDe = (t: TramitePersonal): { url: string; nombre: string }[] =>
       ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
       : [];
 
+// Caché a nivel módulo: persiste mientras no se recargue la página (no en F5).
+let cacheTramites: TramitePersonal[] | null = null;
+
 export default function AprobacionTramitesPage() {
   const { user, profile } = useAuth();
-  const [tramites, setTramites] = useState<TramitePersonal[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Caché por sesión SPA: evita releer los 400 al volver a entrar a la vista.
+  const [tramites, setTramites] = useState<TramitePersonal[]>(() => cacheTramites ?? []);
+  const [loading, setLoading] = useState(false);
+  const [consultado, setConsultado] = useState(cacheTramites !== null);
   const [filtroTab, setFiltroTab] = useState<"pendientes" | "todos">("pendientes");
   const [searchTxt, setSearchTxt] = useState("");
 
@@ -54,24 +59,32 @@ export default function AprobacionTramitesPage() {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "tramites_personal"),
-      orderBy("creadoEn", "desc"),
-      limit(400)
-    );
-    return onSnapshot(q, (snap) => {
-      setTramites(snap.docs.map(d => ({ id: d.id, ...d.data() } as TramitePersonal)));
+  // Lectura puntual bajo demanda (no listener vivo; la bandeja se refresca con el botón).
+  const consultar = async () => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "tramites_personal"),
+        orderBy("creadoEn", "desc"),
+        limit(400)
+      );
+      const snap = await getDocs(q);
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() } as TramitePersonal));
+      cacheTramites = lista;
+      setTramites(lista);
+      setConsultado(true);
+    } finally {
       setLoading(false);
-    });
-  }, []);
+    }
+  };
 
   const handleResolver = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tramiteAprobando?.id || !user || !profile) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, "tramites_personal", tramiteAprobando.id), {
+      const id = tramiteAprobando.id;
+      await updateDoc(doc(db, "tramites_personal", id), {
         estado: accionAdmin,
         revisadoPorId: user.uid,
         revisadoPorNombre: profile.nombre,
@@ -79,6 +92,14 @@ export default function AprobacionTramitesPage() {
         comentariosRevision: comentarioAdmin.trim() || undefined,
         actualizadoEn: Timestamp.now()
       });
+      // Actualización optimista: parchamos el doc en memoria + caché para no releer
+      // los 400 tras cada resolución.
+      const parche = (t: TramitePersonal): TramitePersonal =>
+        t.id === id
+          ? { ...t, estado: accionAdmin, revisadoPorId: user.uid, revisadoPorNombre: profile.nombre, comentariosRevision: comentarioAdmin.trim() || undefined }
+          : t;
+      setTramites(prev => prev.map(parche));
+      if (cacheTramites) cacheTramites = cacheTramites.map(parche);
       setTramiteAprobando(null);
       setComentarioAdmin("");
     } catch (err) {
@@ -110,6 +131,14 @@ export default function AprobacionTramitesPage() {
             Revisa y aprueba los permisos del personal y consulta sus documentos subidos.
           </p>
         </div>
+        <button
+          onClick={consultar}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 self-start"
+        >
+          {loading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
+          {consultado ? "Actualizar" : "Consultar"}
+        </button>
       </div>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -149,6 +178,20 @@ export default function AprobacionTramitesPage() {
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : !consultado ? (
+          <div className="px-6 py-20 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800/50 text-slate-300 mb-4">
+              <ClipboardCheck size={32} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Bandeja de trámites</h3>
+            <p className="text-sm text-slate-500 mb-4">Pulsa Consultar para cargar las solicitudes.</p>
+            <button
+              onClick={consultar}
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              <Search size={15} /> Consultar
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="px-6 py-20 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800/50 text-slate-300 mb-4">
@@ -171,9 +214,8 @@ export default function AprobacionTramitesPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {filtered.map(t => {
-                  const d = t.creadoEn as any as { toDate: () => Date };
-                  const fecha = d.toDate ? d.toDate() : new Date(t.creadoEn as unknown as string);
-                  
+                  const fecha = toDate(t.creadoEn) ?? new Date();
+
                   return (
                     <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
                       <td className="py-3.5 px-4 align-top whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
@@ -194,7 +236,7 @@ export default function AprobacionTramitesPage() {
                             {t.fechaInicio && <span className="text-[10px] text-slate-500">Inicia: {toDate(t.fechaInicio)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}</span>}
                           </div>
                         )}
-                        {t.notas && <p className="text-[11px] text-slate-500 italic mt-1 line-clamp-1 group-hover:line-clamp-none">"{t.notas}"</p>}
+                        {t.notas && <p className="text-[11px] text-slate-500 italic mt-1 line-clamp-1 group-hover:line-clamp-none">&quot;{t.notas}&quot;</p>}
                       </td>
                       <td className="py-3.5 px-4 align-top whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${ESTADO_BADGE[t.estado]}`}>

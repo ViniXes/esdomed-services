@@ -1,35 +1,42 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Syringe, Plus, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Syringe, Plus, Search, X, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import type { RegistroHospitalDia } from "@/types";
 import { calcularEdad, formatFecha, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
 
 const LIMIT = 500;
 const PAGE_SIZE = 50;
 
+// Caché a nivel módulo: persiste mientras no se recargue la página (no en F5).
+let cacheHospitalDia: RegistroHospitalDia[] | null = null;
+
 export default function HospitalDiaPage() {
   const { profile } = useAuth();
   const router = useRouter();
-  const [registros, setRegistros] = useState<RegistroHospitalDia[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [registros, setRegistros] = useState<RegistroHospitalDia[]>(() => cacheHospitalDia ?? []);
+  const [loading, setLoading] = useState(false);
+  const [consultado, setConsultado] = useState(cacheHospitalDia !== null);
   const [busqueda, setBusqueda] = useState("");
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
+  // Lectura puntual bajo demanda (no listener vivo: listado de baja volatilidad).
+  const consultar = async () => {
     if (!profile) return;
-    const q = query(
-      collection(db, "hospital_dia"),
-      orderBy("creadoEn", "desc"),
-      limit(LIMIT),
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setRegistros(snap.docs.map((d) => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "hospital_dia"),
+        orderBy("creadoEn", "desc"),
+        limit(LIMIT),
+      );
+      const snap = await getDocs(q);
+      const lista = snap.docs.map((d) => {
         const data = d.data();
         return {
           id: d.id,
@@ -37,11 +44,14 @@ export default function HospitalDiaPage() {
           fechaNacimiento: toDate(data.fechaNacimiento),
           creadoEn: toDate(data.creadoEn) ?? new Date(),
         } as RegistroHospitalDia;
-      }));
+      });
+      cacheHospitalDia = lista;
+      setRegistros(lista);
+      setConsultado(true);
+    } finally {
       setLoading(false);
-    });
-    return unsub;
-  }, [profile]);
+    }
+  };
 
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -78,12 +88,22 @@ export default function HospitalDiaPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-sm text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950 border border-cyan-200 dark:border-cyan-900 px-3 py-1.5 rounded-xl">
-            {registros.length} pacientes
-          </span>
+          {consultado && (
+            <span className="flex items-center gap-1.5 text-sm text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950 border border-cyan-200 dark:border-cyan-900 px-3 py-1.5 rounded-xl">
+              {registros.length} pacientes
+            </span>
+          )}
+          <button
+            onClick={consultar}
+            disabled={loading}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+          >
+            {loading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
+            {consultado ? "Actualizar" : "Consultar"}
+          </button>
           <Link
             href="/dashboard/hospital-dia/nuevo"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
           >
             <Plus size={15} />
             Nuevo paciente
@@ -116,6 +136,17 @@ export default function HospitalDiaPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : !consultado ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
+          <Syringe size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
+          <p className="text-sm text-slate-500 mb-4">Pulsa Consultar para cargar los pacientes de Hospital Día.</p>
+          <button
+            onClick={consultar}
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            <Search size={15} /> Consultar
+          </button>
         </div>
       ) : filtrados.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">

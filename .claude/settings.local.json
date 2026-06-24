@@ -92,7 +92,9 @@
       "Bash(ls node_modules/pdfjs-dist/build/)",
       "Bash(grep -viE \"//|placeholder\")",
       "Bash(git mv *)",
-      "PowerShell(npx eslint src/app/dashboard/pacientes/page.tsx)"
+      "PowerShell(npx eslint src/app/dashboard/pacientes/page.tsx)",
+      "Bash(xargs grep -l \"onSnapshot\")",
+      "PowerShell(npx eslint src/app/dashboard/historial-consultas/page.tsx src/app/dashboard/historial-busquedas/page.tsx src/app/dashboard/aprobacion-tramites/page.tsx src/app/dashboard/hospital-dia/page.tsx)"
     ]
   }
 }

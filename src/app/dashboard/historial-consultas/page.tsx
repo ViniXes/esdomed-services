@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
-import { AlertTriangle, History, Search, X } from "lucide-react";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { AlertTriangle, History, RefreshCw, Search, X } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,11 +54,16 @@ function finDia(value: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// Caché a nivel módulo: persiste mientras no se recargue la página (no en F5).
+let cacheConsultas: ConsultaPaciente[] | null = null;
+
 export default function HistorialConsultasPage() {
   const { profile, loading } = useAuth();
   const router = useRouter();
-  const [registros, setRegistros] = useState<ConsultaPaciente[]>([]);
-  const [cargando, setCargando] = useState(true);
+  // Caché por sesión SPA: evita releer los 500 al volver a entrar a la vista.
+  const [registros, setRegistros] = useState<ConsultaPaciente[]>(() => cacheConsultas ?? []);
+  const [cargando, setCargando] = useState(false);
+  const [consultado, setConsultado] = useState(cacheConsultas !== null);
   const [busqueda, setBusqueda] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -68,18 +73,25 @@ export default function HistorialConsultasPage() {
     if (!loading && profile?.role !== "admin") router.replace("/dashboard");
   }, [loading, profile, router]);
 
-  useEffect(() => {
+  // Lectura puntual bajo demanda (no listener vivo: es un log de auditoría inmutable).
+  const consultar = async () => {
     if (profile?.role !== "admin") return;
-    const q = query(
-      collection(db, "consultas_paciente"),
-      orderBy("creadoEn", "desc"),
-      limit(500)
-    );
-    return onSnapshot(q, snap => {
-      setRegistros(snap.docs.map(d => ({ id: d.id, ...d.data() } as ConsultaPaciente)));
+    setCargando(true);
+    try {
+      const q = query(
+        collection(db, "consultas_paciente"),
+        orderBy("creadoEn", "desc"),
+        limit(500)
+      );
+      const snap = await getDocs(q);
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() } as ConsultaPaciente));
+      cacheConsultas = lista;
+      setRegistros(lista);
+      setConsultado(true);
+    } finally {
       setCargando(false);
-    }, () => setCargando(false));
-  }, [profile?.role]);
+    }
+  };
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -128,8 +140,18 @@ export default function HistorialConsultasPage() {
             </p>
           </div>
         </div>
-        <div className="text-xs text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2">
-          {filtrados.length} de {registros.length} registros
+        <div className="flex items-center gap-2">
+          <button
+            onClick={consultar}
+            disabled={cargando}
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shrink-0"
+          >
+            {cargando ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
+            {consultado ? "Actualizar" : "Consultar"}
+          </button>
+          <div className="text-xs text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2">
+            {filtrados.length} de {registros.length} registros
+          </div>
         </div>
       </div>
 
@@ -173,6 +195,17 @@ export default function HistorialConsultasPage() {
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
         {cargando ? (
           <p className="text-sm text-slate-500 text-center py-12">Cargando historial...</p>
+        ) : !consultado ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-14 text-slate-500">
+            <History size={24} className="text-slate-400" />
+            <p className="text-sm">Pulsa Consultar para cargar el historial de auditoría.</p>
+            <button
+              onClick={consultar}
+              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              <Search size={15} /> Consultar
+            </button>
+          </div>
         ) : filtrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-14 text-slate-500">
             <AlertTriangle size={24} className="text-slate-400" />
