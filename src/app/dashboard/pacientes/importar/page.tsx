@@ -94,6 +94,8 @@ export default function ImportarReportePage() {
         id: string; servicioActual: string; camaActual: string; nombre: string;
         ultimoDiagnostico?: DiagnosticoCIE;
         dui?: string; estadoFamiliar?: string; ocupacion?: string; responsable?: ResponsablePaciente;
+        numeroAfiliacion?: string; direccion?: string; municipio?: string; departamento?: string;
+        telefono?: string;
       }>();
       snap.forEach((d) => {
         const data = d.data();
@@ -107,6 +109,11 @@ export default function ImportarReportePage() {
           estadoFamiliar: data.estadoFamiliar ?? "",
           ocupacion: data.ocupacion ?? "",
           responsable: data.responsable ?? undefined,
+          numeroAfiliacion: data.numeroAfiliacion ?? "",
+          direccion: data.direccion ?? "",
+          municipio: data.municipio ?? "",
+          departamento: data.departamento ?? "",
+          telefono: data.telefono ?? "",
         });
       });
 
@@ -156,21 +163,29 @@ export default function ImportarReportePage() {
           cmp("DUI", m.form.dui, existente.dui, "dui");
           cmp("Estado familiar", m.form.estadoFamiliar, existente.estadoFamiliar, "estadoFamiliar");
           cmp("Ocupación", m.form.ocupacion, existente.ocupacion, "ocupacion");
+          cmp("Afiliación ISSS", m.form.numeroAfiliacion, existente.numeroAfiliacion, "numeroAfiliacion");
+          cmp("Dirección", m.form.direccion, existente.direccion, "direccion");
+          cmp("Municipio", m.form.municipio, existente.municipio, "municipio");
+          cmp("Departamento", m.form.departamento, existente.departamento, "departamento");
+          cmp("Teléfono", m.form.telefono, existente.telefono, "telefono");
 
-          // Responsable (nombre + teléfono); se reconstruye sin perder lo ya guardado.
+          // Responsable (nombre + teléfono + parentesco); se reconstruye sin perder lo ya guardado.
           const rN = m.form.responsable;
           const rV = existente.responsable;
           const rNombre = (rN?.nombre ?? "").trim();
           const rTel = (rN?.telefono ?? "").trim();
+          const rParent = (rN?.parentesco ?? "").trim();
           const cambioRespNombre = rNombre !== "" && rNombre.toLowerCase() !== (rV?.nombre ?? "").trim().toLowerCase();
           const cambioRespTel = rTel !== "" && rTel !== (rV?.telefono ?? "").trim();
+          const cambioRespParent = rParent !== "" && rParent.toLowerCase() !== (rV?.parentesco ?? "").trim().toLowerCase();
           if (cambioRespNombre) cambiosPersonales.push({ campo: "Responsable", anterior: rV?.nombre || "—", nuevo: rNombre });
           if (cambioRespTel) cambiosPersonales.push({ campo: "Tel. responsable", anterior: rV?.telefono || "—", nuevo: rTel });
-          if (cambioRespNombre || cambioRespTel) {
+          if (cambioRespParent) cambiosPersonales.push({ campo: "Parentesco", anterior: rV?.parentesco || "—", nuevo: rParent });
+          if (cambioRespNombre || cambioRespTel || cambioRespParent) {
             const merged: ResponsablePaciente = { ...(rV ?? { nombre: "" }) };
             if (rNombre) merged.nombre = rNombre;
             if (rTel) merged.telefono = rTel;
-            if ((rN?.parentesco ?? "").trim()) merged.parentesco = rN!.parentesco!.trim();
+            if (rParent) merged.parentesco = rParent;
             const limpio = limpiarResponsable(merged);
             if (limpio) dp.responsable = limpio;
           }
