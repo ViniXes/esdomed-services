@@ -4,14 +4,16 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ArrowLeft, Printer, Pencil, CheckCircle2, Save } from "lucide-react";
+import { ArrowLeft, Printer, Ambulance, Info, CheckCircle2, Save } from "lucide-react";
 import type { DatosConstancia, Genero, Paciente, SolicitudIncapacidad } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
 import { ConstanciaPrintLayout } from "@/components/incapacidades/ConstanciaPrintLayout";
 
 const inputCls =
-  "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
+
+const labelCls = "block text-xs font-medium text-slate-500 mb-1.5";
 
 // Campos personales editables a mano para la constancia (los que muestra el formato).
 const CAMPOS: { k: keyof DatosConstancia; label: string; full?: boolean }[] = [
@@ -154,20 +156,34 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
       {/* Datos personales a mano (solo emergencia, oculto al imprimir) */}
       {esEmergencia && (
         <div className="print:hidden max-w-5xl mx-auto px-4 pt-4">
-          <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl p-4 space-y-3">
-            <div className="flex items-start gap-2">
-              <Pencil size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+            {/* Encabezado */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900 shrink-0">
+                <Ambulance size={17} className="text-rose-600 dark:text-rose-400" />
+              </div>
               <div>
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Completar datos del paciente</p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                  Paciente de emergencia (sin ingreso). Escribe a mano los datos para la constancia. Se guardan solo en este documento, no en el padrón.
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
+                  Completar datos del paciente
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Atención de emergencia sin ingreso — escribe los datos para la constancia.
                 </p>
               </div>
             </div>
 
+            {/* Aviso: no se guarda en el padrón */}
+            <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
+              <Info size={14} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Estos datos se guardan solo en esta constancia, no en el padrón de pacientes.
+              </p>
+            </div>
+
+            {/* Campos */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Sexo</label>
+                <label className={labelCls}>Sexo</label>
                 <select
                   value={datos.genero ?? ""}
                   onChange={(e) => set("genero", (e.target.value || undefined) as Genero | undefined)}
@@ -181,7 +197,7 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
               </div>
               {CAMPOS.map((c) => (
                 <div key={c.k} className={c.full ? "sm:col-span-2 md:col-span-3" : ""}>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">{c.label}</label>
+                  <label className={labelCls}>{c.label}</label>
                   <input
                     type="text"
                     value={(datos[c.k] as string) ?? ""}
@@ -192,7 +208,8 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
               ))}
             </div>
 
-            <div className="flex items-center justify-end gap-3">
+            {/* Acción */}
+            <div className="flex items-center justify-end gap-3 pt-1">
               {guardado && (
                 <span className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-400">
                   <CheckCircle2 size={13} /> Guardado
@@ -201,13 +218,13 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
               <button
                 onClick={guardarDatos}
                 disabled={guardando}
-                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
               >
                 <Save size={14} />
                 {guardando ? "Guardando..." : "Guardar datos"}
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 

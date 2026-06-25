@@ -95,7 +95,10 @@
       "PowerShell(npx eslint src/app/dashboard/pacientes/page.tsx)",
       "Bash(xargs grep -l \"onSnapshot\")",
       "PowerShell(npx eslint src/app/dashboard/historial-consultas/page.tsx src/app/dashboard/historial-busquedas/page.tsx src/app/dashboard/aprobacion-tramites/page.tsx src/app/dashboard/hospital-dia/page.tsx)",
-      "PowerShell(npx eslint src/app/dashboard/pacientes/importar/page.tsx)"
+      "PowerShell(npx eslint src/app/dashboard/pacientes/importar/page.tsx)",
+      "PowerShell(npx eslint \"src/app/dashboard/incapacidades/[id]/imprimir/page.tsx\")",
+      "PowerShell(npx eslint src/components/emergencia/AtencionesEmergenciaConsulta.tsx)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)"
     ]
   }
 }

@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  collection, query, orderBy, onSnapshot, limit, where, getDocs, documentId,
+  collection, query, orderBy, limit, where, getDocs, documentId,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
-  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog,
+  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw,
 } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
@@ -37,6 +37,18 @@ const FILTROS_EGRESOS: { value: string; label: string }[] = [
   { value: "otro",      label: "Otros" },
 ];
 
+// Sub-filtro rápido de condición de egreso dentro del tab "No ingresaron".
+type CondRapida = "todos" | "vivo" | "fallecido";
+
+// Caché por sesión SPA, llaveada por vista + rango de fechas. Guarda también el
+// cruce con el padrón (pacientes/personas) para que un re-acceso no relea nada.
+interface CacheEmergencia {
+  atenciones: AtencionEmergencia[];
+  ingresosPorExp: Map<string, string>;
+  registradosPadron: Set<string>;
+}
+const cacheEmergencia = new Map<string, CacheEmergencia>();
+
 interface Props {
   /** Muestra el botón "Importar reporte" (solo ESDOMED/admin). */
   permiteImportar?: boolean;
@@ -52,8 +64,11 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   const { profile } = useAuth();
   const esEgresos = vista === "egresos";
   const [atenciones, setAtenciones] = useState<AtencionEmergencia[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [consultado, setConsultado] = useState(false);
   const [filtro, setFiltro] = useState<string>(esEgresos ? "todos" : "no");
+  // Sub-filtro rápido de condición de egreso (solo en el tab "No ingresaron").
+  const [condRapida, setCondRapida] = useState<CondRapida>("todos");
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -65,15 +80,46 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   // Atención seleccionada para la ficha de detalle (todos los campos del informe).
   const [seleccion, setSeleccion] = useState<AtencionEmergencia | null>(null);
 
-  useEffect(() => {
-    if (!profile) return;
-    const q = query(
-      collection(db, "atenciones_emergencia"),
-      orderBy("fechaHoraIngreso", "desc"),
-      limit(LIMIT),
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setAtenciones(snap.docs.map((d) => {
+  // La consulta a Firestore se acota por rango de fechas (server-side); la caché se
+  // llavea por vista + rango. Buscador, tabs y sub-filtro son client-side.
+  const cacheKey = `${vista}|${fechaDesde}|${fechaHasta}`;
+
+  // Al cambiar el rango NO se lee Firestore: si hay caché de esa combinación se
+  // restaura (incluido el cruce con el padrón); si no, queda vacío hasta Consultar.
+  const [cacheKeyPrev, setCacheKeyPrev] = useState(cacheKey);
+  if (cacheKeyPrev !== cacheKey) {
+    setCacheKeyPrev(cacheKey);
+    const hit = cacheEmergencia.get(cacheKey);
+    if (hit) {
+      setAtenciones(hit.atenciones);
+      setIngresosPorExp(hit.ingresosPorExp);
+      setRegistradosPadron(hit.registradosPadron);
+      setConsultado(true);
+    } else {
+      setAtenciones([]);
+      setIngresosPorExp(new Map());
+      setRegistradosPadron(new Set());
+      setConsultado(false);
+    }
+  }
+
+  // ── Lectura puntual bajo demanda (botón Consultar). Requiere "fecha desde". ──
+  // Filtra por rango en el servidor (lee solo la ventana elegida, no toda la
+  // colección) y luego cruza con el padrón una sola vez, guardando todo en caché.
+  const consultar = async () => {
+    if (!profile || !fechaDesde) return;
+    setLoading(true);
+    try {
+      const desde = new Date(fechaDesde + "T00:00:00");
+      const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
+      const snap = await getDocs(query(
+        collection(db, "atenciones_emergencia"),
+        where("fechaHoraIngreso", ">=", desde),
+        ...(hasta ? [where("fechaHoraIngreso", "<=", hasta)] : []),
+        orderBy("fechaHoraIngreso", "desc"),
+        limit(LIMIT),
+      ));
+      const lista = snap.docs.map((d) => {
         const data = d.data();
         return {
           id: d.id,
@@ -83,29 +129,11 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           fechaHoraEntradaTriage: toDate(data.fechaHoraEntradaTriage),
           importadoEn: toDate(data.importadoEn) ?? new Date(),
         } as AtencionEmergencia;
-      }));
-      setLoading(false);
-    });
-    return unsub;
-  }, [profile]);
+      });
 
-  // ── Trazabilidad con el padrón ──────────────────────────────────────────────
-  // `personas` (docId = expediente) define "registrado en padrón"; `pacientes` da
-  // el id del ingreso para enlazar a la ficha clínica cuando existe.
-  //
-  // Clave estable del CONJUNTO de expedientes: el cruce solo se recalcula cuando
-  // cambian los expedientes (nuevo/quitado), no en cada delta del listener — antes
-  // re-consultaba pacientes+personas en cada cambio del snapshot (amplificaba lecturas).
-  const expedientesKey = useMemo(
-    () => Array.from(new Set(atenciones.map((a) => a.expediente).filter(Boolean))).sort().join("|"),
-    [atenciones],
-  );
-
-  useEffect(() => {
-    if (!profile || !expedientesKey) return;
-    const exps = expedientesKey.split("|");
-    let cancelado = false;
-    (async () => {
+      // Cruce con el padrón: `personas` (docId = expediente) define "registrado";
+      // `pacientes` da el id del ingreso para enlazar a la ficha clínica.
+      const exps = Array.from(new Set(lista.map((a) => a.expediente).filter(Boolean)));
       const mapa = new Map<string, string>();
       const padron = new Set<string>();
       try {
@@ -120,13 +148,19 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           });
           snapPer.forEach((d) => padron.add(d.id));
         }
-        if (!cancelado) { setIngresosPorExp(mapa); setRegistradosPadron(padron); }
       } catch {
         // Best-effort: sin permisos o error de red, simplemente no se muestran enlaces.
       }
-    })();
-    return () => { cancelado = true; };
-  }, [profile, expedientesKey]);
+
+      cacheEmergencia.set(cacheKey, { atenciones: lista, ingresosPorExp: mapa, registradosPadron: padron });
+      setAtenciones(lista);
+      setIngresosPorExp(mapa);
+      setRegistradosPadron(padron);
+      setConsultado(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // En egresos, el universo son los que NO ingresaron a hospitalización (egresaron
   // de emergencia). En atendidos, son todas las atenciones.
@@ -141,18 +175,17 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
     [esEgresos],
   );
 
+  // Sub-filtro Vivos/Fallecidos solo aplica en atendidos, tab "No ingresaron".
+  const usaCondRapida = !esEgresos && filtro === "no";
+
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
-    const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
-    const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return base.filter((a) => {
       if (filtro !== "todos") {
         if (esEgresos) { if (condicionEgreso(a.tipoEgreso) !== filtro) return false; }
         else if (a.ingresoHospitalizacion !== filtro) return false;
       }
-      const fecha = fechaDe(a);
-      if (desde && fecha < desde) return false;
-      if (hasta && fecha > hasta) return false;
+      if (usaCondRapida && condRapida !== "todos" && condicionEgreso(a.tipoEgreso) !== condRapida) return false;
       if (!term) return true;
       return (
         a.expediente?.toLowerCase().includes(term) ||
@@ -160,10 +193,10 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         a.pacienteNombre?.toLowerCase().includes(term)
       ) ?? false;
     });
-  }, [base, filtro, busqueda, fechaDesde, fechaHasta, esEgresos, fechaDe]);
+  }, [base, filtro, busqueda, esEgresos, usaCondRapida, condRapida]);
 
-  // Reset de página al cambiar filtros.
-  const filtrosKey = `${filtro}|${busqueda}|${fechaDesde}|${fechaHasta}`;
+  // Reset de página al cambiar filtros (las fechas reinician vía cacheKey/Consultar).
+  const filtrosKey = `${filtro}|${condRapida}|${busqueda}`;
   const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
   if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
 
@@ -179,6 +212,19 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   const conteoEgresos = useMemo(() => {
     const c: Record<CondicionEgresoEmergencia, number> = { vivo: 0, fallecido: 0, otro: 0, sin_dato: 0 };
     base.forEach((a) => { c[condicionEgreso(a.tipoEgreso)]++; });
+    return c;
+  }, [base]);
+
+  // Conteo Vivos/Fallecidos entre los que NO ingresaron (para el sub-filtro rápido).
+  const conteoNoIngresaron = useMemo(() => {
+    const c = { todos: 0, vivo: 0, fallecido: 0 };
+    base.forEach((a) => {
+      if (a.ingresoHospitalizacion !== "no") return;
+      c.todos++;
+      const k = condicionEgreso(a.tipoEgreso);
+      if (k === "vivo") c.vivo++;
+      else if (k === "fallecido") c.fallecido++;
+    });
     return c;
   }, [base]);
 
@@ -244,6 +290,31 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         ))}
       </div>
 
+      {/* Sub-filtro rápido por condición de egreso (solo tab "No ingresaron") */}
+      {usaCondRapida && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500">Condición:</span>
+          {([
+            { v: "todos",     l: "Todos",      n: conteoNoIngresaron.todos,     activo: "bg-slate-700 text-white" },
+            { v: "vivo",      l: "Vivos",      n: conteoNoIngresaron.vivo,      activo: "bg-emerald-600 text-white" },
+            { v: "fallecido", l: "Fallecidos", n: conteoNoIngresaron.fallecido, activo: "bg-rose-600 text-white" },
+          ] as { v: CondRapida; l: string; n: number; activo: string }[]).map((c) => (
+            <button
+              key={c.v}
+              onClick={() => setCondRapida(c.v)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                condRapida === c.v
+                  ? c.activo
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+              }`}
+            >
+              {c.l}
+              <span className="ml-1.5 opacity-70 tabular-nums">{c.n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Buscador + rango de fecha */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
@@ -257,13 +328,13 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">{esEgresos ? "Alta desde" : "Ingreso desde"}</span>
+          <span className="text-xs text-slate-500 shrink-0">Atención desde *</span>
           <DateField
             value={fechaDesde}
             onChange={setFechaDesde}
             clearable
-            placeholder={esEgresos ? "Alta desde" : "Ingreso desde"}
-            ariaLabel={esEgresos ? "Alta desde" : "Ingreso desde"}
+            placeholder="Atención desde"
+            ariaLabel="Atención desde"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -276,14 +347,23 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
             ariaLabel="Hasta"
           />
         </div>
-        {(busqueda || fechaDesde || fechaHasta) && (
+        {busqueda && (
           <button
-            onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); }}
+            onClick={() => setBusqueda("")}
             className="flex items-center gap-1 px-3 py-2 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors shadow-sm"
           >
             <X size={12} /> Limpiar
           </button>
         )}
+        <button
+          onClick={consultar}
+          disabled={loading || !fechaDesde}
+          title={!fechaDesde ? "Elige la fecha desde para consultar" : `Consultar ${fechaDesde}${fechaHasta ? ` → ${fechaHasta}` : " en adelante"}`}
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shrink-0"
+        >
+          {loading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
+          {consultado ? "Actualizar" : "Consultar"}
+        </button>
       </div>
 
       {/* Tabla */}
@@ -291,12 +371,29 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : !consultado ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
+          <Ambulance size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
+          <p className="text-sm text-slate-500 mb-4">
+            Elige un rango de fechas (atención en emergencia) y pulsa Consultar.
+          </p>
+          <button
+            onClick={consultar}
+            disabled={!fechaDesde}
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            <Search size={15} /> Consultar
+          </button>
+          {!fechaDesde && (
+            <p className="text-xs text-slate-400 mt-2">Indica al menos la fecha &ldquo;desde&rdquo;.</p>
+          )}
+        </div>
       ) : filtrados.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
           <Ambulance size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
           <p className="text-sm text-slate-500">
             {atenciones.length === 0
-              ? "Aún no hay atenciones de emergencia importadas."
+              ? "No hay atenciones de emergencia en el rango elegido."
               : "Sin coincidencias para los filtros actuales."}
           </p>
         </div>
