@@ -23,9 +23,11 @@ type ModalState = { type: "success"; nombre: string } | { type: "error"; message
 
 export default function EnfermeriaAltasPage() {
   const { user, profile } = useAuth();
+  const esGenerico = !!profile?.generico;
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">("");
+  const [persona, setPersona] = useState("");
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [modal, setModal] = useState<ModalState>(null);
@@ -33,6 +35,11 @@ export default function EnfermeriaAltasPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile || !selectedPaciente || !tipoAlta) return;
+    // Cuentas genéricas (compartidas por servicio): exigir el nombre real de quien notifica.
+    if (esGenerico && !persona.trim()) {
+      setModal({ type: "error", message: "Escribe el nombre de quien notifica." });
+      return;
+    }
     setSaving(true);
     try {
       // Pre-chequeo: evitar duplicados si el paciente ya tiene una alta abierta.
@@ -56,6 +63,7 @@ export default function EnfermeriaAltasPage() {
         cama: selectedPaciente.camaActual ?? "",
         tipoAlta,
         notas: notas.trim() || null,
+        ...(esGenerico ? { notificadoPorPersona: persona.trim() } : {}),
         estado: "pendiente",
         rectificacionUsada: false,
         creadoEn: Timestamp.now(),
@@ -65,6 +73,7 @@ export default function EnfermeriaAltasPage() {
       setSelectedPaciente(null);
       setResetKey(k => k + 1);
       setTipoAlta("");
+      setPersona("");
       setNotas("");
     } catch (err) {
       setModal({ type: "error", message: err instanceof Error ? err.message : "No se pudo enviar." });
@@ -97,6 +106,25 @@ export default function EnfermeriaAltasPage() {
             accent="teal"
           />
         </div>
+
+        {/* Nombre de quien notifica — solo cuentas genéricas (compartidas por servicio) */}
+        {selectedPaciente && esGenerico && (
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              Nombre de quien notifica <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={persona}
+              onChange={e => setPersona(e.target.value)}
+              placeholder="Nombre del enfermero/a que reporta"
+              className={inputCls}
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Esta cuenta es compartida del servicio; indica quién está reportando.
+            </p>
+          </div>
+        )}
 
         {/* Tipo de alta */}
         {selectedPaciente && (
@@ -134,7 +162,7 @@ export default function EnfermeriaAltasPage() {
 
         <button
           type="submit"
-          disabled={saving || !selectedPaciente || !tipoAlta}
+          disabled={saving || !selectedPaciente || !tipoAlta || (esGenerico && !persona.trim())}
           className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-all active:scale-[0.99]"
         >
           {saving ? "Enviando..." : "Enviar notificación"}
