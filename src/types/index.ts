@@ -149,6 +149,39 @@ export interface SolicitudTraslado {
   respuestaMedico?: string;   // respuesta del médico a una observación (estado en_revision)
 }
 
+// ============================================================================
+// Traslado a otro hospital — referencia externa (no es movimiento de cama interno)
+// ============================================================================
+// El médico solo elige el establecimiento destino + comentario opcional; ESDOMED
+// recibe la notificación y confirma de recibido. Colección: traslados_externos.
+
+export type EstadoTrasladoExterno = "pendiente" | "confirmado";
+
+export interface TrasladoExterno {
+  id?: string;
+  medicoId: string;
+  medicoNombre: string;
+  medicoServicio: string;
+  medicoJvpm?: string;
+
+  pacienteId?: string;            // doc id en /pacientes (si venía de un ingreso activo)
+  pacienteNombre?: string;
+  pacienteExpediente: string;
+  servicioOrigen?: string;        // snapshot del ingreso al crear
+  camaOrigen?: string;
+
+  establecimientoDestino: string; // hospital al que se envía
+  comentario?: string;            // opcional
+
+  estado: EstadoTrasladoExterno;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+
+  revisadoPor?: string;           // uid del personal esdomed que confirmó
+  revisadoPorNombre?: string;
+  notasEsdomed?: string;          // observación opcional al confirmar
+}
+
 export type EstadoFallecido = "pendiente" | "confirmado";
 
 export interface NotificacionFallecido {

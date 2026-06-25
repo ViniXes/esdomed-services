@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, X } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -17,6 +17,11 @@ const CONFIG: Record<
     icon: ArrowRightLeft,
     borderColor: "border-l-blue-500",
     iconColor: "text-blue-400",
+  },
+  traslado_externo: {
+    icon: Building2,
+    borderColor: "border-l-cyan-500",
+    iconColor: "text-cyan-400",
   },
   alta: {
     icon: LogIn,

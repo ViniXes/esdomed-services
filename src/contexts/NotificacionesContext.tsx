@@ -16,7 +16,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
 export type TipoNotif =
-  | "fallecido" | "traslado" | "alta" | "psicologia"
+  | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
   | "incapacidad" | "anexo5" | "impresion" | "recepcion";
 
 export interface NotifToast {
@@ -29,6 +29,7 @@ export interface NotifToast {
 interface Pendientes {
   fallecidos: number;
   traslados: number;
+  trasladosExternos: number;
   altas: number;
   incapacidades: number;
   anexo5: number;
@@ -44,7 +45,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -60,7 +61,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
 
   const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
-    fallecidos: 0, traslados: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0,
+    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0,
   });
   const [toasts, setToasts] = useState<NotifToast[]>([]);
 
@@ -96,6 +97,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
       if (esEsdomed) {
         contar("fallecidos", pend("notificaciones_fallecidos"));
         contar("traslados", pend("traslados"));
+        contar("trasladosExternos", pend("traslados_externos"));
         contar("incapacidades", pend("incapacidades"));
         contar("anexo5", pend("anexo5"));
         contar("impresiones", pend("solicitudes_impresion"));
@@ -116,6 +118,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     const fuentes: { coll: string; gate: boolean; tipo: TipoNotif; titulo: string; msg: (d: Doc) => string }[] = [
       { coll: "notificaciones_fallecidos", gate: esEsdomed, tipo: "fallecido", titulo: "Nuevo fallecido notificado", msg: d => `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` },
       { coll: "traslados", gate: esEsdomed, tipo: "traslado", titulo: "Nueva solicitud de traslado", msg: d => `Exp. ${s(d.pacienteExpediente)} · ${s(d.servicioOrigen)} → ${s(d.servicioDestino) || "—"}` },
+      { coll: "traslados_externos", gate: esEsdomed, tipo: "traslado_externo", titulo: "Nuevo traslado a otro hospital", msg: d => `Exp. ${s(d.pacienteExpediente)} → ${s(d.establecimientoDestino)}` },
       { coll: "incapacidades", gate: esEsdomed, tipo: "incapacidad", titulo: "Nueva solicitud de incapacidad", msg: d => `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}` },
       { coll: "anexo5", gate: esEsdomed, tipo: "anexo5", titulo: "Nueva solicitud de Anexo 5", msg: d => `${s(d.nombrePaciente)}` },
       { coll: "solicitudes_impresion", gate: esEsdomed, tipo: "impresion", titulo: "Nueva solicitud de impresión", msg: d => `${s(d.descripcion) || "Documento"}` },
@@ -206,7 +209,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
 
   const pendientes: Pendientes = {
     ...counts,
-    total: counts.fallecidos + counts.traslados + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones,
+    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones,
   };
 
   return (

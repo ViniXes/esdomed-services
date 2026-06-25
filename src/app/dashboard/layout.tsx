@@ -8,6 +8,7 @@ import {
   Activity,
   BarChart3,
   BedDouble,
+  Building2,
   CheckCheck,
   ClipboardCheck,
   ClipboardList,
@@ -133,6 +134,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           label: "Traslados",
           icon: ArrowRightLeft,
           badge: pendientes.traslados,
+          group: G_PACIENTES,
+        }]
+      : []),
+    ...(!esTS
+      ? [{
+          href: "/dashboard/traslados-externos",
+          label: "Traslado a otro hospital",
+          icon: Building2,
+          badge: pendientes.trasladosExternos,
           group: G_PACIENTES,
         }]
       : []),

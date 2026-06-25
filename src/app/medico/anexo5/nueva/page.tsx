@@ -9,54 +9,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown, Search, User2, X } from "lucide-react";
 import type { Paciente, SolicitudAnexo5 } from "@/types";
 import { calcularEdad, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
+import {
+  ESTABLECIMIENTOS as establecimientosReferencia,
+  normalizarBusqueda,
+  etiquetaEstablecimiento,
+} from "@/lib/establecimientos";
 
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm";
-
-const establecimientosReferencia = [
-  "Hospital Nacional El Salvador",
-  "Hospital Nacional Rosales",
-  "Hospital Nacional de Niños Benjamín Bloom",
-  "Hospital Nacional de la Mujer Dra. María Isabel Rodríguez",
-  "Hospital Nacional Zacamil Dr. Juan José Fernández",
-  "Hospital Nacional Neumológico y de Medicina Familiar Dr. José Antonio Saldaña",
-  "Hospital Nacional Psiquiátrico Dr. José Molina Martínez",
-  "Hospital Nacional General de Ilopango Enf. Angélica Vidal de Najarro",
-  "Hospital Nacional Nuestra Señora de Fátima – Cojutepeque",
-  "Hospital Nacional Santa Gertrudis – San Vicente",
-  "Hospital Nacional Santa Teresa – Zacatecoluca",
-  "Hospital Nacional San Juan de Dios – San Miguel",
-  "Hospital Nacional San Pedro – Usulután",
-  "Hospital Nacional Jiquilisco – Usulután",
-  "Hospital Nacional Jorge Mena – Santiago de María",
-  "Hospital Nacional de La Unión",
-  "Hospital Nacional Santa Rosa de Lima – La Unión",
-  "Hospital Nacional Nueva Concepción – Chalatenango",
-  "Hospital Nacional Chalatenango Dr. Luis Edmundo Vásquez",
-  "Hospital Nacional Sonsonate Dr. Jorge Mazzini Villacorta",
-  "Hospital Nacional San Rafael – Santa Tecla",
-  "Hospital Nacional de San Francisco Gotera",
-  "Hospital Nacional de Sensuntepeque – San Jerónimo Emiliani",
-  "Hospital Nacional de Ilobasco Dr. José Luis Saca",
-  "Hospital Nacional Atiquizaya – Francisco Menéndez",
-  "Hospital Nacional Ahuachapán – Dr. Francisco Menéndez",
-  "Hospital Nacional Metapán Dr. Arturo Morales",
-  "Hospital Nacional de Nueva Guadalupe",
-  "Hospital Nacional de La Palma",
-  "Hospital Nacional de San Marcos",
-  "Hospital Nacional de Tecoluca – Prof. José Simeón Cañas",
-  "Hospital Nacional de Chalchuapa",
-  "Hospital Nacional San Juan de Dios - Santa Ana",
-  "Instituto Salvadoreño de Rehabilitación Integral – ISRI",
-];
-
-const normalizarBusqueda = (valor: string) =>
-  valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-const etiquetaEstablecimiento = (establecimiento: string) =>
-  establecimiento === "Hospital Nacional San Juan de Dios - Santa Ana"
-    ? 'Hospital Nacional "San Juan de Dios" - Santa Ana'
-    : establecimiento;
 
 export default function NuevaAnexo5Page() {
   const router = useRouter();

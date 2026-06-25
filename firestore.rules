@@ -177,6 +177,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Traslado a otro hospital (referencia externa) ────────────────────────
+    // El médico solo notifica; ESDOMED (staff) confirma de recibido. Sin flujo
+    // de edición del médico.
+    match /traslados_externos/{id} {
+      allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
+      allow create: if isMedico();
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
     // ─── Notificaciones de fallecidos ─────────────────────────────────────────
     match /notificaciones_fallecidos/{id} {
       allow read:   if isAuth() && (isStaff() || isPsicologia() || isTrabajoSocial() || (isMedico() && resource.data.medicoId == uid()));
