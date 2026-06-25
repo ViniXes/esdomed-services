@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useServicios } from "@/contexts/ServiciosContext";
-import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload, X, RefreshCw } from "lucide-react";
+import { BedDouble, Plus, Search, Clock, Filter, ChevronDown, ChevronLeft, ChevronRight, Upload, X, RefreshCw, FileDown } from "lucide-react";
 import type { EstadoPaciente, Paciente } from "@/types";
 import {
   ESTADO_BADGE, ESTADO_LABEL, calcularEdad, diasEstancia, formatFecha,
@@ -161,6 +161,50 @@ export default function PacientesPage() {
     [pacientes]
   );
 
+  // ── Exportar a Excel lo que esté filtrado en pantalla ──
+  const exportar = async () => {
+    if (filtrados.length === 0) return;
+    const XLSX = await import("xlsx");
+    const generoLetra = (g?: string) =>
+      g === "masculino" ? "M" : g === "femenino" ? "F" : g === "otro" ? "O" : "";
+    const dx = (d?: { codigo?: string; descripcion?: string }) =>
+      d ? [d.codigo, d.descripcion].filter(Boolean).join(" - ") : "";
+
+    const filas = filtrados.map((p) => ({
+      EXPEDIENTE: p.expediente ?? "",
+      DUI: p.dui ?? "",
+      APELLIDOS: p.apellidos ?? "",
+      NOMBRES: p.nombres ?? "",
+      EDAD: calcularEdad(p.fechaNacimiento) ?? "",
+      GENERO: generoLetra(p.genero),
+      "ESTADO FAMILIAR": p.estadoFamiliar ?? "",
+      OCUPACION: p.ocupacion ?? "",
+      "AFILIACION ISSS": p.numeroAfiliacion ?? "",
+      TELEFONO: p.telefono ?? "",
+      DIRECCION: p.direccion ?? "",
+      MUNICIPIO: p.municipio ?? "",
+      DEPARTAMENTO: p.departamento ?? "",
+      RESPONSABLE: p.responsable?.nombre ?? "",
+      PARENTESCO: p.responsable?.parentesco ?? "",
+      "TEL. RESPONSABLE": p.responsable?.telefono ?? "",
+      SERVICIO: p.servicioActual ?? "",
+      CAMA: p.camaActual ?? "",
+      INGRESO: p.fechaIngreso ? formatFecha(p.fechaIngreso) : "",
+      EGRESO: p.fechaEgreso ? formatFecha(p.fechaEgreso) : "",
+      "ESTANCIA (DIAS)": diasEstancia(p.fechaIngreso, p.fechaEgreso),
+      ESTADO: ESTADO_LABEL[p.estado] ?? p.estado,
+      "DX INGRESO": dx(p.diagnosticoIngreso),
+      "ULTIMO DX": dx(p.ultimoDiagnostico),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pacientes");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const sufijo = servicioFiltro ? `-${servicioFiltro.replace(/\s+/g, "_")}` : "";
+    XLSX.writeFile(wb, `pacientes-${filtro}${sufijo}-${stamp}.xlsx`);
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -180,6 +224,15 @@ export default function PacientesPage() {
               {activosCount} hospitalizados
             </div>
           )}
+          <button
+            onClick={exportar}
+            disabled={filtrados.length === 0}
+            title={filtrados.length === 0 ? "No hay pacientes para exportar" : `Exportar ${filtrados.length} registros a Excel`}
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileDown size={15} />
+            Exportar Excel
+          </button>
           <Link
             href="/dashboard/pacientes/importar"
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
