@@ -36,6 +36,19 @@ export const ESTABLECIMIENTOS = [
   "Hospital Nacional de Chalchuapa",
   "Hospital Nacional San Juan de Dios - Santa Ana",
   "Instituto Salvadoreño de Rehabilitación Integral – ISRI",
+
+  // Red hospitalaria del Instituto Salvadoreño del Seguro Social (ISSS).
+  "Hospital General – ISSS",
+  "Hospital Médico Quirúrgico y Oncológico – ISSS",
+  "Hospital Materno Infantil 1.º de Mayo – ISSS",
+  "Hospital Amatepec – ISSS",
+  "Hospital Policlínico Arce – ISSS",
+  "Hospital Policlínico Zacamil – ISSS",
+  "Hospital Policlínico Roma – ISSS",
+  "Hospital Policlínico Planes de Renderos – ISSS",
+  "Hospital Regional de San Miguel – ISSS",
+  "Hospital Regional de Santa Ana – ISSS",
+  "Hospital Regional de Sonsonate – ISSS",
 ];
 
 export const normalizarBusqueda = (valor: string) =>

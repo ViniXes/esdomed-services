@@ -21,6 +21,7 @@ import {
   ListChecks,
   LogIn,
   Phone,
+  PhoneCall,
   Printer,
   Settings,
   Syringe,
@@ -220,7 +221,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verHorario
       ? [
           { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL },
-          { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList, group: G_PERSONAL }
+          { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList, group: G_PERSONAL },
+          { href: "/dashboard/directorio-extensiones", label: "Directorio de extensiones", icon: PhoneCall, group: G_PERSONAL }
         ]
       : []),
 
