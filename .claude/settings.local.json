@@ -99,7 +99,8 @@
       "PowerShell(npx eslint \"src/app/dashboard/incapacidades/[id]/imprimir/page.tsx\")",
       "PowerShell(npx eslint src/components/emergencia/AtencionesEmergenciaConsulta.tsx)",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)",
-      "PowerShell(npx eslint \"src/app/api/esdomed/altas/[id]/estado/route.ts\" src/components/altas/AltasVivosView.tsx)"
+      "PowerShell(npx eslint \"src/app/api/esdomed/altas/[id]/estado/route.ts\" src/components/altas/AltasVivosView.tsx)",
+      "Bash(git check-ignore *)"
     ]
   }
 }
