@@ -858,7 +858,10 @@ export function AltasVivosView() {
                   {" "}({n.notificadoPorRol === "enfermeria" ? "Enfermería" : "Trabajo Social"})
                   {" · "}{formatFecha(n.creadoEn)}
                 </p>
-                {n.modificadoPorNombre && (
+                {/* "Modificado por" solo cuando hubo intervención real (observación):
+                    si el modificador coincide con quien procesó, fue el cierre normal
+                    (legado antes del arreglo) y no se muestra. */}
+                {n.modificadoPorNombre && n.modificadoPorId !== n.procesadoPorId && (
                   <p className="text-xs text-slate-400">
                     Modificado por <span className="text-slate-500 font-medium">{modificadoPorNombre}</span>
                     {" · "}{formatFecha(n.modificadoEn)}

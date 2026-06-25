@@ -39,6 +39,10 @@ yarn-error.log*
 service-account.json
 *-service-account.json
 
+# Listados de accesos/credenciales (claves en texto plano) — NUNCA commitear
+accesos-enfermeria.xlsx
+accesos-*.xlsx
+
 # vercel
 .vercel
 

@@ -127,15 +127,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.action === "procesar") {
     const estadoCierre = TIPOS_SOLO_RECIBIDO.has(String(actual.tipoAlta)) ? "recibida" : "procesada";
 
+    // Procesar NO es una "modificación": es el cierre normal (alta efectiva /
+    // acuse de recibido). Solo se registra el procesadoPor*; el "Modificado por"
+    // se reserva para cuando ESDOMED interviene con una observación.
     await ref.update({
       estado: estadoCierre,
       procesadoPorId: caller.uid,
       procesadoPorNombre: caller.nombre,
       procesadoEn: FieldValue.serverTimestamp(),
-      modificadoPorId: caller.uid,
-      modificadoPorNombre: caller.nombre,
-      modificadoPorRol: caller.role,
-      modificadoEn: FieldValue.serverTimestamp(),
     });
 
     // Alta efectiva → sacar al paciente de activos de una. (Depósito/suspendida solo
