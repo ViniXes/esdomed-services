@@ -14,6 +14,7 @@ export interface UserProfile {
   dui?: string;         // solo médicos — documento único de identidad (########-#)
   codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
   puesto?: string;          // solo personal ESDOMED — cargo que aparece en el plan (ej. "TECNICO EN ...")
+  generico?: boolean;       // cuenta compartida (ej. enfermería por servicio): pide el nombre real de quien actúa
   createdAt: Date;
 }
 
@@ -406,6 +407,7 @@ export interface NotificacionAltaVivo {
   notificadoPorId: string;
   notificadoPorNombre: string;
   notificadoPorRol: string;
+  notificadoPorPersona?: string;  // nombre real escrito a mano cuando la cuenta es genérica (compartida)
 
   pacienteId: string;
   pacienteExpediente: string;

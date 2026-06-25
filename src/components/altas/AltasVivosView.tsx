@@ -158,8 +158,10 @@ function CreateModal({
   onCreated: () => void;
 }) {
   const { user, profile } = useAuth();
+  const esGenerico = !!profile?.generico;
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">("");
+  const [persona, setPersona] = useState("");
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,6 +169,11 @@ function CreateModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !profile || !selectedPaciente || !tipoAlta) return;
+    // Cuentas genéricas (compartidas por servicio): exigir el nombre real de quien notifica.
+    if (esGenerico && !persona.trim()) {
+      setError("Escribe el nombre de quien notifica.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -188,6 +195,7 @@ function CreateModal({
         cama: selectedPaciente.camaActual ?? "",
         tipoAlta,
         notas: notas.trim() || null,
+        ...(esGenerico ? { notificadoPorPersona: persona.trim() } : {}),
         estado: estadoInicialPorTipo(tipoAlta),
         rectificacionUsada: false,
         creadoEn: Timestamp.now(),
@@ -222,6 +230,25 @@ function CreateModal({
               accent="blue"
             />
           </div>
+
+          {/* Nombre de quien notifica — solo cuentas genéricas (compartidas por servicio) */}
+          {selectedPaciente && esGenerico && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                Nombre de quien notifica <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={persona}
+                onChange={e => setPersona(e.target.value)}
+                placeholder="Nombre del enfermero/a que reporta"
+                className={inputCls}
+              />
+              <p className="mt-1 text-[11px] text-slate-400">
+                Esta cuenta es compartida del servicio; indica quién está reportando.
+              </p>
+            </div>
+          )}
 
           {/* Tipo de alta */}
           {selectedPaciente && (
@@ -265,7 +292,7 @@ function CreateModal({
               className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50">
               Cancelar
             </button>
-            <button type="submit" disabled={saving || !selectedPaciente || !tipoAlta}
+            <button type="submit" disabled={saving || !selectedPaciente || !tipoAlta || (esGenerico && !persona.trim())}
               className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors">
               {saving ? "Guardando..." : "Notificar alta"}
             </button>
@@ -656,6 +683,7 @@ export function AltasVivosView() {
         "Tipo de alta": TIPO_LABEL[n.tipoAlta],
         Estado: estadoBadgeLabel(n),
         "Notificado por": n.notificadoPorNombre,
+        "Reportado por (enfermero/a)": n.notificadoPorPersona ?? "",
         Rol: n.notificadoPorRol === "enfermeria" ? "Enfermería" : n.notificadoPorRol === "trabajo_social" ? "Trabajo Social" : (n.notificadoPorRol ?? ""),
         "Procesada / recibida por": n.procesadoPorNombre ?? "",
         "Fecha de proceso": n.procesadoEn ? formatFecha(n.procesadoEn) : "",
@@ -858,6 +886,11 @@ export function AltasVivosView() {
                   {" "}({n.notificadoPorRol === "enfermeria" ? "Enfermería" : "Trabajo Social"})
                   {" · "}{formatFecha(n.creadoEn)}
                 </p>
+                {n.notificadoPorPersona && (
+                  <p className="text-xs text-slate-400">
+                    Reportado por <span className="text-slate-600 dark:text-slate-300 font-medium">{n.notificadoPorPersona}</span>
+                  </p>
+                )}
                 {/* "Modificado por" solo cuando hubo intervención real (observación):
                     si el modificador coincide con quien procesó, fue el cierre normal
                     (legado antes del arreglo) y no se muestra. */}
