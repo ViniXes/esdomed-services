@@ -17,10 +17,17 @@ import {
   nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
 
-type FiltroEstado = EstadoPaciente | "todos";
+type FiltroEstado = EstadoPaciente | "todos" | "alta_vivo_todos";
+
+// Egresos vivos de cualquier tipo (toda alta sin defunción). Se consultan juntos
+// con un `where("estado", "in", ...)`.
+const ESTADOS_ALTA_VIVO: EstadoPaciente[] = [
+  "alta_vivo", "alta_voluntaria", "referido", "fuga", "in_extremis",
+];
 
 const FILTROS: { value: FiltroEstado; label: string }[] = [
   { value: "activo",          label: "Activos" },
+  { value: "alta_vivo_todos", label: "Alta vivo (todos)" },
   { value: "alta_vivo",       label: "Alta vivo" },
   { value: "alta_fallecido",  label: "Fallecidos" },
   { value: "alta_voluntaria", label: "Alta vol." },
@@ -30,6 +37,9 @@ const FILTROS: { value: FiltroEstado; label: string }[] = [
 ];
 
 const LIMIT_HISTORICO = 300;
+// "Todos" mezcla todos los estados; un tope más alto evita que ingresos antiguos
+// (p. ej. de reportes viejos) queden fuera de la ventana y no se encuentren al buscar.
+const LIMIT_TODOS = 1000;
 const PAGE_SIZE = 50;
 
 // Caché de resultados por combinación estado|servicio. Persiste durante la sesión
@@ -56,6 +66,8 @@ export default function PacientesPage() {
   // Para estados de egreso, el rango filtra por fecha de egreso; si no, por ingreso.
   const usaFechaEgreso = filtro !== "activo" && filtro !== "todos";
   const labelFecha = usaFechaEgreso ? "Egreso" : "Ingreso";
+  // Tope de lectura aplicado en la consulta (para avisar de resultados truncados).
+  const topeHistorico = filtro === "todos" ? LIMIT_TODOS : LIMIT_HISTORICO;
 
   // El servicio se aplica en la CONSULTA a Firestore (no en cliente), así que la
   // caché se llavea por estado + servicio.
@@ -78,17 +90,27 @@ export default function PacientesPage() {
     setLoading(true);
     try {
       const constraints: QueryConstraint[] = [];
-      if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
-      if (servicioFiltro) {
+      const grupo = filtro === "alta_vivo_todos" ? ESTADOS_ALTA_VIVO : null;
+      const tope = filtro === "todos" ? LIMIT_TODOS : LIMIT_HISTORICO;
+
+      if (grupo) {
+        // Grupo de estados con `in`: una sola consulta. Sin orderBy (evita índice
+        // compuesto) y sin filtrar servicio en el servidor; ambos se resuelven en
+        // cliente (orden en .sort de abajo, servicio en `filtrados`).
+        constraints.push(where("estado", "in", grupo));
+        constraints.push(limit(tope));
+      } else if (servicioFiltro) {
+        if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
         // Filtra el servicio en el servidor (lee solo ese servicio, no todo el censo).
         // Sin orderBy para no requerir índice compuesto; se ordena en cliente.
         constraints.push(where("servicioActual", "==", servicioFiltro));
-        if (filtro !== "activo") constraints.push(limit(LIMIT_HISTORICO));
+        if (filtro !== "activo") constraints.push(limit(tope));
       } else {
+        if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
         constraints.push(orderBy("fechaIngreso", "desc"));
         // Activos: sin límite (acotado por capacidad hospitalaria)
         // Históricos: límite razonable para no descargar toda la colección
-        if (filtro !== "activo") constraints.push(limit(LIMIT_HISTORICO));
+        if (filtro !== "activo") constraints.push(limit(tope));
       }
 
       const snap = await getDocs(query(collection(db, "pacientes"), ...constraints));
@@ -513,9 +535,9 @@ export default function PacientesPage() {
             )}
 
             {/* Aviso de techo histórico */}
-            {filtro !== "activo" && pacientes.length === LIMIT_HISTORICO && (
+            {filtro !== "activo" && pacientes.length >= topeHistorico && (
               <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
-                Límite de {LIMIT_HISTORICO} — afina filtros
+                Límite de {topeHistorico} — afina por servicio o fecha
               </span>
             )}
           </div>
