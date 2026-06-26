@@ -21,11 +21,10 @@ import {
 import type { ConfigIndicadoresCuidadosCriticos, FichaCuidadosCriticos } from "@/types";
 
 const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
-const SERVICIOS_CRITICOS = serviciosPorTipoMedico("uci_ucin");
 const SERVICIOS_UCI = serviciosPorTipoMedico("uci");
 const SERVICIOS_UCIN = serviciosPorTipoMedico("ucin");
 type VistaTablaIndicadores = "indicadores" | "datos" | "graficos";
-type TipoGraficoCritico = "uci" | "ucin";
+type TipoUnidadIndicadores = "uci" | "ucin";
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -44,7 +43,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
   const [vistaTabla, setVistaTabla] = useState<VistaTablaIndicadores>("indicadores");
-  const [tipoGrafico, setTipoGrafico] = useState<TipoGraficoCritico>("uci");
+  const [tipoUnidad, setTipoUnidad] = useState<TipoUnidadIndicadores>("uci");
   const [mostrarFormulas, setMostrarFormulas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -68,12 +67,20 @@ export default function IndicadoresCuidadosCriticosPage() {
     });
   }, [anio, puedeVer]);
 
+  const serviciosUnidad = useMemo(() => tipoUnidad === "uci" ? SERVICIOS_UCI : SERVICIOS_UCIN, [tipoUnidad]);
+
+  useEffect(() => {
+    if (servicio !== "todos" && !serviciosUnidad.includes(servicio)) {
+      setServicio("todos");
+    }
+  }, [servicio, serviciosUnidad]);
+
   const configDiasHabiles = configs.find(item => item.anio === anio && item.mes === mes && item.servicio === "__periodo__") ?? null;
   const diasHabilesOficial = diasHabilesOficiales(anio, mes);
   const diasHabilesParaCalculo = diasHabilesOficial ?? configDiasHabiles?.diasHabiles ?? 0;
   const camasSistema = servicio !== "todos"
     ? camasServicio(servicio)
-    : SERVICIOS_CRITICOS.reduce((total, item) => total + camasServicio(item), 0);
+    : serviciosUnidad.reduce((total, item) => total + camasServicio(item), 0);
 
   const configParaCalculo = useMemo(() => {
     if (camasSistema <= 0) return null;
@@ -87,18 +94,17 @@ export default function IndicadoresCuidadosCriticosPage() {
   }, [anio, camasSistema, diasHabilesParaCalculo, mes, servicio]);
 
   const indicadores = useMemo(
-    () => calcularIndicadoresCuidadosCriticos(fichas, { anio, mes, servicio, config: configParaCalculo }),
-    [anio, configParaCalculo, fichas, mes, servicio],
+    () => calcularIndicadoresCuidadosCriticos(fichas, { anio, mes, servicio, tipo: tipoUnidad, config: configParaCalculo }),
+    [anio, configParaCalculo, fichas, mes, servicio, tipoUnidad],
   );
   const datosBase = useMemo(
-    () => calcularDatosBaseCuidadosCriticos(fichas, { anio, servicio, configs, camasAsignadas: camasSistema }),
-    [anio, camasSistema, configs, fichas, servicio],
+    () => calcularDatosBaseCuidadosCriticos(fichas, { anio, servicio, tipo: tipoUnidad, configs, camasAsignadas: camasSistema }),
+    [anio, camasSistema, configs, fichas, servicio, tipoUnidad],
   );
   const datosGraficosCama = useMemo(() => {
-    const servicios = tipoGrafico === "uci" ? SERVICIOS_UCI : SERVICIOS_UCIN;
     const serviciosFiltrados = servicio === "todos"
-      ? servicios
-      : servicios.filter(item => item === servicio);
+      ? serviciosUnidad
+      : serviciosUnidad.filter(item => item === servicio);
 
     return serviciosFiltrados.map(nombreServicio => {
       const camas = camasServicio(nombreServicio);
@@ -124,7 +130,7 @@ export default function IndicadoresCuidadosCriticosPage() {
         indiceSustitucion: valor(4),
       };
     });
-  }, [anio, diasHabilesParaCalculo, fichas, mes, servicio, tipoGrafico]);
+  }, [anio, diasHabilesParaCalculo, fichas, mes, servicio, serviciosUnidad]);
   const iniciarEdicionDiasHabiles = () => {
     const valores = Object.fromEntries(MESES_INDICADORES.map((_, indice) => {
       const numeroMes = indice + 1;
@@ -213,7 +219,7 @@ export default function IndicadoresCuidadosCriticosPage() {
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="grid gap-3 lg:grid-cols-[120px_180px_minmax(260px,1fr)]">
+        <div className="grid gap-3 lg:grid-cols-[120px_180px_220px_minmax(260px,1fr)]">
           <label>
             <span className="mb-1 block text-xs font-semibold text-slate-500">Anio</span>
             <input type="number" value={anio} onChange={event => setAnio(Number(event.target.value))} className={inputCls} />
@@ -225,10 +231,29 @@ export default function IndicadoresCuidadosCriticosPage() {
             </select>
           </label>
           <label>
+            <span className="mb-1 block text-xs font-semibold text-slate-500">Tipo de unidad</span>
+            <div className="flex rounded-lg border border-slate-300 bg-white p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
+              <button
+                type="button"
+                onClick={() => setTipoUnidad("uci")}
+                className={`flex-1 rounded-md px-3 py-1.5 ${tipoUnidad === "uci" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
+              >
+                UCI
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipoUnidad("ucin")}
+                className={`flex-1 rounded-md px-3 py-1.5 ${tipoUnidad === "ucin" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
+              >
+                UCIN
+              </button>
+            </div>
+          </label>
+          <label>
             <span className="mb-1 block text-xs font-semibold text-slate-500">Servicio</span>
             <select value={servicio} onChange={event => setServicio(event.target.value)} className={inputCls}>
-              <option value="todos">Todos los servicios UCI/UCIN</option>
-              {SERVICIOS_CRITICOS.map(item => <option key={item} value={item}>{item}</option>)}
+              <option value="todos">Todos los servicios {tipoUnidad.toUpperCase()}</option>
+              {serviciosUnidad.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
         </div>
@@ -294,10 +319,9 @@ export default function IndicadoresCuidadosCriticosPage() {
           />
         ) : (
           <GraficosCama
-            tipo={tipoGrafico}
+            tipo={tipoUnidad}
             servicioSeleccionado={servicio}
             datos={datosGraficosCama}
-            onCambiarTipo={setTipoGrafico}
           />
         )}
       </section>
@@ -309,9 +333,8 @@ function GraficosCama({
   tipo,
   servicioSeleccionado,
   datos,
-  onCambiarTipo,
 }: {
-  tipo: TipoGraficoCritico;
+  tipo: TipoUnidadIndicadores;
   servicioSeleccionado: string;
   datos: Array<{
     servicio: string;
@@ -321,7 +344,6 @@ function GraficosCama({
     promedioEstancia: number | null;
     indiceSustitucion: number | null;
   }>;
-  onCambiarTipo: (tipo: TipoGraficoCritico) => void;
 }) {
   const resumen = {
     giroCama: promedio(datos.map(item => item.giroCama)),
@@ -345,22 +367,9 @@ function GraficosCama({
               : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
           </p>
         </div>
-        <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
-          <button
-            type="button"
-            onClick={() => onCambiarTipo("uci")}
-            className={`rounded-lg px-3 py-2 ${tipo === "uci" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
-          >
-            UCI
-          </button>
-          <button
-            type="button"
-            onClick={() => onCambiarTipo("ucin")}
-            className={`rounded-lg px-3 py-2 ${tipo === "ucin" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
-          >
-            UCIN
-          </button>
-        </div>
+        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          {tipo.toUpperCase()}
+        </span>
       </div>
 
       {sinServicios ? (
