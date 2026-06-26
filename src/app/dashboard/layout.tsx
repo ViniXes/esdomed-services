@@ -83,6 +83,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
+  const G_MEDICINA_CRITICA = "Medicina crítica";
   const G_TRABAJO_SOCIAL = "Trabajo Social";
   const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
@@ -121,10 +122,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
       : []),
     ...(verCuidadosCriticos
-      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_PACIENTES }]
+      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA }]
       : []),
     ...(verCuidadosCriticos
-      ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, group: G_PACIENTES }]
+      ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, group: G_MEDICINA_CRITICA }]
       : []),
     ...(verBusquedaTelefono
       ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
