@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
-import { Activity, AlertCircle, Calculator, Save } from "lucide-react";
+import { Activity, AlertCircle, BarChart3, Calculator, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
@@ -22,6 +22,10 @@ import type { ConfigIndicadoresCuidadosCriticos, FichaCuidadosCriticos } from "@
 
 const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 const SERVICIOS_CRITICOS = serviciosPorTipoMedico("uci_ucin");
+const SERVICIOS_UCI = serviciosPorTipoMedico("uci");
+const SERVICIOS_UCIN = serviciosPorTipoMedico("ucin");
+type VistaTablaIndicadores = "indicadores" | "datos" | "graficos";
+type TipoGraficoCritico = "uci" | "ucin";
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -39,7 +43,8 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [servicio, setServicio] = useState("todos");
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
-  const [vistaTabla, setVistaTabla] = useState<"indicadores" | "datos">("indicadores");
+  const [vistaTabla, setVistaTabla] = useState<VistaTablaIndicadores>("indicadores");
+  const [tipoGrafico, setTipoGrafico] = useState<TipoGraficoCritico>("uci");
   const [mostrarFormulas, setMostrarFormulas] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -89,6 +94,37 @@ export default function IndicadoresCuidadosCriticosPage() {
     () => calcularDatosBaseCuidadosCriticos(fichas, { anio, servicio, configs, camasAsignadas: camasSistema }),
     [anio, camasSistema, configs, fichas, servicio],
   );
+  const datosGraficosCama = useMemo(() => {
+    const servicios = tipoGrafico === "uci" ? SERVICIOS_UCI : SERVICIOS_UCIN;
+    const serviciosFiltrados = servicio === "todos"
+      ? servicios
+      : servicios.filter(item => item === servicio);
+
+    return serviciosFiltrados.map(nombreServicio => {
+      const camas = camasServicio(nombreServicio);
+      const calculados = calcularIndicadoresCuidadosCriticos(fichas, {
+        anio,
+        mes,
+        servicio: nombreServicio,
+        config: camas > 0 ? {
+          servicio: nombreServicio,
+          anio,
+          mes,
+          camasAsignadas: camas,
+          diasHabiles: diasHabilesParaCalculo,
+        } : null,
+      });
+      const valor = (id: number) => calculados.find(indicador => indicador.id === id)?.valor ?? null;
+      return {
+        servicio: nombreServicio,
+        camas,
+        giroCama: valor(1),
+        ocupacion: valor(2),
+        promedioEstancia: valor(3),
+        indiceSustitucion: valor(4),
+      };
+    });
+  }, [anio, diasHabilesParaCalculo, fichas, mes, servicio, tipoGrafico]);
   const iniciarEdicionDiasHabiles = () => {
     const valores = Object.fromEntries(MESES_INDICADORES.map((_, indice) => {
       const numeroMes = indice + 1;
@@ -204,12 +240,14 @@ export default function IndicadoresCuidadosCriticosPage() {
             <Activity size={17} className="text-blue-600 dark:text-blue-400" />
             <div>
               <h2 className="font-heading font-bold text-slate-900 dark:text-slate-100">
-                {vistaTabla === "indicadores" ? "Tabla de indicadores" : "Datos base del periodo evaluado"}
+                {tituloVista(vistaTabla)}
               </h2>
               <p className="text-xs text-slate-500">
                 {vistaTabla === "indicadores"
                   ? "Resultados calculados desde los numeradores y denominadores."
-                  : "Conteos mensuales usados como fuente de los indicadores."}
+                  : vistaTabla === "datos"
+                    ? "Conteos mensuales usados como fuente de los indicadores."
+                    : "Resumen visual por servicio, separado entre UCI y UCIN."}
               </p>
             </div>
           </div>
@@ -228,9 +266,16 @@ export default function IndicadoresCuidadosCriticosPage() {
             >
               Datos base
             </button>
+            <button
+              type="button"
+              onClick={() => setVistaTabla("graficos")}
+              className={`rounded-lg px-3 py-2 ${vistaTabla === "graficos" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+            >
+              Graficos
+            </button>
           </div>
         </div>
-        {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} mostrarFormulas={mostrarFormulas} onCambiarFormulas={() => setMostrarFormulas(actual => !actual)} /> : (
+        {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} mostrarFormulas={mostrarFormulas} onCambiarFormulas={() => setMostrarFormulas(actual => !actual)} /> : vistaTabla === "datos" ? (
           <TablaDatosBase
             datos={datosBase}
             anio={anio}
@@ -247,8 +292,137 @@ export default function IndicadoresCuidadosCriticosPage() {
               setMessage("");
             }}
           />
+        ) : (
+          <GraficosCama
+            tipo={tipoGrafico}
+            servicioSeleccionado={servicio}
+            datos={datosGraficosCama}
+            onCambiarTipo={setTipoGrafico}
+          />
         )}
       </section>
+    </div>
+  );
+}
+
+function GraficosCama({
+  tipo,
+  servicioSeleccionado,
+  datos,
+  onCambiarTipo,
+}: {
+  tipo: TipoGraficoCritico;
+  servicioSeleccionado: string;
+  datos: Array<{
+    servicio: string;
+    camas: number;
+    giroCama: number | null;
+    ocupacion: number | null;
+    promedioEstancia: number | null;
+    indiceSustitucion: number | null;
+  }>;
+  onCambiarTipo: (tipo: TipoGraficoCritico) => void;
+}) {
+  const resumen = {
+    giroCama: promedio(datos.map(item => item.giroCama)),
+    ocupacion: promedio(datos.map(item => item.ocupacion)),
+    promedioEstancia: promedio(datos.map(item => item.promedioEstancia)),
+    indiceSustitucion: promedio(datos.map(item => item.indiceSustitucion)),
+  };
+  const sinServicios = datos.length === 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+            <BarChart3 size={16} className="text-blue-500" />
+            Indicadores cama
+          </h3>
+          <p className="text-xs text-slate-500">
+            {servicioSeleccionado === "todos"
+              ? `Mostrando solo servicios ${tipo.toUpperCase()}.`
+              : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
+          </p>
+        </div>
+        <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
+          <button
+            type="button"
+            onClick={() => onCambiarTipo("uci")}
+            className={`rounded-lg px-3 py-2 ${tipo === "uci" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+          >
+            UCI
+          </button>
+          <button
+            type="button"
+            onClick={() => onCambiarTipo("ucin")}
+            className={`rounded-lg px-3 py-2 ${tipo === "ucin" ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+          >
+            UCIN
+          </button>
+        </div>
+      </div>
+
+      {sinServicios ? (
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-700">
+          El servicio seleccionado no pertenece a {tipo.toUpperCase()}. Cambia el switch o selecciona otro servicio.
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <TarjetaGrafico label="Giro de cama" value={resumen.giroCama} />
+            <TarjetaGrafico label="Porcentaje de ocupacion" value={resumen.ocupacion} suffix="%" />
+            <TarjetaGrafico label="Promedio de dias de estancia" value={resumen.promedioEstancia} />
+            <TarjetaGrafico label="Indice de sustitucion" value={resumen.indiceSustitucion} />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <GraficoBarras titulo="Giro de cama" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.giroCama }))} />
+            <GraficoBarras titulo="Porcentaje de ocupacion" suffix="%" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.ocupacion }))} />
+            <GraficoBarras titulo="Promedio de dias de estancia" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.promedioEstancia }))} />
+            <GraficoBarras titulo="Indice de sustitucion" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.indiceSustitucion }))} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TarjetaGrafico({ label, value, suffix = "" }: { label: string; value: number | null; suffix?: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-black text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
+    </div>
+  );
+}
+
+function GraficoBarras({ titulo, datos, suffix = "" }: { titulo: string; datos: Array<{ label: string; value: number | null }>; suffix?: string }) {
+  const maximo = Math.max(...datos.map(item => item.value ?? 0), 0);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+      <h4 className="mb-4 text-sm font-bold text-slate-900 dark:text-slate-100">{titulo}</h4>
+      <div className="space-y-3">
+        {datos.map(item => {
+          const value = item.value ?? 0;
+          const width = maximo > 0 ? Math.max((value / maximo) * 100, value > 0 ? 6 : 0) : 0;
+          return (
+            <div key={item.label} className="grid grid-cols-[minmax(92px,150px)_1fr_58px] items-center gap-2 text-xs">
+              <span className="truncate font-semibold text-slate-600 dark:text-slate-300" title={item.label}>{item.label}</span>
+              <div className="h-6 rounded bg-slate-200 dark:bg-slate-800">
+                <div
+                  className="flex h-6 items-center justify-end rounded bg-emerald-600 pr-2 text-[10px] font-bold text-white"
+                  style={{ width: `${width}%` }}
+                >
+                  {value > 0 ? `${valorGrafico(value)}${suffix}` : ""}
+                </div>
+              </div>
+              <span className="text-right font-mono text-slate-500 dark:text-slate-400">{valorGrafico(item.value)}{suffix}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -405,10 +579,42 @@ function resultadoTabla(indicador: IndicadorCuidadosCriticos) {
   return indicador.valor.toFixed(2);
 }
 
+function tituloVista(vista: VistaTablaIndicadores) {
+  if (vista === "datos") return "Datos base del periodo evaluado";
+  if (vista === "graficos") return "Graficos del periodo evaluado";
+  return "Tabla de indicadores";
+}
+
 function camasServicio(servicio: string) {
   return CAMAS_POR_SERVICIO[servicio as keyof typeof CAMAS_POR_SERVICIO]?.length ?? 0;
 }
 
 function capitalizarMes(mes: string) {
   return mes.charAt(0) + mes.slice(1).toLowerCase();
+}
+
+function promedio(valores: Array<number | null>) {
+  const validos = valores.filter((valor): valor is number => valor !== null && Number.isFinite(valor));
+  if (!validos.length) return null;
+  return validos.reduce((total, valor) => total + valor, 0) / validos.length;
+}
+
+function valorGrafico(value: number | null) {
+  if (value === null || Number.isNaN(value)) return "-";
+  if (Math.abs(value) >= 100) return value.toFixed(1);
+  return value.toFixed(2).replace(/\.00$/, "");
+}
+
+function nombreCortoServicio(servicio: string) {
+  return servicio
+    .replace(/^Unidad de /i, "")
+    .replace(/^cuidados /i, "Cuidados ")
+    .replace(/Cuidados Intensivos/i, "UCI")
+    .replace(/cuidados intensivos/i, "UCI")
+    .replace(/Cuidados Intermedios/i, "UCIN")
+    .replace(/Adultos/i, "")
+    .replace(/ y Posquirurgicos Cardiovasculares/i, "")
+    .replace(/ y Posquirúrgicos Cardiovasculares/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
