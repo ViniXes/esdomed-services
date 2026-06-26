@@ -312,7 +312,10 @@ service cloud.firestore {
 
     // ─── Incapacidades ────────────────────────────────────────────────────────
     match /incapacidades/{id} {
-      allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
+      // Lectura pública para el cuerpo médico: cualquier médico (o staff) puede ver
+      // todas las incapacidades (vista pública en /medico/incapacidades). La edición
+      // y el borrado siguen restringidos al dueño (o staff/admin).
+      allow read:   if isAuth() && (isStaff() || isMedico());
       allow create: if isMedico();
       allow update: if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       // ESDOMED/admin pueden borrar cualquiera; el médico solo las propias y
