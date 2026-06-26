@@ -3,13 +3,13 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, onSnapshot, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, BedDouble, MapPin, IdCard, User2, Stethoscope,
   Clock, Calendar, ArrowRightLeft, LogOut as LogOutIcon, HeartPulse, Pencil, Save, Users,
-  FileUp, Loader2, AlertTriangle, X as XIcon,
+  FileUp, Loader2, AlertTriangle, X as XIcon, Trash2,
 } from "lucide-react";
 import type { Paciente, MovimientoPaciente, DiagnosticoCIE } from "@/types";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
@@ -24,9 +24,11 @@ type Tab = "datos" | "movimientos" | "egreso";
 export default function PacienteDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { profile } = useAuth();
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("datos");
+  const esAdmin = profile?.role === "admin";
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "pacientes", id), (snap) => {
@@ -134,6 +136,9 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
               Registrar egreso
             </Link>
           )}
+          {esAdmin && (
+            <EliminarPacienteButton pacienteId={id} paciente={paciente} />
+          )}
         </div>
       </div>
 
@@ -190,6 +195,111 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
       {tab === "movimientos" && <TabMovimientos paciente={paciente} />}
       {tab === "egreso" && <TabEgreso paciente={paciente} pacienteId={id} />}
     </div>
+  );
+}
+
+// ─── Eliminar paciente (solo admin) ─────────────────────────────────────────
+// Elimina el documento de la colección `pacientes` (este ingreso). NO toca
+// `personas/{expediente}`: la persona permanece. Pensado para depurar ingresos
+// duplicados (p. ej. reportes viejos reimportados como nuevos).
+
+function EliminarPacienteButton({ pacienteId, paciente }: { pacienteId: string; paciente: Paciente }) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+  const [confirmacion, setConfirmacion] = useState("");
+  const [eliminando, setEliminando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const puedeConfirmar = confirmacion.trim() === paciente.expediente;
+
+  const cerrar = () => {
+    setAbierto(false);
+    setConfirmacion("");
+    setError(null);
+  };
+
+  const eliminar = async () => {
+    if (!puedeConfirmar) return;
+    setEliminando(true);
+    setError(null);
+    try {
+      await deleteDoc(doc(db, "pacientes", pacienteId));
+      router.push("/dashboard/pacientes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setEliminando(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setAbierto(true)}
+        className="flex items-center gap-1.5 border border-rose-300 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+      >
+        <Trash2 size={14} />
+        Eliminar
+      </button>
+
+      {abierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950 flex items-center justify-center">
+                <AlertTriangle size={18} className="text-rose-600 dark:text-rose-400" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 font-heading">
+                  Eliminar ingreso de Pacientes
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Se eliminará este ingreso (expediente{" "}
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{paciente.expediente}</span>
+                  {" — "}{nombreCompleto(paciente)}) de la lista de Pacientes.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400 mb-4">
+              Los datos personales de la persona se conservan. Esta acción es permanente y
+              solo debe usarse para depurar ingresos duplicados.
+            </div>
+
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              Escribe el expediente <span className="font-mono text-slate-700 dark:text-slate-300">{paciente.expediente}</span> para confirmar
+            </label>
+            <input
+              type="text"
+              value={confirmacion}
+              onChange={(e) => setConfirmacion(e.target.value)}
+              autoFocus
+              className="w-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-400"
+              placeholder={paciente.expediente}
+            />
+
+            {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">{error}</p>}
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={cerrar}
+                disabled={eliminando}
+                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={eliminar}
+                disabled={!puedeConfirmar || eliminando}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {eliminando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {eliminando ? "Eliminando..." : "Eliminar ingreso"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

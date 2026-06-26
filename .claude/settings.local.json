@@ -108,7 +108,10 @@
       "WebSearch",
       "WebFetch(domain:www.isss.gob.sv)",
       "WebFetch(domain:es.wikipedia.org)",
-      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 15; Write-Output \"tsc-done\")"
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 15; Write-Output \"tsc-done\")",
+      "PowerShell(npx next lint --file \"src/app/dashboard/pacientes/[id]/page.tsx\" 2>&1 | Select-Object -Last 30)",
+      "PowerShell(npx eslint \"src/app/dashboard/pacientes/[id]/page.tsx\" 2>&1 | Select-Object -Last 30)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 20)"
     ]
   }
 }
