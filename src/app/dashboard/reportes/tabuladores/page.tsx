@@ -71,7 +71,8 @@ export default function TabuladoresPage() {
 
   const hoy = useMemo(() => new Date(), []);
   const [tab, setTab] = useState<Tab>("vivos");
-  const [fechaDesde, setFechaDesde] = useState(() => toInput(new Date(hoy.getFullYear(), hoy.getMonth(), 1)));
+  // Por defecto se consulta solo el día actual (desde = hasta = hoy).
+  const [fechaDesde, setFechaDesde] = useState(() => toInput(hoy));
   const [fechaHasta, setFechaHasta] = useState(() => toInput(hoy));
 
   const [egresos, setEgresos] = useState<Paciente[]>([]);
