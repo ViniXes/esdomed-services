@@ -354,8 +354,8 @@ function GraficosCama({
   const sinServicios = datos.length === 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
             <BarChart3 size={16} className="text-blue-500" />
@@ -367,7 +367,7 @@ function GraficosCama({
               : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
           </p>
         </div>
-        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
           {tipo.toUpperCase()}
         </span>
       </div>
@@ -378,14 +378,14 @@ function GraficosCama({
         </div>
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <TarjetaGrafico label="Giro de cama" value={resumen.giroCama} />
             <TarjetaGrafico label="Porcentaje de ocupacion" value={resumen.ocupacion} suffix="%" />
             <TarjetaGrafico label="Promedio de dias de estancia" value={resumen.promedioEstancia} />
             <TarjetaGrafico label="Indice de sustitucion" value={resumen.indiceSustitucion} />
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-3 xl:grid-cols-2">
             <GraficoBarras titulo="Giro de cama" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.giroCama }))} />
             <GraficoBarras titulo="Porcentaje de ocupacion" suffix="%" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.ocupacion }))} />
             <GraficoBarras titulo="Promedio de dias de estancia" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.promedioEstancia }))} />
@@ -399,9 +399,9 @@ function GraficosCama({
 
 function TarjetaGrafico({ label, value, suffix = "" }: { label: string; value: number | null; suffix?: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-950/40">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-black text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
+      <p className="mt-1 text-2xl font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
     </div>
   );
 }
@@ -410,18 +410,18 @@ function GraficoBarras({ titulo, datos, suffix = "" }: { titulo: string; datos: 
   const maximo = Math.max(...datos.map(item => item.value ?? 0), 0);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-      <h4 className="mb-4 text-sm font-bold text-slate-900 dark:text-slate-100">{titulo}</h4>
-      <div className="space-y-3">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+      <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">{titulo}</h4>
+      <div className="space-y-2">
         {datos.map(item => {
           const value = item.value ?? 0;
           const width = maximo > 0 ? Math.max((value / maximo) * 100, value > 0 ? 6 : 0) : 0;
           return (
-            <div key={item.label} className="grid grid-cols-[minmax(92px,150px)_1fr_58px] items-center gap-2 text-xs">
+            <div key={item.label} className="grid grid-cols-[minmax(88px,138px)_1fr_52px] items-center gap-2 text-[11px]">
               <span className="truncate font-semibold text-slate-600 dark:text-slate-300" title={item.label}>{item.label}</span>
-              <div className="h-6 rounded bg-slate-200 dark:bg-slate-800">
+              <div className="h-4 rounded bg-slate-200 dark:bg-slate-800">
                 <div
-                  className="flex h-6 items-center justify-end rounded bg-emerald-600 pr-2 text-[10px] font-bold text-white"
+                  className="flex h-4 items-center justify-end rounded bg-emerald-600 pr-1.5 text-[9px] font-bold text-white"
                   style={{ width: `${width}%` }}
                 >
                   {value > 0 ? `${valorGrafico(value)}${suffix}` : ""}
