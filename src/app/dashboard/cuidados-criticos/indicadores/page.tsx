@@ -25,6 +25,77 @@ const SERVICIOS_UCI = serviciosPorTipoMedico("uci");
 const SERVICIOS_UCIN = serviciosPorTipoMedico("ucin");
 type VistaTablaIndicadores = "indicadores" | "datos" | "graficos";
 type TipoUnidadIndicadores = "uci" | "ucin";
+type VistaGraficoIndicadores = "cama" | "porcentajes" | "tasas";
+
+interface DatoGraficoServicio {
+  servicio: string;
+  camas: number;
+  valores: Record<number, number | null>;
+}
+
+interface ColumnaGrafico {
+  id: number;
+  label: string;
+  suffix?: string;
+}
+
+const GRAFICOS_CAMA: ColumnaGrafico[] = [
+  { id: 1, label: "Giro cama" },
+  { id: 2, label: "Ocupacion", suffix: "%" },
+  { id: 3, label: "Dias estancia" },
+  { id: 4, label: "Sustitucion" },
+];
+
+const GRAFICOS_COMPLICACIONES: ColumnaGrafico[] = [
+  { id: 12, label: "Complic. CVC", suffix: "%" },
+  { id: 13, label: "Infec. CVC", suffix: "%" },
+  { id: 16, label: "Neumonia VM", suffix: "%" },
+  { id: 19, label: "Infec. STU", suffix: "%" },
+  { id: 6, label: "Ulceras", suffix: "%" },
+];
+
+const GRAFICOS_INGRESO: ColumnaGrafico[] = [
+  { id: 5, label: "Reingreso <=72h", suffix: "%" },
+  { id: 10, label: "Escala severidad", suffix: "%" },
+  { id: 18, label: "Caidas x1000" },
+];
+
+const GRAFICOS_NO_PROGRAMADOS: ColumnaGrafico[] = [
+  { id: 11, label: "Extub. accidental", suffix: "%" },
+  { id: 14, label: "Retiro CVC", suffix: "%" },
+  { id: 20, label: "Retiro STU", suffix: "%" },
+  { id: 21, label: "Retiro SNG", suffix: "%" },
+  { id: 22, label: "Retiro TQT", suffix: "%" },
+  { id: 23, label: "Retiro gastrost.", suffix: "%" },
+];
+
+const GRAFICOS_VMI: ColumnaGrafico[] = [
+  { id: 7, label: "Reintubacion", suffix: "%" },
+  { id: 8, label: "Extub. exitosa", suffix: "%" },
+  { id: 9, label: "Extub. fallida", suffix: "%" },
+];
+
+const GRAFICOS_TASAS_CLAVE: ColumnaGrafico[] = [
+  { id: 17, label: "IAAS", suffix: "%" },
+  { id: 30, label: "Neumonia IASS", suffix: "%" },
+  { id: 32, label: "NAVM x1000" },
+];
+
+const GRAFICOS_MORTALIDAD: ColumnaGrafico[] = [
+  { id: 25, label: "Mortalidad bruta", suffix: "%" },
+  { id: 26, label: "Mortalidad neta", suffix: "%" },
+  { id: 27, label: "Indice mortalidad" },
+];
+
+const GRAFICOS_LETALIDAD: ColumnaGrafico[] = [
+  { id: 28, label: "VM", suffix: "%" },
+  { id: 29, label: "Neumonia", suffix: "%" },
+  { id: 31, label: "COVID-19", suffix: "%" },
+  { id: 33, label: "Diarrea", suffix: "%" },
+  { id: 34, label: "ERC", suffix: "%" },
+  { id: 35, label: "Diabetes", suffix: "%" },
+  { id: 36, label: "Hipertension", suffix: "%" },
+];
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -43,6 +114,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
   const [vistaTabla, setVistaTabla] = useState<VistaTablaIndicadores>("indicadores");
+  const [vistaGrafico, setVistaGrafico] = useState<VistaGraficoIndicadores>("cama");
   const [tipoUnidad, setTipoUnidad] = useState<TipoUnidadIndicadores>("uci");
   const [mostrarFormulas, setMostrarFormulas] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -101,7 +173,7 @@ export default function IndicadoresCuidadosCriticosPage() {
     () => calcularDatosBaseCuidadosCriticos(fichas, { anio, servicio, tipo: tipoUnidad, configs, camasAsignadas: camasSistema }),
     [anio, camasSistema, configs, fichas, servicio, tipoUnidad],
   );
-  const datosGraficosCama = useMemo(() => {
+  const datosGraficos = useMemo<DatoGraficoServicio[]>(() => {
     const serviciosFiltrados = servicio === "todos"
       ? serviciosUnidad
       : serviciosUnidad.filter(item => item === servicio);
@@ -120,14 +192,11 @@ export default function IndicadoresCuidadosCriticosPage() {
           diasHabiles: diasHabilesParaCalculo,
         } : null,
       });
-      const valor = (id: number) => calculados.find(indicador => indicador.id === id)?.valor ?? null;
+      const valores = Object.fromEntries(calculados.map(indicador => [indicador.id, indicador.valor])) as Record<number, number | null>;
       return {
         servicio: nombreServicio,
         camas,
-        giroCama: valor(1),
-        ocupacion: valor(2),
-        promedioEstancia: valor(3),
-        indiceSustitucion: valor(4),
+        valores,
       };
     });
   }, [anio, diasHabilesParaCalculo, fichas, mes, servicio, serviciosUnidad]);
@@ -318,10 +387,12 @@ export default function IndicadoresCuidadosCriticosPage() {
             }}
           />
         ) : (
-          <GraficosCama
+          <GraficosIndicadores
             tipo={tipoUnidad}
+            vista={vistaGrafico}
             servicioSeleccionado={servicio}
-            datos={datosGraficosCama}
+            datos={datosGraficos}
+            onCambiarVista={setVistaGrafico}
           />
         )}
       </section>
@@ -329,28 +400,19 @@ export default function IndicadoresCuidadosCriticosPage() {
   );
 }
 
-function GraficosCama({
+function GraficosIndicadores({
   tipo,
+  vista,
   servicioSeleccionado,
   datos,
+  onCambiarVista,
 }: {
   tipo: TipoUnidadIndicadores;
+  vista: VistaGraficoIndicadores;
   servicioSeleccionado: string;
-  datos: Array<{
-    servicio: string;
-    camas: number;
-    giroCama: number | null;
-    ocupacion: number | null;
-    promedioEstancia: number | null;
-    indiceSustitucion: number | null;
-  }>;
+  datos: DatoGraficoServicio[];
+  onCambiarVista: (vista: VistaGraficoIndicadores) => void;
 }) {
-  const resumen = {
-    giroCama: promedio(datos.map(item => item.giroCama)),
-    ocupacion: promedio(datos.map(item => item.ocupacion)),
-    promedioEstancia: promedio(datos.map(item => item.promedioEstancia)),
-    indiceSustitucion: promedio(datos.map(item => item.indiceSustitucion)),
-  };
   const sinServicios = datos.length === 0;
 
   return (
@@ -359,7 +421,7 @@ function GraficosCama({
         <div>
           <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
             <BarChart3 size={14} className="text-blue-500" />
-            Indicadores cama
+            {tituloGrafico(vista)}
           </h3>
           <p className="text-[11px] text-slate-500">
             {servicioSeleccionado === "todos"
@@ -367,9 +429,11 @@ function GraficosCama({
               : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
           </p>
         </div>
-        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-          {tipo.toUpperCase()}
-        </span>
+        <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-bold dark:border-slate-700 dark:bg-slate-950">
+          <BotonGrafico actual={vista} value="cama" onClick={onCambiarVista}>Cama</BotonGrafico>
+          <BotonGrafico actual={vista} value="porcentajes" onClick={onCambiarVista}>Porcentajes</BotonGrafico>
+          <BotonGrafico actual={vista} value="tasas" onClick={onCambiarVista}>Tasas</BotonGrafico>
+        </div>
       </div>
 
       {sinServicios ? (
@@ -377,22 +441,102 @@ function GraficosCama({
           El servicio seleccionado no pertenece a {tipo.toUpperCase()}. Cambia el switch o selecciona otro servicio.
         </div>
       ) : (
-        <>
-          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
-            <TarjetaGrafico label="Giro de cama" value={resumen.giroCama} />
-            <TarjetaGrafico label="Porcentaje de ocupacion" value={resumen.ocupacion} suffix="%" />
-            <TarjetaGrafico label="Promedio de dias de estancia" value={resumen.promedioEstancia} />
-            <TarjetaGrafico label="Indice de sustitucion" value={resumen.indiceSustitucion} />
-          </div>
-
-          <div className="grid gap-2 xl:grid-cols-4">
-            <GraficoBarras titulo="Giro de cama" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.giroCama }))} />
-            <GraficoBarras titulo="Porcentaje de ocupacion" suffix="%" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.ocupacion }))} />
-            <GraficoBarras titulo="Promedio de dias de estancia" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.promedioEstancia }))} />
-            <GraficoBarras titulo="Indice de sustitucion" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.indiceSustitucion }))} />
-          </div>
-        </>
+        <VistaGraficos datos={datos} vista={vista} />
       )}
+    </div>
+  );
+}
+
+function BotonGrafico({ actual, value, onClick, children }: { actual: VistaGraficoIndicadores; value: VistaGraficoIndicadores; onClick: (vista: VistaGraficoIndicadores) => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(value)}
+      className={`rounded-md px-2.5 py-1 ${actual === value ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: VistaGraficoIndicadores }) {
+  if (vista === "porcentajes") {
+    return (
+      <div className="grid gap-2 xl:grid-cols-2">
+        <TablaGrafica titulo="% por complicaciones" datos={datos} columnas={GRAFICOS_COMPLICACIONES} />
+        <TablaGrafica titulo="% por ingreso" datos={datos} columnas={GRAFICOS_INGRESO} />
+        <TablaGrafica titulo="% no programados" datos={datos} columnas={GRAFICOS_NO_PROGRAMADOS} />
+        <TablaGrafica titulo="% relacionados a VMI" datos={datos} columnas={GRAFICOS_VMI} />
+      </div>
+    );
+  }
+
+  if (vista === "tasas") {
+    return (
+      <div className="space-y-2">
+        <div className="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
+          {[...GRAFICOS_TASAS_CLAVE, ...GRAFICOS_MORTALIDAD].map(columna => (
+            <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
+          ))}
+        </div>
+        <div className="grid gap-2 xl:grid-cols-2">
+          <TablaGrafica titulo="Tasas principales" datos={datos} columnas={GRAFICOS_TASAS_CLAVE} />
+          <TablaGrafica titulo="Tasa de mortalidad" datos={datos} columnas={GRAFICOS_MORTALIDAD} />
+          <GraficoBarras titulo="Letalidad por diagnostico" suffix="%" datos={GRAFICOS_LETALIDAD.map(columna => ({ label: columna.label, value: promedioIndicador(datos, columna.id) }))} />
+          <TablaGrafica titulo="Tasa de letalidad" datos={datos} columnas={GRAFICOS_LETALIDAD} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+        {GRAFICOS_CAMA.map(columna => (
+          <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
+        ))}
+      </div>
+
+      <div className="grid gap-2 xl:grid-cols-4">
+        {GRAFICOS_CAMA.map(columna => (
+          <GraficoBarras
+            key={columna.id}
+            titulo={columna.label}
+            suffix={columna.suffix}
+            datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: valorServicio(item, columna.id) }))}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: DatoGraficoServicio[]; columnas: ColumnaGrafico[] }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
+      <div className="border-b border-slate-200 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
+        {titulo}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-[10px]">
+          <thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+            <tr>
+              <th className="min-w-[120px] px-2 py-1.5">Servicio</th>
+              {columnas.map(columna => <th key={columna.id} className="px-2 py-1.5 text-right">{columna.label}</th>)}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            {datos.map(item => (
+              <tr key={`${titulo}-${item.servicio}`} className="text-slate-700 dark:text-slate-300">
+                <td className="max-w-[150px] truncate px-2 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
+                {columnas.map(columna => (
+                  <td key={columna.id} className="px-2 py-1.5 text-right font-mono">{valorGrafico(valorServicio(item, columna.id))}{columna.suffix ?? ""}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -604,6 +748,20 @@ function promedio(valores: Array<number | null>) {
   const validos = valores.filter((valor): valor is number => valor !== null && Number.isFinite(valor));
   if (!validos.length) return null;
   return validos.reduce((total, valor) => total + valor, 0) / validos.length;
+}
+
+function valorServicio(item: DatoGraficoServicio, id: number) {
+  return item.valores[id] ?? null;
+}
+
+function promedioIndicador(datos: DatoGraficoServicio[], id: number) {
+  return promedio(datos.map(item => valorServicio(item, id)));
+}
+
+function tituloGrafico(vista: VistaGraficoIndicadores) {
+  if (vista === "porcentajes") return "Indicadores porcentajes";
+  if (vista === "tasas") return "Indicadores tasas";
+  return "Indicadores cama";
 }
 
 function valorGrafico(value: number | null) {
