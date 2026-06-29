@@ -99,6 +99,7 @@ export function PacienteForm({ value, onChange, disabled, hideIngreso, expedient
             onChange={(v) => set("fechaNacimiento", v)}
             placeholder="Fecha de nacimiento"
             ariaLabel="Fecha de nacimiento"
+            fromYear={1900}
             disabled={disabled}
           />
         </Field>
