@@ -526,6 +526,25 @@ export default function DashboardFallecidosPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Confirmación de leído por Psicología / Trabajo Social
+                      (la registra el propio personal de esas áreas; recibeDePsRol
+                      solo lo escribe ese flujo). */}
+                  {selectedLive.recibeDePsRol && (
+                    <div className="flex items-start gap-2 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 rounded-xl px-3 py-2.5">
+                      <CheckCircle2 size={15} className="text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 text-sm">
+                        <p className="font-semibold text-green-700 dark:text-green-400">
+                          Confirmado de leído por {selectedLive.recibeDePs}
+                          <span className="ml-1.5 align-middle"><AreaBadge rol={selectedLive.recibeDePsRol} /></span>
+                        </p>
+                        {selectedLive.recibeDePsEn && (
+                          <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">{formatHora(selectedLive.recibeDePsEn)}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => enviarWhatsApp(selectedLive)}
                     className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-500 transition-colors"
@@ -882,6 +901,25 @@ function InfoCell({ label, value, className = "" }: { label: string; value: stri
       <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5">{value}</p>
     </div>
   );
+}
+
+// Distintivo del área del personal que confirmó visto (psicología / trabajo social).
+function AreaBadge({ rol }: { rol?: NotificacionFallecido["recibeDePsRol"] }) {
+  if (rol === "trabajo_social") {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+        Trabajo Social
+      </span>
+    );
+  }
+  if (rol === "psicologia") {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+        Psicología
+      </span>
+    );
+  }
+  return null;
 }
 
 function FamiliarInput({ label, value, onChange, placeholder, className = "", disabled = false }: {
