@@ -111,7 +111,16 @@
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 15; Write-Output \"tsc-done\")",
       "PowerShell(npx next lint --file \"src/app/dashboard/pacientes/[id]/page.tsx\" 2>&1 | Select-Object -Last 30)",
       "PowerShell(npx eslint \"src/app/dashboard/pacientes/[id]/page.tsx\" 2>&1 | Select-Object -Last 30)",
-      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 20)"
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -Last 20)",
+      "Bash(cp '/c/Users/Usuario/desktop/esdomed-services/leyes/Ley Protección Datos Personales.pdf' /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/datos.pdf)",
+      "Bash(cp '/c/Users/Usuario/desktop/esdomed-services/leyes/Ley Ciberseguridad de Información.pdf' /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ciber.pdf)",
+      "Read(//c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/**)",
+      "Bash(command -v pdftotext)",
+      "Bash(command -v python)",
+      "Bash(command -v python3)",
+      "Bash(command -v pip)",
+      "Bash(pdftotext -enc UTF-8 /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley2.pdf /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley2.txt)",
+      "Bash(pdftotext -enc UTF-8 /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley1.pdf /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley1.txt)"
     ]
   }
 }

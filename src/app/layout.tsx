@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ServiciosProvider } from "@/contexts/ServiciosContext";
+import { TerminosGate } from "@/components/TerminosGate";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <AuthProvider>
             <ServiciosProvider>{children}</ServiciosProvider>
+            <TerminosGate />
           </AuthProvider>
         </ThemeProvider>
       </body>

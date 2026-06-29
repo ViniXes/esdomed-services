@@ -47,7 +47,11 @@ service cloud.firestore {
     match /usuarios/{userId} {
       allow read:   if isAuth();
       allow create: if isAdmin();
-      allow update: if isAdmin();
+      // El admin puede actualizar cualquier campo. Además, cada usuario puede
+      // registrar SOLO su propia aceptación de términos (campo terminosAceptados).
+      allow update: if isAdmin()
+        || (isAuth() && uid() == userId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['terminosAceptados']));
       allow delete: if isAdmin();
     }
 
