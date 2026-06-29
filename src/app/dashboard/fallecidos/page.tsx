@@ -58,7 +58,7 @@ export default function DashboardFallecidosPage() {
     const unsub = onSnapshot(q, s =>
       setNotificaciones(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)))
     );
-    getDocs(query(collection(db, "usuarios"), where("role", "==", "esdomed")))
+    getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
       .then(snap => setPersonal(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))));
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["psicologia", "trabajo_social"])))
       .then(snap => setPersonalPsTs(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))));
