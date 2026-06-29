@@ -354,14 +354,14 @@ function GraficosCama({
   const sinServicios = datos.length === 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
-            <BarChart3 size={16} className="text-blue-500" />
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
+            <BarChart3 size={14} className="text-blue-500" />
             Indicadores cama
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-[11px] text-slate-500">
             {servicioSeleccionado === "todos"
               ? `Mostrando solo servicios ${tipo.toUpperCase()}.`
               : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
@@ -378,14 +378,14 @@ function GraficosCama({
         </div>
       ) : (
         <>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
             <TarjetaGrafico label="Giro de cama" value={resumen.giroCama} />
             <TarjetaGrafico label="Porcentaje de ocupacion" value={resumen.ocupacion} suffix="%" />
             <TarjetaGrafico label="Promedio de dias de estancia" value={resumen.promedioEstancia} />
             <TarjetaGrafico label="Indice de sustitucion" value={resumen.indiceSustitucion} />
           </div>
 
-          <div className="grid gap-3 xl:grid-cols-2">
+          <div className="grid gap-2 xl:grid-cols-4">
             <GraficoBarras titulo="Giro de cama" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.giroCama }))} />
             <GraficoBarras titulo="Porcentaje de ocupacion" suffix="%" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.ocupacion }))} />
             <GraficoBarras titulo="Promedio de dias de estancia" datos={datos.map(item => ({ label: nombreCortoServicio(item.servicio), value: item.promedioEstancia }))} />
@@ -399,9 +399,9 @@ function GraficosCama({
 
 function TarjetaGrafico({ label, value, suffix = "" }: { label: string; value: number | null; suffix?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
-      <p className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
-      <p className="mt-1 text-2xl font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
+      <p className="shrink-0 text-lg font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
     </div>
   );
 }
@@ -410,22 +410,20 @@ function GraficoBarras({ titulo, datos, suffix = "" }: { titulo: string; datos: 
   const maximo = Math.max(...datos.map(item => item.value ?? 0), 0);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
-      <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">{titulo}</h4>
-      <div className="space-y-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/40">
+      <h4 className="mb-1.5 truncate text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200" title={titulo}>{titulo}</h4>
+      <div className="space-y-1.5">
         {datos.map(item => {
           const value = item.value ?? 0;
           const width = maximo > 0 ? Math.max((value / maximo) * 100, value > 0 ? 6 : 0) : 0;
           return (
-            <div key={item.label} className="grid grid-cols-[minmax(88px,138px)_1fr_52px] items-center gap-2 text-[11px]">
+            <div key={item.label} className="grid grid-cols-[72px_1fr_38px] items-center gap-1.5 text-[10px]">
               <span className="truncate font-semibold text-slate-600 dark:text-slate-300" title={item.label}>{item.label}</span>
-              <div className="h-4 rounded bg-slate-200 dark:bg-slate-800">
+              <div className="h-3 rounded bg-slate-200 dark:bg-slate-800">
                 <div
-                  className="flex h-4 items-center justify-end rounded bg-emerald-600 pr-1.5 text-[9px] font-bold text-white"
+                  className="h-3 rounded bg-emerald-600"
                   style={{ width: `${width}%` }}
-                >
-                  {value > 0 ? `${valorGrafico(value)}${suffix}` : ""}
-                </div>
+                />
               </div>
               <span className="text-right font-mono text-slate-500 dark:text-slate-400">{valorGrafico(item.value)}{suffix}</span>
             </div>
