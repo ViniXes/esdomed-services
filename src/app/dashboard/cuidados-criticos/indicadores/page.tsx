@@ -451,7 +451,7 @@ function BotonGrafico({ actual, value, onClick, children }: { actual: VistaGrafi
 function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: VistaGraficoIndicadores }) {
   if (vista === "porcentajes") {
     return (
-      <div className="grid gap-2 xl:grid-cols-2">
+      <div className="grid min-h-[560px] gap-2 xl:grid-cols-2">
         <TablaGrafica titulo="% por complicaciones" datos={datos} columnas={GRAFICOS_COMPLICACIONES} />
         <TablaGrafica titulo="% por ingreso" datos={datos} columnas={GRAFICOS_INGRESO} />
         <TablaGrafica titulo="% no programados" datos={datos} columnas={GRAFICOS_NO_PROGRAMADOS} />
@@ -462,7 +462,7 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
 
   if (vista === "tasas") {
     return (
-      <div className="space-y-2">
+      <div className="min-h-[560px] space-y-2">
         <div className="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
           {[...GRAFICOS_TASAS_CLAVE, ...GRAFICOS_MORTALIDAD].map(columna => (
             <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
@@ -479,7 +479,7 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
   }
 
   return (
-    <>
+    <div className="min-h-[560px] space-y-3">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {GRAFICOS_CAMA.map(columna => (
           <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
@@ -496,7 +496,7 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
           />
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -510,7 +510,7 @@ function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: Dato
   }));
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
       <div className="border-b border-slate-200 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
         {titulo}
       </div>
@@ -518,16 +518,16 @@ function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: Dato
         <table className="w-full table-fixed text-left text-[10px]">
           <thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
             <tr>
-              <th className="w-[150px] px-2.5 py-1.5">Servicio</th>
-              {columnas.map(columna => <th key={columna.id} className="px-2 py-1.5 text-left">{columna.label}</th>)}
+              <th className="w-[130px] px-2 py-1.5">Servicio</th>
+              {columnas.map(columna => <th key={columna.id} className="px-1.5 py-1.5 text-left">{columna.label}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
             {datos.map(item => (
               <tr key={`${titulo}-${item.servicio}`} className="text-slate-700 dark:text-slate-300">
-                <td className="truncate px-2.5 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
+                <td className="truncate px-2 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
                 {columnas.map(columna => (
-                  <td key={columna.id} className="px-2 py-1.5">
+                  <td key={columna.id} className="px-1.5 py-1.5">
                     <CeldaGrafica value={valorServicio(item, columna.id)} suffix={columna.suffix} maximo={maximos[columna.id] ?? 0} />
                   </td>
                 ))}
@@ -545,11 +545,11 @@ function CeldaGrafica({ value, suffix = "", maximo }: { value: number | null; su
   const width = maximo > 0 && value !== null ? Math.max(Math.min((numero / maximo) * 100, 100), numero > 0 ? 4 : 0) : 0;
 
   return (
-    <div className="flex min-w-0 items-center justify-between gap-1.5">
-      <div className="h-3 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+    <div className="flex min-w-0 items-center justify-between gap-1">
+      <div className="h-2.5 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
         <div className="h-full rounded bg-emerald-600" style={{ width: `${width}%` }} />
       </div>
-      <span className="min-w-[32px] text-right font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+      <span className="min-w-[28px] text-right font-mono text-[9px] font-semibold text-slate-600 dark:text-slate-300">
         {valorGrafico(value)}{suffix}
       </span>
     </div>
