@@ -451,7 +451,7 @@ function BotonGrafico({ actual, value, onClick, children }: { actual: VistaGrafi
 function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: VistaGraficoIndicadores }) {
   if (vista === "porcentajes") {
     return (
-      <div className="grid min-h-[560px] gap-2 xl:grid-cols-2">
+      <div className="grid min-h-[600px] gap-2 xl:grid-cols-2">
         <TablaGrafica titulo="% por complicaciones" datos={datos} columnas={GRAFICOS_COMPLICACIONES} />
         <TablaGrafica titulo="% por ingreso" datos={datos} columnas={GRAFICOS_INGRESO} />
         <TablaGrafica titulo="% no programados" datos={datos} columnas={GRAFICOS_NO_PROGRAMADOS} />
@@ -462,7 +462,7 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
 
   if (vista === "tasas") {
     return (
-      <div className="min-h-[560px] space-y-2">
+      <div className="min-h-[600px] space-y-2">
         <div className="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
           {[...GRAFICOS_TASAS_CLAVE, ...GRAFICOS_MORTALIDAD].map(columna => (
             <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
@@ -479,7 +479,7 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
   }
 
   return (
-    <div className="min-h-[560px] space-y-3">
+    <div className="min-h-[600px] space-y-3">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {GRAFICOS_CAMA.map(columna => (
           <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
