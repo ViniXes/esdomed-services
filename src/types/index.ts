@@ -216,10 +216,24 @@ export interface NotificacionFallecido {
   digitaSimmowEn?: Date;
   entregaCertificado?: string;
   entregaCertificadoEn?: Date;
-  recibeDePs?: string;          // psicología / trabajo social
-  recibeDePsEn?: Date;
-  recibeDePsRol?: "psicologia" | "trabajo_social";   // área real del que confirmó visto
 
+  // ── Confirmación de LECTURA por Psicología / Trabajo Social ──
+  // La registra el propio personal de esas áreas (FallecidosRevisionView).
+  // El área (lecturaPorRol) sale del rol REAL del usuario que confirma, no de la
+  // ruta, para que el badge nunca quede desfasado del nombre.
+  lecturaPor?: string;          // nombre de quien confirmó haber leído
+  lecturaPorUid?: string;
+  lecturaPorRol?: UserRole;     // rol real del que confirmó (se muestra ts/psicología)
+  lecturaEn?: Date;
+
+  // ── Asignación / entrega del certificado por ESDOMED (NO es la lectura) ──
+  // recibeDePs* son escritos por ESDOMED al asignar a quién de Psic./T.S. se le
+  // entrega el certificado. Históricamente compartían sentido con la lectura;
+  // ya están separados (recibeDePsRol es legacy: solo lo escribía el flujo viejo
+  // de lectura, por eso sirve de respaldo para datos antiguos).
+  recibeDePs?: string;          // nombre del receptor asignado por ESDOMED
+  recibeDePsEn?: Date;
+  recibeDePsRol?: "psicologia" | "trabajo_social";   // LEGACY: área de la lectura vieja
   recibeDePsUid?: string;       // uid del usuario asignado (set by ESDOMED)
   recibeDePsEntregadoPor?: string;   // nombre del ESDOMED que hizo la entrega
   recibeDePsEntregadoPorUid?: string;

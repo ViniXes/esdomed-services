@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp } fro
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido } from "@/types";
+import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { HeartPulse, X, CheckCircle2, Clock } from "lucide-react";
 
@@ -45,14 +46,19 @@ export default function FallecidosRevisionView({
   const filtered = filtro === "todos" ? notificaciones : notificaciones.filter(n => n.estado === filtro);
   const pendientes = notificaciones.filter(n => n.estado === "pendiente").length;
   const selectedLive = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
+  const lecturaSel = selectedLive ? getLecturaConfirmada(selectedLive) : null;
 
   const confirmarVisto = async () => {
     if (!selectedLive?.id || !profile) return;
     setSavingVisto(true);
+    // La confirmación de LECTURA es independiente de la asignación/entrega del
+    // certificado (recibeDePs*, que escribe ESDOMED). El área sale del rol REAL
+    // del usuario, no de la ruta, para que nunca quede desfasada del nombre.
     await updateDoc(doc(db, "notificaciones_fallecidos", selectedLive.id), {
-      recibeDePs:    profile.nombre,
-      recibeDePsEn:  Timestamp.now(),
-      recibeDePsRol: rol,
+      lecturaPor:    profile.nombre,
+      lecturaPorUid: profile.uid,
+      lecturaPorRol: profile.role,
+      lecturaEn:     Timestamp.now(),
     });
     setSavingVisto(false);
   };
@@ -161,17 +167,20 @@ export default function FallecidosRevisionView({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {n.recibeDePs ? (
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                            <CheckCircle2 size={13} /> Visto
-                          </span>
-                          <span className="text-[11px] text-slate-500">{n.recibeDePs}</span>
-                          <AreaBadge rol={n.recibeDePsRol} />
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">Pendiente</span>
-                      )}
+                      {(() => {
+                        const lectura = getLecturaConfirmada(n);
+                        return lectura ? (
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                              <CheckCircle2 size={13} /> Visto
+                            </span>
+                            <span className="text-[11px] text-slate-500">{lectura.por}</span>
+                            <AreaBadge rol={lectura.rol} />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">Pendiente</span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -233,16 +242,16 @@ export default function FallecidosRevisionView({
               {/* Confirmación del área */}
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Recepción</p>
-                {selectedLive.recibeDePs ? (
+                {lecturaSel ? (
                   <div className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-3 py-2.5 rounded-lg">
                     <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
                     <span>
-                      Confirmado por <span className="font-semibold">{selectedLive.recibeDePs}</span>
-                      {selectedLive.recibeDePsRol && (
-                        <span className="ml-1.5 align-middle"><AreaBadge rol={selectedLive.recibeDePsRol} /></span>
+                      Confirmado por <span className="font-semibold">{lecturaSel.por}</span>
+                      {lecturaSel.rol && (
+                        <span className="ml-1.5 align-middle"><AreaBadge rol={lecturaSel.rol} /></span>
                       )}
-                      {selectedLive.recibeDePsEn && (
-                        <><br /><span className="text-xs opacity-75">{formatHora(selectedLive.recibeDePsEn)}</span></>
+                      {lecturaSel.en && (
+                        <><br /><span className="text-xs opacity-75">{formatHora(lecturaSel.en)}</span></>
                       )}
                     </span>
                   </div>
@@ -253,7 +262,7 @@ export default function FallecidosRevisionView({
             </div>
 
             {/* Footer: confirmar visto */}
-            {!selectedLive.recibeDePs && (
+            {!lecturaSel && (
               <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
                 <button
                   onClick={confirmarVisto}
@@ -271,7 +280,7 @@ export default function FallecidosRevisionView({
   );
 }
 
-function AreaBadge({ rol }: { rol?: NotificacionFallecido["recibeDePsRol"] }) {
+function AreaBadge({ rol }: { rol?: string }) {
   if (rol === "trabajo_social") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">

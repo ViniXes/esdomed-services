@@ -120,7 +120,9 @@
       "Bash(command -v python3)",
       "Bash(command -v pip)",
       "Bash(pdftotext -enc UTF-8 /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley2.pdf /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley2.txt)",
-      "Bash(pdftotext -enc UTF-8 /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley1.pdf /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley1.txt)"
+      "Bash(pdftotext -enc UTF-8 /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley1.pdf /c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-desktop-esdomed-services/37ff40b1-e7a5-4c21-bdb9-093040c10b57/scratchpad/ley1.txt)",
+      "Bash(ls app/dashboard/altas-vivos app/dashboard/confirmacion-alta app/dashboard/notificacion-altas app/dashboard/confirmacion-alta)",
+      "Bash(grep -rln \"egresoPendiente\\\\|alta_vivo\\\\|notificacionAltaId\\\\|estado:\" app/dashboard/altas-vivos app/dashboard/confirmacion-alta app/dashboard/notificacion-altas)"
     ]
   }
 }

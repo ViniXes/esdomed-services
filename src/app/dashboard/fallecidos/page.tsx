@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, getDocs, doc, updateDoc, Timest
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
+import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
 import { HeartPulse, Clock, X, ChevronDown, CheckCircle2, FileWarning, Lock, LockOpen, Search, MessageCircle } from "lucide-react";
@@ -228,6 +229,7 @@ export default function DashboardFallecidosPage() {
   const pendientes     = notificaciones.filter(n => n.estado === "pendiente").length;
   const certPendientes = notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente").length;
   const selectedLive   = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
+  const lecturaSel     = selectedLive ? getLecturaConfirmada(selectedLive) : null;
 
   const TABS: { id: ActiveTab; label: string }[] = [
     { id: "expediente",  label: "Expediente"  },
@@ -527,19 +529,19 @@ export default function DashboardFallecidosPage() {
                     )}
                   </div>
 
-                  {/* Confirmación de leído por Psicología / Trabajo Social
-                      (la registra el propio personal de esas áreas; recibeDePsRol
-                      solo lo escribe ese flujo). */}
-                  {selectedLive.recibeDePsRol && (
+                  {/* Confirmación de LEÍDO por Psicología / Trabajo Social.
+                      La registra el propio personal de esas áreas; es independiente
+                      de la asignación/entrega del certificado que hace ESDOMED. */}
+                  {lecturaSel && (
                     <div className="flex items-start gap-2 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 rounded-xl px-3 py-2.5">
                       <CheckCircle2 size={15} className="text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
                       <div className="min-w-0 text-sm">
                         <p className="font-semibold text-green-700 dark:text-green-400">
-                          Confirmado de leído por {selectedLive.recibeDePs}
-                          <span className="ml-1.5 align-middle"><AreaBadge rol={selectedLive.recibeDePsRol} /></span>
+                          Confirmado de leído por {lecturaSel.por}
+                          <span className="ml-1.5 align-middle"><AreaBadge rol={lecturaSel.rol} /></span>
                         </p>
-                        {selectedLive.recibeDePsEn && (
-                          <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">{formatHora(selectedLive.recibeDePsEn)}</p>
+                        {lecturaSel.en && (
+                          <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">{formatHora(lecturaSel.en)}</p>
                         )}
                       </div>
                     </div>
@@ -904,7 +906,7 @@ function InfoCell({ label, value, className = "" }: { label: string; value: stri
 }
 
 // Distintivo del área del personal que confirmó visto (psicología / trabajo social).
-function AreaBadge({ rol }: { rol?: NotificacionFallecido["recibeDePsRol"] }) {
+function AreaBadge({ rol }: { rol?: string }) {
   if (rol === "trabajo_social") {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
