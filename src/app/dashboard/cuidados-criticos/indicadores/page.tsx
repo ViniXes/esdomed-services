@@ -615,7 +615,7 @@ function TablaIndicadores({ indicadores, mostrarFormulas, onCambiarFormulas }: {
             <th className="px-3 py-2 text-right">Numerador</th>
             <th className="px-3 py-2 text-right">Denominador</th>
             <th className="px-3 py-2 text-right">Resultado</th>
-            <th className="px-3 py-2">Estado</th>
+            <th className="px-3 py-2 text-center">Estado</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -630,7 +630,7 @@ function TablaIndicadores({ indicadores, mostrarFormulas, onCambiarFormulas }: {
               <td className="px-3 py-2 text-right font-mono">{numeroTabla(indicador.numerador)}</td>
               <td className="px-3 py-2 text-right font-mono">{numeroTabla(indicador.denominador)}</td>
               <td className="px-3 py-2 text-right font-mono font-semibold">{resultadoTabla(indicador)}</td>
-              <td className="px-3 py-2"><Estado indicador={indicador} /></td>
+              <td className="px-3 py-2 text-center"><Estado indicador={indicador} /></td>
             </tr>
           ))}
         </tbody>
