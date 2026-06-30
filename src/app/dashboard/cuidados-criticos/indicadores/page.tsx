@@ -278,14 +278,13 @@ export default function IndicadoresCuidadosCriticosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6">
+    <div className="mx-auto max-w-[1800px] space-y-4 p-4 md:p-5">
       <header className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
           <Calculator size={19} className="text-blue-600 dark:text-blue-400" />
         </div>
         <div>
           <h1 className="font-heading text-xl font-bold text-slate-900 dark:text-slate-100">Indicadores UCI / UCIN</h1>
-          <p className="text-xs text-slate-500">Calculo mensual desde fichas registradas y configuracion estadistica.</p>
         </div>
       </header>
 
@@ -332,20 +331,13 @@ export default function IndicadoresCuidadosCriticosPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Activity size={17} className="text-blue-600 dark:text-blue-400" />
             <div>
               <h2 className="font-heading font-bold text-slate-900 dark:text-slate-100">
                 {tituloVista(vistaTabla)}
               </h2>
-              <p className="text-xs text-slate-500">
-                {vistaTabla === "indicadores"
-                  ? "Resultados calculados desde los numeradores y denominadores."
-                  : vistaTabla === "datos"
-                    ? "Conteos mensuales usados como fuente de los indicadores."
-                    : "Resumen visual por servicio, separado entre UCI y UCIN."}
-              </p>
             </div>
           </div>
           <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
@@ -426,11 +418,6 @@ function GraficosIndicadores({
             <BarChart3 size={14} className="text-blue-500" />
             {tituloGrafico(vista)}
           </h3>
-          <p className="text-[11px] text-slate-500">
-            {servicioSeleccionado === "todos"
-              ? `Mostrando solo servicios ${tipo.toUpperCase()}.`
-              : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
-          </p>
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-bold dark:border-slate-700 dark:bg-slate-950">
           <BotonGrafico actual={vista} value="cama" onClick={onCambiarVista}>Cama</BotonGrafico>
@@ -525,23 +512,23 @@ function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: Dato
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
-      <div className="border-b border-slate-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
+      <div className="border-b border-slate-200 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
         {titulo}
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-[11px]">
+      <div className="overflow-hidden">
+        <table className="w-full table-fixed text-left text-[10px]">
           <thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
             <tr>
-              <th className="min-w-[150px] px-3 py-2">Servicio</th>
-              {columnas.map(columna => <th key={columna.id} className="min-w-[150px] px-3 py-2 text-left">{columna.label}</th>)}
+              <th className="w-[150px] px-2.5 py-1.5">Servicio</th>
+              {columnas.map(columna => <th key={columna.id} className="px-2 py-1.5 text-left">{columna.label}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
             {datos.map(item => (
               <tr key={`${titulo}-${item.servicio}`} className="text-slate-700 dark:text-slate-300">
-                <td className="max-w-[180px] truncate px-3 py-2 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
+                <td className="truncate px-2.5 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
                 {columnas.map(columna => (
-                  <td key={columna.id} className="px-3 py-2">
+                  <td key={columna.id} className="px-2 py-1.5">
                     <CeldaGrafica value={valorServicio(item, columna.id)} suffix={columna.suffix} maximo={maximos[columna.id] ?? 0} />
                   </td>
                 ))}
@@ -559,15 +546,13 @@ function CeldaGrafica({ value, suffix = "", maximo }: { value: number | null; su
   const width = maximo > 0 && value !== null ? Math.max(Math.min((numero / maximo) * 100, 100), numero > 0 ? 4 : 0) : 0;
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between gap-2">
-        <div className="h-3.5 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
-          <div className="h-full rounded bg-emerald-600" style={{ width: `${width}%` }} />
-        </div>
-        <span className="min-w-[44px] text-right font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300">
-          {valorGrafico(value)}{suffix}
-        </span>
+    <div className="flex min-w-0 items-center justify-between gap-1.5">
+      <div className="h-3 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+        <div className="h-full rounded bg-emerald-600" style={{ width: `${width}%` }} />
       </div>
+      <span className="min-w-[32px] text-right font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+        {valorGrafico(value)}{suffix}
+      </span>
     </div>
   );
 }
