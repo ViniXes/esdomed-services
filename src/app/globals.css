@@ -71,6 +71,30 @@ body {
 ::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
+.scrollbar-matriz-cuidados {
+  scrollbar-color: var(--color-institutional-warm) rgba(201, 168, 146, 0.16);
+  scrollbar-width: thin;
+}
+
+.scrollbar-matriz-cuidados::-webkit-scrollbar {
+  height: 9px;
+}
+
+.scrollbar-matriz-cuidados::-webkit-scrollbar-track {
+  background: rgba(201, 168, 146, 0.14);
+  border-radius: 99px;
+}
+
+.scrollbar-matriz-cuidados::-webkit-scrollbar-thumb {
+  background: #c9a892;
+  border: 2px solid rgba(28, 40, 52, 0.9);
+  border-radius: 99px;
+}
+
+.scrollbar-matriz-cuidados::-webkit-scrollbar-thumb:hover {
+  background: #e0c1ad;
+}
+
 @keyframes notif-in {
   from { opacity: 0; transform: translateX(1.5rem); }
   to   { opacity: 1; transform: translateX(0); }
