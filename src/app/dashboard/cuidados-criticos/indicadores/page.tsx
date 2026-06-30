@@ -26,6 +26,7 @@ const SERVICIOS_UCIN = serviciosPorTipoMedico("ucin");
 type VistaTablaIndicadores = "indicadores" | "datos" | "graficos";
 type TipoUnidadIndicadores = "uci" | "ucin";
 type VistaGraficoIndicadores = "cama" | "porcentajes" | "tasas";
+type MesIndicadores = number | "todos";
 
 interface DatoGraficoServicio {
   servicio: string;
@@ -109,7 +110,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [configs, setConfigs] = useState<ConfigIndicadoresCuidadosCriticos[]>([]);
   const [anio, setAnio] = useState(fecha.getFullYear());
-  const [mes, setMes] = useState(fecha.getMonth() + 1);
+  const [mes, setMes] = useState<MesIndicadores>(fecha.getMonth() + 1);
   const [servicio, setServicio] = useState("todos");
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
@@ -147,8 +148,9 @@ export default function IndicadoresCuidadosCriticosPage() {
     }
   }, [servicio, serviciosUnidad]);
 
-  const configDiasHabiles = configs.find(item => item.anio === anio && item.mes === mes && item.servicio === "__periodo__") ?? null;
-  const diasHabilesOficial = diasHabilesOficiales(anio, mes);
+  const mesNumerico = typeof mes === "number" ? mes : null;
+  const configDiasHabiles = mesNumerico ? configs.find(item => item.anio === anio && item.mes === mesNumerico && item.servicio === "__periodo__") ?? null : null;
+  const diasHabilesOficial = mesNumerico ? diasHabilesOficiales(anio, mesNumerico) : null;
   const diasHabilesParaCalculo = diasHabilesOficial ?? configDiasHabiles?.diasHabiles ?? 0;
   const camasSistema = servicio !== "todos"
     ? camasServicio(servicio)
@@ -159,11 +161,11 @@ export default function IndicadoresCuidadosCriticosPage() {
     return {
       servicio,
       anio,
-      mes,
+      mes: mesNumerico ?? 0,
       camasAsignadas: camasSistema,
       diasHabiles: diasHabilesParaCalculo,
     } satisfies ConfigIndicadoresCuidadosCriticos;
-  }, [anio, camasSistema, diasHabilesParaCalculo, mes, servicio]);
+  }, [anio, camasSistema, diasHabilesParaCalculo, mesNumerico, servicio]);
 
   const indicadores = useMemo(
     () => calcularIndicadoresCuidadosCriticos(fichas, { anio, mes, servicio, tipo: tipoUnidad, config: configParaCalculo }),
@@ -187,7 +189,7 @@ export default function IndicadoresCuidadosCriticosPage() {
         config: camas > 0 ? {
           servicio: nombreServicio,
           anio,
-          mes,
+          mes: mesNumerico ?? 0,
           camasAsignadas: camas,
           diasHabiles: diasHabilesParaCalculo,
         } : null,
@@ -199,7 +201,7 @@ export default function IndicadoresCuidadosCriticosPage() {
         valores,
       };
     });
-  }, [anio, diasHabilesParaCalculo, fichas, mes, servicio, serviciosUnidad]);
+  }, [anio, diasHabilesParaCalculo, fichas, mes, mesNumerico, servicio, serviciosUnidad]);
   const iniciarEdicionDiasHabiles = () => {
     const valores = Object.fromEntries(MESES_INDICADORES.map((_, indice) => {
       const numeroMes = indice + 1;
@@ -295,7 +297,8 @@ export default function IndicadoresCuidadosCriticosPage() {
           </label>
           <label>
             <span className="mb-1 block text-xs font-semibold text-slate-500">Mes</span>
-            <select value={mes} onChange={event => setMes(Number(event.target.value))} className={inputCls}>
+            <select value={mes} onChange={event => setMes(event.target.value === "todos" ? "todos" : Number(event.target.value))} className={inputCls}>
+              <option value="todos">TODOS</option>
               {MESES_INDICADORES.map((nombre, index) => <option key={nombre} value={index + 1}>{nombre}</option>)}
             </select>
           </label>

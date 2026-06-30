@@ -81,7 +81,7 @@ export interface DatoBaseCuidadosCriticos {
 
 interface ParametrosIndicadores {
   anio: number;
-  mes: number;
+  mes: number | "todos";
   servicio: string;
   tipo?: TipoMedicoCuidadosCriticos | "todos";
   config?: ConfigIndicadoresCuidadosCriticos | null;
@@ -210,7 +210,9 @@ export function calcularIndicadoresCuidadosCriticos(
   const { anio, mes, servicio, tipo, config } = parametros;
   const camas = numeroConfig(config?.camasAsignadas);
   const faltaConfig = !camas;
-  const conteos = conteosMensuales(fichas, { anio, mes, servicio, tipo, camasAsignadas: camas });
+  const conteos = mes === "todos"
+    ? sumarConteos(MESES_INDICADORES.map((_, index) => conteosMensuales(fichas, { anio, mes: index + 1, servicio, tipo, camasAsignadas: camas })))
+    : conteosMensuales(fichas, { anio, mes, servicio, tipo, camasAsignadas: camas });
 
   return [
     indicador(1, razon(conteos.totalEgresos, camas), conteos.totalEgresos, camas, faltaConfig ? "sin_configuracion" : undefined),
@@ -250,6 +252,120 @@ export function calcularIndicadoresCuidadosCriticos(
     indicador(35, porcentaje(conteos.diabetes.muertes, conteos.diabetes.egresos), conteos.diabetes.muertes, conteos.diabetes.egresos),
     indicador(36, porcentaje(conteos.hipertension.muertes, conteos.hipertension.egresos), conteos.hipertension.muertes, conteos.hipertension.egresos),
   ];
+}
+
+function sumarConteos(conteos: ConteosMensuales[]) {
+  const total = conteos.reduce((acumulado, item) => ({
+    totalEgresos: acumulado.totalEgresos + item.totalEgresos,
+    totalIngresos: acumulado.totalIngresos + item.totalIngresos,
+    diasEstancia: acumulado.diasEstancia + item.diasEstancia,
+    diasCamaOcupados: acumulado.diasCamaOcupados + item.diasCamaOcupados,
+    diasCamaDisponibles: acumulado.diasCamaDisponibles + item.diasCamaDisponibles,
+    reingresos: acumulado.reingresos + item.reingresos,
+    egresosUlcera: acumulado.egresosUlcera + item.egresosUlcera,
+    reintubados: acumulado.reintubados + item.reintubados,
+    extubados: acumulado.extubados + item.extubados,
+    extubacionExitosa: acumulado.extubacionExitosa + item.extubacionExitosa,
+    extubacionFallida: acumulado.extubacionFallida + item.extubacionFallida,
+    pacientesEscala: acumulado.pacientesEscala + item.pacientesEscala,
+    extubacionAccidental: acumulado.extubacionAccidental + item.extubacionAccidental,
+    pacientesVm: acumulado.pacientesVm + item.pacientesVm,
+    pacientesVmEgresados: acumulado.pacientesVmEgresados + item.pacientesVmEgresados,
+    complicacionesCvc: acumulado.complicacionesCvc + item.complicacionesCvc,
+    pacientesCvc: acumulado.pacientesCvc + item.pacientesCvc,
+    infeccionesCvc: acumulado.infeccionesCvc + item.infeccionesCvc,
+    retirosCvc: acumulado.retirosCvc + item.retirosCvc,
+    complicacionesVm: acumulado.complicacionesVm + item.complicacionesVm,
+    neumoniaVm: acumulado.neumoniaVm + item.neumoniaVm,
+    neumoniasIaas: acumulado.neumoniasIaas + item.neumoniasIaas,
+    iaas: acumulado.iaas + item.iaas,
+    caidas: acumulado.caidas + item.caidas,
+    pacientesStu: acumulado.pacientesStu + item.pacientesStu,
+    infeccionesStu: acumulado.infeccionesStu + item.infeccionesStu,
+    retirosStu: acumulado.retirosStu + item.retirosStu,
+    pacientesSng: acumulado.pacientesSng + item.pacientesSng,
+    retirosSng: acumulado.retirosSng + item.retirosSng,
+    pacientesTraqueostomia: acumulado.pacientesTraqueostomia + item.pacientesTraqueostomia,
+    retirosTraqueostomia: acumulado.retirosTraqueostomia + item.retirosTraqueostomia,
+    pacientesGastrostomia: acumulado.pacientesGastrostomia + item.pacientesGastrostomia,
+    retirosGastrostomia: acumulado.retirosGastrostomia + item.retirosGastrostomia,
+    noAdmitidos: acumulado.noAdmitidos + item.noAdmitidos,
+    fallecidos: acumulado.fallecidos + item.fallecidos,
+    fallecidos48: acumulado.fallecidos48 + item.fallecidos48,
+    esperadoApache: acumulado.esperadoApache + item.esperadoApache,
+    muertesVm: acumulado.muertesVm + item.muertesVm,
+    neumonia: sumarGrupoDiagnostico(acumulado.neumonia, item.neumonia),
+    covid: sumarGrupoDiagnostico(acumulado.covid, item.covid),
+    diarrea: sumarGrupoDiagnostico(acumulado.diarrea, item.diarrea),
+    renal: sumarGrupoDiagnostico(acumulado.renal, item.renal),
+    diabetes: sumarGrupoDiagnostico(acumulado.diabetes, item.diabetes),
+    hipertension: sumarGrupoDiagnostico(acumulado.hipertension, item.hipertension),
+    episodiosNavm: acumulado.episodiosNavm + item.episodiosNavm,
+    diasVmi: acumulado.diasVmi + item.diasVmi,
+  }), conteoVacio());
+
+  return total;
+}
+
+function conteoVacio(): ConteosMensuales {
+  return {
+    totalEgresos: 0,
+    totalIngresos: 0,
+    diasEstancia: 0,
+    diasCamaOcupados: 0,
+    diasCamaDisponibles: 0,
+    reingresos: 0,
+    egresosUlcera: 0,
+    reintubados: 0,
+    extubados: 0,
+    extubacionExitosa: 0,
+    extubacionFallida: 0,
+    pacientesEscala: 0,
+    extubacionAccidental: 0,
+    pacientesVm: 0,
+    pacientesVmEgresados: 0,
+    complicacionesCvc: 0,
+    pacientesCvc: 0,
+    infeccionesCvc: 0,
+    retirosCvc: 0,
+    complicacionesVm: 0,
+    neumoniaVm: 0,
+    neumoniasIaas: 0,
+    iaas: 0,
+    caidas: 0,
+    pacientesStu: 0,
+    infeccionesStu: 0,
+    retirosStu: 0,
+    pacientesSng: 0,
+    retirosSng: 0,
+    pacientesTraqueostomia: 0,
+    retirosTraqueostomia: 0,
+    pacientesGastrostomia: 0,
+    retirosGastrostomia: 0,
+    noAdmitidos: 0,
+    fallecidos: 0,
+    fallecidos48: 0,
+    esperadoApache: 0,
+    muertesVm: 0,
+    neumonia: { egresos: 0, muertes: 0 },
+    covid: { egresos: 0, muertes: 0 },
+    diarrea: { egresos: 0, muertes: 0 },
+    renal: { egresos: 0, muertes: 0 },
+    diabetes: { egresos: 0, muertes: 0 },
+    hipertension: { egresos: 0, muertes: 0 },
+    episodiosNavm: 0,
+    diasVmi: 0,
+  };
+}
+
+function sumarGrupoDiagnostico(
+  a: { egresos: number; muertes: number },
+  b: { egresos: number; muertes: number }
+) {
+  return {
+    egresos: a.egresos + b.egresos,
+    muertes: a.muertes + b.muertes,
+  };
 }
 
 export function calcularDatosBaseCuidadosCriticos(
