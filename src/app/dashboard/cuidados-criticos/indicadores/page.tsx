@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
-import { Activity, AlertCircle, BarChart3, Calculator, Save } from "lucide-react";
+import { AlertCircle, Calculator, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
@@ -332,14 +332,13 @@ export default function IndicadoresCuidadosCriticosPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Activity size={17} className="text-blue-600 dark:text-blue-400" />
+          {vistaTabla !== "graficos" ? (
             <div>
               <h2 className="font-heading font-bold text-slate-900 dark:text-slate-100">
                 {tituloVista(vistaTabla)}
               </h2>
             </div>
-          </div>
+          ) : <div />}
           <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
             <button
               type="button"
@@ -414,8 +413,7 @@ function GraficosIndicadores({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
-            <BarChart3 size={14} className="text-blue-500" />
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
             {tituloGrafico(vista)}
           </h3>
         </div>
