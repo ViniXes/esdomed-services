@@ -515,30 +515,58 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
 }
 
 function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: DatoGraficoServicio[]; columnas: ColumnaGrafico[] }) {
+  const maximos = Object.fromEntries(columnas.map(columna => {
+    const valores = datos.map(item => valorServicio(item, columna.id) ?? 0);
+    const maximo = columna.suffix === "%"
+      ? 100
+      : Math.max(...valores, 0);
+    return [columna.id, maximo];
+  }));
+
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
-      <div className="border-b border-slate-200 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
+      <div className="border-b border-slate-200 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
         {titulo}
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-[10px]">
+        <table className="min-w-full text-left text-[11px]">
           <thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
             <tr>
-              <th className="min-w-[120px] px-2 py-1.5">Servicio</th>
-              {columnas.map(columna => <th key={columna.id} className="px-2 py-1.5 text-right">{columna.label}</th>)}
+              <th className="min-w-[150px] px-3 py-2">Servicio</th>
+              {columnas.map(columna => <th key={columna.id} className="min-w-[150px] px-3 py-2 text-left">{columna.label}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
             {datos.map(item => (
               <tr key={`${titulo}-${item.servicio}`} className="text-slate-700 dark:text-slate-300">
-                <td className="max-w-[150px] truncate px-2 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
+                <td className="max-w-[180px] truncate px-3 py-2 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
                 {columnas.map(columna => (
-                  <td key={columna.id} className="px-2 py-1.5 text-right font-mono">{valorGrafico(valorServicio(item, columna.id))}{columna.suffix ?? ""}</td>
+                  <td key={columna.id} className="px-3 py-2">
+                    <CeldaGrafica value={valorServicio(item, columna.id)} suffix={columna.suffix} maximo={maximos[columna.id] ?? 0} />
+                  </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function CeldaGrafica({ value, suffix = "", maximo }: { value: number | null; suffix?: string; maximo: number }) {
+  const numero = value ?? 0;
+  const width = maximo > 0 && value !== null ? Math.max(Math.min((numero / maximo) * 100, 100), numero > 0 ? 4 : 0) : 0;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="h-3.5 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+          <div className="h-full rounded bg-emerald-600" style={{ width: `${width}%` }} />
+        </div>
+        <span className="min-w-[44px] text-right font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+          {valorGrafico(value)}{suffix}
+        </span>
       </div>
     </div>
   );
@@ -557,18 +585,18 @@ function GraficoBarras({ titulo, datos, suffix = "" }: { titulo: string; datos: 
   const maximo = Math.max(...datos.map(item => item.value ?? 0), 0);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-950/40">
       <h4 className="mb-3 truncate text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200" title={titulo}>{titulo}</h4>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {datos.map(item => {
           const value = item.value ?? 0;
           const width = maximo > 0 ? Math.max((value / maximo) * 100, value > 0 ? 6 : 0) : 0;
           return (
-            <div key={item.label} className="grid grid-cols-[128px_1fr_54px] items-center gap-2 text-[11px]">
+            <div key={item.label} className="grid grid-cols-[150px_1fr_64px] items-center gap-2.5 text-[12px]">
               <span className="truncate font-semibold text-slate-600 dark:text-slate-300" title={item.label}>{item.label}</span>
-              <div className="h-4 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+              <div className="h-5 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
                 <div
-                  className="h-4 rounded bg-emerald-600"
+                  className="h-5 rounded bg-emerald-600"
                   style={{ width: `${width}%` }}
                 />
               </div>
