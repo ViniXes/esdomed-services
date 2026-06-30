@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
-import { AlertCircle, Calculator, Save } from "lucide-react";
+import { AlertCircle, BarChart3, Calculator, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
@@ -413,7 +413,8 @@ function GraficosIndicadores({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-900 dark:text-slate-100">
+          <h3 className="inline-flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-blue-900 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-100">
+            <BarChart3 size={14} className="text-blue-600 dark:text-blue-300" />
             {tituloGrafico(vista)}
           </h3>
         </div>
