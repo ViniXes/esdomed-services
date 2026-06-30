@@ -12,17 +12,61 @@ import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types"
 
 type Filtro = "todos" | TipoMedicoCuidadosCriticos;
 type FiltroCierre = "todos" | "pendientes" | "cerrados";
+type FiltroMes = "todos" | number;
+
+const MESES = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE",
+] as const;
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
   const timestamp = value as { toDate?: () => Date };
-  return timestamp.toDate?.() ?? new Date(value as string);
+  const fecha = timestamp.toDate?.() ?? new Date(value as string);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+function normalizarTexto(value: unknown) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function mesFicha(ficha: FichaCuidadosCriticos) {
+  const mesTexto = normalizarTexto(ficha.datos?.mes);
+  const indiceMesTexto = MESES.findIndex(mes => mes === mesTexto);
+  if (indiceMesTexto >= 0) return indiceMesTexto + 1;
+
+  const fechaIngreso = toDate(ficha.datos?.fecha_ingreso_al_servicio);
+  if (fechaIngreso) return fechaIngreso.getMonth() + 1;
+
+  const fechaCreacion = toDate(ficha.creadoEn);
+  if (fechaCreacion) return fechaCreacion.getMonth() + 1;
+
+  return 99;
+}
+
+function fechaIngresoOrdenFicha(ficha: FichaCuidadosCriticos) {
+  return toDate(ficha.datos?.fecha_ingreso_al_servicio)?.getTime() ?? Number.MAX_SAFE_INTEGER;
 }
 
 export default function CuidadosCriticosDashboardPage() {
   const { profile, loading } = useAuth();
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const [filtroMes, setFiltroMes] = useState<FiltroMes>(() => new Date().getMonth() + 1);
   const [filtroCierre, setFiltroCierre] = useState<FiltroCierre>("todos");
 
   const puedeVer = puedeVerModuloCuidadosCriticos(profile);
@@ -39,9 +83,17 @@ export default function CuidadosCriticosDashboardPage() {
   const fichasPorTipo = filtro === "todos" ? fichas : fichas.filter(ficha => ficha.tipoUnidad === filtro);
   const fichasFiltradas = fichasPorTipo.filter(ficha => {
     const pendiente = fichaPendienteCierreCuidadosCriticos(ficha);
+    if (filtroMes !== "todos" && mesFicha(ficha) !== filtroMes) return false;
     if (filtroCierre === "pendientes") return pendiente;
     if (filtroCierre === "cerrados") return !pendiente;
     return true;
+  }).sort((a, b) => {
+    const mesA = mesFicha(a);
+    const mesB = mesFicha(b);
+    if (mesA !== mesB) return mesA - mesB;
+    const fechaA = fechaIngresoOrdenFicha(a);
+    const fechaB = fechaIngresoOrdenFicha(b);
+    return fechaA - fechaB;
   });
   const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
   if (loading) {
@@ -87,7 +139,7 @@ export default function CuidadosCriticosDashboardPage() {
             <h2 className="font-bold font-heading text-slate-900 dark:text-slate-100">Lienzo consolidado</h2>
             <p className="mt-1 text-xs text-slate-500">Cada ficha forma una fila. Las columnas mantienen los nombres y el orden de la matriz compartida.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <div className="flex rounded-lg border border-slate-200 p-1 dark:border-slate-700">
               {(["todos", "uci", "ucin"] as Filtro[]).map(value => (
                 <button
@@ -100,15 +152,31 @@ export default function CuidadosCriticosDashboardPage() {
                 </button>
               ))}
             </div>
-            <select
-              value={filtroCierre}
-              onChange={event => setFiltroCierre(event.target.value as FiltroCierre)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-            >
-              <option value="todos">Todos</option>
-              <option value="pendientes">Pendientes</option>
-              <option value="cerrados">Cerrados</option>
-            </select>
+            <label className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">Periodo</span>
+              <select
+                value={filtroMes}
+                onChange={event => setFiltroMes(event.target.value === "todos" ? "todos" : Number(event.target.value))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              >
+                <option value="todos">Todos los meses</option>
+                {MESES.map((mes, index) => (
+                  <option key={mes} value={index + 1}>{mes}</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="block text-[11px] font-semibold text-slate-500">Cierre</span>
+              <select
+                value={filtroCierre}
+                onChange={event => setFiltroCierre(event.target.value as FiltroCierre)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              >
+                <option value="todos">Todos</option>
+                <option value="pendientes">Pendientes</option>
+                <option value="cerrados">Cerrados</option>
+              </select>
+            </label>
           </div>
         </div>
         <LienzoMatrizCuidadosCriticos tipo={filtro === "uci" ? "uci" : "ucin"} fichas={fichasFiltradas} />

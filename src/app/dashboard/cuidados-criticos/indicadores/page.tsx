@@ -26,6 +26,7 @@ const SERVICIOS_UCIN = serviciosPorTipoMedico("ucin");
 type VistaTablaIndicadores = "indicadores" | "datos" | "graficos";
 type TipoUnidadIndicadores = "uci" | "ucin";
 type VistaGraficoIndicadores = "cama" | "porcentajes" | "tasas";
+type MesIndicadores = number | "todos";
 
 interface DatoGraficoServicio {
   servicio: string;
@@ -109,7 +110,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [configs, setConfigs] = useState<ConfigIndicadoresCuidadosCriticos[]>([]);
   const [anio, setAnio] = useState(fecha.getFullYear());
-  const [mes, setMes] = useState(fecha.getMonth() + 1);
+  const [mes, setMes] = useState<MesIndicadores>(fecha.getMonth() + 1);
   const [servicio, setServicio] = useState("todos");
   const [editandoDiasHabiles, setEditandoDiasHabiles] = useState(false);
   const [diasHabilesEdicion, setDiasHabilesEdicion] = useState<Record<number, string>>({});
@@ -147,8 +148,9 @@ export default function IndicadoresCuidadosCriticosPage() {
     }
   }, [servicio, serviciosUnidad]);
 
-  const configDiasHabiles = configs.find(item => item.anio === anio && item.mes === mes && item.servicio === "__periodo__") ?? null;
-  const diasHabilesOficial = diasHabilesOficiales(anio, mes);
+  const mesNumerico = typeof mes === "number" ? mes : null;
+  const configDiasHabiles = mesNumerico ? configs.find(item => item.anio === anio && item.mes === mesNumerico && item.servicio === "__periodo__") ?? null : null;
+  const diasHabilesOficial = mesNumerico ? diasHabilesOficiales(anio, mesNumerico) : null;
   const diasHabilesParaCalculo = diasHabilesOficial ?? configDiasHabiles?.diasHabiles ?? 0;
   const camasSistema = servicio !== "todos"
     ? camasServicio(servicio)
@@ -159,11 +161,11 @@ export default function IndicadoresCuidadosCriticosPage() {
     return {
       servicio,
       anio,
-      mes,
+      mes: mesNumerico ?? 0,
       camasAsignadas: camasSistema,
       diasHabiles: diasHabilesParaCalculo,
     } satisfies ConfigIndicadoresCuidadosCriticos;
-  }, [anio, camasSistema, diasHabilesParaCalculo, mes, servicio]);
+  }, [anio, camasSistema, diasHabilesParaCalculo, mesNumerico, servicio]);
 
   const indicadores = useMemo(
     () => calcularIndicadoresCuidadosCriticos(fichas, { anio, mes, servicio, tipo: tipoUnidad, config: configParaCalculo }),
@@ -187,7 +189,7 @@ export default function IndicadoresCuidadosCriticosPage() {
         config: camas > 0 ? {
           servicio: nombreServicio,
           anio,
-          mes,
+          mes: mesNumerico ?? 0,
           camasAsignadas: camas,
           diasHabiles: diasHabilesParaCalculo,
         } : null,
@@ -199,7 +201,7 @@ export default function IndicadoresCuidadosCriticosPage() {
         valores,
       };
     });
-  }, [anio, diasHabilesParaCalculo, fichas, mes, servicio, serviciosUnidad]);
+  }, [anio, diasHabilesParaCalculo, fichas, mes, mesNumerico, servicio, serviciosUnidad]);
   const iniciarEdicionDiasHabiles = () => {
     const valores = Object.fromEntries(MESES_INDICADORES.map((_, indice) => {
       const numeroMes = indice + 1;
@@ -276,14 +278,13 @@ export default function IndicadoresCuidadosCriticosPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1800px] space-y-6 p-4 md:p-6">
+    <div className="mx-auto max-w-[1800px] space-y-4 p-4 md:p-5">
       <header className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
           <Calculator size={19} className="text-blue-600 dark:text-blue-400" />
         </div>
         <div>
           <h1 className="font-heading text-xl font-bold text-slate-900 dark:text-slate-100">Indicadores UCI / UCIN</h1>
-          <p className="text-xs text-slate-500">Calculo mensual desde fichas registradas y configuracion estadistica.</p>
         </div>
       </header>
 
@@ -295,7 +296,8 @@ export default function IndicadoresCuidadosCriticosPage() {
           </label>
           <label>
             <span className="mb-1 block text-xs font-semibold text-slate-500">Mes</span>
-            <select value={mes} onChange={event => setMes(Number(event.target.value))} className={inputCls}>
+            <select value={mes} onChange={event => setMes(event.target.value === "todos" ? "todos" : Number(event.target.value))} className={inputCls}>
+              <option value="todos">TODOS</option>
               {MESES_INDICADORES.map((nombre, index) => <option key={nombre} value={index + 1}>{nombre}</option>)}
             </select>
           </label>
@@ -329,20 +331,13 @@ export default function IndicadoresCuidadosCriticosPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Activity size={17} className="text-blue-600 dark:text-blue-400" />
             <div>
               <h2 className="font-heading font-bold text-slate-900 dark:text-slate-100">
                 {tituloVista(vistaTabla)}
               </h2>
-              <p className="text-xs text-slate-500">
-                {vistaTabla === "indicadores"
-                  ? "Resultados calculados desde los numeradores y denominadores."
-                  : vistaTabla === "datos"
-                    ? "Conteos mensuales usados como fuente de los indicadores."
-                    : "Resumen visual por servicio, separado entre UCI y UCIN."}
-              </p>
             </div>
           </div>
           <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-950">
@@ -423,11 +418,6 @@ function GraficosIndicadores({
             <BarChart3 size={14} className="text-blue-500" />
             {tituloGrafico(vista)}
           </h3>
-          <p className="text-[11px] text-slate-500">
-            {servicioSeleccionado === "todos"
-              ? `Mostrando solo servicios ${tipo.toUpperCase()}.`
-              : "Mostrando el servicio seleccionado si pertenece al grupo activo."}
-          </p>
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-bold dark:border-slate-700 dark:bg-slate-950">
           <BotonGrafico actual={vista} value="cama" onClick={onCambiarVista}>Cama</BotonGrafico>
@@ -491,13 +481,13 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
 
   return (
     <>
-      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {GRAFICOS_CAMA.map(columna => (
           <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
         ))}
       </div>
 
-      <div className="grid gap-2 xl:grid-cols-4">
+      <div className="grid gap-3 xl:grid-cols-2">
         {GRAFICOS_CAMA.map(columna => (
           <GraficoBarras
             key={columna.id}
@@ -512,25 +502,35 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
 }
 
 function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: DatoGraficoServicio[]; columnas: ColumnaGrafico[] }) {
+  const maximos = Object.fromEntries(columnas.map(columna => {
+    const valores = datos.map(item => valorServicio(item, columna.id) ?? 0);
+    const maximo = columna.suffix === "%"
+      ? 100
+      : Math.max(...valores, 0);
+    return [columna.id, maximo];
+  }));
+
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
-      <div className="border-b border-slate-200 px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/40">
+      <div className="border-b border-slate-200 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-700 dark:border-slate-800 dark:text-slate-200">
         {titulo}
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-[10px]">
+      <div className="overflow-hidden">
+        <table className="w-full table-fixed text-left text-[10px]">
           <thead className="bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
             <tr>
-              <th className="min-w-[120px] px-2 py-1.5">Servicio</th>
-              {columnas.map(columna => <th key={columna.id} className="px-2 py-1.5 text-right">{columna.label}</th>)}
+              <th className="w-[150px] px-2.5 py-1.5">Servicio</th>
+              {columnas.map(columna => <th key={columna.id} className="px-2 py-1.5 text-left">{columna.label}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
             {datos.map(item => (
               <tr key={`${titulo}-${item.servicio}`} className="text-slate-700 dark:text-slate-300">
-                <td className="max-w-[150px] truncate px-2 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
+                <td className="truncate px-2.5 py-1.5 font-semibold" title={item.servicio}>{nombreCortoServicio(item.servicio)}</td>
                 {columnas.map(columna => (
-                  <td key={columna.id} className="px-2 py-1.5 text-right font-mono">{valorGrafico(valorServicio(item, columna.id))}{columna.suffix ?? ""}</td>
+                  <td key={columna.id} className="px-2 py-1.5">
+                    <CeldaGrafica value={valorServicio(item, columna.id)} suffix={columna.suffix} maximo={maximos[columna.id] ?? 0} />
+                  </td>
                 ))}
               </tr>
             ))}
@@ -541,11 +541,27 @@ function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: Dato
   );
 }
 
+function CeldaGrafica({ value, suffix = "", maximo }: { value: number | null; suffix?: string; maximo: number }) {
+  const numero = value ?? 0;
+  const width = maximo > 0 && value !== null ? Math.max(Math.min((numero / maximo) * 100, 100), numero > 0 ? 4 : 0) : 0;
+
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-1.5">
+      <div className="h-3 flex-1 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
+        <div className="h-full rounded bg-emerald-600" style={{ width: `${width}%` }} />
+      </div>
+      <span className="min-w-[32px] text-right font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+        {valorGrafico(value)}{suffix}
+      </span>
+    </div>
+  );
+}
+
 function TarjetaGrafico({ label, value, suffix = "" }: { label: string; value: number | null; suffix?: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-950/40">
-      <p className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
-      <p className="shrink-0 text-lg font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="line-clamp-2 text-[11px] font-bold uppercase leading-tight tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
+      <p className="shrink-0 text-xl font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
     </div>
   );
 }
@@ -554,18 +570,18 @@ function GraficoBarras({ titulo, datos, suffix = "" }: { titulo: string; datos: 
   const maximo = Math.max(...datos.map(item => item.value ?? 0), 0);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/40">
-      <h4 className="mb-1.5 truncate text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200" title={titulo}>{titulo}</h4>
-      <div className="space-y-1.5">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-950/40">
+      <h4 className="mb-3 truncate text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200" title={titulo}>{titulo}</h4>
+      <div className="space-y-2.5">
         {datos.map(item => {
           const value = item.value ?? 0;
           const width = maximo > 0 ? Math.max((value / maximo) * 100, value > 0 ? 6 : 0) : 0;
           return (
-            <div key={item.label} className="grid grid-cols-[72px_1fr_38px] items-center gap-1.5 text-[10px]">
+            <div key={item.label} className="grid grid-cols-[150px_1fr_64px] items-center gap-2.5 text-[12px]">
               <span className="truncate font-semibold text-slate-600 dark:text-slate-300" title={item.label}>{item.label}</span>
-              <div className="h-3 rounded bg-slate-200 dark:bg-slate-800">
+              <div className="h-5 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
                 <div
-                  className="h-3 rounded bg-emerald-600"
+                  className="h-5 rounded bg-emerald-600"
                   style={{ width: `${width}%` }}
                 />
               </div>
