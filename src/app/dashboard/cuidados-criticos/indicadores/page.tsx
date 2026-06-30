@@ -491,13 +491,13 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
 
   return (
     <>
-      <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {GRAFICOS_CAMA.map(columna => (
           <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
         ))}
       </div>
 
-      <div className="grid gap-2 xl:grid-cols-4">
+      <div className="grid gap-3 xl:grid-cols-2">
         {GRAFICOS_CAMA.map(columna => (
           <GraficoBarras
             key={columna.id}
@@ -543,9 +543,9 @@ function TablaGrafica({ titulo, datos, columnas }: { titulo: string; datos: Dato
 
 function TarjetaGrafico({ label, value, suffix = "" }: { label: string; value: number | null; suffix?: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-950/40">
-      <p className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
-      <p className="shrink-0 text-lg font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
+      <p className="line-clamp-2 text-[11px] font-bold uppercase leading-tight tracking-wide text-slate-500 dark:text-slate-400" title={label}>{label}</p>
+      <p className="shrink-0 text-xl font-black leading-none text-slate-900 dark:text-slate-100">{valorGrafico(value)}{suffix}</p>
     </div>
   );
 }
@@ -554,18 +554,18 @@ function GraficoBarras({ titulo, datos, suffix = "" }: { titulo: string; datos: 
   const maximo = Math.max(...datos.map(item => item.value ?? 0), 0);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/40">
-      <h4 className="mb-1.5 truncate text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200" title={titulo}>{titulo}</h4>
-      <div className="space-y-1.5">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/40">
+      <h4 className="mb-3 truncate text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200" title={titulo}>{titulo}</h4>
+      <div className="space-y-2">
         {datos.map(item => {
           const value = item.value ?? 0;
           const width = maximo > 0 ? Math.max((value / maximo) * 100, value > 0 ? 6 : 0) : 0;
           return (
-            <div key={item.label} className="grid grid-cols-[72px_1fr_38px] items-center gap-1.5 text-[10px]">
+            <div key={item.label} className="grid grid-cols-[128px_1fr_54px] items-center gap-2 text-[11px]">
               <span className="truncate font-semibold text-slate-600 dark:text-slate-300" title={item.label}>{item.label}</span>
-              <div className="h-3 rounded bg-slate-200 dark:bg-slate-800">
+              <div className="h-4 overflow-hidden rounded bg-slate-200 dark:bg-slate-800">
                 <div
-                  className="h-3 rounded bg-emerald-600"
+                  className="h-4 rounded bg-emerald-600"
                   style={{ width: `${width}%` }}
                 />
               </div>
