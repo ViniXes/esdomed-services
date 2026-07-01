@@ -444,7 +444,7 @@ export interface SolicitudIncapacidad {
 // ============================================================================
 
 export type TipoAltaVivo = "domicilio" | "exigida" | "referido" | "fuga" | "in_extremis" | "deposito" | "suspendida";
-export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada" | "recibida" | "duplicada";
+export type EstadoNotificacionAlta = "pendiente" | "observada" | "deposito" | "suspendida" | "procesada" | "recibida" | "duplicada" | "revertida";
 export type MotivoObservacionAlta =
   | "cama_expediente"
   | "expediente_duplicado"
@@ -506,6 +506,11 @@ export interface NotificacionAltaVivo {
   procesadoPorId?: string;
   procesadoPorNombre?: string;
   procesadoEn?: Date;
+
+  // Reversión de un alta efectiva por ESDOMED (el paciente no se fue tras todo)
+  revertidoPorId?: string;
+  revertidoPorNombre?: string;
+  revertidoEn?: Date;
 
   // Cierre administrativo por duplicidad
   duplicadoPorId?: string;

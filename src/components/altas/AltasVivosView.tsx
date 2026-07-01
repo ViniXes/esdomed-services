@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LogIn, Plus, X, CheckCircle2, AlertCircle, Search,
-  Check, MessageSquareWarning, Pencil, ChevronLeft, ChevronRight, Download,
+  Check, MessageSquareWarning, Pencil, ChevronLeft, ChevronRight, Download, Undo2,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
 import { DateField } from "@/components/ui/DateField";
@@ -52,6 +52,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   procesada:  "Alta efectiva",
   recibida:   "Acusada de recibido",
   duplicada:  "Duplicada",
+  revertida:  "Alta revertida",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -62,6 +63,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   procesada:  "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
   recibida:   "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada:  "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+  revertida:  "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
 };
 
 const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
@@ -72,11 +74,12 @@ const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
   procesada:  "bg-green-500",
   recibida:   "bg-sky-500",
   duplicada:  "bg-slate-400",
+  revertida:  "bg-orange-500",
 };
 
 // Orden de los contadores por estado (también funcionan como filtro rápido).
 const COUNTER_ESTADOS: EstadoNotificacionAlta[] = [
-  "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada",
+  "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada", "revertida",
 ];
 
 const PAGE_SIZE = 12;
@@ -621,6 +624,9 @@ export function AltasVivosView() {
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const [procesandoLoading, setProcesandoLoading] = useState(false);
 
+  const [revirtiendoId, setRevirtiendoId] = useState<string | null>(null);
+  const [revirtiendoLoading, setRevirtiendoLoading] = useState(false);
+
   const [observandoId, setObservandoId] = useState<string | null>(null);
   const [observandoLoading, setObservandoLoading] = useState(false);
   const [quitandoObservacionId, setQuitandoObservacionId] = useState<string | null>(null);
@@ -719,6 +725,26 @@ export function AltasVivosView() {
     }
   };
 
+  const revertirNotificacion = async () => {
+    if (!revirtiendoId || !user || !profile) return;
+    setRevirtiendoLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${revirtiendoId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "revertir" }),
+      });
+      if (!res.ok) throw new Error("No se pudo revertir el alta.");
+    } finally {
+      setRevirtiendoLoading(false);
+      setRevirtiendoId(null);
+    }
+  };
+
   const observarNotificacion = async (motivo: MotivoObservacionAlta, detalle: string) => {
     if (!observandoId || !user || !profile) return;
     setObservandoLoading(true);
@@ -760,6 +786,7 @@ export function AltasVivosView() {
 
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
   const observandoNot = observandoId ? notificaciones.find(n => n.id === observandoId) : null;
+  const revirtiendoNot = revirtiendoId ? notificaciones.find(n => n.id === revirtiendoId) : null;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -848,7 +875,7 @@ export function AltasVivosView() {
 
         {pageItems.map(n => {
           const requiereSoloAcuse = esSoloAcuseRecibido(n.tipoAlta);
-          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida" || n.estado === "duplicada";
+          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida" || n.estado === "duplicada" || n.estado === "revertida";
           const mostrarNombresEsdomed = isEsdomed;
           const modificadoPorNombre = isTS && fueModificadaPorEsdomed(n) ? "ESDOMED" : n.modificadoPorNombre;
           const puedeRectificarTS =
@@ -913,6 +940,12 @@ export function AltasVivosView() {
                 {n.estado === "duplicada" && n.duplicadoPorNombre && (
                   <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
                     Notificacion duplicada cerrada por {nombreEsdomedVisible(mostrarNombresEsdomed, n.duplicadoPorNombre)} · {formatFecha(n.duplicadoEn)}
+                  </p>
+                )}
+                {n.estado === "revertida" && (
+                  <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                    Alta revertida{n.revertidoPorNombre ? ` por ${nombreEsdomedVisible(mostrarNombresEsdomed, n.revertidoPorNombre)}` : ""}
+                    {n.revertidoEn ? ` · ${formatFecha(n.revertidoEn)}` : ""} · paciente reactivado
                   </p>
                 )}
                 {n.observacionEsdomedMotivo && (
@@ -986,6 +1019,20 @@ export function AltasVivosView() {
                   )}
                 </div>
               )}
+
+              {/* ESDOMED: revertir un alta efectiva si el paciente en realidad no se fue */}
+              {isEsdomed && n.estado === "procesada" && (
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setRevirtiendoId(n.id!)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900/60 border border-orange-200 dark:border-orange-800 rounded-lg transition-colors"
+                  >
+                    <Undo2 size={13} />
+                    Revertir alta efectiva
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1043,6 +1090,18 @@ export function AltasVivosView() {
           onConfirm={procesarNotificacion}
           onCancel={() => setProcesandoId(null)}
           loading={procesandoLoading}
+        />
+      )}
+
+      {revirtiendoId && revirtiendoNot && (
+        <ConfirmModal
+          title="Revertir alta efectiva"
+          message={`El paciente ${revirtiendoNot.pacienteNombre} volverá a estar activo en Pacientes y la notificación quedará cerrada como revertida. Úsalo solo si confirmaste que el paciente no se fue.`}
+          confirmLabel="Revertir y reactivar"
+          confirmCls="bg-orange-600 hover:bg-orange-500"
+          onConfirm={revertirNotificacion}
+          onCancel={() => setRevirtiendoId(null)}
+          loading={revirtiendoLoading}
         />
       )}
 

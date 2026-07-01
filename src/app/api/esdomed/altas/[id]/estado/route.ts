@@ -78,8 +78,45 @@ async function desactivarPacienteDelAlta(
   }
 }
 
+// Revertir un alta efectiva: el paciente notificado en realidad no se fue. Deshace
+// la desactivación devolviendo el ingreso a "activo" y limpiando las banderas de
+// egreso. Solo reactiva el paciente si sigue ligado a ESTA notificación
+// (notificacionAltaId), para no pisar un reingreso posterior.
+async function reactivarPacienteDelAlta(
+  noti: FirebaseFirestore.DocumentData,
+  notificacionId: string,
+  caller: Caller,
+) {
+  let ref: FirebaseFirestore.DocumentReference | null = null;
+
+  if (noti.pacienteId) {
+    const snap = await adminDb.collection("pacientes").doc(String(noti.pacienteId)).get();
+    if (snap.exists && snap.data()?.notificacionAltaId === notificacionId) ref = snap.ref;
+  }
+  if (!ref && noti.pacienteExpediente) {
+    const q = await adminDb.collection("pacientes")
+      .where("expediente", "==", String(noti.pacienteExpediente))
+      .get();
+    const match = q.docs.find(d => d.data().notificacionAltaId === notificacionId);
+    if (match) ref = match.ref;
+  }
+  if (!ref) return; // no hay ingreso ligado a esta alta (o ya fue reingresado)
+
+  await ref.update({
+    estado: "activo",
+    egresoPendiente: FieldValue.delete(),
+    egresadoAutoEn: FieldValue.delete(),
+    notificacionAltaId: FieldValue.delete(),
+    reactivadoEn: FieldValue.serverTimestamp(),
+    reactivadoPor: caller.uid,
+    actualizadoEn: FieldValue.serverTimestamp(),
+    actualizadoPor: caller.uid,
+  });
+}
+
 type Body =
   | { action: "procesar" }
+  | { action: "revertir" }
   | { action: "observar"; motivo: MotivoObservacionAlta; detalle: string }
   | { action: "quitar_observacion" };
 
@@ -120,6 +157,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const actual = snap.data()!;
+
+  // Revertir un alta efectiva ya procesada: reactiva al paciente y cierra la
+  // notificación como "revertida". Es la única acción válida sobre una procesada.
+  if (body.action === "revertir") {
+    if (actual.estado !== "procesada") {
+      return NextResponse.json({ error: "Solo se puede revertir un alta efectiva ya procesada." }, { status: 409 });
+    }
+    await ref.update({
+      estado: "revertida",
+      revertidoPorId: caller.uid,
+      revertidoPorNombre: caller.nombre,
+      revertidoEn: FieldValue.serverTimestamp(),
+    });
+    try {
+      await reactivarPacienteDelAlta(actual, id, caller);
+    } catch (e) {
+      // No bloqueamos la reversión de la notificación si la reactivación falla.
+      console.error("No se pudo reactivar al paciente tras revertir el alta:", e);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   if (actual.estado !== "pendiente" && actual.estado !== "observada") {
     return NextResponse.json({ error: "La notificacion ya esta cerrada" }, { status: 409 });
   }

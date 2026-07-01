@@ -56,6 +56,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   procesada: "Alta efectiva",
   recibida: "Acusada de recibido",
   duplicada: "Duplicada",
+  revertida: "Alta revertida",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -66,6 +67,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   procesada: "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900",
   recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+  revertida: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
