@@ -56,7 +56,7 @@ export function LienzoMatrizCuidadosCriticos({ tipo = "ucin", datos, fichas, exp
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="scrollbar-matriz-cuidados overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
         <table className="min-w-max border-collapse text-xs">
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
