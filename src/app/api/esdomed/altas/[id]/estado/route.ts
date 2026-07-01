@@ -73,7 +73,7 @@ async function desactivarPacienteDelAlta(
     await Promise.all(
       tv.docs
         .filter(d => d.data().estado === "activa")
-        .map(d => d.ref.update({ estado: "anulada", actualizadoEn: FieldValue.serverTimestamp() })),
+        .map(d => d.ref.update({ estado: "anulada", anuladaPorAltaId: notificacionId, actualizadoEn: FieldValue.serverTimestamp() })),
     );
   }
 }
@@ -100,23 +100,40 @@ async function reactivarPacienteDelAlta(
     const match = q.docs.find(d => d.data().notificacionAltaId === notificacionId);
     if (match) ref = match.ref;
   }
-  if (!ref) return; // no hay ingreso ligado a esta alta (o ya fue reingresado)
 
-  await ref.update({
-    estado: "activo",
-    egresoPendiente: FieldValue.delete(),
-    egresadoAutoEn: FieldValue.delete(),
-    notificacionAltaId: FieldValue.delete(),
-    reactivadoEn: FieldValue.serverTimestamp(),
-    reactivadoPor: caller.uid,
-    actualizadoEn: FieldValue.serverTimestamp(),
-    actualizadoPor: caller.uid,
-  });
+  if (ref) {
+    await ref.update({
+      estado: "activo",
+      egresoPendiente: FieldValue.delete(),
+      egresadoAutoEn: FieldValue.delete(),
+      notificacionAltaId: FieldValue.delete(),
+      reactivadoEn: FieldValue.serverTimestamp(),
+      reactivadoPor: caller.uid,
+      actualizadoEn: FieldValue.serverTimestamp(),
+      actualizadoPor: caller.uid,
+    });
+  }
+
+  // Restaurar las tarjetas de visita que ESTA alta anuló (marcadas con
+  // anuladaPorAltaId). Corre aunque el ingreso ya no exista/esté ligado.
+  const expediente = String(noti.pacienteExpediente ?? "");
+  if (expediente) {
+    const tv = await adminDb.collection("tarjetas_visita").where("expediente", "==", expediente).get();
+    await Promise.all(
+      tv.docs
+        .filter(d => d.data().estado === "anulada" && d.data().anuladaPorAltaId === notificacionId)
+        .map(d => d.ref.update({
+          estado: "activa",
+          anuladaPorAltaId: FieldValue.delete(),
+          actualizadoEn: FieldValue.serverTimestamp(),
+        })),
+    );
+  }
 }
 
 type Body =
   | { action: "procesar" }
-  | { action: "revertir" }
+  | { action: "revertir"; nota?: string }
   | { action: "observar"; motivo: MotivoObservacionAlta; detalle: string }
   | { action: "quitar_observacion" };
 
@@ -169,6 +186,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       revertidoPorId: caller.uid,
       revertidoPorNombre: caller.nombre,
       revertidoEn: FieldValue.serverTimestamp(),
+      revertidoNota: body.nota?.trim() || null,
     });
     try {
       await reactivarPacienteDelAlta(actual, id, caller);

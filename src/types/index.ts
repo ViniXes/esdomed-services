@@ -511,6 +511,7 @@ export interface NotificacionAltaVivo {
   revertidoPorId?: string;
   revertidoPorNombre?: string;
   revertidoEn?: Date;
+  revertidoNota?: string | null;
 
   // Cierre administrativo por duplicidad
   duplicadoPorId?: string;
@@ -999,6 +1000,7 @@ export interface TarjetaVisita {
   listaBlanca: VisitanteInfo[];   // autorizados/recordados (incluye al titular)
 
   estado: EstadoTarjetaVisita;
+  anuladaPorAltaId?: string;      // id de la notificación de alta que la anuló (permite restaurarla si se revierte)
   creadoEn: Date;
   creadoPor: string;              // uid TS
   creadoPorNombre: string;
