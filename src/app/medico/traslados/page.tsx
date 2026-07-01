@@ -89,7 +89,10 @@ export default function MedicoTrasladosPage() {
   const formatFecha = (ts: unknown) => {
     if (!ts) return "—";
     const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
-    return d.toLocaleDateString("es-HN", { day: "2-digit", month: "short", year: "numeric" });
+    return d.toLocaleString("es-HN", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
   };
 
   const getTipoLabel = (tipo?: string) => {

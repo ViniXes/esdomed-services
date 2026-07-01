@@ -151,6 +151,7 @@ export default function DashboardTrasladosPage() {
                     <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${typeInfo.color}`}>
                       <Icon size={10} /> {typeInfo.label}
                     </span>
+                    <span className="text-xs text-slate-400 font-medium">{formatFechaHora(t.creadoEn)}</span>
                   </div>
 
                   {t.tipoTraslado === "intercambio" ? (
@@ -236,6 +237,7 @@ export default function DashboardTrasladosPage() {
               <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
 
               <Row label="Motivo"      value={selected.motivoTraslado} />
+              <Row label="Solicitado"  value={formatFechaHora(selected.creadoEn)} />
               <Row label="Médico"      value={`Dr. ${selected.medicoNombre}`} />
               {selected.medicoJvpm && (
                 <Row label="JVPM"        value={selected.medicoJvpm} />
@@ -298,6 +300,15 @@ export default function DashboardTrasladosPage() {
       )}
     </div>
   );
+}
+
+function formatFechaHora(ts: unknown) {
+  if (!ts) return "—";
+  const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
+  return d.toLocaleString("es-HN", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
