@@ -96,7 +96,7 @@ interface FichaCargada {
 const MODOS: { id: CriterioConsultaPaciente; label: string; placeholder: string }[] = [
   { id: "expediente", label: "Expediente", placeholder: "Ej. 4599-26 o 459926" },
   { id: "dui", label: "DUI", placeholder: "Ej. 01234567-8" },
-  { id: "nombre", label: "Nombre / Apellidos", placeholder: "Ej. MARTINEZ LOPEZ" },
+  { id: "nombre", label: "Nombre / Apellidos", placeholder: "Ej. MARTINEZ o MARIA LOPEZ" },
 ];
 
 interface Props {
@@ -162,27 +162,29 @@ export function FichaPacienteBuscador({ accent = "blue" }: Props) {
           encontrados = dedupExpediente(snapP.docs.map((d) => aCandidato(d.data() as Paciente)));
         }
       } else {
-        // Nombre: prefijo del primer término sobre `apellidos`. La data del SIS suele
-        // venir en mayúsculas; probamos en mayúsculas y tal cual, y luego filtramos.
-        const tokens = q.split(/\s+/).filter(Boolean);
-        const primer = tokens[0];
-        const prefijos = Array.from(new Set([primer.toUpperCase(), primer])).slice(0, 2);
-        const snaps = await Promise.all(
-          prefijos.map((p) =>
-            getDocs(
-              query(
-                collection(db, "personas"),
-                orderBy("apellidos"),
-                startAt(p),
-                endAt(p + ""),
-                limit(30),
-              ),
+        // Nombre / apellidos: busqueda flexible y tolerante. Antes solo miraba el
+        // PRIMER termino como prefijo de `apellidos`; ahora hace PREFIJO por CADA
+        // termino sobre `apellidos` Y `nombres`, en MAYUSCULAS y sin tildes (asi
+        // viene la data del SIS), deduplicando para no gastar lecturas. Cada
+        // consulta es resiliente (si falla, aporta []); al final se filtra en
+        // cliente que el nombre completo contenga TODOS los terminos.
+        const HIGH = String.fromCharCode(0xf8ff); // tope alto de prefijo en Firestore
+        const tokens = q.split(/\s+/).filter(Boolean).slice(0, 3);
+        const prefijosDe = (t: string) =>
+          Array.from(new Set([t.toUpperCase(), plano(t).toUpperCase()].filter(Boolean)));
+        const consultas = tokens.flatMap((t) =>
+          prefijosDe(t).flatMap((p) =>
+            (["apellidos", "nombres"] as const).map((campo) =>
+              getDocs(
+                query(collection(db, "personas"), orderBy(campo), startAt(p), endAt(p + HIGH), limit(20)),
+              )
+                .then((s) => s.docs.map((d) => aCandidato(d.data() as Persona)))
+                .catch(() => [] as Candidato[]),
             ),
           ),
         );
-        const todos = dedupExpediente(
-          snaps.flatMap((s) => s.docs.map((d) => aCandidato(d.data() as Persona))),
-        );
+        const listas = await Promise.all(consultas);
+        const todos = dedupExpediente(listas.flat());
         // Filtra que el nombre completo contenga todos los términos escritos.
         const claves = tokens.map(plano);
         encontrados = todos
@@ -324,7 +326,7 @@ export function FichaPacienteBuscador({ accent = "blue" }: Props) {
 
         <p className="text-[11px] text-slate-500">
           {modo === "nombre"
-            ? "Escribe el apellido (puedes agregar el nombre para afinar). Cada consulta de ficha queda registrada para auditoría."
+            ? "Escribe nombre y/o apellido, en cualquier orden — encuentra coincidencias parciales. Cada consulta de ficha queda registrada para auditoría."
             : "Cada consulta de ficha queda registrada automáticamente para auditoría."}
         </p>
       </form>
