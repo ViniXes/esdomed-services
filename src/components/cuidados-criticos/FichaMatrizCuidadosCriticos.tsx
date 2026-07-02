@@ -13,6 +13,7 @@ import {
   camposPendientesCierreCuidadosCriticos,
   datosAutomaticosPaciente,
   gruposMatrizPorTipo,
+  rangoFechaParaMes,
   VALOR_NO_REGISTRADO,
   valorComoTexto,
   type CampoMatrizCuidadosCriticos,
@@ -142,6 +143,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
                 campo={campo}
                 tipoMedico={tipo}
                 valor={datosCalculados[campo.key]}
+                mesSeleccionado={valorComoTexto(datosCalculados.mes)}
                 bloqueado={camposBloqueados.has(campo.key)}
                 destacarEgreso={Boolean(datosGuardados)}
                 pendienteCierre={Boolean(datosGuardados) && camposPendientesCierre.has(campo.key)}
@@ -193,7 +195,7 @@ function normalizarBusquedaCatalogo(value: string): string {
     .trim();
 }
 
-function CampoMatriz({ campo, tipoMedico, valor, bloqueado, destacarEgreso, pendienteCierre, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; bloqueado?: boolean; destacarEgreso?: boolean; pendienteCierre?: boolean; onChange: (value: string) => void }) {
+function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, destacarEgreso, pendienteCierre, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; mesSeleccionado?: string; bloqueado?: boolean; destacarEgreso?: boolean; pendienteCierre?: boolean; onChange: (value: string) => void }) {
   const text = valorComoTexto(valor);
   const [editandoNumero, setEditandoNumero] = useState(false);
   const esNumero = campo.tipo === "number";
@@ -206,12 +208,18 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, destacarEgreso, pend
       : text;
   const selectValue = text || VALOR_NO_REGISTRADO;
   const automatico = campo.automatico || bloqueado;
+  const esFechaIngreso = campo.key === "fecha_ingreso_al_servicio" && campo.tipo === "date";
+  const anioReferencia = /^\d{4}-\d{2}-\d{2}$/.test(inputValue) ? Number(inputValue.slice(0, 4)) : new Date().getFullYear();
+  const rangoFechaIngreso = esFechaIngreso && mesSeleccionado ? rangoFechaParaMes(mesSeleccionado, anioReferencia) : null;
   return (
     <label className={`${campo.tipo === "textarea" ? "md:col-span-2 xl:col-span-3" : ""} ${campoEgreso ? `rounded-xl border p-2 ${pendienteCierre || cierreSinDato ? "border-rose-300/80 bg-rose-50/60 dark:border-rose-700/80 dark:bg-rose-950/25" : "border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/60 dark:bg-emerald-950/20"}` : ""}`}>
       <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
         {campo.label}
         {automatico && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800">AUTOMÁTICO</span>}
       </span>
+      {rangoFechaIngreso && (
+        <span className="mb-1.5 block text-[11px] text-slate-400">Debe caer dentro de {mesSeleccionado}.</span>
+      )}
       {campo.tipo === "cie10" ? (
         <CIE10Combobox
           value={diagnosticoDesdeTexto(text)}
@@ -257,7 +265,8 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, destacarEgreso, pend
         <input
           type={esNumero ? "text" : campo.tipo}
           inputMode={esNumero ? "decimal" : undefined}
-          min={esNumero ? 0 : undefined}
+          min={esNumero ? 0 : rangoFechaIngreso?.min}
+          max={rangoFechaIngreso?.max}
           step={esNumero ? "any" : undefined}
           value={inputValue}
           disabled={automatico}
@@ -267,9 +276,14 @@ function CampoMatriz({ campo, tipoMedico, valor, bloqueado, destacarEgreso, pend
             event.currentTarget.select();
           }}
           onBlur={event => {
-            if (!esNumero) return;
-            setEditandoNumero(false);
-            if (!event.currentTarget.value.trim()) onChange("0");
+            if (esNumero) {
+              setEditandoNumero(false);
+              if (!event.currentTarget.value.trim()) onChange("0");
+              return;
+            }
+            if (!rangoFechaIngreso || !event.currentTarget.value) return;
+            if (event.currentTarget.value < rangoFechaIngreso.min) onChange(rangoFechaIngreso.min);
+            else if (event.currentTarget.value > rangoFechaIngreso.max) onChange(rangoFechaIngreso.max);
           }}
           onChange={event => {
             if (!esNumero) {

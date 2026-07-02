@@ -179,7 +179,7 @@ const ETIQUETAS_VISIBLES: Record<string, string> = {
   REGISTRO: "Expediente clínico",
 };
 
-const MESES = [
+export const MESES = [
   "ENERO",
   "FEBRERO",
   "MARZO",
@@ -193,6 +193,15 @@ const MESES = [
   "NOVIEMBRE",
   "DICIEMBRE",
 ];
+
+export function rangoFechaParaMes(mesLabel: string, anioReferencia: number): { min: string; max: string } | null {
+  const indice = MESES.indexOf(mesLabel);
+  if (indice === -1) return null;
+  const formatear = (fecha: Date) => `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+  const primerDia = new Date(anioReferencia, indice, 1);
+  const ultimoDia = new Date(anioReferencia, indice + 1, 0);
+  return { min: formatear(primerDia), max: formatear(ultimoDia) };
+}
 
 function slug(label: string) {
   return label

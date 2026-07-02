@@ -31,13 +31,6 @@ const MESES = [
 
 const inputCls = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 
-function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  const date = timestamp.toDate?.() ?? new Date(value as string);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 function fechaIngresoFicha(ficha: FichaCuidadosCriticos) {
   const fecha = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
   return fecha ? new Date(`${fecha}T00:00:00`) : null;
@@ -76,7 +69,14 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     const fichasQuery = query(collection(db, "fichas_cuidados_criticos"), where("servicio", "in", servicios));
     return onSnapshot(fichasQuery, snap => {
       const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
-      docs.sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
+      docs.sort((a, b) => {
+        const fechaA = fechaIngresoFicha(a)?.getTime();
+        const fechaB = fechaIngresoFicha(b)?.getTime();
+        if (fechaA == null && fechaB == null) return 0;
+        if (fechaA == null) return 1;
+        if (fechaB == null) return -1;
+        return fechaA - fechaB;
+      });
       setFichas(docs);
     });
   }, [profile?.tipoMedico, servicios]);
