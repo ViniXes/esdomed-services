@@ -519,10 +519,14 @@ function conteosMensuales(
     reingresos: cuentaSi(fichasMes, "reingreso_72_horas"),
     egresosUlcera: cuentaSi(fichasEgresoMes, "ulceras_ppor_decubito_desarrolladas_en_uci") + cuentaSi(fichasEgresoMes, "alta_con_ulcera"),
     reintubados: cuentaSi(fichasMes, "reintubacion"),
-    extubados: cuentaSi(fichasMes, "extubacion_exitosa") + cuentaSi(fichasMes, "extubacion_programada_fallida") + cuentaSi(fichasMes, "extubacion_accidental"),
+    extubados: fichasMes.filter(ficha => (
+      si(ficha.datos?.extubacion_exitosa) || si(ficha.datos?.extubacion_programada_fallida) || si(ficha.datos?.extubacion_accidental)
+    )).length,
     extubacionExitosa: cuentaSi(fichasMes, "extubacion_exitosa"),
     extubacionFallida: cuentaSi(fichasMes, "extubacion_programada_fallida"),
-    pacientesEscala: fichasMes.filter(ficha => numero(ficha.datos?.apache_ii_ingreso) > 0 || numero(ficha.datos?.apache_iv) > 0 || numero(ficha.datos?.sofa) > 0).length,
+    pacientesEscala: fichasMes.filter(ficha => (
+      esValorRegistrado(ficha.datos?.apache_ii_ingreso) || esValorRegistrado(ficha.datos?.apache_iv)
+    )).length,
     extubacionAccidental: cuentaSi(fichasMes, "extubacion_accidental"),
     pacientesVm,
     pacientesVmEgresados: fichasEgresoVm.length,
