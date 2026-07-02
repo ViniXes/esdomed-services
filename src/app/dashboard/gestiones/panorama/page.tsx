@@ -12,7 +12,7 @@ import {
 } from "@/lib/trabajosocial/catalogos";
 import { GestionesTabs } from "../_components/GestionesTabs";
 import {
-  CheckCircle2, ChevronDown, LayoutDashboard, Lock, NotebookPen, Search, User, X,
+  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, LayoutDashboard, Lock, NotebookPen, Search, User, X,
 } from "lucide-react";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -54,6 +54,9 @@ const ETAPAS: { key: GrupoGestionTS; label: string }[] = [
   { key: "Altas", label: "Alta" },
 ];
 
+// Máximo de servicios (grupos) por página en el panorama.
+const PAGE_SIZE = 20;
+
 type FiltroRapido = "todos" | "sin_rastreo" | "contactados" | "gestion_hoy";
 
 interface ResumenGestion {
@@ -76,7 +79,9 @@ export default function PanoramaPage() {
   const [servicioFiltro, setServicioFiltro] = useState("");
   const [soloMios, setSoloMios] = useState(false);
   const [filtroRapido, setFiltroRapido] = useState<FiltroRapido>("todos");
-  const [colapsados, setColapsados] = useState<Set<string>>(new Set());
+  // Grupos EXPANDIDos (por servicio). Vacío = todos colapsados por defecto.
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
 
   // Pacientes activos creados por ESDOMED (mismo universo que Rastreo).
   useEffect(() => {
@@ -189,8 +194,17 @@ export default function PanoramaPage() {
   }, [pacientes, estadoRastreoDe, busqueda, servicioFiltro, soloMios, filtroRapido, misExp, hoyPorExp]);
 
   const totalFiltrado = grupos.reduce((n, g) => n + g.pacientes.length, 0);
-  const toggleColapso = (s: string) =>
-    setColapsados((prev) => {
+
+  // Paginación de los grupos por servicio (20 por página). Colapsados por
+  // defecto; reinicia a la página 1 al cambiar filtros.
+  const totalPages = Math.max(1, Math.ceil(grupos.length / PAGE_SIZE));
+  const filtrosKey = `${busqueda}|${servicioFiltro}|${soloMios}|${filtroRapido}`;
+  const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
+  if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
+  const pageSafe = Math.min(page, totalPages);
+  const gruposPagina = grupos.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  const toggleGrupo = (s: string) =>
+    setExpandidos((prev) => {
       const n = new Set(prev);
       if (n.has(s)) n.delete(s); else n.add(s);
       return n;
@@ -200,7 +214,7 @@ export default function PanoramaPage() {
   const limpiar = () => { setBusqueda(""); setServicioFiltro(""); setSoloMios(false); setFiltroRapido("todos"); };
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
@@ -278,11 +292,11 @@ export default function PanoramaPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {grupos.map(({ servicio, pacientes: pac }) => {
-            const colapsado = colapsados.has(servicio);
+          {gruposPagina.map(({ servicio, pacientes: pac }) => {
+            const colapsado = !expandidos.has(servicio);
             return (
               <div key={servicio} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-                <button onClick={() => toggleColapso(servicio)}
+                <button onClick={() => toggleGrupo(servicio)}
                   className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                   <ChevronDown size={15} className={`text-slate-400 transition-transform ${colapsado ? "-rotate-90" : ""}`} />
                   <span className="text-sm font-bold text-slate-800 dark:text-slate-200 flex-1 text-left">{servicio}</span>
@@ -304,6 +318,20 @@ export default function PanoramaPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!loading && grupos.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-xs text-slate-500 shrink-0">
+            {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, grupos.length)} de{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">{grupos.length}</span> servicios
+          </span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(Math.max(1, pageSafe - 1))} disabled={pageSafe === 1} className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={14} /></button>
+            <span className="text-xs text-slate-500 px-2 tabular-nums">{pageSafe} / {totalPages}</span>
+            <button onClick={() => setPage(Math.min(totalPages, pageSafe + 1))} disabled={pageSafe === totalPages} className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={14} /></button>
+          </div>
         </div>
       )}
     </div>
