@@ -63,6 +63,10 @@ interface Props {
 export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista = "atendidos" }: Props) {
   const { profile } = useAuth();
   const esEgresos = vista === "egresos";
+  // El rango de fechas se aplica sobre el campo que corresponde a la vista: en
+  // egresos manda la fecha de egreso (alta); en atendidos, la de ingreso a emergencia.
+  const campoFecha = esEgresos ? "fechaHoraAltaIngreso" : "fechaHoraIngreso";
+  const etiquetaFecha = esEgresos ? "Egreso" : "Atención";
   const [atenciones, setAtenciones] = useState<AtencionEmergencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [consultado, setConsultado] = useState(false);
@@ -114,9 +118,9 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
       const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
       const snap = await getDocs(query(
         collection(db, "atenciones_emergencia"),
-        where("fechaHoraIngreso", ">=", desde),
-        ...(hasta ? [where("fechaHoraIngreso", "<=", hasta)] : []),
-        orderBy("fechaHoraIngreso", "desc"),
+        where(campoFecha, ">=", desde),
+        ...(hasta ? [where(campoFecha, "<=", hasta)] : []),
+        orderBy(campoFecha, "desc"),
         limit(LIMIT),
       ));
       const lista = snap.docs.map((d) => {
@@ -328,13 +332,13 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Atención desde *</span>
+          <span className="text-xs text-slate-500 shrink-0">{etiquetaFecha} desde *</span>
           <DateField
             value={fechaDesde}
             onChange={setFechaDesde}
             clearable
-            placeholder="Atención desde"
-            ariaLabel="Atención desde"
+            placeholder={`${etiquetaFecha} desde`}
+            ariaLabel={`${etiquetaFecha} desde`}
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -375,7 +379,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
           <Ambulance size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
           <p className="text-sm text-slate-500 mb-4">
-            Elige un rango de fechas (atención en emergencia) y pulsa Consultar.
+            Elige un rango de fechas ({esEgresos ? "egreso desde emergencia" : "atención en emergencia"}) y pulsa Consultar.
           </p>
           <button
             onClick={consultar}
