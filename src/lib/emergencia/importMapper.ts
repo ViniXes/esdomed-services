@@ -30,11 +30,30 @@ export interface FilaEmergenciaMapeada {
 
 const txt = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
 
-/** Parsea "DD/MM/YYYY HH:MM:SS" (o sin segundos, o con AM/PM) a Date local. */
+/** Serial de Excel (días desde 1899-12-30) → Date local, preservando la hora de pared. */
+function excelSerialADate(serial: number): Date | null {
+  if (!isFinite(serial) || serial <= 0) return null;
+  const ms = Math.round(serial * 86400000);
+  const u = new Date(Date.UTC(1899, 11, 30) + ms);
+  // Reconstruye la fecha en hora local desde las partes UTC para evitar corrimientos de zona horaria.
+  const d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Parsea la fecha/hora de ingreso a Date local. Acepta tres formas según cómo
+ * exporte el archivo:
+ *  - texto "DD/MM/YYYY HH:MM:SS" (sin segundos o con AM/PM) — reporte HTML/.xls del SIS
+ *  - Date — cuando la hoja se leyó con cellDates
+ *  - número serial de Excel — cuando el reporte se guardó como .xlsx real
+ */
 export function parseFechaHoraEmergencia(valor: unknown): Date | null {
-  if (!valor) return null;
+  if (valor === null || valor === undefined || valor === "") return null;
   if (valor instanceof Date) return isNaN(valor.getTime()) ? null : valor;
+  if (typeof valor === "number") return excelSerialADate(valor);
   const s = String(valor).trim();
+  // Cadena puramente numérica = serial de Excel entregado como texto.
+  if (/^\d+(\.\d+)?$/.test(s)) return excelSerialADate(parseFloat(s));
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
   if (!m) return null;
   const [, d, mo, y, hStr, min, sec, ampm] = m;

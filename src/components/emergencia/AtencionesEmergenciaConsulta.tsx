@@ -3,13 +3,13 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  collection, query, orderBy, limit, where, getDocs, documentId,
+  collection, query, orderBy, limit, where, getDocs, documentId, deleteDoc, doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
-  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw,
+  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw, Download, Trash2, AlertTriangle,
 } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
@@ -63,6 +63,10 @@ interface Props {
 export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista = "atendidos" }: Props) {
   const { profile } = useAuth();
   const esEgresos = vista === "egresos";
+  // El rango de fechas se aplica sobre el campo que corresponde a la vista: en
+  // egresos manda la fecha de egreso (alta); en atendidos, la de ingreso a emergencia.
+  const campoFecha = esEgresos ? "fechaHoraAltaIngreso" : "fechaHoraIngreso";
+  const etiquetaFecha = esEgresos ? "Egreso" : "Atención";
   const [atenciones, setAtenciones] = useState<AtencionEmergencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [consultado, setConsultado] = useState(false);
@@ -79,6 +83,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   const [registradosPadron, setRegistradosPadron] = useState<Set<string>>(new Set());
   // Atención seleccionada para la ficha de detalle (todos los campos del informe).
   const [seleccion, setSeleccion] = useState<AtencionEmergencia | null>(null);
+  const [exportando, setExportando] = useState(false);
 
   // La consulta a Firestore se acota por rango de fechas (server-side); la caché se
   // llavea por vista + rango. Buscador, tabs y sub-filtro son client-side.
@@ -114,9 +119,9 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
       const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
       const snap = await getDocs(query(
         collection(db, "atenciones_emergencia"),
-        where("fechaHoraIngreso", ">=", desde),
-        ...(hasta ? [where("fechaHoraIngreso", "<=", hasta)] : []),
-        orderBy("fechaHoraIngreso", "desc"),
+        where(campoFecha, ">=", desde),
+        ...(hasta ? [where(campoFecha, "<=", hasta)] : []),
+        orderBy(campoFecha, "desc"),
         limit(LIMIT),
       ));
       const lista = snap.docs.map((d) => {
@@ -236,6 +241,65 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
       : conteoAtendidos[value as IngresoHospitalizacion];
   };
 
+  // Elimina una atención (solo ESDOMED/admin, para corregir un registro agregado
+  // por error). Actualiza el estado y la caché de sesión para que no reaparezca.
+  const eliminarAtencion = async (a: AtencionEmergencia) => {
+    if (!a.id) return;
+    await deleteDoc(doc(db, "atenciones_emergencia", a.id));
+    const next = atenciones.filter((x) => x.id !== a.id);
+    setAtenciones(next);
+    const hit = cacheEmergencia.get(cacheKey);
+    if (hit) cacheEmergencia.set(cacheKey, { ...hit, atenciones: next });
+    setSeleccion(null);
+  };
+
+  // Exporta a Excel exactamente lo que se está viendo (respeta tab, sub-filtro,
+  // búsqueda y rango de fechas). Una sola hoja con todas las columnas del informe.
+  const generoLabel = (g?: string) =>
+    g === "masculino" ? "Masculino" : g === "femenino" ? "Femenino" : g === "otro" ? "Otro" : "";
+  const exportarExcel = async () => {
+    if (filtrados.length === 0) return;
+    setExportando(true);
+    try {
+      const XLSX = await import("xlsx");
+      const filas = filtrados.map((a) => ({
+        Expediente: a.expediente,
+        Paciente: a.pacienteNombre ?? "",
+        DUI: a.dui ?? "",
+        Sexo: generoLabel(a.genero),
+        Edad: a.edadTexto ?? (a.edadAnios != null ? `${a.edadAnios} años` : ""),
+        "Ingreso a emergencia": a.fechaHoraIngreso ? formatFechaHora(a.fechaHoraIngreso) : "",
+        "Fecha de alta / egreso": a.fechaHoraAltaIngreso ? formatFechaHora(a.fechaHoraAltaIngreso) : "",
+        "Categorización (triage)": a.categorizacion ?? "",
+        Diagnóstico: a.diagnostico ?? "",
+        "Ingresó a hospitalización": INGRESO_LABEL[a.ingresoHospitalizacion],
+        "Tipo de egreso": a.tipoEgreso ?? "",
+        "Condición de egreso": CONDICION_LABEL[condicionEgreso(a.tipoEgreso)],
+        "Llega referido": a.llegaReferido ? "Sí" : "No",
+        "Veterano de guerra": a.veteranoGuerra ? "Sí" : "No",
+        "Médico triage": a.medicoTriage ?? "",
+        "Especialidad triage": a.especialidadTriage ?? "",
+        "Médico atiende": a.medicoAtiende ?? "",
+        "Especialidad atiende": a.especialidadAtiende ?? "",
+        "Llegada al establecimiento": a.tiempoLlegadaEstablecimiento ?? "",
+        "Duración triage": a.tiempoDuracionTriage ?? "",
+        "Espera a consulta": a.tiempoEsperaConsulta ?? "",
+        Consulta: a.tiempoConsulta ?? "",
+        Evaluación: a.tiempoEvaluacion ?? "",
+        "Total en emergencia": a.tiempoTotalEmergencia ?? "",
+        "Establecimiento de procedencia": a.establecimientoProcedencia ?? "",
+        "Distancia entre establecimientos": a.distanciaEntreEstablecimientos ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(filas);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, esEgresos ? "Egresos emergencia" : "Atendidos emergencia");
+      const nombre = `emergencia_${vista}_${fechaDesde || "inicio"}_a_${fechaHasta || "fin"}.xlsx`;
+      XLSX.writeFile(wb, nombre);
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -261,15 +325,26 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
             </p>
           </div>
         </div>
-        {permiteImportar && (
-          <Link
-            href="/dashboard/emergencia/importar"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportarExcel}
+            disabled={exportando || filtrados.length === 0}
+            title={filtrados.length === 0 ? "Consulta primero para exportar" : `Exportar ${filtrados.length} registros a Excel`}
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Upload size={15} />
-            Importar reporte
-          </Link>
-        )}
+            <Download size={15} />
+            {exportando ? "Generando..." : "Excel"}
+          </button>
+          {permiteImportar && (
+            <Link
+              href="/dashboard/emergencia/importar"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              <Upload size={15} />
+              Importar reporte
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
@@ -328,13 +403,13 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Atención desde *</span>
+          <span className="text-xs text-slate-500 shrink-0">{etiquetaFecha} desde *</span>
           <DateField
             value={fechaDesde}
             onChange={setFechaDesde}
             clearable
-            placeholder="Atención desde"
-            ariaLabel="Atención desde"
+            placeholder={`${etiquetaFecha} desde`}
+            ariaLabel={`${etiquetaFecha} desde`}
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -375,7 +450,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
           <Ambulance size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
           <p className="text-sm text-slate-500 mb-4">
-            Elige un rango de fechas (atención en emergencia) y pulsa Consultar.
+            Elige un rango de fechas ({esEgresos ? "egreso desde emergencia" : "atención en emergencia"}) y pulsa Consultar.
           </p>
           <button
             onClick={consultar}
@@ -512,6 +587,8 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           pacienteId={ingresosPorExp.get(seleccion.expediente)}
           enPadron={ingresosPorExp.has(seleccion.expediente) || registradosPadron.has(seleccion.expediente)}
           fichaHref={fichaHref}
+          permiteEliminar={permiteImportar}
+          onEliminar={eliminarAtencion}
           onClose={() => setSeleccion(null)}
         />
       )}
@@ -520,16 +597,33 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
 }
 
 function FichaEmergencia({
-  atencion: a, pacienteId, enPadron, fichaHref, onClose,
+  atencion: a, pacienteId, enPadron, fichaHref, permiteEliminar, onEliminar, onClose,
 }: {
   atencion: AtencionEmergencia;
   pacienteId?: string;
   enPadron: boolean;
   fichaHref?: (pacienteId: string) => string;
+  permiteEliminar?: boolean;
+  onEliminar?: (a: AtencionEmergencia) => Promise<void>;
   onClose: () => void;
 }) {
   const cond = condicionEgreso(a.tipoEgreso);
   const fechaHora = (d?: Date) => (d ? formatFechaHora(d) : undefined);
+  const [confirmando, setConfirmando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+
+  const handleEliminar = async () => {
+    if (!onEliminar) return;
+    setEliminando(true);
+    setErrorEliminar(null);
+    try {
+      await onEliminar(a);
+    } catch (e) {
+      setErrorEliminar(e instanceof Error ? e.message : "No se pudo eliminar la atención.");
+      setEliminando(false);
+    }
+  };
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -609,11 +703,64 @@ function FichaEmergencia({
             <Campo label="Distancia entre establecimientos" value={a.distanciaEntreEstablecimientos} />
           </SeccionFicha>
 
-          <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
-            Importado por {a.importadoPorNombre} · {formatFechaHora(a.importadoEn)}
-          </p>
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] text-slate-400">
+              Importado por {a.importadoPorNombre} · {formatFechaHora(a.importadoEn)}
+            </p>
+            {permiteEliminar && onEliminar && (
+              <button
+                onClick={() => setConfirmando(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                <Trash2 size={13} /> Eliminar atención
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Confirmación de eliminación */}
+      {confirmando && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-900 dark:text-slate-100">Eliminar atención</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Se eliminará la atención de <span className="font-medium text-slate-700 dark:text-slate-300">{a.pacienteNombre || a.expediente}</span> ({formatFechaHora(a.fechaHoraIngreso)}). Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+
+            {errorEliminar && (
+              <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>{errorEliminar}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setConfirmando(false); setErrorEliminar(null); }}
+                disabled={eliminando}
+                className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={eliminando}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {eliminando ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

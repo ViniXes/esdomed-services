@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ import {
 import { GestionesTabs } from "../_components/GestionesTabs";
 import { DateField } from "@/components/ui/DateField";
 import {
-  AlertTriangle, CheckCircle2, Lock, Loader2, Radar, Search, X,
+  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Lock, Loader2, Radar, Search, X,
 } from "lucide-react";
 
 const inputCls =
@@ -22,6 +22,9 @@ const selectCls =
 const labelCls = "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5";
 
 const ESTADOS: EstadoRastreo[] = ["en_gestion", "contactado", "no_efectivo", "alta", "defuncion", "no_aplica"];
+
+// Máximo de pacientes por página en la lista de rastreo.
+const PAGE_SIZE = 20;
 
 const hoyStr = () => {
   const d = new Date();
@@ -40,6 +43,7 @@ export default function RastreoPage() {
   const [permissionError, setPermissionError] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("pendientes");
+  const [page, setPage] = useState(1);
 
   // Modal de captura
   const [sel, setSel] = useState<Paciente | null>(null);
@@ -76,8 +80,10 @@ export default function RastreoPage() {
     }, (err) => { if (err.code === "permission-denied") setPermissionError(true); });
   }, []);
 
-  const estadoDe = (p: Paciente): EstadoRastreo | "pendiente" =>
-    rastreos.get(p.expediente)?.estado ?? "pendiente";
+  const estadoDe = useCallback(
+    (p: Paciente): EstadoRastreo | "pendiente" => rastreos.get(p.expediente)?.estado ?? "pendiente",
+    [rastreos],
+  );
 
   const stats = useMemo(() => {
     let pend = 0, cont = 0, noef = 0;
@@ -88,7 +94,7 @@ export default function RastreoPage() {
       else if (e === "no_efectivo") noef++;
     }
     return { total: pacientes.length, pend, cont, noef };
-  }, [pacientes, rastreos]);
+  }, [pacientes, estadoDe]);
 
   const lista = useMemo(() => {
     const t = busqueda.trim().toLowerCase();
@@ -106,7 +112,16 @@ export default function RastreoPage() {
         );
       })
       .sort((a, b) => nombrePac(a).localeCompare(nombrePac(b)));
-  }, [pacientes, rastreos, busqueda, filtro]);
+  }, [pacientes, estadoDe, busqueda, filtro]);
+
+  // Paginación (20 por página). Reinicia a la página 1 al cambiar filtros;
+  // pageSafe protege contra la lista en vivo que se encoge.
+  const totalPages = Math.max(1, Math.ceil(lista.length / PAGE_SIZE));
+  const filtrosKey = `${busqueda}|${filtro}`;
+  const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
+  if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
+  const pageSafe = Math.min(page, totalPages);
+  const paginados = lista.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const abrir = (p: Paciente) => {
     const r = rastreos.get(p.expediente);
@@ -185,7 +200,7 @@ export default function RastreoPage() {
     );
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
@@ -251,7 +266,7 @@ export default function RastreoPage() {
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl divide-y divide-slate-100 dark:divide-slate-800">
-          {lista.map((p) => {
+          {paginados.map((p) => {
             const e = estadoDe(p);
             const ok = habilitaSeguimiento(e === "pendiente" ? undefined : e);
             return (
@@ -285,6 +300,20 @@ export default function RastreoPage() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {!loading && lista.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-xs text-slate-500 shrink-0">
+            {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, lista.length)} de{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">{lista.length}</span>
+          </span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(Math.max(1, pageSafe - 1))} disabled={pageSafe === 1} className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronLeft size={14} /></button>
+            <span className="text-xs text-slate-500 px-2 tabular-nums">{pageSafe} / {totalPages}</span>
+            <button onClick={() => setPage(Math.min(totalPages, pageSafe + 1))} disabled={pageSafe === totalPages} className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronRight size={14} /></button>
+          </div>
         </div>
       )}
 
@@ -368,7 +397,7 @@ export default function RastreoPage() {
                   </p>
                 ) : (
                   <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-                    <Lock size={12} /> Mientras no esté "Contactado", el paciente no pasa a seguimiento.
+                    <Lock size={12} /> Mientras no esté &quot;Contactado&quot;, el paciente no pasa a seguimiento.
                   </p>
                 )}
               </div>

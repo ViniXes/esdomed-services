@@ -83,7 +83,12 @@ export default function ImportarEmergenciaPage() {
     try {
       const XLSX = await import("xlsx");
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+      // raw:true preserva el TEXTO original de las celdas. Es clave para el reporte
+      // del SIS (HTML exportado como .xls): sin esto, SheetJS interpreta las fechas
+      // "DD/MM/YYYY" como M/D/Y (formato de EE.UU.) y "01/07/2026" (1 de julio) se
+      // vuelve 7 de enero. Con el texto crudo, parseFechaHoraEmergencia aplica D/M/Y.
+      // Para un .xlsx real las fechas llegan como serial de Excel, ya soportado.
+      const wb = XLSX.read(new Uint8Array(buf), { type: "array", raw: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const matriz = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
       const filas = localizarFilas(matriz);

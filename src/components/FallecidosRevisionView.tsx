@@ -7,7 +7,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
-import { HeartPulse, X, CheckCircle2, Clock } from "lucide-react";
+import { DateField } from "@/components/ui/DateField";
+import { HeartPulse, X, CheckCircle2, Clock, Search, ChevronLeft, ChevronRight } from "lucide-react";
+
+// Registros por página en la tabla (paginación de a 10).
+const PAGE_SIZE = 10;
 
 /**
  * Vista de revisión de notificaciones de fallecidos para personal que solo
@@ -25,6 +29,10 @@ export default function FallecidosRevisionView({
   const { profile } = useAuth();
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
   const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "todos">("todos");
+  const [busqueda, setBusqueda] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<NotificacionFallecido | null>(null);
   const [savingVisto, setSavingVisto] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
@@ -44,6 +52,37 @@ export default function FallecidosRevisionView({
   }, []);
 
   const filtered = filtro === "todos" ? notificaciones : notificaciones.filter(n => n.estado === filtro);
+
+  // Buscador (expediente / paciente / servicio / médico) + rango por fecha de
+  // defunción — la fecha que se muestra en la tabla.
+  const displayList = filtered.filter(n => {
+    const t = busqueda.trim().toLowerCase();
+    if (t) {
+      const hit =
+        (n.pacienteExpediente?.toLowerCase() ?? "").includes(t) ||
+        (n.pacienteNombre?.toLowerCase() ?? "").includes(t) ||
+        (n.servicio?.toLowerCase() ?? "").includes(t) ||
+        (n.medicoNombre?.toLowerCase() ?? "").includes(t);
+      if (!hit) return false;
+    }
+    if (fechaDesde || fechaHasta) {
+      const d = (n.fechaDefuncion as unknown as { toDate?: () => Date }).toDate?.()
+        ?? new Date(n.fechaDefuncion as unknown as string);
+      if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
+      if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
+    }
+    return true;
+  });
+
+  // Paginación (10 por página). El page se reinicia a 1 al cambiar cualquier
+  // filtro; pageSafe protege contra listas que encogen (snapshot en vivo).
+  const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
+  const filtrosKey = `${filtro}|${busqueda}|${fechaDesde}|${fechaHasta}`;
+  const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
+  if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
+  const pageSafe = Math.min(page, totalPages);
+  const paginados = displayList.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
   const pendientes = notificaciones.filter(n => n.estado === "pendiente").length;
   const selectedLive = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
   const lecturaSel = selectedLive ? getLecturaConfirmada(selectedLive) : null;
@@ -123,12 +162,42 @@ export default function FallecidosRevisionView({
             {f.label}
           </button>
         ))}
-        <span className="ml-auto text-sm text-slate-500">{filtered.length} registros</span>
+        <span className="ml-auto text-sm text-slate-500">{displayList.length} registros</span>
+      </div>
+
+      {/* Buscador + rango de fechas */}
+      <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por expediente, paciente o servicio…"
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Desde</span>
+          <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Fecha desde" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+          <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Fecha hasta" />
+        </div>
+        {(busqueda || fechaDesde || fechaHasta) && (
+          <button
+            onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+          >
+            <X size={12} /> Limpiar
+          </button>
+        )}
       </div>
 
       {/* Tabla */}
-      {filtered.length === 0 ? (
-        <p className="text-sm text-slate-500 py-10 text-center">Sin notificaciones en este filtro.</p>
+      {displayList.length === 0 ? (
+        <p className="text-sm text-slate-500 py-10 text-center">Sin notificaciones que coincidan con el filtro.</p>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -144,7 +213,7 @@ export default function FallecidosRevisionView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filtered.map(n => (
+                {paginados.map(n => (
                   <tr key={n.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-sm">{n.pacienteExpediente}</p>
@@ -194,6 +263,33 @@ export default function FallecidosRevisionView({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Paginación */}
+          <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between gap-4">
+            <span className="text-xs text-slate-500 shrink-0">
+              {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, displayList.length)} de{" "}
+              <span className="font-medium text-slate-700 dark:text-slate-300">{displayList.length}</span>
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, pageSafe - 1))}
+                  disabled={pageSafe === 1}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-slate-500 px-2 tabular-nums">{pageSafe} / {totalPages}</span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, pageSafe + 1))}
+                  disabled={pageSafe === totalPages}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -97,7 +97,7 @@ export default function BitacoraPage() {
   const nombre = persona ? `${persona.apellidos}, ${persona.nombres}` : ultima?.pacienteNombre;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
@@ -109,6 +109,9 @@ export default function BitacoraPage() {
 
       <GestionesTabs />
 
+      {/* La bitácora es una vista de lectura: chrome a lo ancho (alineado con las
+          demás tabs), pero el contenido en una columna angosta y legible. */}
+      <div className="max-w-3xl space-y-5">
       {permissionError && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
           Sin permisos para leer las gestiones. Pide al administrador que despliegue la regla de la colección <strong>gestiones_ts</strong>.
@@ -200,6 +203,7 @@ export default function BitacoraPage() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
