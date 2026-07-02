@@ -3,13 +3,13 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  collection, query, orderBy, limit, where, getDocs, documentId,
+  collection, query, orderBy, limit, where, getDocs, documentId, deleteDoc, doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
-  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw, Download,
+  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw, Download, Trash2, AlertTriangle,
 } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
@@ -239,6 +239,18 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
     return esEgresos
       ? conteoEgresos[value as CondicionEgresoEmergencia]
       : conteoAtendidos[value as IngresoHospitalizacion];
+  };
+
+  // Elimina una atención (solo ESDOMED/admin, para corregir un registro agregado
+  // por error). Actualiza el estado y la caché de sesión para que no reaparezca.
+  const eliminarAtencion = async (a: AtencionEmergencia) => {
+    if (!a.id) return;
+    await deleteDoc(doc(db, "atenciones_emergencia", a.id));
+    const next = atenciones.filter((x) => x.id !== a.id);
+    setAtenciones(next);
+    const hit = cacheEmergencia.get(cacheKey);
+    if (hit) cacheEmergencia.set(cacheKey, { ...hit, atenciones: next });
+    setSeleccion(null);
   };
 
   // Exporta a Excel exactamente lo que se está viendo (respeta tab, sub-filtro,
@@ -575,6 +587,8 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
           pacienteId={ingresosPorExp.get(seleccion.expediente)}
           enPadron={ingresosPorExp.has(seleccion.expediente) || registradosPadron.has(seleccion.expediente)}
           fichaHref={fichaHref}
+          permiteEliminar={permiteImportar}
+          onEliminar={eliminarAtencion}
           onClose={() => setSeleccion(null)}
         />
       )}
@@ -583,16 +597,33 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
 }
 
 function FichaEmergencia({
-  atencion: a, pacienteId, enPadron, fichaHref, onClose,
+  atencion: a, pacienteId, enPadron, fichaHref, permiteEliminar, onEliminar, onClose,
 }: {
   atencion: AtencionEmergencia;
   pacienteId?: string;
   enPadron: boolean;
   fichaHref?: (pacienteId: string) => string;
+  permiteEliminar?: boolean;
+  onEliminar?: (a: AtencionEmergencia) => Promise<void>;
   onClose: () => void;
 }) {
   const cond = condicionEgreso(a.tipoEgreso);
   const fechaHora = (d?: Date) => (d ? formatFechaHora(d) : undefined);
+  const [confirmando, setConfirmando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+
+  const handleEliminar = async () => {
+    if (!onEliminar) return;
+    setEliminando(true);
+    setErrorEliminar(null);
+    try {
+      await onEliminar(a);
+    } catch (e) {
+      setErrorEliminar(e instanceof Error ? e.message : "No se pudo eliminar la atención.");
+      setEliminando(false);
+    }
+  };
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -672,11 +703,64 @@ function FichaEmergencia({
             <Campo label="Distancia entre establecimientos" value={a.distanciaEntreEstablecimientos} />
           </SeccionFicha>
 
-          <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
-            Importado por {a.importadoPorNombre} · {formatFechaHora(a.importadoEn)}
-          </p>
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[11px] text-slate-400">
+              Importado por {a.importadoPorNombre} · {formatFechaHora(a.importadoEn)}
+            </p>
+            {permiteEliminar && onEliminar && (
+              <button
+                onClick={() => setConfirmando(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                <Trash2 size={13} /> Eliminar atención
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Confirmación de eliminación */}
+      {confirmando && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-900 dark:text-slate-100">Eliminar atención</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Se eliminará la atención de <span className="font-medium text-slate-700 dark:text-slate-300">{a.pacienteNombre || a.expediente}</span> ({formatFechaHora(a.fechaHoraIngreso)}). Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+
+            {errorEliminar && (
+              <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>{errorEliminar}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setConfirmando(false); setErrorEliminar(null); }}
+                disabled={eliminando}
+                className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={eliminando}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {eliminando ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
