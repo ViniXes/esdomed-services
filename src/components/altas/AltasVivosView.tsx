@@ -425,9 +425,13 @@ function ObservacionModal({
             <MessageSquareWarning size={18} className="text-rose-600 dark:text-rose-300" />
           </div>
           <div>
-            <p className="text-base font-bold text-slate-900 dark:text-slate-100">Marcar con observacion</p>
+            <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+              {notificacion.estado === "revertida" ? "Dejar en espera con observación" : "Marcar con observacion"}
+            </p>
             <p className="text-sm text-slate-500 mt-1">
-              El equipo que notifico vera el motivo para corregir la notificacion de {notificacion.pacienteNombre}.
+              {notificacion.estado === "revertida"
+                ? `La notificación de ${notificacion.pacienteNombre} quedará en espera con tu comentario visible para el equipo que notificó. Cuando se resuelva, podrás marcarla como efectiva de nuevo.`
+                : `El equipo que notifico vera el motivo para corregir la notificacion de ${notificacion.pacienteNombre}.`}
             </p>
           </div>
         </div>
@@ -1095,6 +1099,29 @@ export function AltasVivosView() {
                   </button>
                 </div>
               )}
+
+              {/* ESDOMED: una revertida vuelve al flujo — efectiva de nuevo, o en
+                  espera con observación mientras se resuelve lo que faltó */}
+              {isEsdomed && n.estado === "revertida" && (
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProcesandoId(n.id!)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
+                  >
+                    <Check size={13} />
+                    Marcar efectiva de nuevo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setObservandoId(n.id!)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1c1e4d] dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors"
+                  >
+                    <MessageSquareWarning size={13} />
+                    Dejar en espera con observación
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1141,9 +1168,15 @@ export function AltasVivosView() {
       {/* Procesar confirm */}
       {procesandoId && procesandoNot && (
         <ConfirmModal
-          title={esSoloAcuseRecibido(procesandoNot.tipoAlta) ? "Acusar de recibido" : "Acusar de recibido y dar alta en SIS"}
+          title={
+            procesandoNot.estado === "revertida"
+              ? "Marcar efectiva de nuevo"
+              : esSoloAcuseRecibido(procesandoNot.tipoAlta) ? "Acusar de recibido" : "Acusar de recibido y dar alta en SIS"
+          }
           message={
-            esSoloAcuseRecibido(procesandoNot.tipoAlta)
+            procesandoNot.estado === "revertida"
+              ? `El alta de ${procesandoNot.pacienteNombre} volverá a quedar como efectiva: el paciente saldrá de nuevo de los pacientes activos y sus tarjetas de visita se anularán. Úsalo cuando ya se resolvió lo que motivó la reversión.`
+              : esSoloAcuseRecibido(procesandoNot.tipoAlta)
               ? `Confirma que recibiste la notificación de ${procesandoNot.pacienteNombre}. Quedará cerrada como acuse de recibido, sin alta efectiva.`
               : `Confirma que recibiste la notificación de ${procesandoNot.pacienteNombre} y que se dio de alta en el SIS. Esta acción no se puede deshacer.`
           }

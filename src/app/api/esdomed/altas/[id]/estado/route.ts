@@ -197,7 +197,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: true });
   }
 
-  if (actual.estado !== "pendiente" && actual.estado !== "observada") {
+  // Una revertida NO es terminal: ESDOMED puede reincorporarla al flujo —
+  // marcarla efectiva de nuevo (procesar) o dejarla en espera con observación
+  // (observar) mientras se resuelve lo que motivó la reversión.
+  if (actual.estado !== "pendiente" && actual.estado !== "observada" && actual.estado !== "revertida") {
     return NextResponse.json({ error: "La notificacion ya esta cerrada" }, { status: 409 });
   }
 
@@ -252,6 +255,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (body.action === "quitar_observacion") {
+    if (actual.estado !== "observada") {
+      return NextResponse.json({ error: "La notificacion no tiene observacion activa" }, { status: 409 });
+    }
     await ref.update({
       estado: "pendiente",
       observacionEsdomedMotivo: FieldValue.delete(),
