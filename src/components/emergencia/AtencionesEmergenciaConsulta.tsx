@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Ambulance, HeartPulse, Search, ChevronLeft, ChevronRight, Upload, X,
-  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw,
+  ArrowUpRight, Stethoscope, Clock, MapPin, UserCog, RefreshCw, Download,
 } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import type { AtencionEmergencia, IngresoHospitalizacion } from "@/types";
@@ -83,6 +83,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
   const [registradosPadron, setRegistradosPadron] = useState<Set<string>>(new Set());
   // Atención seleccionada para la ficha de detalle (todos los campos del informe).
   const [seleccion, setSeleccion] = useState<AtencionEmergencia | null>(null);
+  const [exportando, setExportando] = useState(false);
 
   // La consulta a Firestore se acota por rango de fechas (server-side); la caché se
   // llavea por vista + rango. Buscador, tabs y sub-filtro son client-side.
@@ -240,6 +241,53 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
       : conteoAtendidos[value as IngresoHospitalizacion];
   };
 
+  // Exporta a Excel exactamente lo que se está viendo (respeta tab, sub-filtro,
+  // búsqueda y rango de fechas). Una sola hoja con todas las columnas del informe.
+  const generoLabel = (g?: string) =>
+    g === "masculino" ? "Masculino" : g === "femenino" ? "Femenino" : g === "otro" ? "Otro" : "";
+  const exportarExcel = async () => {
+    if (filtrados.length === 0) return;
+    setExportando(true);
+    try {
+      const XLSX = await import("xlsx");
+      const filas = filtrados.map((a) => ({
+        Expediente: a.expediente,
+        Paciente: a.pacienteNombre ?? "",
+        DUI: a.dui ?? "",
+        Sexo: generoLabel(a.genero),
+        Edad: a.edadTexto ?? (a.edadAnios != null ? `${a.edadAnios} años` : ""),
+        "Ingreso a emergencia": a.fechaHoraIngreso ? formatFechaHora(a.fechaHoraIngreso) : "",
+        "Fecha de alta / egreso": a.fechaHoraAltaIngreso ? formatFechaHora(a.fechaHoraAltaIngreso) : "",
+        "Categorización (triage)": a.categorizacion ?? "",
+        Diagnóstico: a.diagnostico ?? "",
+        "Ingresó a hospitalización": INGRESO_LABEL[a.ingresoHospitalizacion],
+        "Tipo de egreso": a.tipoEgreso ?? "",
+        "Condición de egreso": CONDICION_LABEL[condicionEgreso(a.tipoEgreso)],
+        "Llega referido": a.llegaReferido ? "Sí" : "No",
+        "Veterano de guerra": a.veteranoGuerra ? "Sí" : "No",
+        "Médico triage": a.medicoTriage ?? "",
+        "Especialidad triage": a.especialidadTriage ?? "",
+        "Médico atiende": a.medicoAtiende ?? "",
+        "Especialidad atiende": a.especialidadAtiende ?? "",
+        "Llegada al establecimiento": a.tiempoLlegadaEstablecimiento ?? "",
+        "Duración triage": a.tiempoDuracionTriage ?? "",
+        "Espera a consulta": a.tiempoEsperaConsulta ?? "",
+        Consulta: a.tiempoConsulta ?? "",
+        Evaluación: a.tiempoEvaluacion ?? "",
+        "Total en emergencia": a.tiempoTotalEmergencia ?? "",
+        "Establecimiento de procedencia": a.establecimientoProcedencia ?? "",
+        "Distancia entre establecimientos": a.distanciaEntreEstablecimientos ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(filas);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, esEgresos ? "Egresos emergencia" : "Atendidos emergencia");
+      const nombre = `emergencia_${vista}_${fechaDesde || "inicio"}_a_${fechaHasta || "fin"}.xlsx`;
+      XLSX.writeFile(wb, nombre);
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
@@ -265,15 +313,26 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
             </p>
           </div>
         </div>
-        {permiteImportar && (
-          <Link
-            href="/dashboard/emergencia/importar"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportarExcel}
+            disabled={exportando || filtrados.length === 0}
+            title={filtrados.length === 0 ? "Consulta primero para exportar" : `Exportar ${filtrados.length} registros a Excel`}
+            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Upload size={15} />
-            Importar reporte
-          </Link>
-        )}
+            <Download size={15} />
+            {exportando ? "Generando..." : "Excel"}
+          </button>
+          {permiteImportar && (
+            <Link
+              href="/dashboard/emergencia/importar"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              <Upload size={15} />
+              Importar reporte
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
