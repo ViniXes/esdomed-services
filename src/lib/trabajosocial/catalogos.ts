@@ -19,6 +19,7 @@ export type GrupoGestionTS =
   | "Consentimientos y responsables"
   | "Pertenencias"
   | "Rastreo"
+  | "Seguimiento"
   | "Altas"
   | "Defunción"
   | "Documentos"
@@ -30,6 +31,7 @@ export const GRUPOS_GESTION_TS: GrupoGestionTS[] = [
   "Consentimientos y responsables",
   "Pertenencias",
   "Rastreo",
+  "Seguimiento",
   "Altas",
   "Defunción",
   "Documentos",
@@ -41,6 +43,7 @@ export const TIPOS_GESTION_TS: TipoGestionTS[] = [
   { id: "toma_datos_visita",        label: "Toma de datos de visita",                          grupo: "Visitas" },
   { id: "entrega_tarjeta_visita",   label: "Entrega de tarjeta de visita",                     grupo: "Visitas" },
   { id: "autorizacion_visita",      label: "Autorización de visita",                           grupo: "Visitas" },
+  { id: "visita_familiar",          label: "Visita familiar (del día)",                        grupo: "Visitas" },
 
   // ── Consentimientos y responsables ──
   { id: "consentimiento_denegatoria", label: "Recepción y firma de consentimiento / denegatoria", grupo: "Consentimientos y responsables" },
@@ -57,6 +60,14 @@ export const TIPOS_GESTION_TS: TipoGestionTS[] = [
 
   // ── Rastreo ──
   { id: "rastreo",                  label: "Rastreo de paciente",                              grupo: "Rastreo" },
+
+  // ── Seguimiento ── (las columnas de las hojas diarias de SEGUIMIENTO Y VISITA
+  // FAMILIAR / ISBM / GESTORES: videollamada, llamada con médico, seguimiento STS,
+  // confirmación de próxima visita — el vocabulario es el del equipo, no renombrar)
+  { id: "seguimiento_familiar",         label: "Seguimiento a familiar",              grupo: "Seguimiento" },
+  { id: "llamada_con_medico",           label: "Llamada con médico",                  grupo: "Seguimiento" },
+  { id: "seguimiento_sts",              label: "Seguimiento STS",                     grupo: "Seguimiento" },
+  { id: "confirmacion_proxima_visita",  label: "Confirmación de próxima visita",      grupo: "Seguimiento" },
 
   // ── Altas ──
   { id: "alta",                     label: "Gestión de alta",                                  grupo: "Altas" },
@@ -194,3 +205,32 @@ export const CANALES_RASTREO: CanalRastreo[] = [
   "hoja_identificacion", "chat_esdomed", "hospital_referente",
   "entrevista_px", "instituciones", "pnc", "telefonia_interna",
 ];
+
+// ── Seguimiento del día ──────────────────────────────────────────────────────
+// Acciones rápidas de la vista "pasar lista": cada chip de la fila del paciente
+// escribe una gestión normal (tipo + modalidad fijos). Son la traducción 1:1 de
+// las columnas de las hojas diarias de los libros de SEGUIMIENTO del Excel:
+// VIDEOLLAMADA · LLAMADA (a familiar) · LLAMADA CON MÉDICO · SEGUIMIENTO STS ·
+// ESTADO DE VISITA. Al ser gestiones normales alimentan solas la productividad,
+// la bitácora y los totales mensuales.
+
+export interface AccionSeguimiento {
+  key: string;                     // llave estable del chip (tipo|modalidad)
+  tipo: string;                    // id del catálogo TIPOS_GESTION_TS
+  modalidad: ModalidadGestion;
+  chip: string;                    // etiqueta corta del chip
+  resultadoVisita?: ResultadoVisita; // solo para tipos del grupo Visitas
+}
+
+export const ACCIONES_SEGUIMIENTO: AccionSeguimiento[] = [
+  { key: "seguimiento_familiar|videollamada", tipo: "seguimiento_familiar", modalidad: "videollamada", chip: "Videollamada" },
+  { key: "seguimiento_familiar|llamada",      tipo: "seguimiento_familiar", modalidad: "llamada",      chip: "Llamada a familiar" },
+  { key: "llamada_con_medico|llamada",        tipo: "llamada_con_medico",   modalidad: "llamada",      chip: "Llamada con médico" },
+  { key: "seguimiento_sts|llamada",           tipo: "seguimiento_sts",      modalidad: "llamada",      chip: "Seguimiento STS" },
+  { key: "visita_familiar|presencial",        tipo: "visita_familiar",      modalidad: "presencial",   chip: "Visita realizada", resultadoVisita: "realizada" },
+];
+
+/** Llave de agrupación de una gestión hacia los chips del seguimiento del día. */
+export function keyAccionSeguimiento(g: { tipo: string; modalidad?: ModalidadGestion }): string {
+  return `${g.tipo}|${g.modalidad ?? "presencial"}`;
+}

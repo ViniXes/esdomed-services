@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileClock, LayoutDashboard, NotebookPen, Radar } from "lucide-react";
+import { BarChart3, FileClock, LayoutDashboard, ListChecks, NotebookPen, Radar } from "lucide-react";
 
 const TABS = [
   { href: "/dashboard/gestiones/panorama", label: "Panorama", icon: LayoutDashboard },
   { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar },
+  { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento", icon: ListChecks },
   { href: "/dashboard/gestiones", label: "Registro", icon: NotebookPen },
   { href: "/dashboard/gestiones/productividad", label: "Productividad", icon: BarChart3 },
   { href: "/dashboard/gestiones/bitacora", label: "Bitácora", icon: FileClock },

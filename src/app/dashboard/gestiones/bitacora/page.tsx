@@ -92,6 +92,25 @@ export default function BitacoraPage() {
     return grupos;
   }, [gestiones]);
 
+  // Totales por mes × tipo (los "TOTAL MENSUAL DE…" por paciente de los libros
+  // de seguimiento del Excel, ahora derivados en vez de contados a mano).
+  const totalesPorMes = useMemo(() => {
+    const meses = new Map<string, Map<string, number>>();
+    for (const g of gestiones) {
+      const mes = g.fecha.slice(0, 7); // "YYYY-MM"
+      const sub = meses.get(mes) ?? new Map<string, number>();
+      sub.set(g.tipo, (sub.get(g.tipo) ?? 0) + 1);
+      meses.set(mes, sub);
+    }
+    return [...meses.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([mes, tipos]) => ({
+        mes,
+        total: [...tipos.values()].reduce((n, x) => n + x, 0),
+        tipos: [...tipos.entries()].sort((a, b) => b[1] - a[1]),
+      }));
+  }, [gestiones]);
+
   // Datos del paciente derivados de la gestión más reciente (sirve si no está en el padrón).
   const ultima = gestiones[0];
   const nombre = persona ? `${persona.apellidos}, ${persona.nombres}` : ultima?.pacienteNombre;
@@ -162,6 +181,28 @@ export default function BitacoraPage() {
           {gestiones.length === 0 ? (
             <p className="text-sm text-slate-400 py-10 text-center">Este expediente no tiene gestiones registradas.</p>
           ) : (
+            <>
+            {/* Totales por mes (los "TOTAL MENSUAL" de los libros de seguimiento) */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2.5">Totales por mes</p>
+              <div className="space-y-2">
+                {totalesPorMes.map(({ mes, total, tipos }) => {
+                  const [y, m] = mes.split("-").map(Number);
+                  const etiqueta = new Date(y, (m ?? 1) - 1, 1).toLocaleDateString("es-HN", { month: "long", year: "numeric" });
+                  return (
+                    <div key={mes} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 capitalize w-32 shrink-0">{etiqueta}</span>
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 tabular-nums">{total}</span>
+                      <span className="text-xs text-slate-500 min-w-0">
+                        {tipos.map(([tipo, n], i) => (
+                          <span key={tipo}>{i > 0 && " · "}{labelTipoGestion(tipo)} ×{n}</span>
+                        ))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div className="space-y-6">
               {porFecha.map(({ fecha, items }) => (
                 <div key={fecha}>
@@ -200,6 +241,7 @@ export default function BitacoraPage() {
                 </div>
               ))}
             </div>
+            </>
           )}
         </>
       )}
