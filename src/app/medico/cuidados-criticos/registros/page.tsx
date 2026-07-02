@@ -32,8 +32,14 @@ const MESES = [
 const inputCls = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 
 function fechaIngresoFicha(ficha: FichaCuidadosCriticos) {
-  const fecha = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
-  return fecha ? new Date(`${fecha}T00:00:00`) : null;
+  if (!esValorRegistrado(ficha.datos?.fecha_ingreso_al_servicio)) return null;
+  const fecha = new Date(`${valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio)}T00:00:00`);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+function mesFicha(ficha: FichaCuidadosCriticos) {
+  const indice = MESES.indexOf(valorComoTexto(ficha.datos?.mes));
+  return indice === -1 ? MESES.length : indice;
 }
 
 function enRango(fecha: Date | null, desde: string, hasta: string) {
@@ -70,6 +76,9 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     return onSnapshot(fichasQuery, snap => {
       const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
       docs.sort((a, b) => {
+        const mesA = mesFicha(a);
+        const mesB = mesFicha(b);
+        if (mesA !== mesB) return mesA - mesB;
         const fechaA = fechaIngresoFicha(a)?.getTime();
         const fechaB = fechaIngresoFicha(b)?.getTime();
         if (fechaA == null && fechaB == null) return 0;

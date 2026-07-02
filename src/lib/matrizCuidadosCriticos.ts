@@ -498,6 +498,7 @@ export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidado
     sexo,
     edad: calcularEdad(paciente.fechaNacimiento),
     centro_de_procedencia: paciente.establecimientoProcedencia ?? "",
+    fecha_ingreso_al_servicio: fechaActualInput(),
     ...(fallecido ? {
       fecha_de_muerte: fechaComoInput(paciente.fechaEgreso),
       hora_de_muerte: horaComoInput(paciente.fechaEgreso),
