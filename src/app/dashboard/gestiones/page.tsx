@@ -89,7 +89,16 @@ export default function GestionesPage() {
   const { profile } = useAuth();
   const { servicios } = useServicios();
 
-  const [form, setForm] = useState<FormValue>(() => formVacio(hoyStr()));
+  // El expediente puede venir precargado desde el Panorama (deep link ?exp=...);
+  // el efecto de autocompletar rellenará nombre/servicio/estado.
+  const [form, setForm] = useState<FormValue>(() => {
+    const base = formVacio(hoyStr());
+    if (typeof window !== "undefined") {
+      const exp = new URLSearchParams(window.location.search).get("exp");
+      if (exp) base.expediente = exp;
+    }
+    return base;
+  });
   const [buscandoExp, setBuscandoExp] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
