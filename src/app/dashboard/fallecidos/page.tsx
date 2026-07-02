@@ -8,7 +8,7 @@ import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, CheckCircle2, FileWarning, Lock, LockOpen, Search, MessageCircle } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, Lock, LockOpen, Search, MessageCircle } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -29,12 +29,16 @@ type ActiveTab = "expediente" | "seguimiento" | "entrega" | "certificado";
 
 const selectCls = "w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer shadow-sm disabled:cursor-not-allowed";
 
+// Registros por página en la tabla (paginación de a 10).
+const PAGE_SIZE = 10;
+
 export default function DashboardFallecidosPage() {
   const { profile } = useAuth();
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  const [page, setPage] = useState(1);
   const [personal, setPersonal] = useState<UserProfile[]>([]);
   const [personalPsTs, setPersonalPsTs] = useState<UserProfile[]>([]);
   const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "cert_pendiente" | "todos">("todos");
@@ -66,17 +70,26 @@ export default function DashboardFallecidosPage() {
     return unsub;
   }, []);
 
-  useEffect(() => {
-    if (!selected) return;
-    setActiveTab("expediente");
-    setJustificacion("");
-    setFiehPendiente(false);
-    setFamiliarNombre(selected.familiarNombre ?? "");
-    setFamiliarDui(selected.familiarDui ?? "");
-    setFamiliarTelefono(selected.familiarTelefono ?? "");
-    setFamiliarParentesco(selected.familiarParentesco ?? "");
-    setDuiValidado(!!selected.duiValidado);
-  }, [selected?.id]); // eslint-disable-line
+  // Al abrir el modal para otro registro (o reabrir uno tras cerrarlo), reinicia
+  // el formulario de edición. Ajuste de estado en render, no en efecto — patrón
+  // recomendado por React y ya usado en la paginación de esta pantalla. El
+  // centinela rastrea `selected?.id` (incl. undefined) para reiniciar también al
+  // reabrir el mismo registro.
+  const selId = selected?.id;
+  const [selPrev, setSelPrev] = useState(selId);
+  if (selId !== selPrev) {
+    setSelPrev(selId);
+    if (selected) {
+      setActiveTab("expediente");
+      setJustificacion("");
+      setFiehPendiente(false);
+      setFamiliarNombre(selected.familiarNombre ?? "");
+      setFamiliarDui(selected.familiarDui ?? "");
+      setFamiliarTelefono(selected.familiarTelefono ?? "");
+      setFamiliarParentesco(selected.familiarParentesco ?? "");
+      setDuiValidado(!!selected.duiValidado);
+    }
+  }
 
   const filtered = filtro === "todos"       ? notificaciones
     : filtro === "cert_pendiente"           ? notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente")
@@ -91,6 +104,15 @@ export default function DashboardFallecidosPage() {
     }
     return true;
   });
+
+  // Paginación (10 por página). Reinicia a la página 1 al cambiar filtros;
+  // pageSafe protege contra el snapshot en vivo que encoge la lista.
+  const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
+  const filtrosKey = `${filtro}|${busquedaExpediente}|${fechaDesde}|${fechaHasta}`;
+  const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
+  if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
+  const pageSafe = Math.min(page, totalPages);
+  const paginados = displayList.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const confirmar = async () => {
     if (!selected?.id || !profile) return;
@@ -184,12 +206,6 @@ export default function DashboardFallecidosPage() {
       `Servicio: ${n.servicio ?? ""}\n` +
       `Cama: ${n.cama ?? ""}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener");
-  };
-
-  const formatFecha = (ts: unknown) => {
-    if (!ts) return "—";
-    const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
-    return d.toLocaleDateString("es-HN", { day: "2-digit", month: "short", year: "numeric" });
   };
 
   const formatHora = (ts: unknown) => {
@@ -363,7 +379,7 @@ export default function DashboardFallecidosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {displayList.map(n => {
+                {paginados.map(n => {
                   const pasos = COLUMNAS_SEGUIMIENTO.filter(col => !!n[col.key]).length;
                   return (
                     <tr key={n.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -423,6 +439,33 @@ export default function DashboardFallecidosPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Paginación */}
+          <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between gap-4">
+            <span className="text-xs text-slate-500 shrink-0">
+              {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, displayList.length)} de{" "}
+              <span className="font-medium text-slate-700 dark:text-slate-300">{displayList.length}</span>
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, pageSafe - 1))}
+                  disabled={pageSafe === 1}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-slate-500 px-2 tabular-nums">{pageSafe} / {totalPages}</span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, pageSafe + 1))}
+                  disabled={pageSafe === totalPages}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -504,7 +547,7 @@ export default function DashboardFallecidosPage() {
                   <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Registro desbloqueado</p>
                   <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
                     Por <span className="font-medium">{selectedLive.tramiteDesbloqueadoPor}</span>
-                    {selectedLive.tramiteJustificacion && <> · "{selectedLive.tramiteJustificacion}"</>}
+                    {selectedLive.tramiteJustificacion && <> · &quot;{selectedLive.tramiteJustificacion}&quot;</>}
                   </p>
                 </div>
               </div>
