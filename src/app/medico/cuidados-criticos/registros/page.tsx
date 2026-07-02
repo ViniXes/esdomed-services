@@ -213,15 +213,25 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
 function Stat({ icon, label, value, variant = "default" }: { icon: React.ReactNode; label: string; value: number | string; variant?: "default" | "warning" }) {
   const warning = variant === "warning";
   return (
-    <div className={`rounded-xl border p-4 ${
+    <div className={`group relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
       warning
-        ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/25"
-        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        ? "border-rose-200 bg-gradient-to-br from-rose-50 to-white dark:border-rose-900/60 dark:from-rose-950/40 dark:to-slate-900"
+        : "border-slate-200 bg-gradient-to-br from-slate-50 to-white dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
     }`}>
-      <div className={`flex items-center gap-2 ${warning ? "text-rose-500 dark:text-rose-300" : "text-blue-600 dark:text-blue-400"}`}>
-        {icon}<span className={`text-xs font-medium ${warning ? "text-rose-700 dark:text-rose-200" : "text-slate-500"}`}>{label}</span>
+      <div className={`absolute -right-3 -top-3 h-16 w-16 rounded-full blur-2xl ${warning ? "bg-rose-300/30 dark:bg-rose-500/10" : "bg-blue-300/20 dark:bg-blue-500/10"}`} />
+      <div className="relative flex items-center gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+          warning
+            ? "bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-300"
+            : "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300"
+        }`}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className={`truncate text-xs font-semibold uppercase tracking-wide ${warning ? "text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>{label}</p>
+          <p className={`text-2xl font-bold font-heading leading-tight ${warning ? "text-rose-700 dark:text-rose-100" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
+        </div>
       </div>
-      <p className={`mt-2 text-2xl font-bold ${warning ? "text-rose-600 dark:text-rose-200" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
     </div>
   );
 }
