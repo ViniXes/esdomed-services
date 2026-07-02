@@ -38,6 +38,11 @@ function fechaStr(d: Date): string {
 function hoyStr(): string {
   return fechaStr(new Date());
 }
+// Desplaza una fecha "YYYY-MM-DD" ±n días (hojear la lista como las hojas 1–31 del Excel).
+function shiftFecha(fecha: string, dias: number): string {
+  const [y, m, d] = fecha.split("-").map(Number);
+  return fechaStr(new Date(y, (m ?? 1) - 1, (d ?? 1) + dias));
+}
 function toDate(ts: unknown): Date | null {
   if (!ts) return null;
   return (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
@@ -473,16 +478,42 @@ export default function GestionesPage() {
         {/* ── Lista del día ── */}
         <div className="space-y-4 xl:space-y-0 xl:gap-4 xl:h-full xl:min-h-0 xl:flex xl:flex-col">
           <div className="shrink-0 flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <CalendarDays size={15} />
-              <DateField
-                value={fechaLista}
-                onChange={setFechaLista}
-                placeholder="Fecha"
-                ariaLabel="Fecha de la lista"
-              />
-            </label>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setFechaLista(shiftFecha(fechaLista, -1))}
+                title="Día anterior"
+                aria-label="Día anterior"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <CalendarDays size={15} />
+                <DateField
+                  value={fechaLista}
+                  onChange={setFechaLista}
+                  placeholder="Fecha"
+                  ariaLabel="Fecha de la lista"
+                />
+              </label>
+              <button
+                onClick={() => setFechaLista(shiftFecha(fechaLista, 1))}
+                title="Día siguiente"
+                aria-label="Día siguiente"
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
             <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 capitalize">{fmtFechaStr(fechaLista)}</span>
+            {fechaLista !== hoyStr() && (
+              <button
+                onClick={() => setFechaLista(hoyStr())}
+                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Volver a hoy
+              </button>
+            )}
             <span className="ml-auto text-sm text-slate-500">{listaFiltrada.length} de {gestiones.length} gestión(es)</span>
           </div>
 

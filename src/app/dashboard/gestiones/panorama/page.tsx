@@ -49,6 +49,7 @@ const GRUPO_DE_TIPO: Record<string, GrupoGestionTS> = Object.fromEntries(
 
 // Etapas del pipeline visibles en cada paciente (además de Rastreo, que es el paso 0).
 const ETAPAS: { key: GrupoGestionTS; label: string }[] = [
+  { key: "Seguimiento", label: "Seguimiento" },
   { key: "Visitas", label: "Visitas" },
   { key: "Documentos", label: "Documentos" },
   { key: "Altas", label: "Alta" },
