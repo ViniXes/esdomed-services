@@ -31,16 +31,15 @@ const MESES = [
 
 const inputCls = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 
-function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  const date = timestamp.toDate?.() ?? new Date(value as string);
-  return Number.isNaN(date.getTime()) ? null : date;
+function fechaIngresoFicha(ficha: FichaCuidadosCriticos) {
+  if (!esValorRegistrado(ficha.datos?.fecha_ingreso_al_servicio)) return null;
+  const fecha = new Date(`${valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio)}T00:00:00`);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
-function fechaIngresoFicha(ficha: FichaCuidadosCriticos) {
-  const fecha = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
-  return fecha ? new Date(`${fecha}T00:00:00`) : null;
+function mesFicha(ficha: FichaCuidadosCriticos) {
+  const indice = MESES.indexOf(valorComoTexto(ficha.datos?.mes));
+  return indice === -1 ? MESES.length : indice;
 }
 
 function enRango(fecha: Date | null, desde: string, hasta: string) {
@@ -76,7 +75,17 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     const fichasQuery = query(collection(db, "fichas_cuidados_criticos"), where("servicio", "in", servicios));
     return onSnapshot(fichasQuery, snap => {
       const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
-      docs.sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
+      docs.sort((a, b) => {
+        const mesA = mesFicha(a);
+        const mesB = mesFicha(b);
+        if (mesA !== mesB) return mesA - mesB;
+        const fechaA = fechaIngresoFicha(a)?.getTime();
+        const fechaB = fechaIngresoFicha(b)?.getTime();
+        if (fechaA == null && fechaB == null) return 0;
+        if (fechaA == null) return 1;
+        if (fechaB == null) return -1;
+        return fechaA - fechaB;
+      });
       setFichas(docs);
     });
   }, [profile?.tipoMedico, servicios]);
@@ -213,15 +222,25 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
 function Stat({ icon, label, value, variant = "default" }: { icon: React.ReactNode; label: string; value: number | string; variant?: "default" | "warning" }) {
   const warning = variant === "warning";
   return (
-    <div className={`rounded-xl border p-4 ${
+    <div className={`group relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
       warning
-        ? "border-rose-300 bg-rose-50 dark:border-rose-800 dark:bg-rose-950/25"
-        : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        ? "border-rose-200 bg-gradient-to-br from-rose-50 to-white dark:border-rose-900/60 dark:from-rose-950/40 dark:to-slate-900"
+        : "border-slate-200 bg-gradient-to-br from-slate-50 to-white dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
     }`}>
-      <div className={`flex items-center gap-2 ${warning ? "text-rose-500 dark:text-rose-300" : "text-blue-600 dark:text-blue-400"}`}>
-        {icon}<span className={`text-xs font-medium ${warning ? "text-rose-700 dark:text-rose-200" : "text-slate-500"}`}>{label}</span>
+      <div className={`absolute -right-3 -top-3 h-16 w-16 rounded-full blur-2xl ${warning ? "bg-rose-300/30 dark:bg-rose-500/10" : "bg-blue-300/20 dark:bg-blue-500/10"}`} />
+      <div className="relative flex items-center gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+          warning
+            ? "bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-300"
+            : "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300"
+        }`}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className={`truncate text-xs font-semibold uppercase tracking-wide ${warning ? "text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>{label}</p>
+          <p className={`text-2xl font-bold font-heading leading-tight ${warning ? "text-rose-700 dark:text-rose-100" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
+        </div>
       </div>
-      <p className={`mt-2 text-2xl font-bold ${warning ? "text-rose-600 dark:text-rose-200" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
     </div>
   );
 }
