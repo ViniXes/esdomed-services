@@ -385,7 +385,6 @@ export default function CuidadosCriticosMedicoPage() {
       <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-100 p-4 dark:border-slate-800">
           <h2 className="font-bold font-heading text-slate-900 dark:text-slate-100">Seleccionar paciente</h2>
-          <p className="mt-1 text-xs text-slate-500">Cada entrada del paciente a UCI o UCIN debe registrarse como un registro independiente.</p>
           <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
