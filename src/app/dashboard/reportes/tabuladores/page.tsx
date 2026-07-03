@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { collection, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Table2, Download, AlertTriangle, HeartPulse, LogOut, BedDouble, RefreshCw } from "lucide-react";
+import { Table2, Download, AlertTriangle, HeartPulse, LogIn, LogOut, BedDouble, RefreshCw } from "lucide-react";
 import type { EstadoPaciente, Genero, Paciente } from "@/types";
 import { DateField } from "@/components/ui/DateField";
 import { calcularEdad, diasEstancia, formatFecha, nombreCompleto, toDate, ESTADO_LABEL } from "@/lib/pacientes/helpers";
 
-type Tab = "vivos" | "fallecidos" | "activos";
+type Tab = "vivos" | "fallecidos" | "activos" | "ingresos";
 
 interface ColDef { key: string; label: string }
 interface FilaPivote { servicio: string; cols: Record<string, number>; total: number }
@@ -61,6 +61,7 @@ const TABS: { value: Tab; label: string; icon: typeof LogOut }[] = [
   { value: "vivos",      label: "Egresos vivos",     icon: LogOut },
   { value: "fallecidos", label: "Egresos fallecidos", icon: HeartPulse },
   { value: "activos",    label: "Pacientes activos",  icon: BedDouble },
+  { value: "ingresos",   label: "Ingresados",         icon: LogIn },
 ];
 
 export default function TabuladoresPage() {
@@ -77,11 +78,13 @@ export default function TabuladoresPage() {
 
   const [egresos, setEgresos] = useState<Paciente[]>([]);
   const [activos, setActivos] = useState<Paciente[]>([]);
+  const [ingresos, setIngresos] = useState<Paciente[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
 
   const esActivos = tab === "activos";
+  const esIngresos = tab === "ingresos";
 
   useEffect(() => {
     if (!authLoading && profile && !esEsdomed) router.replace("/dashboard");
@@ -117,6 +120,39 @@ export default function TabuladoresPage() {
     }
   }, [esEsdomed, fechaDesde, fechaHasta]);
 
+  // Ingresados por rango de fecha de INGRESO, sin importar el estado: mide
+  // cuántos ENTRARON en el periodo. Solo se consulta al abrir esta pestaña
+  // (puede ser una lectura grande) — rango + orderBy en un solo campo, sin
+  // índice compuesto.
+  const cargarIngresos = useCallback(async () => {
+    if (!esEsdomed || tab !== "ingresos" || !fechaDesde || !fechaHasta) return;
+    setCargando(true);
+    setError(null);
+    try {
+      const desde = new Date(fechaDesde + "T00:00:00");
+      const hasta = new Date(fechaHasta + "T23:59:59");
+      const snap = await getDocs(query(
+        collection(db, "pacientes"),
+        where("fechaIngreso", ">=", Timestamp.fromDate(desde)),
+        where("fechaIngreso", "<=", Timestamp.fromDate(hasta)),
+        orderBy("fechaIngreso", "desc"),
+      ));
+      setIngresos(snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id, ...data,
+          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+          fechaEgreso: toDate(data.fechaEgreso),
+          fechaNacimiento: toDate(data.fechaNacimiento),
+        } as Paciente;
+      }));
+    } catch (e) {
+      setError(`No se pudo cargar el reporte: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setCargando(false);
+    }
+  }, [esEsdomed, tab, fechaDesde, fechaHasta]);
+
   // Pacientes activos (una sola lectura, no en vivo — es un reporte).
   const cargarActivos = useCallback(async () => {
     if (!esEsdomed) return;
@@ -143,6 +179,10 @@ export default function TabuladoresPage() {
     const t = setTimeout(() => { cargarActivos(); }, 0);
     return () => clearTimeout(t);
   }, [cargarActivos]);
+  useEffect(() => {
+    const t = setTimeout(() => { cargarIngresos(); }, 0);
+    return () => clearTimeout(t);
+  }, [cargarIngresos]);
 
   // Filtro de detalle por servicio (se setea al hacer clic en una fila del tabulador).
   const [servicioFiltro, setServicioFiltro] = useState("");
@@ -162,17 +202,21 @@ export default function TabuladoresPage() {
       const columnas = sexoCols(items);
       return { items, columnas, pivote: pivotar(items, columnas, (p) => generoDe(p.genero)), titulo: "Egresos fallecidos por servicio y sexo" };
     }
+    if (tab === "ingresos") {
+      const columnas = sexoCols(ingresos);
+      return { items: ingresos, columnas, pivote: pivotar(ingresos, columnas, (p) => generoDe(p.genero)), titulo: "Ingresados por servicio y sexo (todos los estados)" };
+    }
     const columnas = sexoCols(activos);
     return { items: activos, columnas, pivote: pivotar(activos, columnas, (p) => generoDe(p.genero)), titulo: "Pacientes activos por servicio y sexo" };
-  }, [tab, egresos, activos]);
+  }, [tab, egresos, activos, ingresos]);
 
   const detalle = useMemo(() => {
     const lista = servicioFiltro
       ? items.filter((p) => (p.servicioActual || "Sin servicio").trim() === servicioFiltro)
       : items;
-    const fechaOrden = (p: Paciente) => (esActivos ? p.fechaIngreso : p.fechaEgreso ?? p.fechaIngreso);
+    const fechaOrden = (p: Paciente) => (esActivos || esIngresos ? p.fechaIngreso : p.fechaEgreso ?? p.fechaIngreso);
     return [...lista].sort((a, b) => (fechaOrden(b)?.getTime() ?? 0) - (fechaOrden(a)?.getTime() ?? 0));
-  }, [items, servicioFiltro, esActivos]);
+  }, [items, servicioFiltro, esActivos, esIngresos]);
 
   const exportarExcel = async () => {
     setExportando(true);
@@ -195,7 +239,9 @@ export default function TabuladoresPage() {
         const edad = calcularEdad(p.fechaNacimiento);
         const estancia = esActivos
           ? diasEstancia(p.fechaIngreso)
-          : (p.diasEstancia ?? (p.fechaEgreso ? diasEstancia(p.fechaIngreso, p.fechaEgreso) : ""));
+          : esIngresos
+            ? (p.diasEstancia ?? diasEstancia(p.fechaIngreso, p.fechaEgreso))
+            : (p.diasEstancia ?? (p.fechaEgreso ? diasEstancia(p.fechaIngreso, p.fechaEgreso) : ""));
         const fila: Record<string, string | number> = {
           Expediente: p.expediente,
           Paciente: nombreCompleto(p),
@@ -205,7 +251,10 @@ export default function TabuladoresPage() {
           Cama: p.camaActual ?? "",
           "Fecha de ingreso": p.fechaIngreso ? formatFecha(p.fechaIngreso) : "",
         };
-        if (!esActivos) {
+        if (esIngresos) {
+          fila["Estado"] = ESTADO_LABEL[p.estado];
+          fila["Fecha de egreso"] = p.fechaEgreso ? formatFecha(p.fechaEgreso) : "";
+        } else if (!esActivos) {
           fila["Fecha de egreso"] = p.fechaEgreso ? formatFecha(p.fechaEgreso) : "";
           fila["Tipo de alta"] = ESTADO_LABEL[p.estado];
           fila["Diagnóstico de egreso"] = p.diagnosticoEgreso?.descripcion ?? "";
@@ -251,7 +300,7 @@ export default function TabuladoresPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => (esActivos ? cargarActivos() : cargarEgresos())}
+            onClick={() => (esActivos ? cargarActivos() : esIngresos ? cargarIngresos() : cargarEgresos())}
             disabled={cargandoVista}
             className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
             title="Actualizar"
@@ -291,16 +340,16 @@ export default function TabuladoresPage() {
         })}
       </div>
 
-      {/* Rango de fecha (solo egresos) */}
+      {/* Rango de fecha (egresos por fecha de egreso; ingresados por fecha de ingreso) */}
       {!esActivos && (
         <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-500 shrink-0">Egreso desde</span>
-            <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Egreso desde" />
+            <span className="text-xs text-slate-500 shrink-0">{esIngresos ? "Ingreso desde" : "Egreso desde"}</span>
+            <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel={esIngresos ? "Ingreso desde" : "Egreso desde"} />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-            <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Egreso hasta" />
+            <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel={esIngresos ? "Ingreso hasta" : "Egreso hasta"} />
           </div>
         </div>
       )}
@@ -322,7 +371,7 @@ export default function TabuladoresPage() {
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-3">
             <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">{pivote.totalGeneral}</p>
             <p className="text-sm text-slate-500 leading-tight">
-              {tab === "vivos" ? "egresos vivos" : tab === "fallecidos" ? "egresos fallecidos" : "pacientes activos"}
+              {tab === "vivos" ? "egresos vivos" : tab === "fallecidos" ? "egresos fallecidos" : tab === "ingresos" ? "pacientes ingresados" : "pacientes activos"}
               <br />
               <span className="text-xs">en {pivote.filas.length} servicio{pivote.filas.length === 1 ? "" : "s"}</span>
             </p>
@@ -332,7 +381,11 @@ export default function TabuladoresPage() {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
               <Table2 size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
               <p className="text-sm text-slate-500">
-                {esActivos ? "No hay pacientes ingresados actualmente." : "No hay egresos para el rango seleccionado."}
+                {esActivos
+                  ? "No hay pacientes ingresados actualmente."
+                  : esIngresos
+                    ? "No hay ingresos para el rango seleccionado."
+                    : "No hay egresos para el rango seleccionado."}
               </p>
             </div>
           ) : (
@@ -384,7 +437,7 @@ export default function TabuladoresPage() {
             {/* Detalle: los pacientes que generan los números */}
             <DetalleTabla
               items={detalle}
-              esActivos={esActivos}
+              tab={tab}
               servicioFiltro={servicioFiltro}
               totalItems={items.length}
               onClear={() => setServicioFiltro("")}
@@ -398,14 +451,18 @@ export default function TabuladoresPage() {
 }
 
 function DetalleTabla({
-  items, esActivos, servicioFiltro, totalItems, onClear,
+  items, tab, servicioFiltro, totalItems, onClear,
 }: {
   items: Paciente[];
-  esActivos: boolean;
+  tab: Tab;
   servicioFiltro: string;
   totalItems: number;
   onClear: () => void;
 }) {
+  const esActivos = tab === "activos";
+  const esIngresos = tab === "ingresos";
+  // Activos e ingresados se listan por fecha de INGRESO; los egresos, por la de egreso.
+  const usaIngreso = esActivos || esIngresos;
   return (
     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-3">
@@ -428,9 +485,10 @@ function DetalleTabla({
               <Th>Expediente</Th>
               <Th>Paciente</Th>
               <Th>Servicio / Cama</Th>
-              <Th>{esActivos ? "Ingreso" : "Egreso"}</Th>
+              <Th>{usaIngreso ? "Ingreso" : "Egreso"}</Th>
               <Th center>Estancia</Th>
-              {!esActivos && <Th>Tipo de alta</Th>}
+              {esIngresos && <Th>Estado</Th>}
+              {!esActivos && !esIngresos && <Th>Tipo de alta</Th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -438,7 +496,9 @@ function DetalleTabla({
               const edad = calcularEdad(p.fechaNacimiento);
               const dias = esActivos
                 ? diasEstancia(p.fechaIngreso)
-                : (p.diasEstancia ?? (p.fechaEgreso ? diasEstancia(p.fechaIngreso, p.fechaEgreso) : null));
+                : esIngresos
+                  ? (p.diasEstancia ?? diasEstancia(p.fechaIngreso, p.fechaEgreso))
+                  : (p.diasEstancia ?? (p.fechaEgreso ? diasEstancia(p.fechaIngreso, p.fechaEgreso) : null));
               return (
                 <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                   <td className="px-4 py-2.5 font-mono text-slate-700 dark:text-slate-300">{p.expediente}</td>
@@ -454,10 +514,10 @@ function DetalleTabla({
                     {p.camaActual && <p className="text-xs text-slate-500 mt-0.5">Cama {p.camaActual}</p>}
                   </td>
                   <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400 text-xs whitespace-nowrap">
-                    {formatFecha(esActivos ? p.fechaIngreso : p.fechaEgreso)}
+                    {formatFecha(usaIngreso ? p.fechaIngreso : p.fechaEgreso)}
                   </td>
                   <td className="px-4 py-2.5 text-center text-slate-600 dark:text-slate-400 text-xs">
-                    {dias !== null ? `${dias} ${dias === 1 ? "día" : "días"}` : "—"}
+                    {dias !== null && dias !== undefined ? `${dias} ${dias === 1 ? "día" : "días"}` : "—"}
                   </td>
                   {!esActivos && (
                     <td className="px-4 py-2.5">
