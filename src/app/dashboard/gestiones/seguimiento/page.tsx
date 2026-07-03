@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, query, setDoc, Timestamp, where,
+  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, setDoc, Timestamp, updateDoc, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -189,7 +189,7 @@ export default function SeguimientoPage() {
 
   // Marca una acción del día: escribe una gestión normal (alimenta productividad,
   // bitácora y totales sin captura adicional).
-  const marcar = useCallback(async (p: Paciente, a: AccionSeguimiento, nota?: string) => {
+  const marcar = useCallback(async (p: Paciente, a: AccionSeguimiento) => {
     if (!profile) return;
     const nuevo: Record<string, unknown> = {
       expediente: p.expediente,
@@ -200,7 +200,6 @@ export default function SeguimientoPage() {
       tipo: a.tipo,
       resultadoVisita: a.resultadoVisita,
       modalidad: a.modalidad,
-      notas: nota?.trim() || undefined,
       fecha: hoyStr(),
       trabajadoraId: profile.uid,
       trabajadoraNombre: profile.nombre,
@@ -209,6 +208,16 @@ export default function SeguimientoPage() {
     const payload = Object.fromEntries(Object.entries(nuevo).filter(([, v]) => v !== undefined));
     await addDoc(collection(db, "gestiones_ts"), payload);
   }, [profile]);
+
+  // Agrega/edita la nota de MI última marca de hoy de esa acción (el flujo es
+  // marcar primero y anotar después; texto vacío borra la nota).
+  const guardarNota = useCallback(async (p: Paciente, a: AccionSeguimiento, texto: string) => {
+    const mia = miasHoyPorExp.get(p.expediente)?.get(a.key);
+    if (!mia?.id) return;
+    await updateDoc(doc(db, "gestiones_ts", mia.id), {
+      notas: texto.trim() || deleteField(),
+    });
+  }, [miasHoyPorExp]);
 
   // Deshace MI última marca de hoy de esa acción (equivocaciones al pasar lista).
   const deshacer = useCallback(async (p: Paciente, a: AccionSeguimiento) => {
@@ -330,12 +339,20 @@ export default function SeguimientoPage() {
               hoy={hoyPorExp.get(p.expediente)}
               mes={mesPorExp.get(p.expediente)}
               mias={miasHoyPorExp.get(p.expediente)}
-              onMarcar={async (a, nota) => {
+              onMarcar={async (a) => {
                 try {
-                  await marcar(p, a, nota);
+                  await marcar(p, a);
                   setToast({ tipo: "success", msg: `${a.chip} — ${nombrePac(p)}` });
                 } catch {
                   setToast({ tipo: "error", msg: "No se pudo registrar la marca" });
+                }
+              }}
+              onNota={async (a, texto) => {
+                try {
+                  await guardarNota(p, a, texto);
+                  setToast({ tipo: "success", msg: texto.trim() ? "Nota guardada" : "Nota eliminada" });
+                } catch {
+                  setToast({ tipo: "error", msg: "No se pudo guardar la nota" });
                 }
               }}
               onDeshacer={async (a) => {
@@ -387,7 +404,7 @@ export default function SeguimientoPage() {
 
 // ── Fila de paciente (pasar lista) ───────────────────────────────────────────
 function FilaSeguimiento({
-  paciente: p, rastreo, estadoRastreo, hoy, mes, mias, onMarcar, onDeshacer, onContactar,
+  paciente: p, rastreo, estadoRastreo, hoy, mes, mias, onMarcar, onDeshacer, onNota, onContactar,
 }: {
   paciente: Paciente;
   rastreo?: RastreoTS;
@@ -395,14 +412,17 @@ function FilaSeguimiento({
   hoy?: Map<string, number>;
   mes?: Map<string, number>;
   mias?: Map<string, GestionTS>;
-  onMarcar: (a: AccionSeguimiento, nota?: string) => Promise<void>;
+  onMarcar: (a: AccionSeguimiento) => Promise<void>;
   onDeshacer: (a: AccionSeguimiento) => Promise<void>;
+  onNota: (a: AccionSeguimiento, texto: string) => Promise<void>;
   onContactar: () => Promise<void>;
 }) {
   const bloqueado = !habilitaSeguimiento(estadoRastreo === "pendiente" ? undefined : estadoRastreo);
-  const [notaAbierta, setNotaAbierta] = useState(false);
-  const [nota, setNota] = useState("");
   const [ocupada, setOcupada] = useState<string | null>(null); // key de la acción en curso
+  // Editor de nota post-marca: key de la acción cuya nota se está escribiendo.
+  const [notaKey, setNotaKey] = useState<string | null>(null);
+  const [notaTexto, setNotaTexto] = useState("");
+  const [guardandoNota, setGuardandoNota] = useState(false);
 
   const familiar = rastreo?.familiarNombre || p.responsable?.nombre || "";
   const telefono = rastreo?.telefono || p.responsable?.telefono || p.telefono || "";
@@ -411,9 +431,7 @@ function FilaSeguimiento({
     if (ocupada) return;
     setOcupada(a.key);
     try {
-      await onMarcar(a, nota || undefined);
-      setNota("");
-      setNotaAbierta(false);
+      await onMarcar(a);
     } finally {
       setOcupada(null);
     }
@@ -421,8 +439,30 @@ function FilaSeguimiento({
   const quitar = async (a: AccionSeguimiento) => {
     if (ocupada) return;
     setOcupada(a.key);
-    try { await onDeshacer(a); } finally { setOcupada(null); }
+    try {
+      await onDeshacer(a);
+      if (notaKey === a.key) setNotaKey(null);
+    } finally {
+      setOcupada(null);
+    }
   };
+  const abrirNota = (a: AccionSeguimiento) => {
+    if (notaKey === a.key) { setNotaKey(null); return; }
+    setNotaTexto(mias?.get(a.key)?.notas ?? "");
+    setNotaKey(a.key);
+  };
+  const guardarNota = async () => {
+    const accion = ACCIONES_SEGUIMIENTO.find((a) => a.key === notaKey);
+    if (!accion) return;
+    setGuardandoNota(true);
+    try {
+      await onNota(accion, notaTexto);
+      setNotaKey(null);
+    } finally {
+      setGuardandoNota(false);
+    }
+  };
+  const accionNota = ACCIONES_SEGUIMIENTO.find((a) => a.key === notaKey);
 
   const totalMes = ACCIONES_SEGUIMIENTO
     .map((a) => ({ a, n: mes?.get(a.key) ?? 0 }))
@@ -480,7 +520,7 @@ function FilaSeguimiento({
               {ACCIONES_SEGUIMIENTO.map((a) => {
                 const Icono = ICONO_ACCION[a.key] ?? PhoneCall;
                 const nHoy = hoy?.get(a.key) ?? 0;
-                const miaHoy = !!mias?.get(a.key);
+                const mia = mias?.get(a.key);
                 const cargando = ocupada === a.key;
                 return (
                   <span key={a.key} className="inline-flex items-stretch">
@@ -489,7 +529,7 @@ function FilaSeguimiento({
                       disabled={!!ocupada}
                       title={nHoy > 0 ? `${a.chip} — ${nHoy} hoy (toca para agregar otra)` : `Registrar: ${a.chip}`}
                       className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 border transition-colors disabled:opacity-60 ${
-                        miaHoy ? "rounded-l-lg" : "rounded-lg"
+                        mia ? "rounded-l-lg" : "rounded-lg"
                       } ${
                         nHoy > 0
                           ? "bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
@@ -500,43 +540,66 @@ function FilaSeguimiento({
                       {a.chip}
                       {nHoy > 0 && <span className="font-bold tabular-nums">{nHoy}</span>}
                     </button>
-                    {miaHoy && (
-                      <button
-                        onClick={() => quitar(a)}
-                        disabled={!!ocupada}
-                        title="Deshacer mi última marca de hoy"
-                        className="inline-flex items-center px-1 rounded-r-lg border border-l-0 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-600/70 hover:text-rose-500 transition-colors disabled:opacity-60"
-                      >
-                        <X size={11} />
-                      </button>
+                    {mia && (
+                      <>
+                        <button
+                          onClick={() => abrirNota(a)}
+                          disabled={!!ocupada}
+                          title={mia.notas ? `Editar nota: ${mia.notas}` : "Agregar nota a mi marca de hoy"}
+                          className={`inline-flex items-center px-1.5 border border-l-0 border-emerald-300 dark:border-emerald-800 transition-colors disabled:opacity-60 ${
+                            mia.notas || notaKey === a.key
+                              ? "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400"
+                              : "bg-emerald-50 dark:bg-emerald-950 text-emerald-600/70 hover:text-amber-500"
+                          }`}
+                        >
+                          <StickyNote size={11} />
+                        </button>
+                        <button
+                          onClick={() => quitar(a)}
+                          disabled={!!ocupada}
+                          title="Deshacer mi última marca de hoy"
+                          className="inline-flex items-center px-1 rounded-r-lg border border-l-0 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-600/70 hover:text-rose-500 transition-colors disabled:opacity-60"
+                        >
+                          <X size={11} />
+                        </button>
+                      </>
                     )}
                   </span>
                 );
               })}
-              <button
-                onClick={() => setNotaAbierta((v) => !v)}
-                title="Agregar una nota a la próxima marca"
-                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg border transition-colors ${
-                  notaAbierta || nota
-                    ? "bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
-                    : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-amber-400"
-                }`}
-              >
-                <StickyNote size={12} /> Nota
-              </button>
             </div>
 
-            {/* Nota — se adjunta a la próxima acción que se marque */}
-            {notaAbierta && (
-              <div className="mt-2">
+            {/* Nota de MI marca de hoy (se abre desde el segmento 📝 del chip) */}
+            {notaKey && accionNota && (
+              <div className="mt-2 space-y-1.5">
+                <p className="text-[11px] text-slate-500">
+                  Nota para <span className="font-semibold text-slate-600 dark:text-slate-300">{accionNota.chip}</span> — mi marca de hoy
+                </p>
                 <textarea
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
+                  value={notaTexto}
+                  onChange={(e) => setNotaTexto(e.target.value)}
                   rows={2}
                   autoFocus
-                  placeholder="Escribe la nota y luego toca la acción a registrar — la nota se adjunta a esa marca…"
+                  placeholder="Detalle de la gestión… (dejar vacío borra la nota)"
                   className={inputCls + " resize-y text-xs"}
                 />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setNotaKey(null)}
+                    disabled={guardandoNota}
+                    className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarNota}
+                    disabled={guardandoNota}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {guardandoNota ? <Loader2 size={12} className="animate-spin" /> : <StickyNote size={12} />}
+                    Guardar nota
+                  </button>
+                </div>
               </div>
             )}
 

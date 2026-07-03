@@ -4,9 +4,9 @@
 // (demanda espontánea y referidos). Filosofía: todo lo posible se elige
 // con chips/selects — el texto libre es la excepción, no la regla.
 
-import { Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, Plus, Trash2 } from "lucide-react";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
-import type { DiagnosticoCIE } from "@/types";
+import type { DiagnosticoCIE, EstadoRegistroCenso } from "@/types";
 
 export const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm disabled:opacity-50";
@@ -23,6 +23,48 @@ export function Field({ label, required, children, className = "" }: {
       </label>
       {children}
     </div>
+  );
+}
+
+// ── Estado de digitación (derivado al guardar) ───────────────────────────────
+
+export function EstadoRegistroBadge({ estado, faltantes }: {
+  estado: EstadoRegistroCenso;
+  faltantes?: string[];
+}) {
+  if (estado === "cerrado") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 whitespace-nowrap">
+        <CheckCircle2 size={11} /> Terminado
+      </span>
+    );
+  }
+  return (
+    <span
+      title={faltantes?.length ? `Falta: ${faltantes.join(", ")}` : undefined}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900 whitespace-nowrap cursor-help"
+    >
+      <Clock size={11} /> Falta por cerrar
+    </span>
+  );
+}
+
+// Resumen en vivo para el pie del formulario: qué falta para cerrar.
+export function FaltantesHint({ faltantes }: { faltantes: string[] }) {
+  if (faltantes.length === 0) {
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+        <CheckCircle2 size={13} /> Registro completo — se guardará como <strong>Terminado</strong>.
+      </p>
+    );
+  }
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+      <Clock size={13} className="mt-0.5 shrink-0" />
+      <span>
+        Se guardará como <strong>Falta por cerrar</strong> — pendiente: {faltantes.join(", ")}.
+      </span>
+    </p>
   );
 }
 

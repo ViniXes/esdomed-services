@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, query, Timestamp, where,
+  addDoc, collection, deleteDoc, deleteField, doc, getDocs, onSnapshot, query, Timestamp, updateDoc, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,7 @@ import {
 import type { EstadoPaciente, GestionTS, Paciente } from "@/types";
 import {
   AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Link2, Loader2,
-  NotebookPen, Search, Trash2, User, X,
+  NotebookPen, Pencil, Search, Trash2, User, X,
 } from "lucide-react";
 
 // ── Estilos compartidos (acento ámbar, igual que el resto de vistas de TS) ──────
@@ -109,6 +109,9 @@ export default function GestionesPage() {
   });
   const [buscandoExp, setBuscandoExp] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  // Gestión en edición (cargada al formulario con el lápiz de la lista).
+  const [editando, setEditando] = useState<GestionTS | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   // Lista del día
   const [fechaLista, setFechaLista] = useState(hoyStr());
@@ -149,12 +152,16 @@ export default function GestionesPage() {
   // Autocompletar desde el padrón al escribir el expediente (debounce 400 ms).
   // Si calza en personas: rellena nombre + vincula. Busca su ingreso para servicio/estado.
   // Si no calza: deja el nombre editable (paciente ISBM / rastreo / fuera del padrón).
+  // En modo edición NO se autocompleta: se respetan los datos históricos de la gestión.
   useEffect(() => {
+    if (editando) return;
     const exp = form.expediente.trim();
-    if (!exp) { setBuscandoExp(false); return; }
+    if (!exp) return;
     let cancel = false;
-    setBuscandoExp(true);
     const id = window.setTimeout(async () => {
+      // El spinner se enciende al ejecutar la búsqueda (no durante el debounce):
+      // así el efecto no hace setState síncrono (regla react-hooks).
+      setBuscandoExp(true);
       try {
         const persona = await getPersona(exp);
         if (cancel) return;
@@ -188,11 +195,13 @@ export default function GestionesPage() {
           };
         });
       } finally {
-        if (!cancel) setBuscandoExp(false);
+        // Siempre se apaga: si hay una búsqueda más nueva, su propio timeout
+        // lo volverá a encender al ejecutarse.
+        setBuscandoExp(false);
       }
     }, 400);
     return () => { cancel = true; window.clearTimeout(id); };
-  }, [form.expediente]);
+  }, [form.expediente, editando]);
 
   const setExpediente = (v: string) =>
     setForm((f) => ({ ...f, expediente: v, vinculadoPadron: false }));
@@ -200,13 +209,38 @@ export default function GestionesPage() {
   const valido =
     form.expediente.trim() && form.pacienteNombre.trim() && form.tipo && form.fecha;
 
+  // Carga una gestión de la lista al formulario para editarla.
+  const editar = (g: GestionTS) => {
+    setBuscandoExp(false); // corta cualquier autocompletado en curso
+    setEditando(g);
+    setForm({
+      expediente: g.expediente ?? "",
+      pacienteNombre: g.pacienteNombre ?? "",
+      servicio: g.servicio ?? "",
+      estadoPaciente: g.estadoPaciente ?? "actual",
+      vinculadoPadron: !!g.vinculadoPadron,
+      tipo: g.tipo ?? "",
+      resultadoVisita: g.resultadoVisita ?? "realizada",
+      modalidad: g.modalidad ?? "presencial",
+      duracionMin: g.duracionMin ? String(g.duracionMin) : "",
+      notas: g.notas ?? "",
+      fecha: g.fecha,
+    });
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelarEdicion = () => {
+    setEditando(null);
+    setForm(formVacio(fechaLista));
+  };
+
   const registrar = async () => {
     if (!profile) return;
     if (!valido) { notify("error", "Completa expediente, paciente y tipo de gestión"); return; }
     setGuardando(true);
     try {
       const dur = parseInt(form.duracionMin, 10);
-      const nuevo: Omit<GestionTS, "id"> = {
+      const base = {
         expediente: form.expediente.trim(),
         pacienteNombre: form.pacienteNombre.trim(),
         servicio: form.servicio.trim() || undefined,
@@ -218,19 +252,37 @@ export default function GestionesPage() {
         duracionMin: Number.isFinite(dur) && dur > 0 ? dur : undefined,
         notas: form.notas.trim() || undefined,
         fecha: form.fecha,
-        trabajadoraId: profile.uid,
-        trabajadoraNombre: profile.nombre,
-        creadoEn: Timestamp.now() as unknown as Date,
       };
-      // Firestore no acepta `undefined`: limpiar las claves vacías.
-      const payload = Object.fromEntries(Object.entries(nuevo).filter(([, v]) => v !== undefined));
-      await addDoc(collection(db, "gestiones_ts"), payload);
-      notify("success", "Gestión registrada");
-      // Mantener la fecha (sesión de captura del mismo día); limpiar el resto.
-      setForm(formVacio(form.fecha));
-      expRef.current?.focus();
+
+      if (editando?.id) {
+        // Edición: no se toca trabajadora ni creadoEn (autoría original); los
+        // campos vaciados se BORRAN del doc (updateDoc omitido los dejaría).
+        const cambios = Object.fromEntries(
+          Object.entries(base).map(([k, v]) => [k, v === undefined ? deleteField() : v]),
+        );
+        await updateDoc(doc(db, "gestiones_ts", editando.id), cambios);
+        notify("success", "Gestión actualizada");
+        setEditando(null);
+        setForm(formVacio(form.fecha));
+      } else {
+        const nuevo = {
+          ...base,
+          trabajadoraId: profile.uid,
+          trabajadoraNombre: profile.nombre,
+          creadoEn: Timestamp.now(),
+        };
+        // Firestore no acepta `undefined`: limpiar las claves vacías.
+        const payload = Object.fromEntries(Object.entries(nuevo).filter(([, v]) => v !== undefined));
+        await addDoc(collection(db, "gestiones_ts"), payload);
+        notify("success", "Gestión registrada");
+        // Mantener la fecha (sesión de captura del mismo día); limpiar el resto.
+        setForm(formVacio(form.fecha));
+        expRef.current?.focus();
+      }
     } catch {
-      notify("error", "No se pudo registrar la gestión");
+      notify("error", editando
+        ? "No se pudo actualizar — solo puedes editar tus propias gestiones (o pídelo al administrador)."
+        : "No se pudo registrar la gestión");
     } finally {
       setGuardando(false);
     }
@@ -244,6 +296,8 @@ export default function GestionesPage() {
       await deleteDoc(doc(db, "gestiones_ts", g.id));
       notify("success", "Gestión eliminada");
       setAEliminar(null);
+      // Si se eliminó la gestión que estaba en edición, salir del modo edición.
+      if (editando?.id === g.id) cancelarEdicion();
     } catch {
       notify("error", "No se pudo eliminar (solo el administrador puede borrar gestiones de otros días).");
     } finally {
@@ -307,8 +361,30 @@ export default function GestionesPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,400px)_1fr] xl:grid-rows-1 gap-5 items-start xl:items-stretch xl:flex-1 xl:min-h-0">
         {/* ── Formulario de captura ── */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 xl:h-full xl:overflow-y-auto">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Nueva gestión</p>
+        <div
+          ref={formRef}
+          className={`bg-white dark:bg-slate-900 border rounded-2xl p-4 space-y-3.5 xl:h-full xl:overflow-y-auto ${
+            editando ? "border-blue-300 dark:border-blue-800 ring-1 ring-blue-400/30" : "border-slate-200 dark:border-slate-800"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+              {editando ? "Editar gestión" : "Nueva gestión"}
+            </p>
+            {editando && (
+              <button
+                onClick={cancelarEdicion}
+                className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+              >
+                <X size={12} /> Cancelar edición
+              </button>
+            )}
+          </div>
+          {editando && (
+            <p className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-lg px-2.5 py-1.5">
+              Editando la gestión de <strong>{editando.pacienteNombre}</strong> registrada por {editando.trabajadoraNombre}.
+            </p>
+          )}
 
           {/* Expediente + autocompletar */}
           <div>
@@ -471,7 +547,7 @@ export default function GestionesPage() {
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
           >
             {guardando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-            Registrar gestión
+            {editando ? "Guardar cambios" : "Registrar gestión"}
           </button>
         </div>
 
@@ -599,13 +675,22 @@ export default function GestionesPage() {
                       <span className="inline-flex items-center gap-1 text-xs text-slate-500 min-w-0">
                         <User size={12} className="text-slate-400 shrink-0" /> <span className="truncate">{g.trabajadoraNombre}</span>
                       </span>
-                      <button
-                        onClick={() => setAEliminar(g)}
-                        className="shrink-0 text-slate-400 hover:text-rose-500 transition-colors"
-                        aria-label="Eliminar gestión"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <span className="flex items-center gap-2.5 shrink-0">
+                        <button
+                          onClick={() => editar(g)}
+                          className="text-slate-400 hover:text-blue-600 transition-colors"
+                          aria-label="Editar gestión"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => setAEliminar(g)}
+                          className="text-slate-400 hover:text-rose-500 transition-colors"
+                          aria-label="Eliminar gestión"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -655,7 +740,14 @@ export default function GestionesPage() {
                             <span className="inline-flex items-center gap-1"><User size={12} className="text-slate-400" /> {g.trabajadoraNombre}</span>
                           </td>
                           <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{fmtHora(g.creadoEn)}</td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => editar(g)}
+                              className="text-slate-400 hover:text-blue-600 transition-colors mr-2.5"
+                              aria-label="Editar gestión"
+                            >
+                              <Pencil size={15} />
+                            </button>
                             <button
                               onClick={() => setAEliminar(g)}
                               className="text-slate-400 hover:text-rose-500 transition-colors"

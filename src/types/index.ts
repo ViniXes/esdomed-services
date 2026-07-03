@@ -1297,8 +1297,18 @@ export type DestinoEmergencia =
   | "referencia"
   | "fuga";
 
+// Estado de digitación de un registro de censo. Es DERIVADO al guardar:
+// "abierto" mientras falte algún campo obligatorio (el médico registra al
+// paciente al entrar y completa durante/al final del turno), "cerrado"
+// automáticamente cuando todo está digitado.
+export type EstadoRegistroCenso = "abierto" | "cerrado";
+
 export interface CensoDemandaEspontanea {
   id?: string;
+
+  // ── Digitación ──
+  estadoRegistro: EstadoRegistroCenso;
+  camposFaltantes?: string[];     // qué falta para cerrar (snapshot al guardar)
 
   // ── Atención ──
   fecha: Date;                    // estampa de la atención (auto al crear)
@@ -1308,10 +1318,10 @@ export interface CensoDemandaEspontanea {
   expediente: string;
   pacienteNombre: string;
   edad?: number;
-  genero: Genero;
+  genero: Genero | null;          // null mientras el registro está abierto
 
   // ── Evaluación (criterio del médico) ──
-  triage: TriageEmergencia;
+  triage: TriageEmergencia | null;
   condicion: "vivo" | "fallecido";
   diagnosticos: DiagnosticoCIE[]; // impresión diagnóstica, restringida a CIE-10
   especialidad: string;           // catálogo ESPECIALIDADES_EMERGENCIA
@@ -1321,7 +1331,7 @@ export interface CensoDemandaEspontanea {
   lugarReferencia?: string;       // solo si traeReferencia
 
   // ── Destino ──
-  destino: DestinoEmergencia;
+  destino: DestinoEmergencia | null;
   servicioIngresar?: string;      // solo si destino == "ingreso"
   centroRefiere?: string;         // solo si destino == "referencia"
 
@@ -1362,6 +1372,10 @@ export type ClasificacionSisReferido =
 export interface CensoReferido {
   id?: string;
 
+  // ── Digitación ──
+  estadoRegistro: EstadoRegistroCenso;
+  camposFaltantes?: string[];     // qué falta para cerrar (snapshot al guardar)
+
   // ── Atención ──
   fecha: Date;
   turno: TurnoEmergencia;
@@ -1370,15 +1384,15 @@ export interface CensoReferido {
   expediente: string;
   pacienteNombre: string;
   edad?: number;
-  genero: Genero;
+  genero: Genero | null;          // null mientras el registro está abierto
 
   // ── Referencia ──
   hospitalReferencia: string;     // catálogo HOSPITALES_REFERENCIA
   referenciaSis: boolean;         // ¿trae referencia registrada en SIS?
-  clasificacionSis: ClasificacionSisReferido; // derivada (snapshot)
+  clasificacionSis: ClasificacionSisReferido | null; // derivada (null sin hospital)
 
   // ── Evaluación ──
-  condicion: "estable" | "inestable";
+  condicion: "estable" | "inestable" | null;
   dispositivoO2: string;          // catálogo DISPOSITIVOS_O2
   diagnosticos: DiagnosticoCIE[];
   discrepanciaDiagnostico: "si" | "no" | "no_aplica";

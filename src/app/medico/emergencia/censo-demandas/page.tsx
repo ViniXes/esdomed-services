@@ -21,7 +21,8 @@ import {
 } from "@/lib/emergencia/censos";
 import { buscarIdentidadPaciente } from "@/lib/emergencia/prefillCenso";
 import {
-  ChipMulti, ChipSelect, DiagnosticosEditor, Field, SelectCatalogo, SiNoChips, StaffInput, inputCls,
+  ChipMulti, ChipSelect, DiagnosticosEditor, EstadoRegistroBadge, FaltantesHint, Field,
+  SelectCatalogo, SiNoChips, StaffInput, inputCls,
 } from "@/components/emergencia/censoUi";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -63,6 +64,25 @@ function formVacio(medicosGenerales: string) {
   };
 }
 type FormState = ReturnType<typeof formVacio>;
+
+// Qué falta para que el registro quede "Terminado". Guardar con faltantes es
+// válido: el registro queda "Falta por cerrar" y se completa después.
+function camposFaltantes(f: FormState): string[] {
+  const dx = f.diagnosticos.filter((d) => d.codigo.trim() || d.descripcion.trim());
+  const faltan: string[] = [];
+  if (!f.nombre.trim()) faltan.push("nombre");
+  if (!f.genero) faltan.push("sexo");
+  if (!f.triage) faltan.push("triage");
+  if (dx.length === 0) faltan.push("diagnóstico");
+  if (!f.especialidad) faltan.push("especialidad");
+  if (!f.destino) faltan.push("destino");
+  if (f.destino === "ingreso" && !f.servicioIngresar) faltan.push("servicio a ingresar");
+  if (f.destino === "referencia" && !f.centroRefiere.trim()) faltan.push("centro al que refiere");
+  if (f.traeReferencia && !f.lugarReferencia) faltan.push("lugar de referencia");
+  if (f.empleadoHes && !f.dependencia) faltan.push("dependencia");
+  if (!f.staffEvalua.trim()) faltan.push("staff que evalúa");
+  return faltan;
+}
 
 export default function CensoDemandasPage() {
   const { profile } = useAuth();
@@ -149,7 +169,7 @@ export default function CensoDemandasPage() {
       turno: r.turno,
       expediente: r.expediente,
       nombre: r.pacienteNombre,
-      edad: r.edad !== undefined ? String(r.edad) : "",
+      edad: r.edad !== undefined && r.edad !== null ? String(r.edad) : "",
       genero: r.genero,
       triage: r.triage,
       condicion: r.condicion,
@@ -179,18 +199,10 @@ export default function CensoDemandasPage() {
   const guardar = async () => {
     if (!profile) return;
     const dx = form.diagnosticos.filter((d) => d.codigo.trim() || d.descripcion.trim());
+    // Lo único bloqueante es el expediente (identifica el registro); lo demás
+    // puede quedar pendiente y el registro se guarda como "Falta por cerrar".
     if (!form.expediente.trim()) return setError("El expediente es obligatorio.");
-    if (!form.nombre.trim()) return setError("El nombre del paciente es obligatorio.");
-    if (!form.genero) return setError("Selecciona el sexo del paciente.");
-    if (!form.triage) return setError("Selecciona el triage.");
-    if (dx.length === 0) return setError("Registra al menos un diagnóstico (CIE-10).");
-    if (!form.especialidad) return setError("Selecciona la especialidad que evalúa.");
-    if (!form.destino) return setError("Selecciona el destino del paciente.");
-    if (form.destino === "ingreso" && !form.servicioIngresar) return setError("Indica el servicio a ingresar.");
-    if (form.destino === "referencia" && !form.centroRefiere.trim()) return setError("Indica el centro al que se refiere.");
-    if (form.traeReferencia && !form.lugarReferencia) return setError("Indica el lugar de referencia.");
-    if (form.empleadoHes && !form.dependencia) return setError("Indica la dependencia del empleado.");
-    if (!form.staffEvalua.trim()) return setError("El staff que evalúa es obligatorio.");
+    const faltan = camposFaltantes(form);
 
     setError(null);
     setGuardando(true);
@@ -211,6 +223,8 @@ export default function CensoDemandasPage() {
       });
 
       const datos: Record<string, unknown> = {
+        estadoRegistro: faltan.length ? "abierto" : "cerrado",
+        camposFaltantes: faltan,
         fecha: Timestamp.fromDate(fecha),
         turno: form.turno,
         expediente: form.expediente.trim(),
@@ -287,7 +301,7 @@ export default function CensoDemandasPage() {
           "# DE REGISTRO": r.expediente,
           "EDAD": r.edad ?? "",
           "TRIAGE": TRIAGE_LABEL[r.triage as TriageEmergencia] ?? "",
-          "SEXO: M / F": r.genero === "masculino" ? "M" : "F",
+          "SEXO: M / F": r.genero === "masculino" ? "M" : r.genero === "femenino" ? "F" : "",
           "CONDICION DE PACIENTE": r.condicion === "vivo" ? "Vivo" : "Fallecido",
           "IMPRESION DIAGNOSTICA": diagnosticosACelda(r.diagnosticos ?? []),
           "ESPECIALIDAD": (r.especialidad ?? "").toUpperCase(),
@@ -539,21 +553,24 @@ export default function CensoDemandasPage() {
             </Field>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
-            <button
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={guardar}
-              disabled={guardando}
-              className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
-            >
-              {guardando ? <Loader2 size={15} className="animate-spin" /> : null}
-              {guardando ? "Guardando..." : editandoId ? "Guardar cambios" : "Registrar atención"}
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+            <FaltantesHint faltantes={camposFaltantes(form)} />
+            <div className="flex items-center gap-3 ml-auto">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardar}
+                disabled={guardando}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {guardando ? <Loader2 size={15} className="animate-spin" /> : null}
+                {guardando ? "Guardando..." : editandoId ? "Guardar cambios" : "Registrar atención"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -597,14 +614,21 @@ export default function CensoDemandasPage() {
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-4 pt-4 pb-2 font-heading">
-            {registros.length} atención{registros.length === 1 ? "" : "es"} el {dia.split("-").reverse().join("/")}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 px-4 pt-4 pb-2">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
+              {registros.length} atención{registros.length === 1 ? "" : "es"} el {dia.split("-").reverse().join("/")}
+            </p>
+            {registros.some((r) => r.estadoRegistro !== "cerrado") && (
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
+                {registros.filter((r) => r.estadoRegistro !== "cerrado").length} por cerrar
+              </span>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-y border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                  {["Hora / Turno", "Expediente", "Paciente", "Triage", "Diagnóstico", "Destino", "Staff", ""].map((h) => (
+                  {["Hora / Turno", "Expediente", "Paciente", "Triage", "Diagnóstico", "Destino", "Estado", ""].map((h) => (
                     <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -620,22 +644,29 @@ export default function CensoDemandasPage() {
                       </td>
                       <td className="px-4 py-2.5 font-mono text-slate-700 dark:text-slate-300">{r.expediente}</td>
                       <td className="px-4 py-2.5">
-                        <p className="font-medium text-slate-800 dark:text-slate-200">{r.pacienteNombre}</p>
-                        <p className="text-xs text-slate-500">{r.edad !== null && r.edad !== undefined ? `${r.edad} años · ` : ""}{r.genero === "masculino" ? "M" : "F"}</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">{r.pacienteNombre || "—"}</p>
+                        <p className="text-xs text-slate-500">
+                          {r.edad !== null && r.edad !== undefined ? `${r.edad} años · ` : ""}
+                          {r.genero === "masculino" ? "M" : r.genero === "femenino" ? "F" : "—"}
+                        </p>
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold border ${t?.chip ?? ""}`}>
-                          {t?.label}
-                        </span>
+                        {t ? (
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold border ${t.chip}`}>
+                            {t.label}
+                          </span>
+                        ) : <span className="text-xs text-slate-400">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400 max-w-[220px] truncate">
-                        {(r.diagnosticos ?? []).map((d) => d.descripcion).join(" // ")}
+                        {(r.diagnosticos ?? []).map((d) => d.descripcion).join(" // ") || "—"}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {DESTINO_LABEL[r.destino]}
+                        {r.destino ? DESTINO_LABEL[r.destino] : "—"}
                         {r.consulta48h && <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-medium">&lt; 48 h</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{r.staffEvalua}</td>
+                      <td className="px-4 py-2.5">
+                        <EstadoRegistroBadge estado={r.estadoRegistro ?? "cerrado"} faltantes={r.camposFaltantes} />
+                      </td>
                       <td className="px-4 py-2.5 text-right">
                         <button
                           onClick={() => editar(r)}
