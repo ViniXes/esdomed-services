@@ -122,7 +122,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
       : []),
     ...(verCuidadosCriticos
-      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA }]
+      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA, exact: true }]
       : []),
     ...(verCuidadosCriticos
       ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, group: G_MEDICINA_CRITICA }]
