@@ -8,7 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LogIn, Plus, X, CheckCircle2, AlertCircle, Search,
+  LogIn, Plus, X, CheckCircle2, AlertCircle, Search, Ban,
   Check, MessageSquareWarning, Pencil, ChevronLeft, ChevronRight, Download, Undo2,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
@@ -53,6 +53,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   recibida:   "Acusada de recibido",
   duplicada:  "Duplicada",
   revertida:  "Alta revertida",
+  rechazada:  "Rechazada",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -64,6 +65,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   recibida:   "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada:  "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   revertida:  "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
+  rechazada:  "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
 };
 
 const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
@@ -75,11 +77,12 @@ const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
   recibida:   "bg-sky-500",
   duplicada:  "bg-slate-400",
   revertida:  "bg-orange-500",
+  rechazada:  "bg-red-500",
 };
 
 // Orden de los contadores por estado (también funcionan como filtro rápido).
 const COUNTER_ESTADOS: EstadoNotificacionAlta[] = [
-  "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada", "revertida",
+  "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada", "revertida", "rechazada",
 ];
 
 const PAGE_SIZE = 12;
@@ -396,6 +399,61 @@ function RevertirModal({
   );
 }
 
+// ── Rechazar Modal ─────────────────────────────────────────────────────────────
+
+function RechazarModal({
+  notificacion, onConfirm, onCancel, loading,
+}: {
+  notificacion: NotificacionAltaVivo;
+  onConfirm: (nota: string) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [nota, setNota] = useState("");
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 flex items-center justify-center shrink-0">
+            <Ban size={18} className="text-red-600 dark:text-red-300" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-900 dark:text-slate-100">Rechazar notificación</p>
+            <p className="text-sm text-slate-500 mt-1">
+              La notificación de {notificacion.pacienteNombre} quedará cerrada como <strong>Rechazada</strong> (no procede el alta). No cambia el estado del paciente. El equipo que notificó verá tu nota; si el alta sí corresponde, deberán enviar una notificación nueva.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1.5">
+            Motivo del rechazo <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            rows={3}
+            autoFocus
+            className={`${inputCls} resize-none focus:ring-red-500`}
+            placeholder="Ej. El paciente no está en proceso de alta; la notificación se envió por error..."
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={loading}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={() => onConfirm(nota)} disabled={loading || !nota.trim()}
+            className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-colors disabled:opacity-50">
+            {loading ? "Procesando..." : "Rechazar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 function ObservacionModal({
@@ -685,6 +743,9 @@ export function AltasVivosView() {
   const [revirtiendoId, setRevirtiendoId] = useState<string | null>(null);
   const [revirtiendoLoading, setRevirtiendoLoading] = useState(false);
 
+  const [rechazandoId, setRechazandoId] = useState<string | null>(null);
+  const [rechazandoLoading, setRechazandoLoading] = useState(false);
+
   const [observandoId, setObservandoId] = useState<string | null>(null);
   const [observandoLoading, setObservandoLoading] = useState(false);
   const [quitandoObservacionId, setQuitandoObservacionId] = useState<string | null>(null);
@@ -754,6 +815,8 @@ export function AltasVivosView() {
         "Revertida por": n.revertidoPorNombre ?? "",
         "Fecha de reversión": n.revertidoEn ? formatFecha(n.revertidoEn) : "",
         "Nota de reversión": n.revertidoNota ?? "",
+        "Rechazada por": n.rechazadoPorNombre ?? "",
+        "Motivo de rechazo": n.rechazoNota ?? "",
         Observación: n.observacionEsdomedMotivo ? OBSERVACION_LABEL[n.observacionEsdomedMotivo] : "",
         Notas: n.notas ?? "",
       }));
@@ -806,6 +869,26 @@ export function AltasVivosView() {
     }
   };
 
+  const rechazarNotificacion = async (nota: string) => {
+    if (!rechazandoId || !user || !profile) return;
+    setRechazandoLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${rechazandoId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "rechazar", nota }),
+      });
+      if (!res.ok) throw new Error("No se pudo rechazar la notificacion.");
+    } finally {
+      setRechazandoLoading(false);
+      setRechazandoId(null);
+    }
+  };
+
   const observarNotificacion = async (motivo: MotivoObservacionAlta, detalle: string) => {
     if (!observandoId || !user || !profile) return;
     setObservandoLoading(true);
@@ -848,6 +931,7 @@ export function AltasVivosView() {
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
   const observandoNot = observandoId ? notificaciones.find(n => n.id === observandoId) : null;
   const revirtiendoNot = revirtiendoId ? notificaciones.find(n => n.id === revirtiendoId) : null;
+  const rechazandoNot = rechazandoId ? notificaciones.find(n => n.id === rechazandoId) : null;
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -936,7 +1020,7 @@ export function AltasVivosView() {
 
         {pageItems.map(n => {
           const requiereSoloAcuse = esSoloAcuseRecibido(n.tipoAlta);
-          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida" || n.estado === "duplicada" || n.estado === "revertida";
+          const isLocked = n.estado === "procesada" || n.estado === "recibida" || n.estado === "deposito" || n.estado === "suspendida" || n.estado === "duplicada" || n.estado === "revertida" || n.estado === "rechazada";
           const mostrarNombresEsdomed = isEsdomed;
           const modificadoPorNombre = isTS && fueModificadaPorEsdomed(n) ? "ESDOMED" : n.modificadoPorNombre;
           const puedeRectificarTS =
@@ -1014,6 +1098,17 @@ export function AltasVivosView() {
                     )}
                   </>
                 )}
+                {n.estado === "rechazada" && (
+                  <>
+                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      Rechazada{n.rechazadoPorNombre ? ` por ${nombreEsdomedVisible(mostrarNombresEsdomed, n.rechazadoPorNombre)}` : ""}
+                      {n.rechazadoEn ? ` · ${formatFecha(n.rechazadoEn)}` : ""}
+                    </p>
+                    {n.rechazoNota && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 italic">Motivo del rechazo: {n.rechazoNota}</p>
+                    )}
+                  </>
+                )}
                 {n.observacionEsdomedMotivo && (
                   <details className="group mt-2 rounded-lg border border-rose-200/70 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 px-3 py-2 text-slate-900 dark:text-slate-100">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold">
@@ -1070,6 +1165,13 @@ export function AltasVivosView() {
                           {quitandoObservacionId === n.id ? "Quitando..." : "Quitar observacion"}
                         </button>
                       )}
+                      <button
+                        onClick={() => setRechazandoId(n.id!)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-800 rounded-lg transition-colors"
+                      >
+                        <Ban size={13} />
+                        Rechazar
+                      </button>
                     </>
                   )}
 
@@ -1119,6 +1221,14 @@ export function AltasVivosView() {
                   >
                     <MessageSquareWarning size={13} />
                     Dejar en espera con observación
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRechazandoId(n.id!)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/60 border border-red-200 dark:border-red-800 rounded-lg transition-colors"
+                  >
+                    <Ban size={13} />
+                    Rechazar
                   </button>
                 </div>
               )}
@@ -1194,6 +1304,15 @@ export function AltasVivosView() {
           onConfirm={revertirNotificacion}
           onCancel={() => setRevirtiendoId(null)}
           loading={revirtiendoLoading}
+        />
+      )}
+
+      {rechazandoId && rechazandoNot && (
+        <RechazarModal
+          notificacion={rechazandoNot}
+          onConfirm={rechazarNotificacion}
+          onCancel={() => setRechazandoId(null)}
+          loading={rechazandoLoading}
         />
       )}
 

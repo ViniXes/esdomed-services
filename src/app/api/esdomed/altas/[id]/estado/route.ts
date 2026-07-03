@@ -134,6 +134,7 @@ async function reactivarPacienteDelAlta(
 type Body =
   | { action: "procesar" }
   | { action: "revertir"; nota?: string }
+  | { action: "rechazar"; nota: string }
   | { action: "observar"; motivo: MotivoObservacionAlta; detalle: string }
   | { action: "quitar_observacion" };
 
@@ -202,6 +203,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // (observar) mientras se resuelve lo que motivó la reversión.
   if (actual.estado !== "pendiente" && actual.estado !== "observada" && actual.estado !== "revertida") {
     return NextResponse.json({ error: "La notificacion ya esta cerrada" }, { status: 409 });
+  }
+
+  // Rechazar: cierre terminal — la notificación no procede (error de enfermería,
+  // paciente que no corresponde, etc.). No toca al paciente: en estos estados
+  // nunca se desactivó (y si venía de revertida, ya fue reactivado). La nota
+  // del porqué es obligatoria y queda visible para quien notificó.
+  if (body.action === "rechazar") {
+    const nota = body.nota?.trim();
+    if (!nota) {
+      return NextResponse.json({ error: "La nota del rechazo es obligatoria" }, { status: 400 });
+    }
+    await ref.update({
+      estado: "rechazada",
+      rechazadoPorId: caller.uid,
+      rechazadoPorNombre: caller.nombre,
+      rechazadoEn: FieldValue.serverTimestamp(),
+      rechazoNota: nota,
+      // Es una intervención de ESDOMED sobre la notificación, como observar.
+      modificadoPorId: caller.uid,
+      modificadoPorNombre: caller.nombre,
+      modificadoPorRol: caller.role,
+      modificadoEn: FieldValue.serverTimestamp(),
+    });
+    return NextResponse.json({ ok: true });
   }
 
   if (body.action === "procesar") {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getPersona } from "@/lib/pacientes/persona";
 import {
@@ -9,8 +9,8 @@ import {
   RESULTADO_VISITA_COLOR, RESULTADO_VISITA_LABEL,
   type EstadoPacienteGestion,
 } from "@/lib/trabajosocial/catalogos";
-import type { GestionTS, Persona } from "@/types";
-import { FileClock, Loader2, Search, User } from "lucide-react";
+import type { GestionTS, IntentoContactoTS, Persona } from "@/types";
+import { FileClock, History, Loader2, Search, User } from "lucide-react";
 import { GestionesTabs } from "../_components/GestionesTabs";
 
 const inputCls =
@@ -30,6 +30,12 @@ function fmtFechaStr(fecha: string): string {
   return dt.toLocaleDateString("es-HN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
 }
 
+// Entrada unificada de la línea de tiempo: gestiones + intentos de contacto
+// del rastreo (heredados de rastreos_ts.intentosContacto).
+type ItemBitacora =
+  | { kind: "gestion"; fecha: string; orden: number; g: GestionTS }
+  | { kind: "intento"; fecha: string; orden: number; it: IntentoContactoTS };
+
 const ESTADO_COLOR: Record<EstadoPacienteGestion, string> = {
   actual:    "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-900",
   alta:      "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900",
@@ -42,20 +48,37 @@ export default function BitacoraPage() {
   const [buscado, setBuscado] = useState("");        // expediente efectivamente consultado
   const [persona, setPersona] = useState<Persona | null>(null);
   const [gestiones, setGestiones] = useState<GestionTS[]>([]);
+  const [intentos, setIntentos] = useState<IntentoContactoTS[]>([]);
   const [loading, setLoading] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
+
+  // Al escribir: resetea o enciende el spinner AQUÍ (handler, no en el efecto —
+  // regla react-hooks); el efecto de abajo solo ejecuta la búsqueda con debounce.
+  const onExpediente = (v: string) => {
+    setExpediente(v);
+    if (!v.trim()) {
+      setBuscado("");
+      setPersona(null);
+      setGestiones([]);
+      setIntentos([]);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  };
 
   // Buscar al escribir el expediente (debounce 450 ms).
   useEffect(() => {
     const exp = expediente.trim();
-    if (!exp) { setBuscado(""); setPersona(null); setGestiones([]); return; }
+    if (!exp) return;
     let cancel = false;
-    setLoading(true);
     const id = window.setTimeout(async () => {
       try {
-        const [p, snap] = await Promise.all([
+        const [p, snap, rastreoSnap] = await Promise.all([
           getPersona(exp).catch(() => null),
           getDocs(query(collection(db, "gestiones_ts"), where("expediente", "==", exp))),
+          // Intentos de contacto del rastreo — heredados a la bitácora.
+          getDoc(doc(db, "rastreos_ts", exp)).catch(() => null),
         ]);
         if (cancel) return;
         setPermissionError(false);
@@ -66,11 +89,13 @@ export default function BitacoraPage() {
           (toDate(b.creadoEn)?.getTime() ?? 0) - (toDate(a.creadoEn)?.getTime() ?? 0),
         );
         setGestiones(docs);
+        setIntentos((rastreoSnap?.exists() ? rastreoSnap.data().intentosContacto ?? [] : []) as IntentoContactoTS[]);
         setBuscado(exp);
       } catch (err) {
         if (!cancel) {
           if ((err as { code?: string }).code === "permission-denied") setPermissionError(true);
           setGestiones([]);
+          setIntentos([]);
           setPersona(null);
           setBuscado(exp);
         }
@@ -81,16 +106,26 @@ export default function BitacoraPage() {
     return () => { cancel = true; window.clearTimeout(id); };
   }, [expediente]);
 
-  // Agrupar por fecha (ya vienen ordenadas desc por fecha + hora).
+  // Línea de tiempo unificada: gestiones + intentos de contacto del rastreo,
+  // ordenada desc por fecha + hora y agrupada por fecha.
   const porFecha = useMemo(() => {
-    const grupos: { fecha: string; items: GestionTS[] }[] = [];
-    for (const g of gestiones) {
+    const items: ItemBitacora[] = [
+      ...gestiones.map((g) => ({
+        kind: "gestion" as const, fecha: g.fecha, orden: toDate(g.creadoEn)?.getTime() ?? 0, g,
+      })),
+      ...intentos.map((it) => ({
+        kind: "intento" as const, fecha: it.fecha, orden: toDate(it.creadoEn)?.getTime() ?? 0, it,
+      })),
+    ].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.orden - a.orden);
+
+    const grupos: { fecha: string; items: ItemBitacora[] }[] = [];
+    for (const item of items) {
       const ult = grupos[grupos.length - 1];
-      if (ult && ult.fecha === g.fecha) ult.items.push(g);
-      else grupos.push({ fecha: g.fecha, items: [g] });
+      if (ult && ult.fecha === item.fecha) ult.items.push(item);
+      else grupos.push({ fecha: item.fecha, items: [item] });
     }
     return grupos;
-  }, [gestiones]);
+  }, [gestiones, intentos]);
 
   // Totales por mes × tipo (los "TOTAL MENSUAL DE…" por paciente de los libros
   // de seguimiento del Excel, ahora derivados en vez de contados a mano).
@@ -142,7 +177,7 @@ export default function BitacoraPage() {
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           value={expediente}
-          onChange={(e) => setExpediente(e.target.value)}
+          onChange={(e) => onExpediente(e.target.value)}
           placeholder="Número de expediente (ej. 1-26)"
           className={inputCls + " pl-9 pr-9 font-mono"}
           autoFocus
@@ -174,15 +209,21 @@ export default function BitacoraPage() {
               <div className="text-right">
                 <p className="text-2xl font-bold font-heading text-blue-600 dark:text-blue-400">{gestiones.length}</p>
                 <p className="text-xs text-slate-500">gestión(es)</p>
+                {intentos.length > 0 && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                    + {intentos.length} intento{intentos.length === 1 ? "" : "s"} de contacto
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
-          {gestiones.length === 0 ? (
+          {gestiones.length === 0 && intentos.length === 0 ? (
             <p className="text-sm text-slate-400 py-10 text-center">Este expediente no tiene gestiones registradas.</p>
           ) : (
             <>
             {/* Totales por mes (los "TOTAL MENSUAL" de los libros de seguimiento) */}
+            {gestiones.length > 0 && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2.5">Totales por mes</p>
               <div className="space-y-2">
@@ -203,38 +244,56 @@ export default function BitacoraPage() {
                 })}
               </div>
             </div>
+            )}
             <div className="space-y-6">
               {porFecha.map(({ fecha, items }) => (
                 <div key={fecha}>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2.5 capitalize">{fmtFechaStr(fecha)}</p>
                   <div className="space-y-2 border-l-2 border-slate-200 dark:border-slate-800 pl-4 ml-1">
-                    {items.map((g) => (
-                      <div key={g.id} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+                    {items.map((item, idx) => item.kind === "intento" ? (
+                      /* Intento de contacto heredado del rastreo */
+                      <div key={`int-${idx}`} className="relative bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/50 rounded-xl p-3">
+                        <span className="absolute -left-[21px] top-4 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-950" />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-amber-800 dark:text-amber-300 inline-flex items-center gap-1.5">
+                            <History size={13} /> Intento de contacto
+                          </p>
+                          <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-md">
+                            Rastreo
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 inline-flex items-center gap-1">
+                          <User size={11} className="text-slate-400" /> {item.it.trabajadoraNombre}
+                        </p>
+                        {item.it.nota && <p className="text-sm text-slate-600 dark:text-slate-400 mt-1.5 break-words whitespace-pre-wrap">{item.it.nota}</p>}
+                      </div>
+                    ) : (
+                      <div key={item.g.id} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
                         <span className="absolute -left-[21px] top-4 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-950" />
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(g.tipo)}</p>
-                              {g.resultadoVisita && (
-                                <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${RESULTADO_VISITA_COLOR[g.resultadoVisita]}`}>
-                                  {RESULTADO_VISITA_LABEL[g.resultadoVisita]}
+                              <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{labelTipoGestion(item.g.tipo)}</p>
+                              {item.g.resultadoVisita && (
+                                <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${RESULTADO_VISITA_COLOR[item.g.resultadoVisita]}`}>
+                                  {RESULTADO_VISITA_LABEL[item.g.resultadoVisita]}
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex items-center gap-1"><User size={11} className="text-slate-400" /> {g.trabajadoraNombre}</span>
+                              <span className="inline-flex items-center gap-1"><User size={11} className="text-slate-400" /> {item.g.trabajadoraNombre}</span>
                               <span className="text-slate-300 dark:text-slate-600">·</span>
-                              <span>{fmtHora(g.creadoEn)}</span>
+                              <span>{fmtHora(item.g.creadoEn)}</span>
                               <span className="text-slate-300 dark:text-slate-600">·</span>
-                              <span>{g.modalidad ? MODALIDAD_GESTION_LABEL[g.modalidad] : "Presencial"}{g.duracionMin ? ` · ${g.duracionMin} min` : ""}</span>
-                              {g.servicio && <><span className="text-slate-300 dark:text-slate-600">·</span><span>{g.servicio}</span></>}
+                              <span>{item.g.modalidad ? MODALIDAD_GESTION_LABEL[item.g.modalidad] : "Presencial"}{item.g.duracionMin ? ` · ${item.g.duracionMin} min` : ""}</span>
+                              {item.g.servicio && <><span className="text-slate-300 dark:text-slate-600">·</span><span>{item.g.servicio}</span></>}
                             </p>
                           </div>
-                          <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-1 rounded-lg border ${ESTADO_COLOR[g.estadoPaciente]}`}>
-                            {ESTADO_PACIENTE_GESTION_LABEL[g.estadoPaciente]}
+                          <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-1 rounded-lg border ${ESTADO_COLOR[item.g.estadoPaciente]}`}>
+                            {ESTADO_PACIENTE_GESTION_LABEL[item.g.estadoPaciente]}
                           </span>
                         </div>
-                        {g.notas && <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 break-words whitespace-pre-wrap">{g.notas}</p>}
+                        {item.g.notas && <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 break-words whitespace-pre-wrap">{item.g.notas}</p>}
                       </div>
                     ))}
                   </div>
