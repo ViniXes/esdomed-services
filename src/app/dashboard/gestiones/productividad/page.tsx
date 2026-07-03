@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -8,7 +8,7 @@ import {
   TIPOS_GESTION_TS, type ModalidadGestion,
 } from "@/lib/trabajosocial/catalogos";
 import type { GestionTS } from "@/types";
-import { BarChart3, Download } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { GestionesTabs } from "../_components/GestionesTabs";
 
 const selectCls =
@@ -34,6 +34,8 @@ export default function ProductividadPage() {
   const [gestiones, setGestiones] = useState<GestionTS[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState(false);
+  // Trabajadoras con su desglose por tipo desplegado en la matriz.
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
 
   const { ini, fin, dias } = useMemo(() => rangoMes(mes), [mes]);
 
@@ -75,6 +77,27 @@ export default function ProductividadPage() {
     const trabajadoras = [...conteo.keys()].sort((a, b) => a.localeCompare(b));
     return { trabajadoras, conteo, totalPorTrabajadora, totalPorDia, totalMes };
   }, [gestiones]);
+
+  // Desglose trabajadora → tipo → día (sub-filas expandibles de la matriz).
+  const porTrabajadoraTipoDia = useMemo(() => {
+    const m = new Map<string, Map<string, Map<number, number>>>();
+    for (const g of gestiones) {
+      const dia = Number(g.fecha.split("-")[2]);
+      if (!m.has(g.trabajadoraNombre)) m.set(g.trabajadoraNombre, new Map());
+      const tipos = m.get(g.trabajadoraNombre)!;
+      if (!tipos.has(g.tipo)) tipos.set(g.tipo, new Map());
+      const fila = tipos.get(g.tipo)!;
+      fila.set(dia, (fila.get(dia) ?? 0) + 1);
+    }
+    return m;
+  }, [gestiones]);
+
+  const toggleExpandida = (t: string) =>
+    setExpandidas((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
 
   // Totales por tipo de gestión (mes completo).
   const porTipo = useMemo(() => {
@@ -219,22 +242,64 @@ export default function ProductividadPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {trabajadoras.map((t) => (
-                    <tr key={t} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">{t}</td>
-                      {diasArr.map((d) => {
-                        const n = conteo.get(t)?.get(d) ?? 0;
-                        return (
-                          <td key={d} className={`px-2 py-2 text-center tabular-nums ${n ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-300 dark:text-slate-700"}`}>
-                            {n || "·"}
+                  {trabajadoras.map((t) => {
+                    const abierta = expandidas.has(t);
+                    // Sub-filas por tipo, ordenadas por volumen en el mes.
+                    const tipos = abierta
+                      ? [...(porTrabajadoraTipoDia.get(t) ?? new Map<string, Map<number, number>>()).entries()]
+                          .map(([tipo, porDia]) => ({
+                            tipo,
+                            porDia,
+                            total: [...porDia.values()].reduce((a, b) => a + b, 0),
+                          }))
+                          .sort((a, b) => b.total - a.total || labelTipoGestion(a.tipo).localeCompare(labelTipoGestion(b.tipo)))
+                      : [];
+                    return (
+                      <Fragment key={t}>
+                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 whitespace-nowrap">
+                            <button
+                              onClick={() => toggleExpandida(t)}
+                              title={abierta ? "Ocultar desglose por tipo" : "Ver desglose diario por tipo de gestión"}
+                              className="inline-flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            >
+                              {abierta ? <ChevronDown size={13} className="text-slate-400" /> : <ChevronRight size={13} className="text-slate-400" />}
+                              {t}
+                            </button>
                           </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 text-center font-bold tabular-nums text-blue-700 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30">
-                        {totalPorTrabajadora.get(t) ?? 0}
-                      </td>
-                    </tr>
-                  ))}
+                          {diasArr.map((d) => {
+                            const n = conteo.get(t)?.get(d) ?? 0;
+                            return (
+                              <td key={d} className={`px-2 py-2 text-center tabular-nums ${n ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-300 dark:text-slate-700"}`}>
+                                {n || "·"}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-2 text-center font-bold tabular-nums text-blue-700 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30">
+                            {totalPorTrabajadora.get(t) ?? 0}
+                          </td>
+                        </tr>
+                        {tipos.map(({ tipo, porDia, total }) => (
+                          <tr key={`${t}|${tipo}`} className="bg-slate-50/70 dark:bg-slate-800/30">
+                            <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/90 pl-8 pr-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap max-w-[240px] truncate" title={labelTipoGestion(tipo)}>
+                              {labelTipoGestion(tipo)}
+                            </td>
+                            {diasArr.map((d) => {
+                              const n = porDia.get(d) ?? 0;
+                              return (
+                                <td key={d} className={`px-2 py-1.5 text-center text-xs tabular-nums ${n ? "text-slate-600 dark:text-slate-300" : "text-slate-200 dark:text-slate-700/70"}`}>
+                                  {n || "·"}
+                                </td>
+                              );
+                            })}
+                            <td className="px-3 py-1.5 text-center text-xs font-semibold tabular-nums text-slate-600 dark:text-slate-300 bg-blue-50/40 dark:bg-blue-950/20">
+                              {total}
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 font-semibold">
