@@ -26,6 +26,7 @@ import {
   Settings,
   Syringe,
   Table2,
+  TrendingUp,
   Users,
   DoorOpen,
   CalendarClock,
@@ -80,6 +81,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
   const verAprobacionTramites = esAdmin || esAsistente;
+  const verProductividad = esAdmin;
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
@@ -244,6 +246,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           { href: "/dashboard/historial-busquedas", label: "Historial busquedas", icon: History, group: G_ADMIN },
           { href: "/dashboard/historial-consultas", label: "Historial consultas", icon: UserSearch, group: G_ADMIN },
         ]
+      : []),
+    ...(verProductividad
+      ? [{ href: "/dashboard/productividad/esdomed", label: "Productividad", icon: TrendingUp, group: G_ADMIN, exact: true }]
       : []),
   ];
 
