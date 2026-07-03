@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
-  GRUPOS_GESTION_TS, labelTipoGestion, MODALIDAD_GESTION_LABEL,
-  TIPOS_GESTION_TS, type ModalidadGestion,
+  ACCIONES_SEGUIMIENTO, GRUPOS_GESTION_TS, keyAccionSeguimiento, labelTipoGestion,
+  MODALIDAD_GESTION_LABEL, TIPOS_GESTION_TS, type ModalidadGestion,
 } from "@/lib/trabajosocial/catalogos";
 import type { GestionTS } from "@/types";
 import { BarChart3, ChevronDown, ChevronRight, Download } from "lucide-react";
@@ -17,6 +17,25 @@ const selectCls =
 function mesActualStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}`;
+}
+
+const ACCION_KEYS = new Set(ACCIONES_SEGUIMIENTO.map((a) => a.key));
+
+// Agrupación macro de servicios como la usa el libro "SEGUIMIENTO Y VISITA
+// FAMILIAR" (cuadros VISITAS/VIDEOLLAMADAS/LLAMADAS/STS POR SERVICIO).
+// El orden de los checks importa: "intensivos quirúrgicos" es UCI, no Cirugía.
+const GRUPOS_SVF = ["MEDICINA INTERNA", "CIRUGÍA", "UCINT", "UCI", "DOLOR Y PALIATIVOS", "OTROS", "SIN ESPECIFICAR"] as const;
+function grupoServicioSVF(servicio?: string): string {
+  const s = (servicio ?? "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").trim();
+  if (!s) return "SIN ESPECIFICAR";
+  if (s.includes("intermedio")) return "UCINT";
+  if (s.includes("intensiv") || s.includes("coronario") || s.includes("neurocritic")) return "UCI";
+  if (s.includes("paliativ")) return "DOLOR Y PALIATIVOS";
+  if (s.includes("cirug")) return "CIRUGÍA";
+  if (s.includes("medicina interna") || s.includes("cardiolog") || s.includes("hematolog") || s.includes("aislado") || s.includes("oncolog")) {
+    return "MEDICINA INTERNA";
+  }
+  return "OTROS";
 }
 // Primer y último día del mes "YYYY-MM" como strings "YYYY-MM-DD" (rango lexicográfico).
 function rangoMes(mes: string): { ini: string; fin: string; dias: number } {
@@ -104,6 +123,63 @@ export default function ProductividadPage() {
     const m = new Map<string, number>();
     for (const g of gestiones) m.set(g.tipo, (m.get(g.tipo) ?? 0) + 1);
     return m;
+  }, [gestiones]);
+
+  // Cuadros diarios del libro "SEGUIMIENTO Y VISITA FAMILIAR": resumen de
+  // acciones por día + desglose por servicio (macro) para cada acción.
+  const cuadrosSVF = useMemo(() => {
+    const porAccionDia = new Map<string, Map<number, number>>();          // acción → día → n
+    const porAccionGrupoDia = new Map<string, Map<string, Map<number, number>>>(); // acción → grupo → día → n
+    const atendidosDia = new Map<number, Set<string>>();                  // día → expedientes únicos (acciones)
+    for (const g of gestiones) {
+      const k = keyAccionSeguimiento(g);
+      if (!ACCION_KEYS.has(k)) continue;
+      const dia = Number(g.fecha.split("-")[2]);
+      if (!porAccionDia.has(k)) porAccionDia.set(k, new Map());
+      const pd = porAccionDia.get(k)!;
+      pd.set(dia, (pd.get(dia) ?? 0) + 1);
+      const grupo = grupoServicioSVF(g.servicio);
+      if (!porAccionGrupoDia.has(k)) porAccionGrupoDia.set(k, new Map());
+      const grupos = porAccionGrupoDia.get(k)!;
+      if (!grupos.has(grupo)) grupos.set(grupo, new Map());
+      const gd = grupos.get(grupo)!;
+      gd.set(dia, (gd.get(dia) ?? 0) + 1);
+      if (!atendidosDia.has(dia)) atendidosDia.set(dia, new Set());
+      atendidosDia.get(dia)!.add(g.expediente);
+    }
+    const suma = (m?: Map<number, number>) => [...(m?.values() ?? [])].reduce((a, b) => a + b, 0);
+
+    // Cuadro resumen: pacientes atendidos (únicos) + una fila por acción.
+    const atendidosPorDia = new Map<number, number>();
+    atendidosDia.forEach((set, dia) => atendidosPorDia.set(dia, set.size));
+    const resumen = [
+      { label: "PACIENTES ATENDIDOS (únicos)", porDia: atendidosPorDia, total: suma(atendidosPorDia) },
+      ...ACCIONES_SEGUIMIENTO.map((a) => ({
+        label: a.chip.toUpperCase(),
+        porDia: porAccionDia.get(a.key) ?? new Map<number, number>(),
+        total: suma(porAccionDia.get(a.key)),
+      })),
+    ];
+
+    // Un cuadro por acción: filas = grupos de servicio con datos, en el orden del libro.
+    const porServicio = ACCIONES_SEGUIMIENTO.map((a) => {
+      const grupos = porAccionGrupoDia.get(a.key) ?? new Map<string, Map<number, number>>();
+      const filas = GRUPOS_SVF
+        .map((gr) => ({ label: gr, porDia: grupos.get(gr) ?? new Map<number, number>(), total: suma(grupos.get(gr)) }))
+        .filter((f) => f.total > 0);
+      return {
+        key: a.key,
+        titulo: `${a.chip} por servicio`,
+        filas,
+        totalPorDia: porAccionDia.get(a.key) ?? new Map<number, number>(),
+        total: suma(porAccionDia.get(a.key)),
+      };
+    }).filter((c) => c.total > 0);
+
+    const totalGestionesDia = new Map<number, number>();
+    porAccionDia.forEach((pd) => pd.forEach((n, dia) => totalGestionesDia.set(dia, (totalGestionesDia.get(dia) ?? 0) + n)));
+
+    return { resumen, porServicio, totalGestionesDia, totalGestiones: suma(totalGestionesDia) };
   }, [gestiones]);
 
   // Gestiones por servicio del paciente (snapshot guardado en cada gestión),
@@ -314,6 +390,36 @@ export default function ProductividadPage() {
             </div>
           </div>
 
+          {/* Cuadros diarios del libro "SEGUIMIENTO Y VISITA FAMILIAR" */}
+          {cuadrosSVF.totalGestiones > 0 && (
+            <div className="space-y-2.5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest pt-1">
+                Cuadros diarios — seguimiento y visita familiar
+                <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">· formato del libro PRODUCCION DIARIA</span>
+              </p>
+              <CuadroDiario
+                titulo="Resumen diario"
+                filas={cuadrosSVF.resumen}
+                diasArr={diasArr}
+                totalPorDia={cuadrosSVF.totalGestionesDia}
+                totalLabel="TOTAL DE GESTIONES DIARIAS"
+                total={cuadrosSVF.totalGestiones}
+                abiertoInicial
+              />
+              {cuadrosSVF.porServicio.map((c) => (
+                <CuadroDiario
+                  key={c.key}
+                  titulo={c.titulo}
+                  filas={c.filas}
+                  diasArr={diasArr}
+                  totalPorDia={c.totalPorDia}
+                  totalLabel="TOTAL DE ATENCIONES DIARIAS"
+                  total={c.total}
+                />
+              ))}
+            </div>
+          )}
+
           {/* Gestiones por servicio (servicio del paciente al momento de la gestión) */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest px-4 pt-4 pb-3">
@@ -386,6 +492,73 @@ export default function ProductividadPage() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ── Cuadro diario (formato del libro: filas × día 1..31 + TOTAL MENSUAL) ──────
+function CuadroDiario({
+  titulo, filas, diasArr, totalPorDia, totalLabel, total, abiertoInicial = false,
+}: {
+  titulo: string;
+  filas: { label: string; porDia: Map<number, number>; total: number }[];
+  diasArr: number[];
+  totalPorDia: Map<number, number>;
+  totalLabel: string;
+  total: number;
+  abiertoInicial?: boolean;
+}) {
+  const [abierto, setAbierto] = useState(abiertoInicial);
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+      >
+        <ChevronDown size={14} className={`text-slate-400 transition-transform ${abierto ? "" : "-rotate-90"}`} />
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex-1 text-left">{titulo}</span>
+        <span className="text-xs font-bold text-blue-700 dark:text-blue-400 tabular-nums">{total}</span>
+      </button>
+      {abierto && (
+        <div className="overflow-x-auto border-t border-slate-100 dark:border-slate-800">
+          <table className="text-sm border-collapse">
+            <thead>
+              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                <th className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/50 text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide min-w-[190px]" />
+                {diasArr.map((d) => (
+                  <th key={d} className="px-2 py-2 text-xs font-semibold text-slate-500 text-center w-9">{d}</th>
+                ))}
+                <th className="px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 text-center bg-blue-50/60 dark:bg-blue-950/30 whitespace-nowrap">Total mensual</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {filas.map((f) => (
+                <tr key={f.label} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="sticky left-0 z-10 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{f.label}</td>
+                  {diasArr.map((d) => {
+                    const n = f.porDia.get(d) ?? 0;
+                    return (
+                      <td key={d} className={`px-2 py-2 text-center tabular-nums ${n ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-300 dark:text-slate-700"}`}>
+                        {n || "·"}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-center font-bold tabular-nums text-blue-700 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30">{f.total}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 font-semibold">
+                <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 text-[11px] uppercase tracking-wide text-slate-600 dark:text-slate-300 whitespace-nowrap">{totalLabel}</td>
+                {diasArr.map((d) => (
+                  <td key={d} className="px-2 py-2 text-center tabular-nums text-slate-600 dark:text-slate-400">{totalPorDia.get(d) ?? 0}</td>
+                ))}
+                <td className="px-3 py-2 text-center tabular-nums text-blue-700 dark:text-blue-400 bg-blue-100/70 dark:bg-blue-950/50">{total}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
     </div>
   );
