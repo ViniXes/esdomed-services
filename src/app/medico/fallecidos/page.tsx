@@ -8,6 +8,7 @@ import { NotificacionFallecido } from "@/types";
 import type { Paciente, AtencionEmergencia } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
+import { DateTimeField } from "@/components/ui/DateTimeField";
 import { toDate } from "@/lib/pacientes/helpers";
 import { condicionEgreso, CONDICION_LABEL } from "@/lib/emergencia/helpers";
 import {
@@ -81,6 +82,19 @@ export default function MedicoFallecidosPage() {
   // Campos de la notificación
   const [fechaDefuncion, setFechaDefuncion] = useState("");
   const [causaMuerte, setCausaMuerte] = useState("");
+
+  // Validación: la defunción debe caer dentro de la estancia y no en el futuro
+  // (atrapa años mal tecleados en el datetime-local, ej. 2025 en vez de 2026).
+  const fechaIngresoSel = paciente ? toDate(paciente.fechaIngreso) : atencion?.fechaHoraIngreso;
+  const errorFecha = (() => {
+    if (!fechaDefuncion) return null;
+    const d = new Date(fechaDefuncion);
+    if (isNaN(d.getTime())) return "La fecha ingresada no es válida.";
+    if (d > new Date()) return "La fecha de defunción no puede estar en el futuro. Revisa el año y la hora.";
+    if (fechaIngresoSel && d < fechaIngresoSel)
+      return `La fecha de defunción no puede ser anterior al ingreso del paciente (${fechaIngresoSel.toLocaleString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}). Revisa el año.`;
+    return null;
+  })();
 
   useEffect(() => {
     if (!user) return;
@@ -179,7 +193,7 @@ export default function MedicoFallecidosPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !profile || !sel || !fechaDefuncion) return;
+    if (!user || !profile || !sel || !fechaDefuncion || errorFecha) return;
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
@@ -400,13 +414,19 @@ export default function MedicoFallecidosPage() {
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">
                     Fecha y hora de defunción <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeField
                     value={fechaDefuncion}
-                    onChange={e => setFechaDefuncion(e.target.value)}
-                    required
-                    className={`${inputCls} [color-scheme:light] dark:[color-scheme:dark]`}
+                    onChange={setFechaDefuncion}
+                    ariaLabel="Fecha y hora de defunción"
+                    minDate={fechaIngresoSel}
+                    maxDate={new Date()}
                   />
+                  {errorFecha && (
+                    <p className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 mt-1.5">
+                      <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                      {errorFecha}
+                    </p>
+                  )}
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">
@@ -424,7 +444,7 @@ export default function MedicoFallecidosPage() {
 
               <button
                 type="submit"
-                disabled={saving || !fechaDefuncion}
+                disabled={saving || !fechaDefuncion || !!errorFecha}
                 className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-all active:scale-[0.99]"
               >
                 {saving ? "Enviando..." : "Enviar notificación de fallecido"}
