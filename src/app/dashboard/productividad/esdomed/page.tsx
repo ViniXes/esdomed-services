@@ -15,9 +15,16 @@ import {
 import { db } from "@/lib/firebase";
 import { ProductividadTabs } from "../_components/ProductividadTabs";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
-import type { NotificacionFallecido, Persona, RegistroAlta, SolicitudTraslado } from "@/types";
+import type { NotificacionAltaVivo, NotificacionFallecido, RegistroAlta, SolicitudImpresion, SolicitudTraslado } from "@/types";
 
 type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "franjas";
+
+type ControlIngreso = {
+  id?: string;
+  responsableIngresoNombre?: string;
+  creadoPorNombre?: string;
+  creadoEn?: unknown;
+};
 
 const VISTAS: { id: Vista; label: string; icon: LucideIcon }[] = [
   { id: "resumen", label: "Resumen", icon: BarChart3 },
@@ -121,10 +128,12 @@ function aRegistros<T>(items: T[], obtenerNombre: (item: T) => string | undefine
 export default function ProductividadEsdomedPage() {
   const [mes, setMes] = useState(mesActualStr());
   const [personal, setPersonal] = useState<string[]>([]);
-  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [controlIngresos, setControlIngresos] = useState<ControlIngreso[]>([]);
   const [fallecidosConfirmados, setFallecidosConfirmados] = useState<NotificacionFallecido[]>([]);
   const [fallecidosCertificado, setFallecidosCertificado] = useState<NotificacionFallecido[]>([]);
   const [altas, setAltas] = useState<RegistroAlta[]>([]);
+  const [altasEfectivasProcesadas, setAltasEfectivasProcesadas] = useState<NotificacionAltaVivo[]>([]);
+  const [impresionesEntregadas, setImpresionesEntregadas] = useState<SolicitudImpresion[]>([]);
   const [traslados, setTraslados] = useState<SolicitudTraslado[]>([]);
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
@@ -147,33 +156,45 @@ export default function ProductividadEsdomedPage() {
     const finTs = Timestamp.fromDate(fin);
 
     Promise.all([
-      getDocs(query(collection(db, "personas"), where("creadoEn", ">=", inicioTs), where("creadoEn", "<=", finTs))),
+      getDocs(query(collection(db, "control_ingresos"), where("creadoEn", ">=", inicioTs), where("creadoEn", "<=", finTs))),
       getDocs(query(collection(db, "notificaciones_fallecidos"), where("confirmadoEn", ">=", inicioTs), where("confirmadoEn", "<=", finTs))),
       getDocs(query(collection(db, "notificaciones_fallecidos"), where("entregaCertificadoEn", ">=", inicioTs), where("entregaCertificadoEn", "<=", finTs))),
       getDocs(query(collection(db, "registro_altas"), where("fecha", ">=", iniStr), where("fecha", "<=", finStr))),
+      getDocs(query(collection(db, "notificaciones_altas"), where("procesadoEn", ">=", inicioTs), where("procesadoEn", "<=", finTs))),
+      getDocs(query(collection(db, "solicitudes_impresion"), where("impresoEn", ">=", inicioTs), where("impresoEn", "<=", finTs))),
       getDocs(query(collection(db, "traslados"), where("actualizadoEn", ">=", inicioTs), where("actualizadoEn", "<=", finTs))),
     ])
-      .then(([personasSnap, confirmadosSnap, certificadoSnap, altasSnap, trasladosSnap]) => {
-        setPersonas(personasSnap.docs.map(d => ({ id: d.id, ...d.data() } as Persona)));
+      .then(([ingresosSnap, confirmadosSnap, certificadoSnap, altasSnap, altasProcesadasSnap, impresionesSnap, trasladosSnap]) => {
+        setControlIngresos(ingresosSnap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
         setFallecidosConfirmados(confirmadosSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
         setFallecidosCertificado(certificadoSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
         setAltas(altasSnap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroAlta)));
+        setAltasEfectivasProcesadas(
+          altasProcesadasSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo))
+            .filter(a => a.estado === "procesada")
+        );
+        setImpresionesEntregadas(
+          impresionesSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion))
+            .filter(i => i.estado === "impreso")
+        );
         setTraslados(trasladosSnap.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado)));
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [inicio, fin, iniStr, finStr]);
 
-  const expedientesCreados = useMemo(() => contarPor(personas, p => (p as unknown as { creadoPorNombre?: string }).creadoPorNombre), [personas]);
+  const expedientesCreados = useMemo(() => contarPor(controlIngresos, i => i.responsableIngresoNombre ?? i.creadoPorNombre), [controlIngresos]);
   const defuncionesProcesadas = useMemo(() => contarPor(fallecidosConfirmados, f => f.confirmadoPorNombre), [fallecidosConfirmados]);
   const certificadosEntregados = useMemo(() => contarPor(fallecidosCertificado, f => f.entregaCertificado), [fallecidosCertificado]);
-  const altasEfectivas = useMemo(() => contarPor(altas.filter(a => a.tipoAlta === "alta_efectiva"), a => a.responsableEsdomed), [altas]);
-  const documentosEntregados = useMemo(() => contarPor(altas.filter(a => a.documentacionEntregada), a => a.responsableEsdomed), [altas]);
+  const altasEfectivas = useMemo(() => contarPor(altasEfectivasProcesadas, a => a.procesadoPorNombre), [altasEfectivasProcesadas]);
+  const documentosEntregados = useMemo(() => contarPor(impresionesEntregadas, i => i.impresoPorNombre), [impresionesEntregadas]);
   const altasSimmow = useMemo(() => contarPor(altas.filter(a => a.digitadorSimmow), a => a.digitadorSimmow), [altas]);
   const trasladosProcesados = useMemo(() => contarPor(traslados, t => t.revisadoPorNombre), [traslados]);
 
-  const registrosIngresos = useMemo(() => aRegistros(personas, p => (p as unknown as { creadoPorNombre?: string }).creadoPorNombre, p => (p as unknown as { creadoEn?: unknown }).creadoEn), [personas]);
-  const registrosAltas = useMemo(() => aRegistros(altas, a => a.responsableEsdomed, a => a.creadoEn), [altas]);
+  const registrosIngresos = useMemo(() => aRegistros(controlIngresos, i => i.responsableIngresoNombre ?? i.creadoPorNombre, i => i.creadoEn), [controlIngresos]);
+  const registrosAltas = useMemo(() => aRegistros(altasEfectivasProcesadas, a => a.procesadoPorNombre, a => a.procesadoEn), [altasEfectivasProcesadas]);
   const registrosFallecidos = useMemo(() => aRegistros(fallecidosConfirmados, f => f.confirmadoPorNombre, f => f.confirmadoEn), [fallecidosConfirmados]);
   const registrosTraslados = useMemo(() => aRegistros(traslados, t => t.revisadoPorNombre, t => t.actualizadoEn), [traslados]);
 
@@ -202,7 +223,7 @@ export default function ProductividadEsdomedPage() {
   }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados]);
 
   const totales = {
-    expedientesCreados: personas.length,
+    expedientesCreados: controlIngresos.length,
     defuncionesProcesadas: fallecidosConfirmados.length,
     certificadosEntregados: fallecidosCertificado.length,
     altasEfectivas: altasEfectivas.size ? Array.from(altasEfectivas.values()).reduce((a, b) => a + b, 0) : 0,
