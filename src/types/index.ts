@@ -878,6 +878,16 @@ export interface GestionTS {
 // activos creados por ESDOMED. Regla: sin `estado === "contactado"` el paciente
 // NO puede pasar a seguimiento/visita.
 
+// Un intento de contacto anotado en la bitácora del rastreo ("se llamó tal
+// día y pasó esto"). Se agregan con arrayUnion — el historial nunca se pisa.
+export interface IntentoContactoTS {
+  fecha: string;               // "YYYY-MM-DD" del intento
+  nota: string;                // qué pasó ("no contesta", "número equivocado"…)
+  trabajadoraId: string;
+  trabajadoraNombre: string;
+  creadoEn: Date;              // Timestamp de cuándo se anotó
+}
+
 export interface RastreoTS {
   id?: string;                 // = expediente
 
@@ -901,6 +911,7 @@ export interface RastreoTS {
   estado: import("@/lib/trabajosocial/catalogos").EstadoRastreo;
   canalesIntentados?: import("@/lib/trabajosocial/catalogos").CanalRastreo[];
   intentos?: number;           // nº de intentos de contacto
+  intentosContacto?: IntentoContactoTS[]; // bitácora por fecha de los intentos
   fechaContacto?: string;      // "YYYY-MM-DD" del contacto efectivo
   horaContacto?: string;
   duracionMin?: number;

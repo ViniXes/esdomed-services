@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query, setDoc, Timestamp, where } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, onSnapshot, query, setDoc, Timestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Paciente, RastreoTS } from "@/types";
+import type { IntentoContactoTS, Paciente, RastreoTS } from "@/types";
 import {
   CANALES_RASTREO, CANAL_RASTREO_LABEL, ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL,
   habilitaSeguimiento, type CanalRastreo, type EstadoRastreo,
@@ -12,7 +12,7 @@ import {
 import { GestionesTabs } from "../_components/GestionesTabs";
 import { DateField } from "@/components/ui/DateField";
 import {
-  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Lock, Loader2, Radar, Search, X,
+  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, History, Lock, Loader2, Plus, Radar, Search, Trash2, X,
 } from "lucide-react";
 
 const inputCls =
@@ -31,6 +31,11 @@ const hoyStr = () => {
   return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
 };
 const nombrePac = (p: Paciente) => `${p.apellidos}, ${p.nombres}`;
+// "YYYY-MM-DD" → "DD/MM/YY" (formato compacto de la bitácora).
+const fmtDia = (f: string) => {
+  const [y, m, d] = f.split("-");
+  return y && m && d ? `${d}/${m}/${y.slice(2)}` : f;
+};
 
 type Filtro = "pendientes" | "contactados" | "no_efectivo" | "todos";
 
@@ -60,6 +65,11 @@ export default function RastreoPage() {
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ tipo: "success" | "error"; msg: string } | null>(null);
+
+  // Bitácora de intentos de contacto (se agregan al instante, sin pasar por Guardar).
+  const [intentoFecha, setIntentoFecha] = useState(hoyStr());
+  const [intentoNota, setIntentoNota] = useState("");
+  const [agregandoIntento, setAgregandoIntento] = useState(false);
 
   // Pacientes activos creados por ESDOMED — origen del worklist de rastreo.
   useEffect(() => {
@@ -126,6 +136,8 @@ export default function RastreoPage() {
   const abrir = (p: Paciente) => {
     const r = rastreos.get(p.expediente);
     setSel(p);
+    setIntentoFecha(hoyStr());
+    setIntentoNota("");
     setEstado(r?.estado ?? "en_gestion");
     setCanales(r?.canalesIntentados ?? []);
     setFamiliar(r?.familiarNombre ?? p.responsable?.nombre ?? "");
@@ -141,6 +153,67 @@ export default function RastreoPage() {
 
   const toggleCanal = (c: CanalRastreo) =>
     setCanales((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+
+  // Rastreo EN VIVO del paciente abierto: la bitácora refleja al instante lo
+  // que agregue cualquier trabajadora (el onSnapshot ya está suscrito).
+  const rastreoSel = sel ? rastreos.get(sel.expediente) : undefined;
+  const bitacora = useMemo(() => {
+    const items = rastreoSel?.intentosContacto ?? [];
+    return [...items].sort((a, b) =>
+      b.fecha.localeCompare(a.fecha) ||
+      ((b.creadoEn as unknown as { toMillis?: () => number })?.toMillis?.() ?? 0) -
+      ((a.creadoEn as unknown as { toMillis?: () => number })?.toMillis?.() ?? 0),
+    );
+  }, [rastreoSel?.intentosContacto]);
+
+  // Agrega un intento a la bitácora de inmediato (arrayUnion: nunca pisa el
+  // historial). Si el paciente aún no tiene doc de rastreo, lo crea en gestión.
+  const agregarIntento = async () => {
+    if (!sel || !profile || !intentoNota.trim()) return;
+    setAgregandoIntento(true);
+    try {
+      const existe = rastreos.has(sel.expediente);
+      const item: IntentoContactoTS = {
+        fecha: intentoFecha || hoyStr(),
+        nota: intentoNota.trim(),
+        trabajadoraId: profile.uid,
+        trabajadoraNombre: profile.nombre,
+        creadoEn: Timestamp.now() as unknown as Date,
+      };
+      await setDoc(doc(db, "rastreos_ts", sel.expediente), {
+        expediente: sel.expediente,
+        pacienteId: sel.id ?? null,
+        pacienteNombre: nombrePac(sel),
+        servicio: sel.servicioActual ?? null,
+        cama: sel.camaActual ?? null,
+        vinculadoPadron: true,
+        intentosContacto: arrayUnion(item),
+        trabajadoraId: profile.uid,
+        trabajadoraNombre: profile.nombre,
+        actualizadoEn: Timestamp.now(),
+        ...(existe ? {} : { estado: "en_gestion", creadoEn: Timestamp.now() }),
+      }, { merge: true });
+      setIntentoNota("");
+      setIntentoFecha(hoyStr());
+    } catch {
+      setToast({ tipo: "error", msg: "No se pudo agregar el intento" });
+    } finally {
+      setAgregandoIntento(false);
+    }
+  };
+
+  // Quita un intento propio (equivocaciones). arrayRemove exige el objeto exacto.
+  const quitarIntento = async (item: IntentoContactoTS) => {
+    if (!sel) return;
+    try {
+      await setDoc(doc(db, "rastreos_ts", sel.expediente), {
+        intentosContacto: arrayRemove(item),
+        actualizadoEn: Timestamp.now(),
+      }, { merge: true });
+    } catch {
+      setToast({ tipo: "error", msg: "No se pudo quitar el intento" });
+    }
+  };
 
   const guardar = async () => {
     if (!sel || !profile) return;
@@ -279,6 +352,12 @@ export default function RastreoPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-[11px] text-slate-500">{p.expediente}</span>
                     <Badge e={e} />
+                    {(rastreos.get(p.expediente)?.intentosContacto?.length ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                        <History size={11} />
+                        {rastreos.get(p.expediente)!.intentosContacto!.length} intento{rastreos.get(p.expediente)!.intentosContacto!.length === 1 ? "" : "s"}
+                      </span>
+                    )}
                     {ok ? (
                       <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400">
                         <CheckCircle2 size={11} /> Habilita seguimiento
@@ -383,6 +462,65 @@ export default function RastreoPage() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Bitácora de intentos de contacto (por fecha, se guarda al instante) */}
+              <div>
+                <label className={labelCls}>
+                  Intentos de contacto <span className="text-slate-400 normal-case font-normal">(bitácora por fecha)</span>
+                </label>
+                <div className="flex gap-2">
+                  <DateField
+                    value={intentoFecha}
+                    onChange={setIntentoFecha}
+                    ariaLabel="Fecha del intento"
+                    className="w-[145px] shrink-0"
+                  />
+                  <input
+                    value={intentoNota}
+                    onChange={(e) => setIntentoNota(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarIntento(); } }}
+                    placeholder="No contestó / número equivocado / se dejó recado…"
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={agregarIntento}
+                    disabled={agregandoIntento || !intentoNota.trim()}
+                    title="Agregar intento a la bitácora"
+                    className="shrink-0 inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors"
+                  >
+                    {agregandoIntento ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    Agregar
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Se guarda al instante — no hace falta pulsar &quot;Guardar rastreo&quot;.</p>
+                {bitacora.length > 0 && (
+                  <ul className="mt-2 space-y-1 max-h-44 overflow-y-auto pr-1">
+                    {bitacora.map((it) => (
+                      <li
+                        key={`${it.fecha}|${(it.creadoEn as unknown as { toMillis?: () => number })?.toMillis?.() ?? 0}|${it.trabajadoraId}`}
+                        className="flex items-start gap-2 text-xs bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg px-2.5 py-1.5"
+                      >
+                        <History size={12} className="mt-0.5 text-slate-400 shrink-0" />
+                        <span className="font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{fmtDia(it.fecha)}</span>
+                        <span className="flex-1 min-w-0 text-slate-600 dark:text-slate-400 break-words">{it.nota}</span>
+                        <span className="hidden sm:inline text-slate-400 whitespace-nowrap">{it.trabajadoraNombre?.split(" ")[0]}</span>
+                        {it.trabajadoraId === profile?.uid && (
+                          <button
+                            type="button"
+                            onClick={() => quitarIntento(it)}
+                            title="Quitar mi intento"
+                            className="shrink-0 text-slate-300 hover:text-rose-500 transition-colors"
+                            aria-label="Quitar intento"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* Estado */}

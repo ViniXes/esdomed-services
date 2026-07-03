@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { GestionTS, Paciente, RastreoTS } from "@/types";
 import {
   ACCIONES_SEGUIMIENTO, ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL,
-  habilitaSeguimiento, keyAccionSeguimiento,
+  habilitaSeguimiento, keyAccionSeguimiento, labelTipoGestion,
   type AccionSeguimiento, type EstadoRastreo,
 } from "@/lib/trabajosocial/catalogos";
 import { GestionesTabs } from "../_components/GestionesTabs";
@@ -47,7 +47,7 @@ const inicioMesStr = () => hoyStr().slice(0, 8) + "01";
 const nombrePac = (p: Paciente) => `${p.apellidos}, ${p.nombres}`;
 const toMillis = (ts: unknown) => (ts as { toMillis?: () => number })?.toMillis?.() ?? 0;
 
-type FiltroRapido = "pendientes" | "atendidos" | "bloqueados" | "todos";
+type FiltroRapido = "pendientes" | "atendidos" | "adicionales" | "bloqueados" | "todos";
 
 export default function SeguimientoPage() {
   const { profile } = useAuth();
@@ -92,13 +92,15 @@ export default function SeguimientoPage() {
     }, (err) => { if (err.code === "permission-denied") setPermissionError(true); });
   }, []);
 
-  // Índices por expediente: marcas de hoy, totales del mes y "mi última de hoy"
-  // por acción (para poder deshacer una marca propia equivocada).
-  const { hoyPorExp, mesPorExp, miasHoyPorExp } = useMemo(() => {
+  // Índices por expediente: marcas de hoy, totales del mes, "mi última de hoy"
+  // por acción (para poder deshacer una marca propia equivocada) y las gestiones
+  // ADICIONALES de hoy (tipos fuera de los 5 chips, registradas en Registro/Panorama).
+  const { hoyPorExp, mesPorExp, miasHoyPorExp, adicionalesHoyPorExp } = useMemo(() => {
     const hoyS = hoyStr();
     const hoy = new Map<string, Map<string, number>>();
     const mes = new Map<string, Map<string, number>>();
     const mias = new Map<string, Map<string, GestionTS>>();
+    const adicionales = new Map<string, GestionTS[]>();
     const inc = (m: Map<string, Map<string, number>>, exp: string, k: string) => {
       const sub = m.get(exp) ?? new Map<string, number>();
       sub.set(k, (sub.get(k) ?? 0) + 1);
@@ -106,7 +108,10 @@ export default function SeguimientoPage() {
     };
     for (const g of gestionesMes) {
       const k = keyAccionSeguimiento(g);
-      if (!ACCION_KEYS.has(k)) continue;
+      if (!ACCION_KEYS.has(k)) {
+        if (g.fecha === hoyS) adicionales.set(g.expediente, [...(adicionales.get(g.expediente) ?? []), g]);
+        continue;
+      }
       inc(mes, g.expediente, k);
       if (g.fecha !== hoyS) continue;
       inc(hoy, g.expediente, k);
@@ -117,7 +122,7 @@ export default function SeguimientoPage() {
         mias.set(g.expediente, sub);
       }
     }
-    return { hoyPorExp: hoy, mesPorExp: mes, miasHoyPorExp: mias };
+    return { hoyPorExp: hoy, mesPorExp: mes, miasHoyPorExp: mias, adicionalesHoyPorExp: adicionales };
   }, [gestionesMes, profile?.uid]);
 
   const estadoRastreoDe = useCallback(
@@ -141,16 +146,17 @@ export default function SeguimientoPage() {
 
   // Stats globales (sobre todos los activos, no sobre el filtro).
   const stats = useMemo(() => {
-    let hab = 0, aten = 0, bloq = 0, pend = 0;
+    let hab = 0, aten = 0, bloq = 0, pend = 0, adic = 0;
     for (const p of pacientes) {
       const h = habilitado(p.expediente);
       const a = atendidoHoy(p.expediente);
       if (h) hab++; else bloq++;
       if (a) aten++;
       if (h && !a) pend++;
+      if ((adicionalesHoyPorExp.get(p.expediente)?.length ?? 0) > 0) adic++;
     }
-    return { habilitados: hab, atendidos: aten, pendientes: pend, bloqueados: bloq };
-  }, [pacientes, habilitado, atendidoHoy]);
+    return { habilitados: hab, atendidos: aten, pendientes: pend, bloqueados: bloq, adicionales: adic };
+  }, [pacientes, habilitado, atendidoHoy, adicionalesHoyPorExp]);
 
   // Lista plana (servicio → nombre): el orden natural de "bajar la lista".
   const lista = useMemo(() => {
@@ -163,6 +169,7 @@ export default function SeguimientoPage() {
         const aten = atendidoHoy(p.expediente);
         if (filtro === "pendientes" && !(hab && !aten)) return false;
         if (filtro === "atendidos" && !aten) return false;
+        if (filtro === "adicionales" && (adicionalesHoyPorExp.get(p.expediente)?.length ?? 0) === 0) return false;
         if (filtro === "bloqueados" && hab) return false;
         if (!t) return true;
         return (
@@ -175,7 +182,7 @@ export default function SeguimientoPage() {
         (a.servicioActual || "").localeCompare(b.servicioActual || "") ||
         nombrePac(a).localeCompare(nombrePac(b)),
       );
-  }, [pacientes, busqueda, servicioFiltro, filtro, habilitado, atendidoHoy]);
+  }, [pacientes, busqueda, servicioFiltro, filtro, habilitado, atendidoHoy, adicionalesHoyPorExp]);
 
   // Paginación (patrón estándar del proyecto: reset render-time + pageSafe).
   const totalPages = Math.max(1, Math.ceil(lista.length / PAGE_SIZE));
@@ -275,10 +282,11 @@ export default function SeguimientoPage() {
       )}
 
       {/* Stats clicables */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         {([
           { k: "pendientes" as FiltroRapido, label: "Pendientes hoy", n: stats.pendientes, cls: "text-amber-600 dark:text-amber-400" },
           { k: "atendidos" as FiltroRapido, label: "Atendidos hoy", n: stats.atendidos, cls: "text-emerald-600 dark:text-emerald-400" },
+          { k: "adicionales" as FiltroRapido, label: "Gestiones adicionales", n: stats.adicionales, cls: "text-violet-600 dark:text-violet-400" },
           { k: "todos" as FiltroRapido, label: "Habilitados", n: stats.habilitados, cls: "text-slate-800 dark:text-slate-200" },
           { k: "bloqueados" as FiltroRapido, label: "Sin rastreo", n: stats.bloqueados, cls: "text-slate-500 dark:text-slate-400" },
         ]).map((s) => (
@@ -339,6 +347,7 @@ export default function SeguimientoPage() {
               hoy={hoyPorExp.get(p.expediente)}
               mes={mesPorExp.get(p.expediente)}
               mias={miasHoyPorExp.get(p.expediente)}
+              adicionales={adicionalesHoyPorExp.get(p.expediente)}
               onMarcar={async (a) => {
                 try {
                   await marcar(p, a);
@@ -404,7 +413,7 @@ export default function SeguimientoPage() {
 
 // ── Fila de paciente (pasar lista) ───────────────────────────────────────────
 function FilaSeguimiento({
-  paciente: p, rastreo, estadoRastreo, hoy, mes, mias, onMarcar, onDeshacer, onNota, onContactar,
+  paciente: p, rastreo, estadoRastreo, hoy, mes, mias, adicionales, onMarcar, onDeshacer, onNota, onContactar,
 }: {
   paciente: Paciente;
   rastreo?: RastreoTS;
@@ -412,6 +421,7 @@ function FilaSeguimiento({
   hoy?: Map<string, number>;
   mes?: Map<string, number>;
   mias?: Map<string, GestionTS>;
+  adicionales?: GestionTS[];
   onMarcar: (a: AccionSeguimiento) => Promise<void>;
   onDeshacer: (a: AccionSeguimiento) => Promise<void>;
   onNota: (a: AccionSeguimiento, texto: string) => Promise<void>;
@@ -468,6 +478,20 @@ function FilaSeguimiento({
     .map((a) => ({ a, n: mes?.get(a.key) ?? 0 }))
     .filter((x) => x.n > 0);
 
+  // Gestiones de hoy que NO son de los 5 chips (registradas en Registro/Panorama).
+  const lineaAdicionales = adicionales && adicionales.length > 0 ? (
+    <p className="text-[11px] text-violet-600 dark:text-violet-400 mt-1.5">
+      Gestiones adicionales hoy:{" "}
+      {adicionales.map((g, i) => (
+        <span key={g.id ?? i} title={g.notas ?? undefined}>
+          {i > 0 && " · "}
+          <span className="font-medium">{labelTipoGestion(g.tipo)}</span>
+          {g.trabajadoraNombre ? ` (${g.trabajadoraNombre.split(" ")[0]})` : ""}
+        </span>
+      ))}
+    </p>
+  ) : null;
+
   return (
     <div className="px-4 py-3">
       <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 lg:gap-4">
@@ -497,22 +521,25 @@ function FilaSeguimiento({
 
         {/* Chips de acciones / gate */}
         {bloqueado ? (
-          <div className="flex items-center gap-2.5 flex-wrap flex-1">
-            <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-              <Lock size={12} /> Sin contacto efectivo en rastreo
-            </span>
-            <button
-              onClick={onContactar}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 hover:border-emerald-400 px-2.5 py-1.5 rounded-lg transition-colors"
-            >
-              <CheckCircle2 size={12} /> Marcar contactado
-            </button>
-            <Link
-              href="/dashboard/gestiones/rastreo"
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              Ir a Rastreo
-            </Link>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                <Lock size={12} /> Sin contacto efectivo en rastreo
+              </span>
+              <button
+                onClick={onContactar}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 hover:border-emerald-400 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                <CheckCircle2 size={12} /> Marcar contactado
+              </button>
+              <Link
+                href="/dashboard/gestiones/rastreo"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Ir a Rastreo
+              </Link>
+            </div>
+            {lineaAdicionales}
           </div>
         ) : (
           <div className="flex-1 min-w-0">
@@ -602,6 +629,8 @@ function FilaSeguimiento({
                 </div>
               </div>
             )}
+
+            {lineaAdicionales}
 
             {/* Totales del mes por paciente (los "TOTAL MENSUAL" del Excel) */}
             <p className="text-[11px] text-slate-400 mt-1.5">

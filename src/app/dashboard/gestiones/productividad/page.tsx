@@ -38,7 +38,6 @@ export default function ProductividadPage() {
   const { ini, fin, dias } = useMemo(() => rangoMes(mes), [mes]);
 
   useEffect(() => {
-    setLoading(true);
     const q = query(
       collection(db, "gestiones_ts"),
       where("fecha", ">=", ini),
@@ -82,6 +81,23 @@ export default function ProductividadPage() {
     const m = new Map<string, number>();
     for (const g of gestiones) m.set(g.tipo, (m.get(g.tipo) ?? 0) + 1);
     return m;
+  }, [gestiones]);
+
+  // Gestiones por servicio del paciente (snapshot guardado en cada gestión),
+  // con desglose por trabajadora para la tabla servicio × trabajadora.
+  const { serviciosOrdenados, porServicioTrabajadora } = useMemo(() => {
+    const totales = new Map<string, number>();
+    const cruz = new Map<string, Map<string, number>>(); // servicio → (trabajadora → n)
+    for (const g of gestiones) {
+      const s = g.servicio?.trim() || "Sin servicio";
+      totales.set(s, (totales.get(s) ?? 0) + 1);
+      if (!cruz.has(s)) cruz.set(s, new Map());
+      const fila = cruz.get(s)!;
+      fila.set(g.trabajadoraNombre, (fila.get(g.trabajadoraNombre) ?? 0) + 1);
+    }
+    const serviciosOrdenados = [...totales.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return { serviciosOrdenados, porServicioTrabajadora: cruz };
   }, [gestiones]);
 
   // Desglose por modalidad + total de minutos registrados en el mes.
@@ -140,7 +156,15 @@ export default function ProductividadPage() {
 
       {/* Controles */}
       <div className="flex flex-wrap items-center gap-3">
-        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className={selectCls} />
+        <input
+          type="month"
+          value={mes}
+          onChange={(e) => {
+            // El spinner se enciende aquí (handler), no en el efecto — regla react-hooks.
+            if (e.target.value !== mes) { setMes(e.target.value); setLoading(true); }
+          }}
+          className={selectCls}
+        />
         <span className="text-sm text-slate-500">{totalMes} gestión(es) en el mes</span>
         {totalMes > 0 && (
           <button
@@ -217,6 +241,56 @@ export default function ProductividadPage() {
                     <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/50 px-3 py-2.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">Total</td>
                     {diasArr.map((d) => (
                       <td key={d} className="px-2 py-2.5 text-center tabular-nums text-slate-600 dark:text-slate-400">{totalPorDia.get(d) ?? 0}</td>
+                    ))}
+                    <td className="px-3 py-2.5 text-center tabular-nums text-blue-700 dark:text-blue-400 bg-blue-100/70 dark:bg-blue-950/50">{totalMes}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Gestiones por servicio (servicio del paciente al momento de la gestión) */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest px-4 pt-4 pb-3">
+              Gestiones por servicio
+              <span className="ml-2 font-normal normal-case tracking-normal text-slate-400">· servicio del paciente al registrar la gestión</span>
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-y border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Servicio</th>
+                    {trabajadoras.map((t) => (
+                      <th key={t} className="px-3 py-2.5 text-xs font-semibold text-slate-500 text-center whitespace-nowrap">
+                        {t.split(" ")[0]}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 text-center bg-blue-50/60 dark:bg-blue-950/30">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {serviciosOrdenados.map(([servicio, total]) => (
+                    <tr key={servicio} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-4 py-2 font-medium text-slate-800 dark:text-slate-200">{servicio}</td>
+                      {trabajadoras.map((t) => {
+                        const n = porServicioTrabajadora.get(servicio)?.get(t) ?? 0;
+                        return (
+                          <td key={t} className={`px-3 py-2 text-center tabular-nums ${n ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-300 dark:text-slate-700"}`}>
+                            {n || "·"}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-center font-bold tabular-nums text-blue-700 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/30">{total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 font-semibold">
+                    <td className="px-4 py-2.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">Total</td>
+                    {trabajadoras.map((t) => (
+                      <td key={t} className="px-3 py-2.5 text-center tabular-nums text-slate-600 dark:text-slate-400">
+                        {totalPorTrabajadora.get(t) ?? 0}
+                      </td>
                     ))}
                     <td className="px-3 py-2.5 text-center tabular-nums text-blue-700 dark:text-blue-400 bg-blue-100/70 dark:bg-blue-950/50">{totalMes}</td>
                   </tr>
