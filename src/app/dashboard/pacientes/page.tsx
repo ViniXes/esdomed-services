@@ -94,10 +94,11 @@ export default function PacientesPage() {
       const tope = filtro === "todos" ? LIMIT_TODOS : LIMIT_HISTORICO;
 
       if (grupo) {
-        // Grupo de estados con `in`: una sola consulta. Sin orderBy (evita índice
-        // compuesto) y sin filtrar servicio en el servidor; ambos se resuelven en
-        // cliente (orden en .sort de abajo, servicio en `filtrados`).
+        // Grupo de estados con `in`: una sola consulta, ordenada por fecha de egreso
+        // (índice compuesto estado+fechaEgreso) para que el límite corte lo más
+        // antiguo, no documentos al azar. El servicio se filtra en cliente.
         constraints.push(where("estado", "in", grupo));
+        constraints.push(orderBy("fechaEgreso", "desc"));
         constraints.push(limit(tope));
       } else if (servicioFiltro) {
         if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
@@ -107,7 +108,9 @@ export default function PacientesPage() {
         if (filtro !== "activo") constraints.push(limit(tope));
       } else {
         if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
-        constraints.push(orderBy("fechaIngreso", "desc"));
+        // Estados de egreso: ordenar por fecha de egreso para que el límite corte
+        // lo más antiguo (una alta de hoy siempre entra). Activos/todos: por ingreso.
+        constraints.push(orderBy(usaFechaEgreso ? "fechaEgreso" : "fechaIngreso", "desc"));
         // Activos: sin límite (acotado por capacidad hospitalaria)
         // Históricos: límite razonable para no descargar toda la colección
         if (filtro !== "activo") constraints.push(limit(tope));
@@ -127,7 +130,11 @@ export default function PacientesPage() {
           } as Paciente;
         })
         // Orden garantizado en cliente (la consulta con servicio no trae orderBy).
-        .sort((a, b) => b.fechaIngreso.getTime() - a.fechaIngreso.getTime());
+        .sort((a, b) =>
+          usaFechaEgreso
+            ? (b.fechaEgreso?.getTime() ?? 0) - (a.fechaEgreso?.getTime() ?? 0)
+            : b.fechaIngreso.getTime() - a.fechaIngreso.getTime()
+        );
 
       cachePacientes.set(cacheKey, lista);
       setPacientes(lista);
@@ -537,7 +544,7 @@ export default function PacientesPage() {
             {/* Aviso de techo histórico */}
             {filtro !== "activo" && pacientes.length >= topeHistorico && (
               <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
-                Límite de {topeHistorico} — afina por servicio o fecha
+                Se muestran los {topeHistorico} más recientes — afina por servicio para ver más antiguos
               </span>
             )}
           </div>
