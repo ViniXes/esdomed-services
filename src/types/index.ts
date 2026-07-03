@@ -1263,13 +1263,182 @@ export interface TramitePersonal {
   tipoSolicitud?: "ordinario" | "diferido";
   
   estado: EstadoTramitePersonal;
-  
+
   creadoEn: Date;
   actualizadoEn?: Date;
-  
+
   // Aprobación
   revisadoPorId?: string;
   revisadoPorNombre?: string;
   revisadoEn?: Date;
   comentariosRevision?: string;
+}
+
+// ============================================================================
+// Censos de Emergencia (demanda espontánea y referidos)
+// ============================================================================
+// Digitación en vivo por los médicos de emergencia; reemplaza los libros de
+// Excel "DEMANDAS ESPONTANEAS" y "REFERIDOS A HES" (una hoja por mes). Los
+// catálogos normalizados viven en src/lib/emergencia/censos.ts. Solo se
+// prellena la identidad del paciente (padrón personas + registro diario del
+// SIS); todo lo clínico es criterio del médico que digita.
+
+// Rangos de turno fijos del censo (columna HORARIO del Excel).
+export type TurnoEmergencia = "t00_07" | "t07_15" | "t15_19" | "t19_24";
+
+export type TriageEmergencia = "rojo" | "amarillo" | "verde";
+
+// Destino del paciente en demanda espontánea (columna DESTINO DE PACIENTE).
+export type DestinoEmergencia =
+  | "alta"
+  | "alta_voluntaria"
+  | "alta_exigida"
+  | "ingreso"
+  | "referencia"
+  | "fuga";
+
+export interface CensoDemandaEspontanea {
+  id?: string;
+
+  // ── Atención ──
+  fecha: Date;                    // estampa de la atención (auto al crear)
+  turno: TurnoEmergencia;         // lo elige el médico (chips)
+
+  // ── Identidad (prellenada de personas / registro diario; editable) ──
+  expediente: string;
+  pacienteNombre: string;
+  edad?: number;
+  genero: Genero;
+
+  // ── Evaluación (criterio del médico) ──
+  triage: TriageEmergencia;
+  condicion: "vivo" | "fallecido";
+  diagnosticos: DiagnosticoCIE[]; // impresión diagnóstica, restringida a CIE-10
+  especialidad: string;           // catálogo ESPECIALIDADES_EMERGENCIA
+
+  // ── Referencia de entrada ──
+  traeReferencia: boolean;
+  lugarReferencia?: string;       // solo si traeReferencia
+
+  // ── Destino ──
+  destino: DestinoEmergencia;
+  servicioIngresar?: string;      // solo si destino == "ingreso"
+  centroRefiere?: string;         // solo si destino == "referencia"
+
+  // ── Médicos ──
+  staffEvalua: string;
+  reevaluacion?: string;          // vacío/undefined = no aplica
+  medicosGenerales?: string;      // los del turno (se copia a cada registro)
+  ventilacionMecanica: boolean;
+
+  // ── Administrativo ──
+  consulta48h: boolean;           // derivado: mismo expediente en las últimas 48 h
+  aseguradoIsss: boolean;
+  empleadoHes: boolean;
+  dependencia?: string;           // solo si empleadoHes
+
+  // ── Procedimientos (catálogo, chips) ──
+  procedimientosMaxima: string[]; // vacío = "NO"
+  procedimientosUE: string[];
+
+  plan?: string;                  // PLAN / OBSERVACIONES — único texto libre
+
+  // ── Trazabilidad ──
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}
+
+// Clasificación derivada de la columna "REFERENCIA EN SIS (no modificar)":
+// se calcula de hospitalReferencia + referenciaSis, nunca se digita.
+export type ClasificacionSisReferido =
+  | "HNSR CON REF SIS"
+  | "HNSR SIN REF SIS"
+  | "OTROS HOSP CON REF SIS"
+  | "OTROS HOSP SIN REF SIS"
+  | "DR SV";
+
+export interface CensoReferido {
+  id?: string;
+
+  // ── Atención ──
+  fecha: Date;
+  turno: TurnoEmergencia;
+
+  // ── Identidad (prellenada; editable) ──
+  expediente: string;
+  pacienteNombre: string;
+  edad?: number;
+  genero: Genero;
+
+  // ── Referencia ──
+  hospitalReferencia: string;     // catálogo HOSPITALES_REFERENCIA
+  referenciaSis: boolean;         // ¿trae referencia registrada en SIS?
+  clasificacionSis: ClasificacionSisReferido; // derivada (snapshot)
+
+  // ── Evaluación ──
+  condicion: "estable" | "inestable";
+  dispositivoO2: string;          // catálogo DISPOSITIVOS_O2
+  diagnosticos: DiagnosticoCIE[];
+  discrepanciaDiagnostico: "si" | "no" | "no_aplica";
+  modificacionServicio: "si" | "no" | "no_aplica";
+  servicioIngreso: string;        // catálogo SERVICIOS_INGRESO_REFERIDO
+
+  // ── Médicos ──
+  staffEvalua: string;
+  reevaluacion?: string;          // vacío/undefined = no aplica
+  medicosGenerales?: string;
+
+  // ── Tiempos ──
+  tiempoPermanencia: string;      // catálogo TIEMPOS_PERMANENCIA
+  razonDemora?: string;           // catálogo RAZONES_DEMORA — solo si > 1 hora
+
+  // ── Procedimientos ──
+  procedimientosMaxima: string[];
+  otrosProcedimientos: string[];
+
+  observaciones?: string;
+
+  // ── Trazabilidad ──
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}
+
+// ── Registro Diario de Emergencia (reporte del SIS, importado por ESDOMED) ──
+// Los pacientes aparecen aquí apenas entran a emergencia (antes que en
+// atenciones_emergencia, que llega hasta cerrar triage). Fuente de identidad
+// (edad/sexo) para el prellenado de los censos. No trae nombre ni hora.
+export interface RegistroDiarioEmergencia {
+  id?: string;                    // dedup determinista: `${expediente}__${YYYY-MM-DD}`
+
+  expediente: string;
+  fechaReporte: Date;             // día del reporte (lo elige ESDOMED al importar)
+  genero: Genero;                 // sexo 1/2 del SIS → masculino/femenino
+  edadTexto?: string;             // "64 años 7 meses 18 días" — crudo del reporte
+  edadAnios?: number;             // años extraídos del texto
+
+  departamento?: string;
+  municipio?: string;
+  area?: AreaGeografica;          // 1 = urbana, 2 = rural
+
+  medico?: string;                // quien registró en el SIS
+  subservicio?: string;           // "Máxima Emergencia" | "Medicina Interna" | ...
+
+  diagnosticoPrincipal?: DiagnosticoCIE;
+  diagnosticoSecundario?: DiagnosticoCIE;
+  causaExterna?: DiagnosticoCIE;
+
+  ingresoHospitalario: boolean;   // 1 = sí, 2 = no
+  tipoAfiliacion?: string;        // "ISSS Cotizante" | "ISSS Beneficiario" | ...
+  numeroAfiliacion?: string;
+  establecimientoReferido?: string;
+
+  // Metadata de importación
+  importadoEn: Date;
+  importadoPorId: string;
+  importadoPorNombre: string;
+  archivoOrigen?: string;
 }
