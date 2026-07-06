@@ -108,6 +108,16 @@ function contarPor<T>(items: T[], obtenerNombre: (item: T) => string | undefined
   return mapa;
 }
 
+function sumarMapas(...mapas: Map<string, number>[]): Map<string, number> {
+  const resultado = new Map<string, number>();
+  for (const mapa of mapas) {
+    for (const [nombre, valor] of mapa) {
+      resultado.set(nombre, (resultado.get(nombre) ?? 0) + valor);
+    }
+  }
+  return resultado;
+}
+
 function contarFranjas(fechas: Date[]): number[] {
   return FRANJAS.map(({ desde, hasta }) => fechas.filter(f => f.getHours() >= desde && f.getHours() < hasta).length);
 }
@@ -161,6 +171,7 @@ export default function ProductividadEsdomedPage() {
   const [controlIngresos, setControlIngresos] = useState<ControlIngreso[]>([]);
   const [fallecidosConfirmados, setFallecidosConfirmados] = useState<NotificacionFallecido[]>([]);
   const [fallecidosCertificado, setFallecidosCertificado] = useState<NotificacionFallecido[]>([]);
+  const [fallecidosSimmow, setFallecidosSimmow] = useState<NotificacionFallecido[]>([]);
   const [altas, setAltas] = useState<RegistroAlta[]>([]);
   const [altasEfectivasProcesadas, setAltasEfectivasProcesadas] = useState<NotificacionAltaVivo[]>([]);
   const [impresionesEntregadas, setImpresionesEntregadas] = useState<SolicitudImpresion[]>([]);
@@ -209,15 +220,17 @@ export default function ProductividadEsdomedPage() {
       getDocs(query(collection(db, "control_ingresos"), where("creadoEn", ">=", inicioTs), where("creadoEn", "<=", finTs))),
       getDocs(query(collection(db, "notificaciones_fallecidos"), where("confirmadoEn", ">=", inicioTs), where("confirmadoEn", "<=", finTs))),
       getDocs(query(collection(db, "notificaciones_fallecidos"), where("entregaCertificadoEn", ">=", inicioTs), where("entregaCertificadoEn", "<=", finTs))),
+      getDocs(query(collection(db, "notificaciones_fallecidos"), where("digitaSimmowEn", ">=", inicioTs), where("digitaSimmowEn", "<=", finTs))),
       getDocs(query(collection(db, "registro_altas"), where("fecha", ">=", iniStr), where("fecha", "<=", finStr))),
       getDocs(query(collection(db, "notificaciones_altas"), where("procesadoEn", ">=", inicioTs), where("procesadoEn", "<=", finTs))),
       getDocs(query(collection(db, "solicitudes_impresion"), where("impresoEn", ">=", inicioTs), where("impresoEn", "<=", finTs))),
       getDocs(query(collection(db, "traslados"), where("actualizadoEn", ">=", inicioTs), where("actualizadoEn", "<=", finTs))),
     ])
-      .then(([ingresosSnap, confirmadosSnap, certificadoSnap, altasSnap, altasProcesadasSnap, impresionesSnap, trasladosSnap]) => {
+      .then(([ingresosSnap, confirmadosSnap, certificadoSnap, simmowFallecidosSnap, altasSnap, altasProcesadasSnap, impresionesSnap, trasladosSnap]) => {
         setControlIngresos(ingresosSnap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
         setFallecidosConfirmados(confirmadosSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
         setFallecidosCertificado(certificadoSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
+        setFallecidosSimmow(simmowFallecidosSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
         setAltas(altasSnap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroAlta)));
         setAltasEfectivasProcesadas(
           altasProcesadasSnap.docs
@@ -240,7 +253,9 @@ export default function ProductividadEsdomedPage() {
   const certificadosEntregados = useMemo(() => contarPor(fallecidosCertificado, f => f.entregaCertificado), [fallecidosCertificado]);
   const altasEfectivas = useMemo(() => contarPor(altasEfectivasProcesadas, a => a.procesadoPorNombre), [altasEfectivasProcesadas]);
   const documentosEntregados = useMemo(() => contarPor(impresionesEntregadas, i => i.impresoPorNombre), [impresionesEntregadas]);
-  const altasSimmow = useMemo(() => contarPor(altas.filter(a => a.digitadorSimmow), a => a.digitadorSimmow), [altas]);
+  const altasSimmowVivo = useMemo(() => contarPor(altas.filter(a => a.digitadorSimmow), a => a.digitadorSimmow), [altas]);
+  const fallecidosSimmowConteo = useMemo(() => contarPor(fallecidosSimmow, f => f.digitaSimmow), [fallecidosSimmow]);
+  const altasSimmow = useMemo(() => sumarMapas(altasSimmowVivo, fallecidosSimmowConteo), [altasSimmowVivo, fallecidosSimmowConteo]);
   const trasladosProcesados = useMemo(() => contarPor(traslados, t => t.revisadoPorNombre), [traslados]);
 
   const registrosIngresos = useMemo(() => aRegistros(controlIngresos, i => i.responsableIngresoNombre ?? i.creadoPorNombre, i => i.creadoEn), [controlIngresos]);
@@ -285,9 +300,10 @@ export default function ProductividadEsdomedPage() {
     consentimientosDrive: Array.from(consentimientosDrive.values()).reduce((a, b) => a + b, 0),
   };
 
+  const altasSimmowVivoTotal = Array.from(altasSimmowVivo.values()).reduce((a, b) => a + b, 0);
   const simmowDona: PuntoDato[] = [
-    { nombre: "Digitadas en SIMMOW", valor: totales.altasSimmow },
-    { nombre: "Pendientes de digitar", valor: Math.max(0, totales.altasEfectivas - totales.altasSimmow) },
+    { nombre: "Digitadas en SIMMOW", valor: altasSimmowVivoTotal },
+    { nombre: "Pendientes de digitar", valor: Math.max(0, totales.altasEfectivas - altasSimmowVivoTotal) },
   ];
 
   const resumenPorPersona = useMemo(() => nombres.map(nombre => {
