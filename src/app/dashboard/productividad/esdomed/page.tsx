@@ -13,9 +13,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProductividadTabs } from "../_components/ProductividadTabs";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
+import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
 import type { NotificacionAltaVivo, NotificacionFallecido, RegistroAlta, SolicitudImpresion, SolicitudTraslado } from "@/types";
+
+const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos"] as const;
+type HojaDrive = (typeof HOJAS_DRIVE)[number];
 
 type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "franjas";
 
@@ -42,6 +47,9 @@ const COLUMNAS_RESUMEN = [
   { id: "documentos", label: "Docs. de alta entregados", corto: "Docs. alta" },
   { id: "simmow", label: "Altas digitadas SIMMOW", corto: "SIMMOW" },
   { id: "traslados", label: "Traslados procesados", corto: "Traslados" },
+  { id: "carpetasDrive", label: "Carpetas creadas (Drive)", corto: "Carpetas (Drive)" },
+  { id: "actualizacionesDrive", label: "Actualizaciones (Drive)", corto: "Actualiz. (Drive)" },
+  { id: "consentimientosDrive", label: "Consentimientos (Drive)", corto: "Consent. (Drive)" },
 ] as const;
 
 type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate";
@@ -125,9 +133,27 @@ function aRegistros<T>(items: T[], obtenerNombre: (item: T) => string | undefine
   return registros;
 }
 
+async function fetchHojaDrive(hoja: HojaDrive, mes: string, token: string, roster: string[]): Promise<Map<string, number>> {
+  const res = await fetch(`/api/productividad/historial-drive?hoja=${hoja}&mes=${mes}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const mapa = new Map<string, number>();
+  if (!res.ok) return mapa;
+  const data = await res.json() as { registros: { nombre: string; fecha: string }[] };
+  for (const registro of data.registros) {
+    const nombre = emparejarNombre(registro.nombre, roster);
+    mapa.set(nombre, (mapa.get(nombre) ?? 0) + 1);
+  }
+  return mapa;
+}
+
 export default function ProductividadEsdomedPage() {
+  const { user } = useAuth();
   const [mes, setMes] = useState(mesActualStr());
   const [personal, setPersonal] = useState<string[]>([]);
+  const [carpetasDrive, setCarpetasDrive] = useState<Map<string, number>>(new Map());
+  const [actualizacionesDrive, setActualizacionesDrive] = useState<Map<string, number>>(new Map());
+  const [consentimientosDrive, setConsentimientosDrive] = useState<Map<string, number>>(new Map());
   const [controlIngresos, setControlIngresos] = useState<ControlIngreso[]>([]);
   const [fallecidosConfirmados, setFallecidosConfirmados] = useState<NotificacionFallecido[]>([]);
   const [fallecidosCertificado, setFallecidosCertificado] = useState<NotificacionFallecido[]>([]);
@@ -149,6 +175,26 @@ export default function ProductividadEsdomedPage() {
       .then(s => setPersonal(s.docs.map(d => (d.data().nombre as string)).filter(Boolean).sort((a, b) => a.localeCompare(b))))
       .catch(() => setPersonal([]));
   }, []);
+
+  useEffect(() => {
+    if (!user || personal.length === 0) return;
+    let cancelado = false;
+    user.getIdToken()
+      .then(token => Promise.all(HOJAS_DRIVE.map(hoja => fetchHojaDrive(hoja, mes, token, personal))))
+      .then(([carpetas, actualizaciones, consentimientos]) => {
+        if (cancelado) return;
+        setCarpetasDrive(carpetas);
+        setActualizacionesDrive(actualizaciones);
+        setConsentimientosDrive(consentimientos);
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setCarpetasDrive(new Map());
+        setActualizacionesDrive(new Map());
+        setConsentimientosDrive(new Map());
+      });
+    return () => { cancelado = true; };
+  }, [user, personal, mes]);
 
   useEffect(() => {
     queueMicrotask(() => setLoading(true));
@@ -216,11 +262,11 @@ export default function ProductividadEsdomedPage() {
 
   const nombres = useMemo(() => {
     const set = new Set<string>(personal);
-    for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados]) {
+    for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]) {
       for (const nombre of mapa.keys()) set.add(nombre);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados]);
+  }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]);
 
   const totales = {
     expedientesCreados: controlIngresos.length,
@@ -230,6 +276,9 @@ export default function ProductividadEsdomedPage() {
     documentosEntregados: Array.from(documentosEntregados.values()).reduce((a, b) => a + b, 0),
     altasSimmow: Array.from(altasSimmow.values()).reduce((a, b) => a + b, 0),
     trasladosProcesados: Array.from(trasladosProcesados.values()).reduce((a, b) => a + b, 0),
+    carpetasDrive: Array.from(carpetasDrive.values()).reduce((a, b) => a + b, 0),
+    actualizacionesDrive: Array.from(actualizacionesDrive.values()).reduce((a, b) => a + b, 0),
+    consentimientosDrive: Array.from(consentimientosDrive.values()).reduce((a, b) => a + b, 0),
   };
 
   const simmowDona: PuntoDato[] = [
@@ -246,6 +295,9 @@ export default function ProductividadEsdomedPage() {
       documentos: documentosEntregados.get(nombre) ?? 0,
       simmow: altasSimmow.get(nombre) ?? 0,
       traslados: trasladosProcesados.get(nombre) ?? 0,
+      carpetasDrive: carpetasDrive.get(nombre) ?? 0,
+      actualizacionesDrive: actualizacionesDrive.get(nombre) ?? 0,
+      consentimientosDrive: consentimientosDrive.get(nombre) ?? 0,
     };
     const total = Object.values(valores).reduce((sum, valor) => sum + valor, 0);
     return { nombre, valores, total };
@@ -258,6 +310,9 @@ export default function ProductividadEsdomedPage() {
     documentosEntregados,
     altasSimmow,
     trasladosProcesados,
+    carpetasDrive,
+    actualizacionesDrive,
+    consentimientosDrive,
   ]);
 
   const exportarExcel = async () => {
@@ -267,7 +322,7 @@ export default function ProductividadEsdomedPage() {
       const aoa: (string | number)[][] = [
         ["Productividad ESDOMED", mes],
         [],
-        ["Nombre", "Expedientes creados", "Defunciones procesadas", "Certificados entregados", "Altas efectivas", "Documentos de alta entregados", "Altas digitadas SIMMOW", "Traslados procesados"],
+        ["Nombre", "Expedientes creados", "Defunciones procesadas", "Certificados entregados", "Altas efectivas", "Documentos de alta entregados", "Altas digitadas SIMMOW", "Traslados procesados", "Carpetas creadas (Drive)", "Actualizaciones (Drive)", "Consentimientos (Drive)"],
         ...nombres.map(nombre => [
           nombre,
           expedientesCreados.get(nombre) ?? 0,
@@ -277,6 +332,9 @@ export default function ProductividadEsdomedPage() {
           documentosEntregados.get(nombre) ?? 0,
           altasSimmow.get(nombre) ?? 0,
           trasladosProcesados.get(nombre) ?? 0,
+          carpetasDrive.get(nombre) ?? 0,
+          actualizacionesDrive.get(nombre) ?? 0,
+          consentimientosDrive.get(nombre) ?? 0,
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
