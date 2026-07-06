@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     if (!respuesta.ok) return NextResponse.json({ error: "No se pudo leer la hoja" }, { status: 502 });
     const texto = await respuesta.text();
 
-    const libro = XLSX.read(texto, { type: "string" });
+    const libro = XLSX.read(texto, { type: "string", raw: true });
     const hojaDatos = libro.Sheets[libro.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json<(string | number)[]>(hojaDatos, { header: 1 });
 
