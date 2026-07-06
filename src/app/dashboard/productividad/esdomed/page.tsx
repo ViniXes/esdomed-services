@@ -300,11 +300,6 @@ export default function ProductividadEsdomedPage() {
     consentimientosDrive: Array.from(consentimientosDrive.values()).reduce((a, b) => a + b, 0),
   };
 
-  const simmowDona: PuntoDato[] = [
-    { nombre: "Digitadas en SIMMOW", valor: totales.altasSimmow },
-    { nombre: "Pendientes de digitar", valor: Math.max(0, totales.altasEfectivas - totales.altasSimmow) },
-  ];
-
   const resumenPorPersona = useMemo(() => nombres.map(nombre => {
     const valores = {
       expedientes: expedientesCreados.get(nombre) ?? 0,
@@ -497,7 +492,7 @@ export default function ProductividadEsdomedPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <GraficoBarras titulo="Altas efectivas por persona" datos={mapaAArray(altasEfectivas)} color="#3b82f6" />
               <GraficoBarras titulo="Traslados procesados por persona" datos={mapaAArray(trasladosProcesados)} color="#8b5cf6" />
-              <GraficoPastel titulo="Altas digitadas en SIMMOW" datos={simmowDona} />
+              <GraficoBarras titulo="Altas digitadas en SIMMOW por persona" datos={mapaAArray(altasSimmow)} color="#14b8a6" />
             </div>
           )}
 
