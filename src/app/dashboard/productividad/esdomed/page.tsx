@@ -9,8 +9,11 @@ import {
   Cloud,
   Download,
   FileCheck2,
+  FileSignature,
   FileText,
+  FolderCheck,
   HeartPulse,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -54,7 +57,7 @@ const COLUMNAS_RESUMEN = [
   { id: "consentimientosDrive", label: "Consentimientos (Drive)", corto: "Consent. (Drive)" },
 ] as const;
 
-type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate";
+type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate" | "indigo" | "teal" | "pink";
 
 const tonosTarjeta: Record<TonoTarjeta, { barra: string; icono: string }> = {
   blue: { barra: "bg-blue-500", icono: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
@@ -64,6 +67,9 @@ const tonosTarjeta: Record<TonoTarjeta, { barra: string; icono: string }> = {
   cyan: { barra: "bg-cyan-500", icono: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" },
   violet: { barra: "bg-violet-500", icono: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
   slate: { barra: "bg-slate-500", icono: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200" },
+  indigo: { barra: "bg-indigo-500", icono: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  teal: { barra: "bg-teal-500", icono: "bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" },
+  pink: { barra: "bg-pink-500", icono: "bg-pink-50 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300" },
 };
 
 const selectCls =
@@ -397,7 +403,7 @@ export default function ProductividadEsdomedPage() {
 
           {vista === "resumen" && (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2.5">
                 <TarjetaTotal label="Expedientes creados" valor={totales.expedientesCreados} icon={FileText} tono="blue" />
                 <TarjetaTotal label="Defunciones procesadas" valor={totales.defuncionesProcesadas} icon={HeartPulse} tono="rose" />
                 <TarjetaTotal label="Certificados entregados" valor={totales.certificadosEntregados} icon={FileCheck2} tono="amber" />
@@ -405,6 +411,9 @@ export default function ProductividadEsdomedPage() {
                 <TarjetaTotal label="Docs. de alta entregados" valor={totales.documentosEntregados} icon={FileCheck2} tono="cyan" />
                 <TarjetaTotal label="Altas digitadas SIMMOW" valor={totales.altasSimmow} icon={BadgeCheck} tono="violet" />
                 <TarjetaTotal label="Traslados procesados" valor={totales.trasladosProcesados} icon={Clock3} tono="slate" />
+                <TarjetaTotal label="Carpetas creadas (Drive)" valor={totales.carpetasDrive} icon={FolderCheck} tono="indigo" />
+                <TarjetaTotal label="Actualizaciones (Drive)" valor={totales.actualizacionesDrive} icon={RefreshCw} tono="teal" />
+                <TarjetaTotal label="Consentimientos (Drive)" valor={totales.consentimientosDrive} icon={FileSignature} tono="pink" />
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
