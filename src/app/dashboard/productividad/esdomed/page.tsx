@@ -9,11 +9,7 @@ import {
   Cloud,
   Download,
   FileCheck2,
-  FileSignature,
-  FileText,
-  FolderCheck,
   HeartPulse,
-  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -59,17 +55,17 @@ const COLUMNAS_RESUMEN = [
 
 type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate" | "indigo" | "teal" | "pink";
 
-const tonosTarjeta: Record<TonoTarjeta, { barra: string; icono: string }> = {
-  blue: { barra: "bg-blue-500", icono: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
-  rose: { barra: "bg-rose-500", icono: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
-  amber: { barra: "bg-amber-500", icono: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
-  emerald: { barra: "bg-emerald-500", icono: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  cyan: { barra: "bg-cyan-500", icono: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" },
-  violet: { barra: "bg-violet-500", icono: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
-  slate: { barra: "bg-slate-500", icono: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200" },
-  indigo: { barra: "bg-indigo-500", icono: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
-  teal: { barra: "bg-teal-500", icono: "bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300" },
-  pink: { barra: "bg-pink-500", icono: "bg-pink-50 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300" },
+const tonosTarjeta: Record<TonoTarjeta, { barra: string }> = {
+  blue: { barra: "bg-blue-500" },
+  rose: { barra: "bg-rose-500" },
+  amber: { barra: "bg-amber-500" },
+  emerald: { barra: "bg-emerald-500" },
+  cyan: { barra: "bg-cyan-500" },
+  violet: { barra: "bg-violet-500" },
+  slate: { barra: "bg-slate-500" },
+  indigo: { barra: "bg-indigo-500" },
+  teal: { barra: "bg-teal-500" },
+  pink: { barra: "bg-pink-500" },
 };
 
 const selectCls =
@@ -404,16 +400,16 @@ export default function ProductividadEsdomedPage() {
           {vista === "resumen" && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2.5">
-                <TarjetaTotal label="Expedientes creados" valor={totales.expedientesCreados} icon={FileText} tono="blue" />
-                <TarjetaTotal label="Defunciones procesadas" valor={totales.defuncionesProcesadas} icon={HeartPulse} tono="rose" />
-                <TarjetaTotal label="Certificados entregados" valor={totales.certificadosEntregados} icon={FileCheck2} tono="amber" />
-                <TarjetaTotal label="Altas efectivas" valor={totales.altasEfectivas} icon={BadgeCheck} tono="emerald" />
-                <TarjetaTotal label="Docs. de alta entregados" valor={totales.documentosEntregados} icon={FileCheck2} tono="cyan" />
-                <TarjetaTotal label="Altas digitadas SIMMOW" valor={totales.altasSimmow} icon={BadgeCheck} tono="violet" />
-                <TarjetaTotal label="Traslados procesados" valor={totales.trasladosProcesados} icon={Clock3} tono="slate" />
-                <TarjetaTotal label="Carpetas creadas (Drive)" valor={totales.carpetasDrive} icon={FolderCheck} tono="indigo" />
-                <TarjetaTotal label="Actualizaciones (Drive)" valor={totales.actualizacionesDrive} icon={RefreshCw} tono="teal" />
-                <TarjetaTotal label="Consentimientos (Drive)" valor={totales.consentimientosDrive} icon={FileSignature} tono="pink" />
+                <TarjetaTotal label="Expedientes creados" valor={totales.expedientesCreados} tono="blue" />
+                <TarjetaTotal label="Defunciones procesadas" valor={totales.defuncionesProcesadas} tono="rose" />
+                <TarjetaTotal label="Certificados entregados" valor={totales.certificadosEntregados} tono="amber" />
+                <TarjetaTotal label="Altas efectivas" valor={totales.altasEfectivas} tono="emerald" />
+                <TarjetaTotal label="Docs. de alta entregados" valor={totales.documentosEntregados} tono="cyan" />
+                <TarjetaTotal label="Altas digitadas SIMMOW" valor={totales.altasSimmow} tono="violet" />
+                <TarjetaTotal label="Traslados procesados" valor={totales.trasladosProcesados} tono="slate" />
+                <TarjetaTotal label="Carpetas creadas (Drive)" valor={totales.carpetasDrive} tono="indigo" />
+                <TarjetaTotal label="Actualizaciones (Drive)" valor={totales.actualizacionesDrive} tono="teal" />
+                <TarjetaTotal label="Consentimientos (Drive)" valor={totales.consentimientosDrive} tono="pink" />
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -554,20 +550,13 @@ export default function ProductividadEsdomedPage() {
   );
 }
 
-function TarjetaTotal({ label, valor, icon: Icon, tono }: { label: string; valor: number; icon: LucideIcon; tono: TonoTarjeta }) {
+function TarjetaTotal({ label, valor, tono }: { label: string; valor: number; tono: TonoTarjeta }) {
   const clases = tonosTarjeta[tono];
   return (
     <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
       <div className={`absolute inset-x-0 top-0 h-1 ${clases.barra}`} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-1 text-2xl font-bold font-heading tabular-nums text-slate-900 dark:text-slate-100">{valor}</p>
-        </div>
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${clases.icono}`}>
-          <Icon size={16} />
-        </div>
-      </div>
+      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-bold font-heading tabular-nums text-slate-900 dark:text-slate-100">{valor}</p>
     </div>
   );
 }
