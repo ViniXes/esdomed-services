@@ -192,11 +192,14 @@ service cloud.firestore {
     }
 
     // ─── Notificaciones de fallecidos ─────────────────────────────────────────
+    // Delete: ESDOMED puede eliminar notificaciones duplicadas, pero NO las de
+    // trámite cerrado (esas solo el admin, previa revisión).
     match /notificaciones_fallecidos/{id} {
       allow read:   if isAuth() && (isStaff() || isPsicologia() || isTrabajoSocial() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
       allow update: if isStaff() || isPsicologia() || isTrabajoSocial();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin()
+                    || (isEsdomed() && resource.data.tramiteCerrado != true);
     }
 
     // ─── Solicitudes de impresión ─────────────────────────────────────────────

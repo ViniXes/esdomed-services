@@ -57,6 +57,7 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   recibida: "Acusada de recibido",
   duplicada: "Duplicada",
   revertida: "Alta revertida",
+  rechazada: "Rechazada por ESDOMED",
 };
 
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
@@ -68,6 +69,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   revertida: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
+  rechazada: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
@@ -354,6 +356,19 @@ export default function EnfermeriaMovimientosPage() {
                   <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
                     Notificacion duplicada cerrada por ESDOMED - {formatFecha(n.duplicadoEn)}
                   </p>
+                )}
+                {n.estado === "rechazada" && (
+                  <>
+                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      Rechazada por ESDOMED{n.rechazadoEn ? ` - ${formatFecha(n.rechazadoEn)}` : ""}
+                    </p>
+                    {n.rechazoNota && (
+                      <p className="text-xs text-slate-600 dark:text-slate-300 rounded-lg border border-red-200/70 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/30 px-3 py-2 mt-1">
+                        <span className="font-semibold">Motivo:</span> {n.rechazoNota}
+                        <span className="block mt-0.5 text-[11px] text-slate-500">Si el alta sí corresponde, envía una notificación nueva.</span>
+                      </p>
+                    )}
+                  </>
                 )}
                 {n.observacionEsdomedMotivo && (
                   <details className="group mt-2 rounded-lg border border-rose-200/70 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 px-3 py-2 text-slate-900 dark:text-slate-100">

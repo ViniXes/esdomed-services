@@ -58,7 +58,7 @@ export function GraficoBarras({ titulo, datos, color = PALETA_PRODUCTIVIDAD[0], 
             <CartesianGrid strokeDasharray="3 3" horizontal={false} className={gridCls} />
             <XAxis type="number" tick={{ ...ejeTick, fontSize: 11 }} allowDecimals={false} />
             <YAxis type="category" dataKey="nombre" width={140} tick={{ ...ejeTick, fontSize: 11 }} />
-            <Tooltip {...tooltipStyle()} formatter={valor => [`${valor}${sufijo}`, ""]} />
+            <Tooltip {...tooltipStyle()} formatter={(valor?: number | string | readonly (number | string)[]) => [`${valor ?? 0}${sufijo}`, ""]} />
             <Bar dataKey="valor" fill={color} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>

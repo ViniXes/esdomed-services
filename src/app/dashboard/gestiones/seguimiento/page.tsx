@@ -9,14 +9,14 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { GestionTS, Paciente, RastreoTS } from "@/types";
 import {
-  ACCIONES_SEGUIMIENTO, ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL,
-  habilitaSeguimiento, keyAccionSeguimiento, labelTipoGestion,
-  type AccionSeguimiento, type EstadoRastreo,
+  ACCIONES_SEGUIMIENTO, ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL, esTipoVisita,
+  GRUPOS_GESTION_TS, habilitaSeguimiento, keyAccionSeguimiento, labelTipoGestion,
+  TIPOS_GESTION_TS, type AccionSeguimiento, type EstadoRastreo,
 } from "@/lib/trabajosocial/catalogos";
 import { GestionesTabs } from "../_components/GestionesTabs";
 import {
   AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Loader2, Lock,
-  Phone, PhoneCall, Search, StickyNote, Stethoscope, Users, Video, X,
+  Phone, PhoneCall, Plus, Search, StickyNote, Stethoscope, Users, Video, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -216,6 +216,28 @@ export default function SeguimientoPage() {
     await addDoc(collection(db, "gestiones_ts"), payload);
   }, [profile]);
 
+  // Registra una gestión ADICIONAL (cualquier tipo del catálogo fuera de los 5
+  // chips) sin salir del pasar-lista. Es una gestión normal en gestiones_ts.
+  const marcarAdicional = useCallback(async (p: Paciente, tipo: string) => {
+    if (!profile || !tipo) return;
+    const nuevo: Record<string, unknown> = {
+      expediente: p.expediente,
+      pacienteNombre: nombrePac(p),
+      servicio: p.servicioActual || undefined,
+      estadoPaciente: "actual",
+      vinculadoPadron: true,
+      tipo,
+      resultadoVisita: esTipoVisita(tipo) ? "realizada" : undefined,
+      modalidad: "presencial",
+      fecha: hoyStr(),
+      trabajadoraId: profile.uid,
+      trabajadoraNombre: profile.nombre,
+      creadoEn: Timestamp.now(),
+    };
+    const payload = Object.fromEntries(Object.entries(nuevo).filter(([, v]) => v !== undefined));
+    await addDoc(collection(db, "gestiones_ts"), payload);
+  }, [profile]);
+
   // Agrega/edita la nota de MI última marca de hoy de esa acción (el flujo es
   // marcar primero y anotar después; texto vacío borra la nota).
   const guardarNota = useCallback(async (p: Paciente, a: AccionSeguimiento, texto: string) => {
@@ -364,6 +386,14 @@ export default function SeguimientoPage() {
                   setToast({ tipo: "error", msg: "No se pudo guardar la nota" });
                 }
               }}
+              onAdicional={async (tipo) => {
+                try {
+                  await marcarAdicional(p, tipo);
+                  setToast({ tipo: "success", msg: `${labelTipoGestion(tipo)} — ${nombrePac(p)}` });
+                } catch {
+                  setToast({ tipo: "error", msg: "No se pudo registrar la gestión adicional" });
+                }
+              }}
               onDeshacer={async (a) => {
                 try {
                   await deshacer(p, a);
@@ -413,7 +443,7 @@ export default function SeguimientoPage() {
 
 // ── Fila de paciente (pasar lista) ───────────────────────────────────────────
 function FilaSeguimiento({
-  paciente: p, rastreo, estadoRastreo, hoy, mes, mias, adicionales, onMarcar, onDeshacer, onNota, onContactar,
+  paciente: p, rastreo, estadoRastreo, hoy, mes, mias, adicionales, onMarcar, onDeshacer, onNota, onAdicional, onContactar,
 }: {
   paciente: Paciente;
   rastreo?: RastreoTS;
@@ -425,6 +455,7 @@ function FilaSeguimiento({
   onMarcar: (a: AccionSeguimiento) => Promise<void>;
   onDeshacer: (a: AccionSeguimiento) => Promise<void>;
   onNota: (a: AccionSeguimiento, texto: string) => Promise<void>;
+  onAdicional: (tipo: string) => Promise<void>;
   onContactar: () => Promise<void>;
 }) {
   const bloqueado = !habilitaSeguimiento(estadoRastreo === "pendiente" ? undefined : estadoRastreo);
@@ -433,6 +464,10 @@ function FilaSeguimiento({
   const [notaKey, setNotaKey] = useState<string | null>(null);
   const [notaTexto, setNotaTexto] = useState("");
   const [guardandoNota, setGuardandoNota] = useState(false);
+  // Selector de gestión adicional (cualquier tipo del catálogo).
+  const [adicionalAbierto, setAdicionalAbierto] = useState(false);
+  const [tipoAdicional, setTipoAdicional] = useState("");
+  const [guardandoAdicional, setGuardandoAdicional] = useState(false);
 
   const familiar = rastreo?.familiarNombre || p.responsable?.nombre || "";
   const telefono = rastreo?.telefono || p.responsable?.telefono || p.telefono || "";
@@ -473,6 +508,18 @@ function FilaSeguimiento({
     }
   };
   const accionNota = ACCIONES_SEGUIMIENTO.find((a) => a.key === notaKey);
+
+  const registrarAdicional = async () => {
+    if (!tipoAdicional) return;
+    setGuardandoAdicional(true);
+    try {
+      await onAdicional(tipoAdicional);
+      setTipoAdicional("");
+      setAdicionalAbierto(false);
+    } finally {
+      setGuardandoAdicional(false);
+    }
+  };
 
   const totalMes = ACCIONES_SEGUIMIENTO
     .map((a) => ({ a, n: mes?.get(a.key) ?? 0 }))
@@ -594,7 +641,60 @@ function FilaSeguimiento({
                   </span>
                 );
               })}
+              {/* Chip: gestión adicional (cualquier tipo del catálogo) */}
+              <button
+                onClick={() => setAdicionalAbierto((v) => !v)}
+                disabled={!!ocupada}
+                title="Registrar otra gestión del catálogo para este paciente"
+                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors disabled:opacity-60 ${
+                  (adicionales?.length ?? 0) > 0
+                    ? "bg-violet-50 dark:bg-violet-950 border-violet-300 dark:border-violet-800 text-violet-700 dark:text-violet-300"
+                    : adicionalAbierto
+                      ? "bg-violet-50 dark:bg-violet-950 border-violet-300 dark:border-violet-800 text-violet-700 dark:text-violet-300"
+                      : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-violet-400"
+                }`}
+              >
+                <Plus size={13} />
+                Gestión adicional
+                {(adicionales?.length ?? 0) > 0 && <span className="font-bold tabular-nums">{adicionales!.length}</span>}
+              </button>
             </div>
+
+            {/* Selector de gestión adicional */}
+            {adicionalAbierto && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  value={tipoAdicional}
+                  onChange={(e) => setTipoAdicional(e.target.value)}
+                  autoFocus
+                  className={selectCls + " flex-1 min-w-[220px]"}
+                >
+                  <option value="">— Selecciona el tipo de gestión</option>
+                  {GRUPOS_GESTION_TS.map((grupo) => (
+                    <optgroup key={grupo} label={grupo}>
+                      {TIPOS_GESTION_TS.filter((t) => t.grupo === grupo).map((t) => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <button
+                  onClick={registrarAdicional}
+                  disabled={!tipoAdicional || guardandoAdicional}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {guardandoAdicional ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  Registrar
+                </button>
+                <button
+                  onClick={() => { setAdicionalAbierto(false); setTipoAdicional(""); }}
+                  disabled={guardandoAdicional}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-2 py-2 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
 
             {/* Nota de MI marca de hoy (se abre desde el segmento 📝 del chip) */}
             {notaKey && accionNota && (

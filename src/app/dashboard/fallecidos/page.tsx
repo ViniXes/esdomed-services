@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, getDocs, doc, updateDoc, Timestamp, where, limit } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, updateDoc, Timestamp, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, Lock, LockOpen, Search, MessageCircle } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2 } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -57,6 +57,9 @@ export default function DashboardFallecidosPage() {
   const [savedFamiliar, setSavedFamiliar] = useState(false);
   const [fiehPendiente, setFiehPendiente] = useState(false);
   const [duiValidado, setDuiValidado] = useState(false);
+  // Eliminación de notificaciones duplicadas (con confirmación).
+  const [aEliminar, setAEliminar] = useState<NotificacionFallecido | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(500));
@@ -197,6 +200,23 @@ export default function DashboardFallecidosPage() {
     setSavingFamiliar(false);
     setSavedFamiliar(true);
     setTimeout(() => setSavedFamiliar(false), 3000);
+  };
+
+  // Elimina una notificación duplicada. No toca al paciente: si ya fue marcado
+  // fallecido por la notificación buena, ese estado se conserva.
+  const eliminarNotificacion = async () => {
+    const n = aEliminar;
+    if (!n?.id) return;
+    setEliminando(true);
+    try {
+      await deleteDoc(doc(db, "notificaciones_fallecidos", n.id));
+      if (selected?.id === n.id) setSelected(null);
+      setAEliminar(null);
+    } catch {
+      /* las reglas bloquean trámites cerrados para no-admin */
+    } finally {
+      setEliminando(false);
+    }
   };
 
   const enviarWhatsApp = (n: NotificacionFallecido) => {
@@ -428,11 +448,22 @@ export default function DashboardFallecidosPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         <button onClick={() => setSelected(n)}
-                          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 transition-colors whitespace-nowrap">
+                          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 transition-colors">
                           Ver detalle
                         </button>
+                        {/* Eliminar duplicados: trámites cerrados solo el admin */}
+                        {(!n.tramiteCerrado || isAdmin) && (
+                          <button
+                            onClick={() => setAEliminar(n)}
+                            title="Eliminar notificación (duplicado)"
+                            aria-label="Eliminar notificación"
+                            className="ml-2.5 p-1 rounded-md text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors align-middle"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -931,6 +962,50 @@ export default function DashboardFallecidosPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación de eliminación (duplicados) */}
+      {aEliminar && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-900 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-rose-600 dark:text-rose-300" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-900 dark:text-slate-100">Eliminar notificación de fallecido</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Se eliminará la notificación de <strong>{aEliminar.pacienteNombre}</strong> (Exp.{" "}
+                  <span className="font-mono">{aEliminar.pacienteExpediente}</span>), incluido su seguimiento
+                  (SIMMOW, certificado, entrega). Úsalo solo para <strong>duplicados</strong> — esta acción no se
+                  puede deshacer y no cambia el estado del paciente.
+                </p>
+              </div>
+            </div>
+            {aEliminar.estado === "confirmado" && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
+                Esta notificación ya fue confirmada. Verifica que exista otra notificación del mismo fallecimiento antes de eliminarla.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAEliminar(null)}
+                disabled={eliminando}
+                className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={eliminarNotificacion}
+                disabled={eliminando}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {eliminando ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                Eliminar
+              </button>
             </div>
           </div>
         </div>
