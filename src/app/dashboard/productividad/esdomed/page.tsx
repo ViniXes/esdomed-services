@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   BarChart3,
   Clock3,
+  Cloud,
   Download,
   FileCheck2,
   FileText,
@@ -22,7 +23,7 @@ import type { NotificacionAltaVivo, NotificacionFallecido, RegistroAlta, Solicit
 const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos"] as const;
 type HojaDrive = (typeof HOJAS_DRIVE)[number];
 
-type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "franjas";
+type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "drive" | "franjas";
 
 type ControlIngreso = {
   id?: string;
@@ -36,6 +37,7 @@ const VISTAS: { id: Vista; label: string; icon: LucideIcon }[] = [
   { id: "expedientes", label: "Expedientes y defunciones", icon: HeartPulse },
   { id: "documentos", label: "Documentos entregados", icon: FileCheck2 },
   { id: "altas", label: "Altas y SIMMOW", icon: BadgeCheck },
+  { id: "drive", label: "Historial Drive", icon: Cloud },
   { id: "franjas", label: "Franjas horarias", icon: Clock3 },
 ];
 
@@ -375,7 +377,7 @@ export default function ProductividadEsdomedPage() {
         <p className="text-sm text-slate-400 py-16 text-center">Cargando...</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white/80 p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white/80 p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:grid-cols-3 lg:grid-cols-6">
             {VISTAS.map(item => (
               <button
                 key={item.id}
@@ -476,6 +478,14 @@ export default function ProductividadEsdomedPage() {
               <GraficoBarras titulo="Altas efectivas por persona" datos={mapaAArray(altasEfectivas)} color="#3b82f6" />
               <GraficoBarras titulo="Traslados procesados por persona" datos={mapaAArray(trasladosProcesados)} color="#8b5cf6" />
               <GraficoPastel titulo="Altas digitadas en SIMMOW" datos={simmowDona} />
+            </div>
+          )}
+
+          {vista === "drive" && (
+            <div className="grid gap-4 lg:grid-cols-3">
+              <GraficoBarras titulo="Carpetas creadas (Drive)" datos={mapaAArray(carpetasDrive)} color="#f59e0b" />
+              <GraficoBarras titulo="Actualizaciones (Drive)" datos={mapaAArray(actualizacionesDrive)} color="#06b6d4" />
+              <GraficoBarras titulo="Consentimientos (Drive)" datos={mapaAArray(consentimientosDrive)} color="#ec4899" />
             </div>
           )}
 
