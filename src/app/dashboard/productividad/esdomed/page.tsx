@@ -300,10 +300,9 @@ export default function ProductividadEsdomedPage() {
     consentimientosDrive: Array.from(consentimientosDrive.values()).reduce((a, b) => a + b, 0),
   };
 
-  const altasSimmowVivoTotal = Array.from(altasSimmowVivo.values()).reduce((a, b) => a + b, 0);
   const simmowDona: PuntoDato[] = [
-    { nombre: "Digitadas en SIMMOW", valor: altasSimmowVivoTotal },
-    { nombre: "Pendientes de digitar", valor: Math.max(0, totales.altasEfectivas - altasSimmowVivoTotal) },
+    { nombre: "Digitadas en SIMMOW", valor: totales.altasSimmow },
+    { nombre: "Pendientes de digitar", valor: Math.max(0, totales.altasEfectivas - totales.altasSimmow) },
   ];
 
   const resumenPorPersona = useMemo(() => nombres.map(nombre => {
