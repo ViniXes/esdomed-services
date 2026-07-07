@@ -746,6 +746,8 @@ export function AltasVivosView() {
   const [rechazandoId, setRechazandoId] = useState<string | null>(null);
   const [rechazandoLoading, setRechazandoLoading] = useState(false);
 
+  const [reabriendoId, setReabriendoId] = useState<string | null>(null);
+
   const [observandoId, setObservandoId] = useState<string | null>(null);
   const [observandoLoading, setObservandoLoading] = useState(false);
   const [quitandoObservacionId, setQuitandoObservacionId] = useState<string | null>(null);
@@ -886,6 +888,25 @@ export function AltasVivosView() {
     } finally {
       setRechazandoLoading(false);
       setRechazandoId(null);
+    }
+  };
+
+  const reabrirNotificacion = async (id: string) => {
+    if (!user || !profile) return;
+    setReabriendoId(id);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${id}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "reabrir" }),
+      });
+      if (!res.ok) throw new Error("No se pudo reabrir la notificacion.");
+    } finally {
+      setReabriendoId(null);
     }
   };
 
@@ -1229,6 +1250,22 @@ export function AltasVivosView() {
                   >
                     <Ban size={13} />
                     Rechazar
+                  </button>
+                </div>
+              )}
+
+              {/* ESDOMED: reabrir una rechazada por error → vuelve a "pendiente"
+                  para gestionarla de nuevo (p. ej. dejarla con observación) */}
+              {isEsdomed && n.estado === "rechazada" && (
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => reabrirNotificacion(n.id!)}
+                    disabled={reabriendoId === n.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900/60 border border-orange-200 dark:border-orange-800 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Undo2 size={13} />
+                    {reabriendoId === n.id ? "Reabriendo..." : "Reabrir (rechazada por error)"}
                   </button>
                 </div>
               )}

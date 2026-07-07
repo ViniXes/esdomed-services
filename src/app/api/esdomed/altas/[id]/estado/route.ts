@@ -143,6 +143,7 @@ type Body =
   | { action: "procesar" }
   | { action: "revertir"; nota?: string }
   | { action: "rechazar"; nota: string }
+  | { action: "reabrir" }
   | { action: "observar"; motivo: MotivoObservacionAlta; detalle: string }
   | { action: "quitar_observacion" };
 
@@ -203,6 +204,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // No bloqueamos la reversión de la notificación si la reactivación falla.
       console.error("No se pudo reactivar al paciente tras revertir el alta:", e);
     }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Reabrir una notificación rechazada por error: la devuelve a "pendiente" para
+  // poder gestionarla de nuevo (p. ej. dejarla con observación mientras se corrige).
+  // El rechazo nunca desactivó al paciente, así que no hay nada que reactivar.
+  if (body.action === "reabrir") {
+    if (actual.estado !== "rechazada") {
+      return NextResponse.json({ error: "Solo se puede reabrir una notificacion rechazada." }, { status: 409 });
+    }
+    await ref.update({
+      estado: "pendiente",
+      rechazadoPorId: FieldValue.delete(),
+      rechazadoPorNombre: FieldValue.delete(),
+      rechazadoEn: FieldValue.delete(),
+      rechazoNota: FieldValue.delete(),
+      // Rastro de quién reabrió (intervención de ESDOMED, igual que observar/rechazar).
+      modificadoPorId: caller.uid,
+      modificadoPorNombre: caller.nombre,
+      modificadoPorRol: caller.role,
+      modificadoEn: FieldValue.serverTimestamp(),
+    });
     return NextResponse.json({ ok: true });
   }
 
