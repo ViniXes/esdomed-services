@@ -1,53 +1,70 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowDownWideNarrow, ArrowUpWideNarrow, BedDouble, Clock, Filter, ChevronDown, Search, X } from "lucide-react";
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, BedDouble, Clock, Filter, ChevronDown, Search, X, RefreshCw } from "lucide-react";
 import type { Paciente } from "@/types";
 import { calcularEdad, diasEstancia, formatFecha, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
 
 type Orden = "antiguos" | "recientes";
 
+// Caché de módulo: el censo activo consultado sobrevive a la navegación SPA (no a
+// una recarga completa). Evita releer los ~cientos de docs al volver a la vista.
+let cachePacientesActivos: Paciente[] | null = null;
+let cacheActualizadoEn: Date | null = null;
+
 export default function PacientesActivosPsicologiaPage() {
   const { profile } = useAuth();
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pacientes, setPacientes] = useState<Paciente[]>(() => cachePacientesActivos ?? []);
+  const [loading, setLoading] = useState(cachePacientesActivos === null);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(cacheActualizadoEn);
   const [error, setError] = useState("");
   const [servicioFiltro, setServicioFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState<Orden>("antiguos");
 
-  useEffect(() => {
-    if (!profile) return;
-    // Misma fuente que ESDOMED: ingresos activos. Sin orderBy en la consulta para
-    // no depender de un índice compuesto (estado + fechaIngreso); ordenamos en cliente.
-    const q = query(
-      collection(db, "pacientes"),
-      where("estado", "==", "activo"),
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setError("");
-      setPacientes(
-        snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            ...data,
-            fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-            fechaNacimiento: toDate(data.fechaNacimiento),
-          } as Paciente;
-        }),
+  // Lectura puntual bajo demanda (una vez al abrir + botón "Actualizar") en lugar de
+  // un listener en vivo: el censo activo ya no se relee en cada cambio mientras la
+  // pestaña queda abierta. Misma fuente que ESDOMED (ingresos activos). Sin orderBy
+  // para no requerir índice compuesto (estado + fechaIngreso); se ordena en cliente.
+  const consultar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "pacientes"), where("estado", "==", "activo")),
       );
-      setLoading(false);
-    }, (err) => {
+      const lista = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+          fechaNacimiento: toDate(data.fechaNacimiento),
+        } as Paciente;
+      });
+      cachePacientesActivos = lista;
+      cacheActualizadoEn = new Date();
+      setPacientes(lista);
+      setActualizadoEn(cacheActualizadoEn);
+      setError("");
+    } catch (err) {
       console.error("pacientes-activos:", err);
-      setError(err.message || "No se pudieron cargar los pacientes.");
+      setError((err as Error).message || "No se pudieron cargar los pacientes.");
+    } finally {
       setLoading(false);
-    });
-    return unsub;
-  }, [profile]);
+    }
+  }, []);
+
+  // Al abrir: si no hay caché de esta sesión, se consulta una sola vez. Se difiere
+  // con setTimeout para no llamar setState de forma síncrona dentro del efecto
+  // (regla react-hooks/set-state-in-effect).
+  useEffect(() => {
+    if (!profile || cachePacientesActivos !== null) return;
+    const t = setTimeout(consultar, 0);
+    return () => clearTimeout(t);
+  }, [profile, consultar]);
 
   const serviciosUnicos = useMemo(() => {
     const set = new Set<string>();
@@ -90,9 +107,20 @@ export default function PacientesActivosPsicologiaPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-sm text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-900 px-3 py-1.5 rounded-xl">
-          <BedDouble size={14} />
-          {pacientes.length} hospitalizados
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-sm text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-900 px-3 py-1.5 rounded-xl">
+            <BedDouble size={14} />
+            {pacientes.length} hospitalizados
+          </div>
+          <button
+            onClick={consultar}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+            title={actualizadoEn ? `Actualizado a las ${actualizadoEn.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Actualizar"}
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            Actualizar
+          </button>
         </div>
       </div>
 
