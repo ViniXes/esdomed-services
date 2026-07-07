@@ -60,6 +60,12 @@ async function desactivarPacienteDelAlta(
     estado: nuevoEstado,
     egresoPendiente: true, // bandera: el egreso aún debe completarlo ESDOMED
     egresadoAutoEn: FieldValue.serverTimestamp(),
+    // Fecha de egreso PRELIMINAR = momento en que ESDOMED marcó el alta efectiva
+    // (equivale al registro en SIS). Se guarda igual que en defunciones para que
+    // el paciente aparezca en la pestaña "Alta vivo" (filtrada por fechaEgreso) sin
+    // tener que buscarlo en "Todos". El formulario de egreso la precarga y la puede
+    // ajustar al valor confirmado cuando ESDOMED complete el egreso.
+    fechaEgreso: FieldValue.serverTimestamp(),
     notificacionAltaId: notificacionId,
     actualizadoEn: FieldValue.serverTimestamp(),
     actualizadoPor: caller.uid,
@@ -106,6 +112,8 @@ async function reactivarPacienteDelAlta(
       estado: "activo",
       egresoPendiente: FieldValue.delete(),
       egresadoAutoEn: FieldValue.delete(),
+      // El paciente no se fue → limpiar la fecha de egreso preliminar que se puso al procesar.
+      fechaEgreso: FieldValue.delete(),
       notificacionAltaId: FieldValue.delete(),
       reactivadoEn: FieldValue.serverTimestamp(),
       reactivadoPor: caller.uid,

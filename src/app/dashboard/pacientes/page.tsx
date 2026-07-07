@@ -33,7 +33,11 @@ const FILTROS: { value: FiltroEstado; label: string }[] = [
   { value: "alta_voluntaria", label: "Alta vol." },
   { value: "referido",        label: "Referidos" },
   { value: "fuga",            label: "Fugas" },
-  { value: "todos",           label: "Todos" },
+  // "Todos" oculto a propósito: lee hasta LIMIT_TODOS (1000) docs por consulta —
+  // es la pestaña más cara y era fácil pulsarla por accidente. La lógica sigue
+  // intacta (LIMIT_TODOS, ramas `filtro === "todos"`); para reactivarla,
+  // descomentar esta línea.
+  // { value: "todos",           label: "Todos" },
 ];
 
 const LIMIT_HISTORICO = 300;
