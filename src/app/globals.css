@@ -62,6 +62,24 @@ body {
   font-family: var(--font-body), system-ui, sans-serif;
 }
 
+/* ── Sensación de app nativa en móvil ── */
+html {
+  /* Sin el recuadro gris/azul que el navegador dibuja al tocar (los propios
+     estados hover/active de cada botón ya dan el feedback). */
+  -webkit-tap-highlight-color: transparent;
+}
+html, body {
+  /* Evita que el rebote elástico al final del scroll se propague al navegador
+     (revela la barra de direcciones / dispara pull-to-refresh no deseado). */
+  overscroll-behavior-y: contain;
+}
+
+/* Áreas seguras (notch / home indicator) para elementos fijos en pantalla completa. */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+/* Alto de la barra móvil fija (h-14 = 3.5rem) + su propio espacio seguro superior;
+   lo usan los layouts para que el contenido no quede oculto bajo la barra. */
+.pt-mobile-bar { padding-top: calc(3.5rem + env(safe-area-inset-top)); }
+
 .font-heading {
   font-family: var(--font-heading), system-ui, sans-serif;
 }

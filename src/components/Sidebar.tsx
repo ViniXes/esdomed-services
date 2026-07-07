@@ -377,8 +377,11 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-[var(--color-institutional-dark)] backdrop-blur-sm border-b border-slate-200 dark:border-blue-900/30 flex items-center h-14 px-3 gap-3">
+      {/* Mobile top bar. El fondo/borde llega hasta el borde real de la pantalla
+          (pt-safe reserva el notch); la fila de contenido (h-14) queda siempre
+          debajo del área segura, como en una app nativa. */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-[var(--color-institutional-dark)] backdrop-blur-sm border-b border-slate-200 dark:border-blue-900/30 pt-safe">
+      <div className="flex items-center h-14 px-3 gap-3">
         <button
           onClick={() => setOpen(true)}
           className="relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/85 flex-shrink-0 transition-colors"
@@ -412,6 +415,7 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
         >
           {dark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
+      </div>
       </div>
 
       {open && (

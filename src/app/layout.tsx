@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Sora } from "next/font/google";
 import "./globals.css";
@@ -6,6 +6,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ServiciosProvider } from "@/contexts/ServiciosContext";
 import { TerminosGate } from "@/components/TerminosGate";
+import { PwaRegister } from "@/components/PwaRegister";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -13,6 +14,28 @@ const sora = Sora({ variable: "--font-sora", subsets: ["latin"], weight: ["400",
 export const metadata: Metadata = {
   title: "ESDOMED Services",
   description: "Portal de gestión operativa — Estadística y Documentos Médicos",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ESDOMED",
+  },
+  // Evita que iOS convierta expedientes/números en tablas en enlaces de
+  // llamada/dirección (los detecta como teléfono al ser secuencias numéricas).
+  formatDetection: {
+    telephone: false,
+    address: false,
+    email: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c2834" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <TerminosGate />
           </AuthProvider>
         </ThemeProvider>
+        <PwaRegister />
       </body>
     </html>
   );

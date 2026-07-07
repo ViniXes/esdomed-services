@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sin conexión — ESDOMED Services</title>
+<style>
+  :root { color-scheme: light dark; }
+  html, body {
+    height: 100%; margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    background: #f8fafc; color: #1c2834;
+  }
+  @media (prefers-color-scheme: dark) {
+    html, body { background: #1c2834; color: #f0ece8; }
+  }
+  .wrap {
+    min-height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; padding: 2rem;
+    padding-top: max(2rem, env(safe-area-inset-top));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+  .icon {
+    width: 64px; height: 64px; border-radius: 16px; background: #1d4ed8;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;
+  }
+  h1 { font-size: 1.125rem; font-weight: 700; margin: 0 0 0.5rem; }
+  p { font-size: 0.9rem; opacity: 0.7; margin: 0 0 1.5rem; max-width: 320px; }
+  button {
+    font: inherit; font-weight: 600; font-size: 0.875rem; color: #fff;
+    background: #1d4ed8; border: none; border-radius: 10px; padding: 0.65rem 1.5rem;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="icon">
+      <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="20" width="6" height="9" rx="1.5" fill="#ffffff" fill-opacity="0.70"/>
+        <rect x="13" y="13" width="6" height="16" rx="1.5" fill="#ffffff"/>
+        <rect x="22" y="16" width="6" height="13" rx="1.5" fill="#ffffff" fill-opacity="0.82"/>
+        <polyline points="3,10 7,10 9,4 11,15 13,6 16,10 29,10" stroke="#fb923c" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1>Sin conexión</h1>
+    <p>No se pudo conectar con ESDOMED Services. Revisa tu conexión a internet e intenta de nuevo.</p>
+    <button onclick="location.reload()">Reintentar</button>
+  </div>
+</body>
+</html>
