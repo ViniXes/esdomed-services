@@ -6,18 +6,23 @@ import {
   BadgeCheck,
   BarChart3,
   Clock3,
+  Cloud,
   Download,
   FileCheck2,
-  FileText,
   HeartPulse,
   type LucideIcon,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProductividadTabs } from "../_components/ProductividadTabs";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
+import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
 import type { NotificacionAltaVivo, NotificacionFallecido, RegistroAlta, SolicitudImpresion, SolicitudTraslado } from "@/types";
 
-type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "franjas";
+const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos"] as const;
+type HojaDrive = (typeof HOJAS_DRIVE)[number];
+
+type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "drive" | "franjas";
 
 type ControlIngreso = {
   id?: string;
@@ -31,6 +36,7 @@ const VISTAS: { id: Vista; label: string; icon: LucideIcon }[] = [
   { id: "expedientes", label: "Expedientes y defunciones", icon: HeartPulse },
   { id: "documentos", label: "Documentos entregados", icon: FileCheck2 },
   { id: "altas", label: "Altas y SIMMOW", icon: BadgeCheck },
+  { id: "drive", label: "Historial Drive", icon: Cloud },
   { id: "franjas", label: "Franjas horarias", icon: Clock3 },
 ];
 
@@ -42,18 +48,24 @@ const COLUMNAS_RESUMEN = [
   { id: "documentos", label: "Docs. de alta entregados", corto: "Docs. alta" },
   { id: "simmow", label: "Altas digitadas SIMMOW", corto: "SIMMOW" },
   { id: "traslados", label: "Traslados procesados", corto: "Traslados" },
+  { id: "carpetasDrive", label: "Carpetas creadas (Drive)", corto: "Carpetas (Drive)" },
+  { id: "actualizacionesDrive", label: "Actualizaciones (Drive)", corto: "Actualiz. (Drive)" },
+  { id: "consentimientosDrive", label: "Consentimientos (Drive)", corto: "Consent. (Drive)" },
 ] as const;
 
-type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate";
+type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate" | "indigo" | "teal" | "pink";
 
-const tonosTarjeta: Record<TonoTarjeta, { barra: string; icono: string }> = {
-  blue: { barra: "bg-blue-500", icono: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" },
-  rose: { barra: "bg-rose-500", icono: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
-  amber: { barra: "bg-amber-500", icono: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
-  emerald: { barra: "bg-emerald-500", icono: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  cyan: { barra: "bg-cyan-500", icono: "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300" },
-  violet: { barra: "bg-violet-500", icono: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
-  slate: { barra: "bg-slate-500", icono: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200" },
+const tonosTarjeta: Record<TonoTarjeta, { barra: string }> = {
+  blue: { barra: "bg-blue-500" },
+  rose: { barra: "bg-rose-500" },
+  amber: { barra: "bg-amber-500" },
+  emerald: { barra: "bg-emerald-500" },
+  cyan: { barra: "bg-cyan-500" },
+  violet: { barra: "bg-violet-500" },
+  slate: { barra: "bg-slate-500" },
+  indigo: { barra: "bg-indigo-500" },
+  teal: { barra: "bg-teal-500" },
+  pink: { barra: "bg-pink-500" },
 };
 
 const selectCls =
@@ -96,6 +108,16 @@ function contarPor<T>(items: T[], obtenerNombre: (item: T) => string | undefined
   return mapa;
 }
 
+function sumarMapas(...mapas: Map<string, number>[]): Map<string, number> {
+  const resultado = new Map<string, number>();
+  for (const mapa of mapas) {
+    for (const [nombre, valor] of mapa) {
+      resultado.set(nombre, (resultado.get(nombre) ?? 0) + valor);
+    }
+  }
+  return resultado;
+}
+
 function contarFranjas(fechas: Date[]): number[] {
   return FRANJAS.map(({ desde, hasta }) => fechas.filter(f => f.getHours() >= desde && f.getHours() < hasta).length);
 }
@@ -125,12 +147,31 @@ function aRegistros<T>(items: T[], obtenerNombre: (item: T) => string | undefine
   return registros;
 }
 
+async function fetchHojaDrive(hoja: HojaDrive, mes: string, token: string, roster: string[]): Promise<Map<string, number>> {
+  const res = await fetch(`/api/productividad/historial-drive?hoja=${hoja}&mes=${mes}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const mapa = new Map<string, number>();
+  if (!res.ok) return mapa;
+  const data = await res.json() as { registros: { nombre: string; fecha: string }[] };
+  for (const registro of data.registros) {
+    const nombre = emparejarNombre(registro.nombre, roster);
+    mapa.set(nombre, (mapa.get(nombre) ?? 0) + 1);
+  }
+  return mapa;
+}
+
 export default function ProductividadEsdomedPage() {
+  const { user } = useAuth();
   const [mes, setMes] = useState(mesActualStr());
   const [personal, setPersonal] = useState<string[]>([]);
+  const [carpetasDrive, setCarpetasDrive] = useState<Map<string, number>>(new Map());
+  const [actualizacionesDrive, setActualizacionesDrive] = useState<Map<string, number>>(new Map());
+  const [consentimientosDrive, setConsentimientosDrive] = useState<Map<string, number>>(new Map());
   const [controlIngresos, setControlIngresos] = useState<ControlIngreso[]>([]);
   const [fallecidosConfirmados, setFallecidosConfirmados] = useState<NotificacionFallecido[]>([]);
   const [fallecidosCertificado, setFallecidosCertificado] = useState<NotificacionFallecido[]>([]);
+  const [fallecidosSimmow, setFallecidosSimmow] = useState<NotificacionFallecido[]>([]);
   const [altas, setAltas] = useState<RegistroAlta[]>([]);
   const [altasEfectivasProcesadas, setAltasEfectivasProcesadas] = useState<NotificacionAltaVivo[]>([]);
   const [impresionesEntregadas, setImpresionesEntregadas] = useState<SolicitudImpresion[]>([]);
@@ -151,6 +192,26 @@ export default function ProductividadEsdomedPage() {
   }, []);
 
   useEffect(() => {
+    if (!user || personal.length === 0) return;
+    let cancelado = false;
+    user.getIdToken()
+      .then(token => Promise.all(HOJAS_DRIVE.map(hoja => fetchHojaDrive(hoja, mes, token, personal))))
+      .then(([carpetas, actualizaciones, consentimientos]) => {
+        if (cancelado) return;
+        setCarpetasDrive(carpetas);
+        setActualizacionesDrive(actualizaciones);
+        setConsentimientosDrive(consentimientos);
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setCarpetasDrive(new Map());
+        setActualizacionesDrive(new Map());
+        setConsentimientosDrive(new Map());
+      });
+    return () => { cancelado = true; };
+  }, [user, personal, mes]);
+
+  useEffect(() => {
     queueMicrotask(() => setLoading(true));
     const inicioTs = Timestamp.fromDate(inicio);
     const finTs = Timestamp.fromDate(fin);
@@ -159,15 +220,17 @@ export default function ProductividadEsdomedPage() {
       getDocs(query(collection(db, "control_ingresos"), where("creadoEn", ">=", inicioTs), where("creadoEn", "<=", finTs))),
       getDocs(query(collection(db, "notificaciones_fallecidos"), where("confirmadoEn", ">=", inicioTs), where("confirmadoEn", "<=", finTs))),
       getDocs(query(collection(db, "notificaciones_fallecidos"), where("entregaCertificadoEn", ">=", inicioTs), where("entregaCertificadoEn", "<=", finTs))),
+      getDocs(query(collection(db, "notificaciones_fallecidos"), where("digitaSimmowEn", ">=", inicioTs), where("digitaSimmowEn", "<=", finTs))),
       getDocs(query(collection(db, "registro_altas"), where("fecha", ">=", iniStr), where("fecha", "<=", finStr))),
       getDocs(query(collection(db, "notificaciones_altas"), where("procesadoEn", ">=", inicioTs), where("procesadoEn", "<=", finTs))),
       getDocs(query(collection(db, "solicitudes_impresion"), where("impresoEn", ">=", inicioTs), where("impresoEn", "<=", finTs))),
       getDocs(query(collection(db, "traslados"), where("actualizadoEn", ">=", inicioTs), where("actualizadoEn", "<=", finTs))),
     ])
-      .then(([ingresosSnap, confirmadosSnap, certificadoSnap, altasSnap, altasProcesadasSnap, impresionesSnap, trasladosSnap]) => {
+      .then(([ingresosSnap, confirmadosSnap, certificadoSnap, simmowFallecidosSnap, altasSnap, altasProcesadasSnap, impresionesSnap, trasladosSnap]) => {
         setControlIngresos(ingresosSnap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
         setFallecidosConfirmados(confirmadosSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
         setFallecidosCertificado(certificadoSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
+        setFallecidosSimmow(simmowFallecidosSnap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)));
         setAltas(altasSnap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroAlta)));
         setAltasEfectivasProcesadas(
           altasProcesadasSnap.docs
@@ -190,7 +253,9 @@ export default function ProductividadEsdomedPage() {
   const certificadosEntregados = useMemo(() => contarPor(fallecidosCertificado, f => f.entregaCertificado), [fallecidosCertificado]);
   const altasEfectivas = useMemo(() => contarPor(altasEfectivasProcesadas, a => a.procesadoPorNombre), [altasEfectivasProcesadas]);
   const documentosEntregados = useMemo(() => contarPor(impresionesEntregadas, i => i.impresoPorNombre), [impresionesEntregadas]);
-  const altasSimmow = useMemo(() => contarPor(altas.filter(a => a.digitadorSimmow), a => a.digitadorSimmow), [altas]);
+  const altasSimmowVivo = useMemo(() => contarPor(altas.filter(a => a.digitadorSimmow), a => a.digitadorSimmow), [altas]);
+  const fallecidosSimmowConteo = useMemo(() => contarPor(fallecidosSimmow, f => f.digitaSimmow), [fallecidosSimmow]);
+  const altasSimmow = useMemo(() => sumarMapas(altasSimmowVivo, fallecidosSimmowConteo), [altasSimmowVivo, fallecidosSimmowConteo]);
   const trasladosProcesados = useMemo(() => contarPor(traslados, t => t.revisadoPorNombre), [traslados]);
 
   const registrosIngresos = useMemo(() => aRegistros(controlIngresos, i => i.responsableIngresoNombre ?? i.creadoPorNombre, i => i.creadoEn), [controlIngresos]);
@@ -216,11 +281,11 @@ export default function ProductividadEsdomedPage() {
 
   const nombres = useMemo(() => {
     const set = new Set<string>(personal);
-    for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados]) {
+    for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]) {
       for (const nombre of mapa.keys()) set.add(nombre);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados]);
+  }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]);
 
   const totales = {
     expedientesCreados: controlIngresos.length,
@@ -230,12 +295,10 @@ export default function ProductividadEsdomedPage() {
     documentosEntregados: Array.from(documentosEntregados.values()).reduce((a, b) => a + b, 0),
     altasSimmow: Array.from(altasSimmow.values()).reduce((a, b) => a + b, 0),
     trasladosProcesados: Array.from(trasladosProcesados.values()).reduce((a, b) => a + b, 0),
+    carpetasDrive: Array.from(carpetasDrive.values()).reduce((a, b) => a + b, 0),
+    actualizacionesDrive: Array.from(actualizacionesDrive.values()).reduce((a, b) => a + b, 0),
+    consentimientosDrive: Array.from(consentimientosDrive.values()).reduce((a, b) => a + b, 0),
   };
-
-  const simmowDona: PuntoDato[] = [
-    { nombre: "Digitadas en SIMMOW", valor: totales.altasSimmow },
-    { nombre: "Pendientes de digitar", valor: Math.max(0, totales.altasEfectivas - totales.altasSimmow) },
-  ];
 
   const resumenPorPersona = useMemo(() => nombres.map(nombre => {
     const valores = {
@@ -246,6 +309,9 @@ export default function ProductividadEsdomedPage() {
       documentos: documentosEntregados.get(nombre) ?? 0,
       simmow: altasSimmow.get(nombre) ?? 0,
       traslados: trasladosProcesados.get(nombre) ?? 0,
+      carpetasDrive: carpetasDrive.get(nombre) ?? 0,
+      actualizacionesDrive: actualizacionesDrive.get(nombre) ?? 0,
+      consentimientosDrive: consentimientosDrive.get(nombre) ?? 0,
     };
     const total = Object.values(valores).reduce((sum, valor) => sum + valor, 0);
     return { nombre, valores, total };
@@ -258,6 +324,9 @@ export default function ProductividadEsdomedPage() {
     documentosEntregados,
     altasSimmow,
     trasladosProcesados,
+    carpetasDrive,
+    actualizacionesDrive,
+    consentimientosDrive,
   ]);
 
   const exportarExcel = async () => {
@@ -267,7 +336,7 @@ export default function ProductividadEsdomedPage() {
       const aoa: (string | number)[][] = [
         ["Productividad ESDOMED", mes],
         [],
-        ["Nombre", "Expedientes creados", "Defunciones procesadas", "Certificados entregados", "Altas efectivas", "Documentos de alta entregados", "Altas digitadas SIMMOW", "Traslados procesados"],
+        ["Nombre", "Expedientes creados", "Defunciones procesadas", "Certificados entregados", "Altas efectivas", "Documentos de alta entregados", "Altas digitadas SIMMOW", "Traslados procesados", "Carpetas creadas (Drive)", "Actualizaciones (Drive)", "Consentimientos (Drive)"],
         ...nombres.map(nombre => [
           nombre,
           expedientesCreados.get(nombre) ?? 0,
@@ -277,6 +346,9 @@ export default function ProductividadEsdomedPage() {
           documentosEntregados.get(nombre) ?? 0,
           altasSimmow.get(nombre) ?? 0,
           trasladosProcesados.get(nombre) ?? 0,
+          carpetasDrive.get(nombre) ?? 0,
+          actualizacionesDrive.get(nombre) ?? 0,
+          consentimientosDrive.get(nombre) ?? 0,
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -317,7 +389,7 @@ export default function ProductividadEsdomedPage() {
         <p className="text-sm text-slate-400 py-16 text-center">Cargando...</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white/80 p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white/80 p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:grid-cols-3 lg:grid-cols-6">
             {VISTAS.map(item => (
               <button
                 key={item.id}
@@ -337,14 +409,17 @@ export default function ProductividadEsdomedPage() {
 
           {vista === "resumen" && (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
-                <TarjetaTotal label="Expedientes creados" valor={totales.expedientesCreados} icon={FileText} tono="blue" />
-                <TarjetaTotal label="Defunciones procesadas" valor={totales.defuncionesProcesadas} icon={HeartPulse} tono="rose" />
-                <TarjetaTotal label="Certificados entregados" valor={totales.certificadosEntregados} icon={FileCheck2} tono="amber" />
-                <TarjetaTotal label="Altas efectivas" valor={totales.altasEfectivas} icon={BadgeCheck} tono="emerald" />
-                <TarjetaTotal label="Docs. de alta entregados" valor={totales.documentosEntregados} icon={FileCheck2} tono="cyan" />
-                <TarjetaTotal label="Altas digitadas SIMMOW" valor={totales.altasSimmow} icon={BadgeCheck} tono="violet" />
-                <TarjetaTotal label="Traslados procesados" valor={totales.trasladosProcesados} icon={Clock3} tono="slate" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2.5">
+                <TarjetaTotal label="Expedientes creados" valor={totales.expedientesCreados} tono="blue" />
+                <TarjetaTotal label="Defunciones procesadas" valor={totales.defuncionesProcesadas} tono="rose" />
+                <TarjetaTotal label="Certificados entregados" valor={totales.certificadosEntregados} tono="amber" />
+                <TarjetaTotal label="Altas efectivas" valor={totales.altasEfectivas} tono="emerald" />
+                <TarjetaTotal label="Docs. de alta entregados" valor={totales.documentosEntregados} tono="cyan" />
+                <TarjetaTotal label="Altas digitadas SIMMOW" valor={totales.altasSimmow} tono="violet" />
+                <TarjetaTotal label="Traslados procesados" valor={totales.trasladosProcesados} tono="slate" />
+                <TarjetaTotal label="Carpetas creadas (Drive)" valor={totales.carpetasDrive} tono="indigo" />
+                <TarjetaTotal label="Actualizaciones (Drive)" valor={totales.actualizacionesDrive} tono="teal" />
+                <TarjetaTotal label="Consentimientos (Drive)" valor={totales.consentimientosDrive} tono="pink" />
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -417,7 +492,15 @@ export default function ProductividadEsdomedPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <GraficoBarras titulo="Altas efectivas por persona" datos={mapaAArray(altasEfectivas)} color="#3b82f6" />
               <GraficoBarras titulo="Traslados procesados por persona" datos={mapaAArray(trasladosProcesados)} color="#8b5cf6" />
-              <GraficoPastel titulo="Altas digitadas en SIMMOW" datos={simmowDona} />
+              <GraficoBarras titulo="Altas digitadas en SIMMOW por persona" datos={mapaAArray(altasSimmow)} color="#14b8a6" />
+            </div>
+          )}
+
+          {vista === "drive" && (
+            <div className="grid gap-4 lg:grid-cols-3">
+              <GraficoBarras titulo="Carpetas creadas (Drive)" datos={mapaAArray(carpetasDrive)} color="#f59e0b" />
+              <GraficoBarras titulo="Actualizaciones (Drive)" datos={mapaAArray(actualizacionesDrive)} color="#06b6d4" />
+              <GraficoBarras titulo="Consentimientos (Drive)" datos={mapaAArray(consentimientosDrive)} color="#ec4899" />
             </div>
           )}
 
@@ -477,20 +560,13 @@ export default function ProductividadEsdomedPage() {
   );
 }
 
-function TarjetaTotal({ label, valor, icon: Icon, tono }: { label: string; valor: number; icon: LucideIcon; tono: TonoTarjeta }) {
+function TarjetaTotal({ label, valor, tono }: { label: string; valor: number; tono: TonoTarjeta }) {
   const clases = tonosTarjeta[tono];
   return (
     <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm transition-colors hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
       <div className={`absolute inset-x-0 top-0 h-1 ${clases.barra}`} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-1 text-2xl font-bold font-heading tabular-nums text-slate-900 dark:text-slate-100">{valor}</p>
-        </div>
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${clases.icono}`}>
-          <Icon size={16} />
-        </div>
-      </div>
+      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-bold font-heading tabular-nums text-slate-900 dark:text-slate-100">{valor}</p>
     </div>
   );
 }
