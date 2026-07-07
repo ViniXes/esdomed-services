@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp,
-  where, getDocs, limit, arrayUnion,
+  where, getDocs, limit, arrayUnion, QueryConstraint,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, EstadoTraslado, Paciente, MovimientoPaciente } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search } from "lucide-react";
+import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History } from "lucide-react";
 
 const FILTROS: { label: string; value: EstadoTraslado | "todos" }[] = [
   { label: "Todos", value: "todos" },
@@ -20,44 +20,114 @@ const FILTROS: { label: string; value: EstadoTraslado | "todos" }[] = [
   { label: "Rechazados", value: "rechazado" },
 ];
 
+// Ventana en vivo: las últimas 50 solicitudes (cualquier estado) + TODAS las
+// pendientes (aunque sean más viejas que esa ventana, para no perder ninguna por
+// procesar). Lo anterior a esto se busca bajo demanda por expediente o fecha.
+const LIVE_LIMIT = 50;
+
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none";
+
+const ms = (ts: unknown) => (ts as { toDate?: () => Date })?.toDate?.()?.getTime() ?? new Date(ts as string).getTime() ?? 0;
+
+function dedupe(...listas: SolicitudTraslado[][]): SolicitudTraslado[] {
+  const m = new Map<string, SolicitudTraslado>();
+  listas.flat().forEach(t => { if (t.id) m.set(t.id, t); });
+  return [...m.values()].sort((a, b) => ms(b.creadoEn) - ms(a.creadoEn));
+}
 
 export default function DashboardTrasladosPage() {
   const { profile } = useAuth();
-  const [traslados, setTraslados] = useState<SolicitudTraslado[]>([]);
+
+  // Zona 1: en vivo — últimas 50 (cualquier estado) + todas las pendientes.
+  const [recientes, setRecientes] = useState<SolicitudTraslado[]>([]);
+  const [pendientesLive, setPendientesLive] = useState<SolicitudTraslado[]>([]);
   const [filtro, setFiltro] = useState<EstadoTraslado | "todos">("pendiente");
+
+  // Zona 2: búsqueda histórica bajo demanda (NO en vivo).
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  const [resultados, setResultados] = useState<SolicitudTraslado[] | null>(null); // null = aún no se busca
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+
   const [selected, setSelected] = useState<SolicitudTraslado | null>(null);
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "traslados"), orderBy("creadoEn", "desc"), limit(400));
-    return onSnapshot(q, s => setTraslados(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado))));
+    const q = query(collection(db, "traslados"), orderBy("creadoEn", "desc"), limit(LIVE_LIMIT));
+    return onSnapshot(q, s => setRecientes(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado))));
   }, []);
 
-  const filtered = filtro === "todos" ? traslados : traslados.filter(t => t.estado === filtro);
+  useEffect(() => {
+    const q = query(collection(db, "traslados"), where("estado", "==", "pendiente"));
+    return onSnapshot(q, s => setPendientesLive(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado))));
+  }, []);
 
-  const displayList = filtered.filter(t => {
-    if (busquedaExpediente) {
-      const q = busquedaExpediente.toLowerCase();
-      if (!(t.pacienteExpediente?.toLowerCase() ?? "").includes(q) &&
-          !(t.pacienteBExpediente?.toLowerCase() ?? "").includes(q)) return false;
-    }
-    if (fechaDesde || fechaHasta) {
-      const d = ((t.creadoEn as unknown) as { toDate?: () => Date }).toDate?.() ?? t.creadoEn;
-      if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
-      if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
-    }
+  const enVivo = useMemo(() => dedupe(recientes, pendientesLive), [recientes, pendientesLive]);
+  const displayList = filtro === "todos" ? enVivo : enVivo.filter(t => t.estado === filtro);
+
+  const dentroDelRango = (ts: unknown) => {
+    if (!fechaDesde && !fechaHasta) return true;
+    const d = (ts as { toDate?: () => Date })?.toDate?.();
+    if (!d) return false;
+    if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
+    if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
     return true;
-  });
+  };
+
+  // Búsqueda de traslados anteriores: una sola lectura (getDocs), no un listener.
+  const buscar = async () => {
+    const exp = busquedaExpediente.trim();
+    if (!exp && !fechaDesde && !fechaHasta) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: SolicitudTraslado[];
+      if (exp) {
+        // Por expediente: puede aparecer como paciente A o como paciente B (intercambio).
+        // Dos consultas de igualdad (sin índice compuesto) + merge por id.
+        const [snapA, snapB] = await Promise.all([
+          getDocs(query(collection(db, "traslados"), where("pacienteExpediente", "==", exp))),
+          getDocs(query(collection(db, "traslados"), where("pacienteBExpediente", "==", exp))),
+        ]);
+        docs = dedupe(
+          snapA.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado)),
+          snapB.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado)),
+        ).filter(t => dentroDelRango(t.creadoEn));
+      } else {
+        // Por rango de fecha (todo sobre creadoEn → sin índice compuesto).
+        const constraints: QueryConstraint[] = [];
+        if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+        if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+        constraints.push(orderBy("creadoEn", "desc"));
+        constraints.push(limit(500));
+        const snap = await getDocs(query(collection(db, "traslados"), ...constraints));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado));
+      }
+      docs.sort((a, b) => ms(b.creadoEn) - ms(a.creadoEn));
+      setResultados(docs);
+    } catch (e) {
+      setErrorBusqueda((e as Error).message || "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const limpiarBusqueda = () => {
+    setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta("");
+    setResultados(null); setErrorBusqueda("");
+  };
+
+  const sinCriterio = !busquedaExpediente.trim() && !fechaDesde && !fechaHasta;
 
   const actualizarEstado = async (estado: EstadoTraslado) => {
     if (!selected?.id || !profile) return;
     setSaving(true);
-    await updateDoc(doc(db, "traslados", selected.id), {
+    const id = selected.id;
+    await updateDoc(doc(db, "traslados", id), {
       estado, notasEsdomed: notas,
       revisadoPor: profile.uid, revisadoPorNombre: profile.nombre,
       actualizadoEn: Timestamp.now(),
@@ -71,6 +141,10 @@ export default function DashboardTrasladosPage() {
         console.error("Error sincronizando traslado con paciente:", err);
       }
     }
+    // La lista en vivo se actualiza sola (listeners). Los resultados de búsqueda son
+    // una foto puntual → actualización optimista local.
+    const local = { estado, notasEsdomed: notas, revisadoPor: profile.uid, revisadoPorNombre: profile.nombre };
+    setResultados(prev => prev?.map(t => (t.id === id ? { ...t, ...local } : t)) ?? prev);
     setSaving(false); setSelected(null); setNotas("");
   };
 
@@ -79,6 +153,68 @@ export default function DashboardTrasladosPage() {
     if (tipo === "interno") return { label: "Interno", color: "text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 border-purple-200 dark:border-purple-800", icon: ArrowRightLeft };
     if (tipo === "intercambio") return { label: "Intercambio", color: "text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/50 border-orange-200 dark:border-orange-800", icon: RefreshCw };
     return { label: "Traslado", color: "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700", icon: ArrowRightLeft };
+  };
+
+  const abrir = (t: SolicitudTraslado) => { setSelected(t); setNotas(t.notasEsdomed ?? ""); };
+
+  const renderTraslado = (t: SolicitudTraslado) => {
+    const typeInfo = getTipoLabel(t.tipoTraslado);
+    const Icon = typeInfo.icon;
+    return (
+      <div key={t.id} onClick={() => abrir(t)}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${typeInfo.color}`}>
+                <Icon size={10} /> {typeInfo.label}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">{formatFechaHora(t.creadoEn)}</span>
+            </div>
+
+            {t.tipoTraslado === "intercambio" ? (
+              <div className="space-y-1 mt-2">
+                <div className="text-sm">
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">Exp. {t.pacienteExpediente}</span>
+                  {t.pacienteNombre && <span className="text-slate-500 ml-1">({t.pacienteNombre})</span>}
+                  <span className="text-xs text-slate-500 ml-2">↔</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">Exp. {t.pacienteBExpediente}</span>
+                  {t.pacienteBNombre && <span className="text-slate-500 ml-1">({t.pacienteBNombre})</span>}
+                </div>
+                <p className="text-xs text-slate-500">Servicios: {t.servicioOrigen} / {t.servicioDestino}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">
+                  Exp. {t.pacienteExpediente} {t.pacienteNombre ? `- ${t.pacienteNombre}` : ""}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {t.servicioOrigen} (Cama {t.camaOrigen}) → {t.tipoTraslado === "interno" ? t.servicioOrigen : t.servicioDestino} (Cama {t.camaDestino})
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <p className="text-xs text-slate-500">
+                Dr. {t.medicoNombre}{t.medicoJvpm ? ` · JVPM ${t.medicoJvpm}` : ""}
+              </p>
+              {t.revisadoPorNombre && (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  Procesado por: {t.revisadoPorNombre}
+                </span>
+              )}
+              {t.respuestaMedico && t.estado === "pendiente" && (
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  Médico respondió
+                </span>
+              )}
+            </div>
+          </div>
+          <Badge estado={t.estado} />
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -92,112 +228,95 @@ export default function DashboardTrasladosPage() {
         </div>
         <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
           <Clock size={14} />
-          {traslados.filter(t => t.estado === "pendiente").length} pendiente(s)
+          {pendientesLive.length} pendiente(s)
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-5">
-        {FILTROS.map(f => (
-          <button key={f.value} onClick={() => setFiltro(f.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filtro === f.value
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-200"
-            }`}>
-            {f.label}
+      {/* ── Zona 1: en vivo (últimas 50 + todas las pendientes) ── */}
+      <section className="mb-8">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {FILTROS.map(f => (
+            <button key={f.value} onClick={() => setFiltro(f.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filtro === f.value
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}>
+              {f.label}
+            </button>
+          ))}
+          <span className="ml-auto text-xs text-slate-500">Últimas {LIVE_LIMIT} + pendientes</span>
+        </div>
+
+        <div className="space-y-2">
+          {displayList.length === 0 && (
+            <p className="text-sm text-slate-500 py-10 text-center">Sin solicitudes en este filtro.</p>
+          )}
+          {displayList.map(renderTraslado)}
+        </div>
+      </section>
+
+      {/* ── Zona 2: Buscar traslados anteriores (bajo demanda) ── */}
+      <section className="border-t border-slate-200 dark:border-slate-800 pt-6">
+        <div className="flex items-center gap-2 mb-1">
+          <History size={15} className="text-slate-400" />
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Buscar traslados anteriores</h2>
+        </div>
+        <p className="text-xs text-slate-500 mb-3">
+          Busca por expediente (trae todas las de ese paciente) o por rango de fecha. La búsqueda se hace bajo demanda.
+        </p>
+
+        <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input type="text" placeholder="Buscar por expediente..." value={busquedaExpediente}
+              onChange={e => setBusquedaExpediente(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") buscar(); }}
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 shrink-0">Desde</span>
+            <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Fecha desde" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+            <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Fecha hasta" />
+          </div>
+          <button onClick={buscar} disabled={buscando || sinCriterio}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-sm">
+            <Search size={13} /> {buscando ? "Buscando..." : "Buscar"}
           </button>
-        ))}
-      </div>
+          {(busquedaExpediente || fechaDesde || fechaHasta || resultados !== null) && (
+            <button onClick={limpiarBusqueda}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
+              <X size={12} /> Limpiar
+            </button>
+          )}
+        </div>
 
-      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input type="text" placeholder="Buscar por expediente..." value={busquedaExpediente} onChange={e => setBusquedaExpediente(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <DateField value={fechaDesde} onChange={setFechaDesde} clearable
-            placeholder="Desde" ariaLabel="Fecha desde" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <DateField value={fechaHasta} onChange={setFechaHasta} clearable
-            placeholder="Hasta" ariaLabel="Fecha hasta" />
-        </div>
-        {(busquedaExpediente || fechaDesde || fechaHasta) && (
-          <button onClick={() => { setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta(""); }}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
-            <X size={12} /> Limpiar
-          </button>
+        {errorBusqueda && (
+          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400 mb-4">
+            {errorBusqueda}
+          </div>
         )}
-      </div>
 
-      <div className="space-y-2">
-        {displayList.length === 0 && (
-          <p className="text-sm text-slate-500 py-10 text-center">Sin solicitudes en este filtro.</p>
+        {resultados === null ? (
+          <p className="text-sm text-slate-400 py-8 text-center">
+            Escribe un expediente o elige un rango de fechas y pulsa Buscar.
+          </p>
+        ) : buscando ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : resultados.length === 0 ? (
+          <p className="text-sm text-slate-500 py-10 text-center">Sin resultados para esa búsqueda.</p>
+        ) : (
+          <>
+            <p className="text-xs text-slate-500 mb-3">{resultados.length} resultado(s)</p>
+            <div className="space-y-2">{resultados.map(renderTraslado)}</div>
+          </>
         )}
-        {displayList.map(t => {
-          const typeInfo = getTipoLabel(t.tipoTraslado);
-          const Icon = typeInfo.icon;
-          
-          return (
-            <div key={t.id} onClick={() => { setSelected(t); setNotas(t.notasEsdomed ?? ""); }}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${typeInfo.color}`}>
-                      <Icon size={10} /> {typeInfo.label}
-                    </span>
-                    <span className="text-xs text-slate-400 font-medium">{formatFechaHora(t.creadoEn)}</span>
-                  </div>
-
-                  {t.tipoTraslado === "intercambio" ? (
-                    <div className="space-y-1 mt-2">
-                      <div className="text-sm">
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">Exp. {t.pacienteExpediente}</span>
-                        {t.pacienteNombre && <span className="text-slate-500 ml-1">({t.pacienteNombre})</span>}
-                        <span className="text-xs text-slate-500 ml-2">↔</span>
-                        <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">Exp. {t.pacienteBExpediente}</span>
-                        {t.pacienteBNombre && <span className="text-slate-500 ml-1">({t.pacienteBNombre})</span>}
-                      </div>
-                      <p className="text-xs text-slate-500">Servicios: {t.servicioOrigen} / {t.servicioDestino}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">
-                        Exp. {t.pacienteExpediente} {t.pacienteNombre ? `- ${t.pacienteNombre}` : ""}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {t.servicioOrigen} (Cama {t.camaOrigen}) → {t.tipoTraslado === "interno" ? t.servicioOrigen : t.servicioDestino} (Cama {t.camaDestino})
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <p className="text-xs text-slate-500">
-                      Dr. {t.medicoNombre}{t.medicoJvpm ? ` · JVPM ${t.medicoJvpm}` : ""}
-                    </p>
-                    {t.revisadoPorNombre && (
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                        Procesado por: {t.revisadoPorNombre}
-                      </span>
-                    )}
-                    {t.respuestaMedico && t.estado === "pendiente" && (
-                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                        Médico respondió
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <Badge estado={t.estado} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      </section>
 
       {selected && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -209,7 +328,7 @@ export default function DashboardTrasladosPage() {
               <button onClick={() => setSelected(null)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"><X size={16} /></button>
             </div>
             <div className="p-5 space-y-4 text-sm">
-              
+
               {selected.tipoTraslado === "intercambio" ? (
                 <>
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
@@ -233,7 +352,7 @@ export default function DashboardTrasladosPage() {
                   <Row label="Destino"     value={`${selected.tipoTraslado === "interno" ? selected.servicioOrigen : selected.servicioDestino} / Cama ${selected.camaDestino}`} />
                 </>
               )}
-              
+
               <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
 
               <Row label="Motivo"      value={selected.motivoTraslado} />
