@@ -14,6 +14,8 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { getLecturaConfirmada } from "@/lib/fallecidos";
+import type { NotificacionFallecido } from "@/types";
 
 export type TipoNotif =
   | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
@@ -68,6 +70,9 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esEsdomed    = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
   const puedeAltas   = esEsdomed || profile?.role === "trabajo_social";
   const esPsicologia = profile?.role === "psicologia";
+  const esTS         = profile?.role === "trabajo_social";
+  // Psicología y Trabajo Social comparten la revisión de fallecidos (confirmar "visto").
+  const revisaFallecidos = esPsicologia || esTS;
   const psUid        = profile?.uid;
 
   const addToast = useCallback((toast: Omit<NotifToast, "id">) => {
@@ -183,14 +188,17 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [esPsicologia, psUid, addToast, setCount]);
 
-  // ── Psicología: fallecidos por revisar (sin "visto" del área) — limit 40 ──
+  // ── Psicología / Trabajo Social: fallecidos por revisar (sin "visto" del área) — limit 40 ──
   const knownVistos = useRef<Set<string> | null>(null);
   useEffect(() => {
-    if (!esPsicologia) return;
+    if (!revisaFallecidos) return;
     knownVistos.current = null;
     const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(40));
     return onSnapshot(q, snap => {
-      const sinVisto = snap.docs.filter(d => !d.data().recibeDePs);
+      // "Sin visto" = sin lectura confirmada por el área (lecturaPor / getLecturaConfirmada),
+      // NO el campo recibeDePs (que es la asignación de certificado que hace ESDOMED). Así el
+      // contador coincide con lo que la página marca Visto/Pendiente y baja al confirmar.
+      const sinVisto = snap.docs.filter(d => !getLecturaConfirmada({ id: d.id, ...d.data() } as NotificacionFallecido));
       const ids = new Set(sinVisto.map(d => d.id));
       if (knownVistos.current === null) {
         knownVistos.current = ids;
@@ -205,7 +213,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
       }
       setCount("fallecidos", sinVisto.length);
     });
-  }, [esPsicologia, addToast, setCount]);
+  }, [revisaFallecidos, addToast, setCount]);
 
   const pendientes: Pendientes = {
     ...counts,
