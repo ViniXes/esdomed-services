@@ -7,6 +7,10 @@ import {
   orderBy,
   query,
   limit,
+  where,
+  getDocs,
+  Timestamp,
+  QueryConstraint,
 } from "firebase/firestore";
 import {
   AlertCircle,
@@ -97,6 +101,11 @@ const estadoBadgeColor = (n: NotificacionAltaVivo) => {
   return ESTADO_COLOR[n.estado];
 };
 
+/** Fecha (YYYY-MM-DD) en zona local, evita el corrimiento de toISOString() en UTC. */
+function fechaLocalStr(d: Date) {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 function toDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
@@ -123,8 +132,14 @@ export default function EnfermeriaMovimientosPage() {
   const [registros, setRegistros] = useState<NotificacionAltaVivo[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoNotificacionAlta | "todos">("todos");
-  const [fechaDesde, setFechaDesde] = useState(() => new Date().toISOString().split("T")[0]);
-  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split("T")[0]);
+  const [fechaDesde, setFechaDesde] = useState(() => {
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    return fechaLocalStr(ayer);
+  });
+  const [fechaHasta, setFechaHasta] = useState(() => fechaLocalStr(new Date()));
+  const [resultadosHistoricos, setResultadosHistoricos] = useState<NotificacionAltaVivo[] | null>(null);
+  const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
   const [editing, setEditing] = useState<NotificacionAltaVivo | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const [tipoAlta, setTipoAlta] = useState<TipoAltaVivo | "">("");
@@ -132,8 +147,18 @@ export default function EnfermeriaMovimientosPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
+  // índice compuesto). Antes traía hasta 500 notificaciones de toda la
+  // historia cada vez que se abría la ruta.
   useEffect(() => {
-    const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"), limit(500));
+    const inicioAyer = new Date();
+    inicioAyer.setDate(inicioAyer.getDate() - 1);
+    inicioAyer.setHours(0, 0, 0, 0);
+    const q = query(
+      collection(db, "notificaciones_altas"),
+      where("creadoEn", ">=", Timestamp.fromDate(inicioAyer)),
+      orderBy("creadoEn", "desc"),
+    );
     return onSnapshot(q, (snap) => {
       setRegistros(
         snap.docs
@@ -143,7 +168,43 @@ export default function EnfermeriaMovimientosPage() {
     });
   }, []);
 
-  const registrosVisibles = registros.filter((n) => !esEstadoOcultoParaEnfermeria(n));
+  // Fecha (YYYY-MM-DD local) de "ayer", límite inferior de la vista en vivo.
+  const limiteVivoStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return fechaLocalStr(d);
+  })();
+  const fueraDeRangoVivo = !!fechaDesde && fechaDesde < limiteVivoStr;
+
+  // Búsqueda de notificaciones anteriores a ayer: una sola lectura (getDocs), no listener.
+  const buscarHistoricos = async () => {
+    if (!fechaDesde && !fechaHasta) return;
+    setBuscandoHistoricos(true);
+    try {
+      const constraints: QueryConstraint[] = [];
+      if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+      if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+      constraints.push(orderBy("creadoEn", "desc"), limit(500));
+      const snap = await getDocs(query(collection(db, "notificaciones_altas"), ...constraints));
+      setResultadosHistoricos(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as NotificacionAltaVivo))
+          .filter((n) => n.notificadoPorRol === "enfermeria")
+      );
+    } finally {
+      setBuscandoHistoricos(false);
+    }
+  };
+
+  const volverARecientes = () => {
+    setResultadosHistoricos(null);
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    setFechaDesde(fechaLocalStr(ayer));
+    setFechaHasta(fechaLocalStr(new Date()));
+  };
+
+  const registrosVisibles = (resultadosHistoricos ?? registros).filter((n) => !esEstadoOcultoParaEnfermeria(n));
 
   const lista = registrosVisibles.filter((n) => {
     if (filtroEstado !== "todos" && n.estado !== filtroEstado) return false;
@@ -293,10 +354,39 @@ export default function EnfermeriaMovimientosPage() {
         )}
       </div>
 
+      {/* La vista en vivo solo cubre ayer y hoy; para fechas anteriores hay que pedirlo explícitamente */}
+      {fueraDeRangoVivo && resultadosHistoricos === null && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
+          <span>Ese rango incluye fechas anteriores a ayer, fuera de la vista en vivo.</span>
+          <button
+            onClick={buscarHistoricos}
+            disabled={buscandoHistoricos}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50 transition-colors shrink-0"
+          >
+            <Search size={12} /> {buscandoHistoricos ? "Buscando…" : "Buscar históricos"}
+          </button>
+        </div>
+      )}
+      {resultadosHistoricos !== null && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-500">
+          <span>Mostrando resultados históricos para el rango seleccionado.</span>
+          <button
+            onClick={volverARecientes}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors shrink-0"
+          >
+            <X size={12} /> Ver recientes
+          </button>
+        </div>
+      )}
+
       <div className="space-y-2">
         {lista.length === 0 && (
           <p className="text-sm text-slate-500 py-10 text-center">
-            {registrosVisibles.length === 0 ? "Aun no hay movimientos de enfermeria." : "Sin resultados para los filtros aplicados."}
+            {resultadosHistoricos !== null
+              ? "Sin resultados históricos para ese rango."
+              : registrosVisibles.length === 0
+                ? "No hay movimientos de enfermeria en las últimas 24-48 horas."
+                : "Sin resultados para los filtros aplicados."}
           </p>
         )}
 
