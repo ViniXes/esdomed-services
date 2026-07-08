@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
-import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Download, Search, UserPlus, XCircle } from "lucide-react";
+import { collection, getCountFromServer, getDocs, limit, query, where } from "firebase/firestore";
+import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Download, History, Search, UserPlus, X, XCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toDate } from "@/lib/pacientes/helpers";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { jvpmAUsername } from "@/lib/username";
 import type { RegistroMedicoResuelto } from "@/types";
 
 const inputCls =
@@ -34,11 +35,22 @@ const PAGE_SIZE = 10;
 export default function RegistrosMedicosHistorialPage() {
   const { profile, loading } = useAuth();
   const router = useRouter();
-  const [registros, setRegistros] = useState<RegistroMedicoResuelto[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [busqueda, setBusqueda] = useState("");
+
+  // Búsqueda bajo demanda: nada se carga hasta que se escribe JVPM o nombre y
+  // se pulsa Buscar. Antes esta ruta traía hasta 500 documentos completos
+  // cada vez que se abría.
+  const [busquedaJvpm, setBusquedaJvpm] = useState("");
+  const [busquedaNombre, setBusquedaNombre] = useState("");
+  const [resultados, setResultados] = useState<RegistroMedicoResuelto[] | null>(null); // null = aún no se busca
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [pagina, setPagina] = useState(1);
+
+  // Totales por agregación (getCountFromServer): no lee documentos, no es en vivo.
+  const [totalAprobados, setTotalAprobados] = useState<number | null>(null);
+  const [totalRechazados, setTotalRechazados] = useState<number | null>(null);
 
   useEffect(() => {
     if (!loading && profile?.role !== "admin") router.replace("/dashboard");
@@ -46,45 +58,78 @@ export default function RegistrosMedicosHistorialPage() {
 
   useEffect(() => {
     if (profile?.role !== "admin") return;
-    const q = query(
-      collection(db, "registros_medicos_historial"),
-      orderBy("resueltoEn", "desc"),
-      limit(500)
-    );
-    return onSnapshot(
-      q,
-      (snap) => {
-        setRegistros(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RegistroMedicoResuelto)));
-        setCargando(false);
-      },
-      () => setCargando(false)
-    );
+    let activo = true;
+    (async () => {
+      try {
+        const col = collection(db, "registros_medicos_historial");
+        const [aprobadosSnap, rechazadosSnap] = await Promise.all([
+          getCountFromServer(query(col, where("estado", "==", "aprobado"))),
+          getCountFromServer(query(col, where("estado", "==", "rechazado"))),
+        ]);
+        if (activo) {
+          setTotalAprobados(aprobadosSnap.data().count);
+          setTotalRechazados(rechazadosSnap.data().count);
+        }
+      } catch {
+        if (activo) { setTotalAprobados(null); setTotalRechazados(null); }
+      }
+    })();
+    return () => { activo = false; };
   }, [profile?.role]);
 
+  const sinCriterio = !busquedaJvpm.trim() && !busquedaNombre.trim();
+
+  // Una sola lectura (getDocs) por búsqueda, no un listener.
+  const buscar = async () => {
+    const jvpmInput = busquedaJvpm.trim();
+    const nombreInput = busquedaNombre.trim().toUpperCase();
+    if (!jvpmInput && !nombreInput) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: RegistroMedicoResuelto[];
+      if (jvpmInput) {
+        // El JVPM crudo puede variar en mayúsculas/espacios según cómo se
+        // autoregistró el médico; "username" es su forma ya normalizada
+        // (login), así que buscamos por ahí para que sea confiable.
+        const usernameNorm = jvpmAUsername(jvpmInput);
+        const snap = await getDocs(query(collection(db, "registros_medicos_historial"), where("username", "==", usernameNorm)));
+        docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RegistroMedicoResuelto));
+      } else {
+        // Nombre: coincidencia desde el inicio del campo (Firestore no tiene "contiene").
+        // "nombre" ya se guarda en mayúsculas; se normaliza igual el texto de búsqueda.
+        const snap = await getDocs(
+          query(
+            collection(db, "registros_medicos_historial"),
+            where("nombre", ">=", nombreInput),
+            where("nombre", "<", nombreInput + ""),
+            limit(200),
+          )
+        );
+        docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RegistroMedicoResuelto));
+      }
+      docs.sort((a, b) => (toDate(b.resueltoEn)?.getTime() ?? 0) - (toDate(a.resueltoEn)?.getTime() ?? 0));
+      setResultados(docs);
+    } catch (e) {
+      setErrorBusqueda((e as Error).message || "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const limpiarBusqueda = () => {
+    setBusquedaJvpm(""); setBusquedaNombre("");
+    setResultados(null); setErrorBusqueda("");
+  };
+
   const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    return registros.filter((r) => {
-      const matchEstado = filtro === "todos" || r.estado === filtro;
-      const matchTexto =
-        !q ||
-        r.nombre?.toLowerCase().includes(q) ||
-        r.dui?.toLowerCase().includes(q) ||
-        r.jvpm?.toLowerCase().includes(q) ||
-        r.resueltoPorNombre?.toLowerCase().includes(q);
-      return matchEstado && matchTexto;
-    });
-  }, [registros, busqueda, filtro]);
+    if (resultados === null) return [];
+    return resultados.filter((r) => filtro === "todos" || r.estado === filtro);
+  }, [resultados, filtro]);
 
-  const totales = useMemo(
-    () => ({
-      aprobados: registros.filter((r) => r.estado === "aprobado").length,
-      rechazados: registros.filter((r) => r.estado === "rechazado").length,
-    }),
-    [registros]
-  );
-
-  // Al cambiar filtros/búsqueda, volver a la página 1 (ajuste en render, sin efecto).
-  const filtrosKey = `${busqueda}|${filtro}`;
+  // Al cambiar filtro/resultados, volver a la página 1 (ajuste en render, sin efecto).
+  const filtrosKey = `${resultados === null ? "null" : resultados.length}|${filtro}`;
   const [prevFiltros, setPrevFiltros] = useState(filtrosKey);
   if (filtrosKey !== prevFiltros) {
     setPrevFiltros(filtrosKey);
@@ -160,44 +205,91 @@ export default function RegistrosMedicosHistorialPage() {
         </div>
       </div>
 
-      {/* Resumen */}
+      {/* Resumen: agregación (getCountFromServer), no lee documentos */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3">
           <p className="text-xs text-emerald-700 dark:text-emerald-400">Aprobados</p>
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{totales.aprobados}</p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{totalAprobados ?? "…"}</p>
         </div>
         <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-4 py-3">
           <p className="text-xs text-red-700 dark:text-red-400">Rechazados</p>
-          <p className="text-2xl font-bold text-red-700 dark:text-red-300">{totales.rechazados}</p>
+          <p className="text-2xl font-bold text-red-700 dark:text-red-300">{totalRechazados ?? "…"}</p>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre, DUI, JVPM o quién resolvió..."
-            className={inputCls}
-          />
+      {/* Búsqueda bajo demanda: JVPM (exacto) o nombre (coincidencia desde el inicio) */}
+      <div className="space-y-2 mb-5">
+        <div className="flex items-center gap-2">
+          <History size={14} className="text-slate-400 flex-shrink-0" />
+          <p className="text-xs text-slate-500">
+            Busca por junta de vigilancia (JVPM) o por nombre. La búsqueda se hace bajo demanda para no releer todo el historial.
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={busquedaJvpm}
+              onChange={(e) => setBusquedaJvpm(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") buscar(); }}
+              placeholder="Buscar por JVPM…"
+              className={`${inputCls} pl-9`}
+            />
+          </div>
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={busquedaNombre}
+              onChange={(e) => setBusquedaNombre(e.target.value.toUpperCase())}
+              onKeyDown={(e) => { if (e.key === "Enter") buscar(); }}
+              placeholder="Buscar por nombre o apellido…"
+              className={`${inputCls} pl-9`}
+            />
+          </div>
+          <button
+            onClick={buscar}
+            disabled={buscando || sinCriterio}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
+          </button>
+          {(busquedaJvpm || busquedaNombre || resultados !== null) && (
+            <button
+              onClick={limpiarBusqueda}
+              className="flex items-center gap-1 px-2.5 py-2 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+            >
+              <X size={12} /> Limpiar
+            </button>
+          )}
+        </div>
+        {errorBusqueda && (
+          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+            {errorBusqueda}
+          </div>
+        )}
+      </div>
+
+      {resultados !== null && (
+        <div className="flex gap-2 mb-5">
           {filtroBtn("todos", "Todos")}
           {filtroBtn("aprobado", "Aprobados")}
           {filtroBtn("rechazado", "Rechazados")}
         </div>
-      </div>
+      )}
 
       {/* Lista */}
-      {cargando ? (
-        <p className="text-sm text-slate-400 py-10 text-center">Cargando historial...</p>
+      {resultados === null ? (
+        <p className="text-sm text-slate-400 py-16 text-center">
+          Escribe un JVPM o un nombre y pulsa Buscar.
+        </p>
+      ) : buscando ? (
+        <p className="text-sm text-slate-400 py-10 text-center">Buscando...</p>
       ) : filtrados.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <ClipboardList size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No hay registros que coincidan.</p>
+          <p className="text-sm">Sin resultados para esa búsqueda.</p>
         </div>
       ) : (
         <div className="space-y-2.5">

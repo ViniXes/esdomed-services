@@ -10,7 +10,7 @@ import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, EstadoTraslado, Paciente, MovimientoPaciente } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History } from "lucide-react";
+import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History, Inbox } from "lucide-react";
 
 const FILTROS: { label: string; value: EstadoTraslado | "todos" }[] = [
   { label: "Todos", value: "todos" },
@@ -42,6 +42,7 @@ export default function DashboardTrasladosPage() {
   const [recientes, setRecientes] = useState<SolicitudTraslado[]>([]);
   const [pendientesLive, setPendientesLive] = useState<SolicitudTraslado[]>([]);
   const [filtro, setFiltro] = useState<EstadoTraslado | "todos">("pendiente");
+  const [vista, setVista] = useState<"bandeja" | "buscar">("bandeja");
 
   // Zona 2: búsqueda histórica bajo demanda (NO en vivo).
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
@@ -232,8 +233,34 @@ export default function DashboardTrasladosPage() {
         </div>
       </div>
 
-      {/* ── Zona 1: en vivo (últimas 50 + todas las pendientes) ── */}
-      <section className="mb-8">
+      {/* Cambio de vista: bandeja en vivo ⇄ búsqueda histórica */}
+      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl mb-6 w-full sm:w-fit">
+        <button onClick={() => setVista("bandeja")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            vista === "bandeja"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-blue-700 dark:text-blue-300"
+              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}>
+          <Inbox size={15} /> Bandeja
+          {pendientesLive.length > 0 && (
+            <span className="min-w-[18px] px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-amber-500 text-white">
+              {pendientesLive.length}
+            </span>
+          )}
+        </button>
+        <button onClick={() => setVista("buscar")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            vista === "buscar"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-blue-700 dark:text-blue-300"
+              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}>
+          <Search size={15} /> Buscar anteriores
+        </button>
+      </div>
+
+      {/* ── Vista: Bandeja en vivo (últimas 50 + todas las pendientes) ── */}
+      {vista === "bandeja" && (
+      <section>
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {FILTROS.map(f => (
             <button key={f.value} onClick={() => setFiltro(f.value)}
@@ -255,9 +282,11 @@ export default function DashboardTrasladosPage() {
           {displayList.map(renderTraslado)}
         </div>
       </section>
+      )}
 
-      {/* ── Zona 2: Buscar traslados anteriores (bajo demanda) ── */}
-      <section className="border-t border-slate-200 dark:border-slate-800 pt-6">
+      {/* ── Vista: Buscar traslados anteriores (bajo demanda) ── */}
+      {vista === "buscar" && (
+      <section>
         <div className="flex items-center gap-2 mb-1">
           <History size={15} className="text-slate-400" />
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Buscar traslados anteriores</h2>
@@ -317,6 +346,7 @@ export default function DashboardTrasladosPage() {
           </>
         )}
       </section>
+      )}
 
       {selected && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">

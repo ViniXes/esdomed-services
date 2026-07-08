@@ -11,12 +11,15 @@ import { SolicitudImpresion } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
 import { toDate } from "@/lib/pacientes/helpers";
-import { Printer, Clock, Search, X, History } from "lucide-react";
+import { Printer, Clock, Search, X, History, Inbox } from "lucide-react";
 
 const ms = (ts: unknown) => toDate(ts)?.getTime() ?? 0;
 
 export default function DashboardImpresionesPage() {
   const { profile } = useAuth();
+
+  // Vista activa: bandeja en vivo ⇄ búsqueda histórica.
+  const [vista, setVista] = useState<"bandeja" | "buscar">("bandeja");
 
   // Zona 1: pendientes en vivo (worklist). Aparecen al instante al subirlos.
   const [pendientes, setPendientes] = useState<SolicitudImpresion[]>([]);
@@ -218,8 +221,34 @@ export default function DashboardImpresionesPage() {
         </div>
       </div>
 
-      {/* ── Zona 1: Pendientes (en vivo) ── */}
-      <section className="mb-8">
+      {/* Cambio de vista: bandeja en vivo ⇄ búsqueda histórica */}
+      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl mb-6 w-full sm:w-fit">
+        <button onClick={() => setVista("bandeja")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            vista === "bandeja"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-violet-700 dark:text-violet-300"
+              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}>
+          <Inbox size={15} /> Pendientes
+          {pendientes.length > 0 && (
+            <span className="min-w-[18px] px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none bg-amber-500 text-white">
+              {pendientes.length}
+            </span>
+          )}
+        </button>
+        <button onClick={() => setVista("buscar")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            vista === "buscar"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-violet-700 dark:text-violet-300"
+              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}>
+          <Search size={15} /> Buscar anteriores
+        </button>
+      </div>
+
+      {/* ── Vista: Pendientes (en vivo) ── */}
+      {vista === "bandeja" && (
+      <section>
         <div className="flex items-center gap-2 mb-3">
           <Clock size={15} className="text-amber-500" />
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pendientes de imprimir</h2>
@@ -234,9 +263,11 @@ export default function DashboardImpresionesPage() {
           <div className="space-y-3">{pendientes.map(renderSolicitud)}</div>
         )}
       </section>
+      )}
 
-      {/* ── Zona 2: Buscar impresiones anteriores (bajo demanda) ── */}
-      <section className="border-t border-slate-200 dark:border-slate-800 pt-6">
+      {/* ── Vista: Buscar impresiones anteriores (bajo demanda) ── */}
+      {vista === "buscar" && (
+      <section>
         <div className="flex items-center gap-2 mb-1">
           <History size={15} className="text-slate-400" />
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Buscar impresiones anteriores</h2>
@@ -296,6 +327,7 @@ export default function DashboardImpresionesPage() {
           </>
         )}
       </section>
+      )}
     </div>
   );
 }
