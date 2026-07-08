@@ -21,10 +21,10 @@ import { serviciosPorTipoMedico, tipoUnidadPorServicio, TIPO_MEDICO_CRITICO_LABE
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
-  queryFichasActivasServicios,
-  queryFichasIngresoMesServicios,
+  queryFichasServicios,
   unirFichas,
 } from "@/lib/fichasCuidadosCriticosQueries";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
 import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
@@ -34,9 +34,7 @@ const NUEVA_ESTANCIA = "nueva";
 const inputCls = "w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 
 function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  return timestamp.toDate?.() ?? new Date(value as string);
+  return fechaCuidadosCriticos(value);
 }
 
 function fichaEgresada(ficha: FichaCuidadosCriticos) {
@@ -57,14 +55,14 @@ function estadoPacienteLabel(estado: Paciente["estado"]) {
 function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente {
   const [apellidos = ficha.pacienteNombre, nombres = ""] = ficha.pacienteNombre.split(",").map(parte => parte.trim());
   const sexo = valorComoTexto(ficha.datos?.sexo).toLowerCase();
-  const fechaIngreso = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
+  const fechaIngreso = fechaCuidadosCriticos(ficha.datos?.fecha_ingreso_al_servicio);
   return {
     id,
     expediente: ficha.pacienteExpediente,
     apellidos,
     nombres,
     genero: sexo === "femenino" ? "femenino" : sexo === "masculino" ? "masculino" : "otro",
-    fechaIngreso: fechaIngreso ? new Date(`${fechaIngreso}T00:00:00`) : new Date(),
+    fechaIngreso: fechaIngreso ?? new Date(),
     establecimientoProcedencia: valorComoTexto(ficha.datos?.centro_de_procedencia),
     servicioIngreso: valorComoTexto(ficha.datos?.servicio_proveniente) || ficha.servicio,
     servicioActual: ficha.servicio,
@@ -87,10 +85,7 @@ function limpiarFichaUrl() {
 export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
-  const fechaConsulta = new Date();
-  const anioConsulta = fechaConsulta.getFullYear();
-  const mesConsulta = fechaConsulta.getMonth() + 1;
-  const claveConsultaFichas = `medico-cuidados-criticos:${anioConsulta}:${mesConsulta}`;
+  const claveConsultaFichas = `medico-cuidados-criticos:${servicios.join("|")}`;
   const cacheInicialFichas = getFichasCuidadosCriticosCache(claveConsultaFichas);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [pacientesHistoricos, setPacientesHistoricos] = useState<Paciente[]>([]);
@@ -140,8 +135,7 @@ export default function CuidadosCriticosMedicoPage() {
     setConsultandoFichas(true);
     try {
       const resultado = await consultarFichasCuidadosCriticos(claveConsultaFichas, [
-        queryFichasIngresoMesServicios(anioConsulta, mesConsulta, servicios),
-        queryFichasActivasServicios(servicios),
+        queryFichasServicios(servicios),
       ]);
       setFichasBase(ordenarFichas(resultado.fichas.filter(ficha => servicios.includes(ficha.servicio))));
       setConsultadoEn(resultado.consultadoEn);

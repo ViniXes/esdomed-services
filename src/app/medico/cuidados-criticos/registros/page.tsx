@@ -9,11 +9,9 @@ import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
-  queryFichasActivasServicios,
-  queryFichasIngresoAnioServicios,
-  queryFichasIngresoMesServicios,
-  queryFichasPorIngresoServicios,
+  queryFichasServicios,
 } from "@/lib/fichasCuidadosCriticosQueries";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos } from "@/types";
 
@@ -39,8 +37,7 @@ const inputCls = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm 
 
 function fechaIngresoFicha(ficha: FichaCuidadosCriticos) {
   if (!esValorRegistrado(ficha.datos?.fecha_ingreso_al_servicio)) return null;
-  const fecha = new Date(`${valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio)}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
+  return fechaCuidadosCriticos(ficha.datos?.fecha_ingreso_al_servicio);
 }
 
 function mesFicha(ficha: FichaCuidadosCriticos) {
@@ -50,8 +47,8 @@ function mesFicha(ficha: FichaCuidadosCriticos) {
 
 function enRango(fecha: Date | null, desde: string, hasta: string) {
   if (!fecha) return false;
-  const inicio = desde ? new Date(`${desde}T00:00:00`) : null;
-  const fin = hasta ? new Date(`${hasta}T23:59:59`) : null;
+  const inicio = fechaCuidadosCriticos(desde);
+  const fin = fechaCuidadosCriticos(hasta);
   if (inicio && fecha < inicio) return false;
   if (fin && fecha > fin) return false;
   return true;
@@ -88,9 +85,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [busqueda, setBusqueda] = useState("");
 
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
-  const anioConsulta = new Date().getFullYear();
-  const mesNumero = MESES.indexOf(mes) + 1;
-  const claveConsulta = `medico-registros-cuidados:${anioConsulta}:${periodo}:${mes}:${desde}:${hasta}`;
+  const claveConsulta = `medico-registros-cuidados:${servicios.join("|")}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
   const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
@@ -108,12 +103,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     if (!profile?.tipoMedico || servicios.length === 0 || consultando) return;
     setConsultando(true);
     try {
-      const periodoQuery = periodo === "mes" && mesNumero > 0
-        ? queryFichasIngresoMesServicios(anioConsulta, mesNumero, servicios)
-        : periodo === "rango"
-          ? queryFichasPorIngresoServicios(desde || `${anioConsulta}-01-01`, hasta || `${anioConsulta}-12-31`, servicios)
-          : queryFichasIngresoAnioServicios(anioConsulta, servicios);
-      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [periodoQuery, queryFichasActivasServicios(servicios)]);
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasServicios(servicios)]);
       setFichas(ordenarFichas(resultado.fichas.filter(ficha => servicios.includes(ficha.servicio))));
       setConsultadoEn(resultado.consultadoEn);
     } finally {

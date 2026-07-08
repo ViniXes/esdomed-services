@@ -11,10 +11,9 @@ import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
-  queryFichasActivas,
-  queryFichasEgresoAnio,
-  queryFichasIngresoAnio,
+  queryFichasTodas,
 } from "@/lib/fichasCuidadosCriticosQueries";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import {
   calcularDatosBaseCuidadosCriticos,
   calcularIndicadoresCuidadosCriticos,
@@ -106,9 +105,7 @@ const GRAFICOS_LETALIDAD: ColumnaGrafico[] = [
 ];
 
 function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  return timestamp.toDate?.() ?? new Date(value as string);
+  return fechaCuidadosCriticos(value);
 }
 
 export default function IndicadoresCuidadosCriticosPage() {
@@ -148,9 +145,7 @@ export default function IndicadoresCuidadosCriticosPage() {
     setConsultando(true);
     try {
       const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [
-        queryFichasIngresoAnio(anio),
-        queryFichasEgresoAnio(anio),
-        queryFichasActivas(),
+        queryFichasTodas(),
       ]);
       const docs = [...resultado.fichas].sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
       setFichas(docs);

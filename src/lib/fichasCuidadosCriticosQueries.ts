@@ -14,6 +14,7 @@ import type { FichaCuidadosCriticos } from "@/types";
 const COLLECTION = "fichas_cuidados_criticos";
 const LIMITE_RANGO = 1200;
 const LIMITE_ACTIVAS = 300;
+const LIMITE_CONSULTA_MANUAL = 5000;
 
 interface CacheFichas {
   fichas: FichaCuidadosCriticos[];
@@ -54,6 +55,21 @@ export function queryFichasPorIngreso(desde: string, hasta: string, limite = LIM
     where("datos.fecha_ingreso_al_servicio", ">=", desde),
     where("datos.fecha_ingreso_al_servicio", "<=", hasta),
     orderBy("datos.fecha_ingreso_al_servicio", "asc"),
+    limit(limite),
+  );
+}
+
+export function queryFichasTodas(limite = LIMITE_CONSULTA_MANUAL) {
+  return query(
+    collection(db, COLLECTION),
+    limit(limite),
+  );
+}
+
+export function queryFichasServicios(servicios: string[], limite = LIMITE_CONSULTA_MANUAL) {
+  return query(
+    collection(db, COLLECTION),
+    where("servicio", "in", serviciosParaConsulta(servicios)),
     limit(limite),
   );
 }

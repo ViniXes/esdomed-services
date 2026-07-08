@@ -8,10 +8,9 @@ import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/Lie
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
-  queryFichasActivas,
-  queryFichasIngresoAnio,
-  queryFichasIngresoMes,
+  queryFichasTodas,
 } from "@/lib/fichasCuidadosCriticosQueries";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
@@ -35,10 +34,7 @@ const MESES = [
 ] as const;
 
 function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  const fecha = timestamp.toDate?.() ?? new Date(value as string);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
+  return fechaCuidadosCriticos(value);
 }
 
 function normalizarTexto(value: unknown) {
@@ -75,7 +71,7 @@ export default function CuidadosCriticosDashboardPage() {
 
   const puedeVer = puedeVerModuloCuidadosCriticos(profile);
   const anioConsulta = new Date().getFullYear();
-  const claveConsulta = `dashboard-cuidados-criticos:${anioConsulta}:${filtroMes}`;
+  const claveConsulta = `dashboard-cuidados-criticos:${anioConsulta}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => cacheInicial?.fichas ?? []);
   const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
@@ -93,10 +89,7 @@ export default function CuidadosCriticosDashboardPage() {
     if (!puedeVer || consultando) return;
     setConsultando(true);
     try {
-      const periodoQuery = filtroMes === "todos"
-        ? queryFichasIngresoAnio(anioConsulta)
-        : queryFichasIngresoMes(anioConsulta, filtroMes);
-      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [periodoQuery, queryFichasActivas()]);
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasTodas()]);
       const docs = [...resultado.fichas].sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
       setFichas(docs);
       setConsultadoEn(resultado.consultadoEn);
