@@ -11,7 +11,7 @@ import {
 } from "react";
 import {
   collection, onSnapshot, query, where, orderBy, limit, getCountFromServer, type Query,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLecturaConfirmada } from "@/lib/fallecidos";

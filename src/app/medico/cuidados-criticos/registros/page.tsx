@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "@/lib/firestoreMeter";
 import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query, limit, doc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, limit, doc, updateDoc, Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClipboardList, Clock, CheckCircle2, Search, Printer, ExternalLink } from "lucide-react";

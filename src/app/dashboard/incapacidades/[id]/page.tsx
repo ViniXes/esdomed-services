@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, onSnapshot, Timestamp, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, Timestamp, updateDoc, deleteDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {

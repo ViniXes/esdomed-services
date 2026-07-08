@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { getPersona } from "@/lib/pacientes/persona";
 import {

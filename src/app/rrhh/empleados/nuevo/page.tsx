@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, getDoc, Timestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import {

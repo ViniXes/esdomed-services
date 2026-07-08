@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, updateDoc, Timestamp, where, limit } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, updateDoc, Timestamp, where, limit } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";

@@ -10,7 +10,7 @@ import {
   signOut,
   updatePassword,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "@/lib/firestoreMeter";
 import { auth, db } from "@/lib/firebase";
 import { UserProfile } from "@/types";
 

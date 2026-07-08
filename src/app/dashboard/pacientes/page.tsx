@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   collection, query, where, orderBy, getDocs, limit, QueryConstraint,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";

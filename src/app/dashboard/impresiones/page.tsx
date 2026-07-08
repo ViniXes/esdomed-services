@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   collection, query, where, orderBy, onSnapshot, getDocs, limit,
   doc, updateDoc, Timestamp, QueryConstraint,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudImpresion } from "@/types";
@@ -24,6 +24,7 @@ export default function DashboardImpresionesPage() {
   // Zona 1: pendientes en vivo (worklist). Aparecen al instante al subirlos.
   const [pendientes, setPendientes] = useState<SolicitudImpresion[]>([]);
   const [loadingPend, setLoadingPend] = useState(true);
+  const [busquedaPendientes, setBusquedaPendientes] = useState("");
 
   // Zona 2: búsqueda histórica bajo demanda (NO en vivo).
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
@@ -136,6 +137,18 @@ export default function DashboardImpresionesPage() {
   };
 
   const sinCriterio = !busquedaExpediente.trim() && !fechaDesde && !fechaHasta;
+
+  // Filtro en cliente sobre los pendientes ya cargados (sin lecturas extra):
+  // útil para ubicar uno entre muchos sin tener que buscar en el histórico.
+  const pendientesFiltrados = pendientes.filter(s => {
+    const q = busquedaPendientes.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (s.pacienteExpediente ?? "").toLowerCase().includes(q) ||
+      s.medicoNombre.toLowerCase().includes(q) ||
+      s.descripcion.toLowerCase().includes(q)
+    );
+  });
 
   const renderSolicitud = (s: SolicitudImpresion) => (
     <div key={s.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-violet-300 dark:hover:border-violet-900 transition-all shadow-sm">
@@ -253,14 +266,30 @@ export default function DashboardImpresionesPage() {
           <Clock size={15} className="text-amber-500" />
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pendientes de imprimir</h2>
         </div>
+
+        {!loadingPend && pendientes.length > 0 && (
+          <div className="relative mb-3">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={busquedaPendientes}
+              onChange={e => setBusquedaPendientes(e.target.value)}
+              placeholder="Buscar entre los pendientes por expediente, médico o descripción..."
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-slate-100 placeholder-slate-400 shadow-sm"
+            />
+          </div>
+        )}
+
         {loadingPend ? (
           <div className="flex items-center justify-center py-10">
             <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : pendientes.length === 0 ? (
           <p className="text-sm text-slate-500 py-10 text-center">No hay impresiones pendientes.</p>
+        ) : pendientesFiltrados.length === 0 ? (
+          <p className="text-sm text-slate-500 py-10 text-center">Sin resultados para esa búsqueda.</p>
         ) : (
-          <div className="space-y-3">{pendientes.map(renderSolicitud)}</div>
+          <div className="space-y-3">{pendientesFiltrados.map(renderSolicitud)}</div>
         )}
       </section>
       )}

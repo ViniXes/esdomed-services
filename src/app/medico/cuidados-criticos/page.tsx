@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   updateDoc,
   where,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";

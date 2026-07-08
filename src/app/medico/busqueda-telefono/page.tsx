@@ -9,7 +9,7 @@ import {
   query,
   serverTimestamp,
   where,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { AlertCircle, CheckCircle2, Phone, Search, UserRound } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";

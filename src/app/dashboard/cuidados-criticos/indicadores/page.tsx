@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "@/lib/firestoreMeter";
 import { AlertCircle, BarChart3, Calculator, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";

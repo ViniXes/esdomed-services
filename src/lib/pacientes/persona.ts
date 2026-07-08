@@ -1,6 +1,6 @@
 import {
   collection, doc, getDoc, getDocs, query, where, writeBatch, setDoc, Timestamp,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import type { Persona, ResponsablePaciente } from "@/types";
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";

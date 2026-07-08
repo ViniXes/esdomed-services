@@ -9,7 +9,7 @@
 //      edad; disponible apenas el paciente entra, aunque aún no esté en padrón.
 //      No trae nombre.
 
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { calcularEdad, toDate } from "@/lib/pacientes/helpers";
 import type { Genero } from "@/types";

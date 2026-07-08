@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import {
   ACCIONES_SEGUIMIENTO, GRUPOS_GESTION_TS, keyAccionSeguimiento, labelTipoGestion,

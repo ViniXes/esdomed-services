@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { ArrowLeft, Printer, Ambulance, Info, CheckCircle2, Save } from "lucide-react";
 import type { DatosConstancia, Genero, Paciente, SolicitudIncapacidad } from "@/types";

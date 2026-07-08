@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   collection, query, where, onSnapshot, getDocs,
   addDoc, updateDoc, deleteDoc, doc, Timestamp,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";

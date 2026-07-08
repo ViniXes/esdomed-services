@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   addDoc, collection, doc, getDocs, orderBy, query, Timestamp, updateDoc, where,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, setDoc, Timestamp, updateDoc, where,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { GestionTS, Paciente, RastreoTS } from "@/types";

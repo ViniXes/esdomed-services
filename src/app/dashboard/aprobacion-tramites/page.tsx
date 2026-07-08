@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp, limit } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp, limit } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, RefreshCw, AlertTriangle } from "lucide-react";

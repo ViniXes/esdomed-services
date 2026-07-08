@@ -1,7 +1,7 @@
 // Pre-chequeo de duplicados para las notificaciones de alta (vivo) y prealta.
 // Es una verificación de UX (no atómica): bloquea el caso real de que alguien ya
 // notificó al paciente. Para el simultáneo exacto haría falta un candado atómico.
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 
 // Estados en los que una notificación de alta vivo sigue "abierta" (aún no cerrada

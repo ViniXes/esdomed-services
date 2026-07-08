@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   collection, query, orderBy, onSnapshot, limit,
   addDoc, Timestamp,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {

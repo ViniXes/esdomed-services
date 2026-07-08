@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { collection, getCountFromServer, getDocs, limit, query, where } from "firebase/firestore";
+import { collection, getCountFromServer, getDocs, limit, query, where } from "@/lib/firestoreMeter";
 import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Download, History, Search, UserPlus, X, XCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";

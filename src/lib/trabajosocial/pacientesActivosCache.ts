@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import type { Paciente } from "@/types";
 

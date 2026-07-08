@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp,
   where, getDocs, limit, arrayUnion, QueryConstraint,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";

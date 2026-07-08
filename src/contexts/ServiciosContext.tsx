@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { SERVICIOS_HOSPITALARIOS, CAMAS_POR_SERVICIO } from "@/lib/servicios";
 

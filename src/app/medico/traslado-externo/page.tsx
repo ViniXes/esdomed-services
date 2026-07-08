@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "@/lib/firestoreMeter";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";

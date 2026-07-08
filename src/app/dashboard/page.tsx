@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { collection, query, orderBy, limit, getDocs, where, getCountFromServer } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, where, getCountFromServer } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, NotificacionFallecido, SolicitudImpresion } from "@/types";

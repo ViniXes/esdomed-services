@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { Search, Upload, Users, ChevronRight, UserPlus } from "lucide-react";
 import type { Empleado } from "@/types";

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { Search, FilePlus2, FileText } from "lucide-react";
 import type { Licencia } from "@/types";

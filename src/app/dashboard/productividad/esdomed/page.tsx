@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, query, Timestamp, where } from "firebase/firestore";
+import { collection, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import {
   BadgeCheck,
   BarChart3,

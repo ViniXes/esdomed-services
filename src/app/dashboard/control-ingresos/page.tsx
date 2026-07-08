@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   addDoc, collection, Timestamp, query, orderBy, onSnapshot, limit, doc, updateDoc,
   where, getDocs, QueryConstraint,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import Image from "next/image";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";

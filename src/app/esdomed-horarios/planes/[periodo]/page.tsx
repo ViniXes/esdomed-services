@@ -11,7 +11,7 @@ import {
   query,
   setDoc,
   where,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { FilaPlanTrabajo, PlanTrabajo, UserProfile } from "@/types";

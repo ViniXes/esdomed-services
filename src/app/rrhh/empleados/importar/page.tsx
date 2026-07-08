@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   collection, doc, getDocs, Timestamp, writeBatch,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { ArrowLeft, Upload, AlertTriangle, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import type { Empleado } from "@/types";

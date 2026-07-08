@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { SolicitudAnexo5 } from "@/types";

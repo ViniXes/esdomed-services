@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   collection, query, where, orderBy, onSnapshot, getDocs, getCountFromServer,
   limit, Timestamp, QueryConstraint, QueryDocumentSnapshot, DocumentData,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { FileText, Clock, CheckCircle2, Search, X, AlertTriangle, History } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";

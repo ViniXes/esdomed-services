@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, NotificacionFallecido, SolicitudImpresion } from "@/types";

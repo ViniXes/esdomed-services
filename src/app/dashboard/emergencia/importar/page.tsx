@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   collection, doc, documentId, getDocs, query, where, writeBatch, Timestamp,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {

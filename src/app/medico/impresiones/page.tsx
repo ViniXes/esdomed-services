@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, query, where, onSnapshot, addDoc, Timestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, Timestamp } from "@/lib/firestoreMeter";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";

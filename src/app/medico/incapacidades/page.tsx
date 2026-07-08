@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   collection, query, where, onSnapshot, deleteDoc, doc,
   getDocs, orderBy, limit, type QueryDocumentSnapshot, type DocumentData,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";

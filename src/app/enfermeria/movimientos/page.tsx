@@ -11,7 +11,7 @@ import {
   getDocs,
   Timestamp,
   QueryConstraint,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import {
   AlertCircle,
   CheckCircle2,

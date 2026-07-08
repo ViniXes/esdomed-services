@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useRef, useCallback, createContext, useCo
 import {
   collection, query, where, onSnapshot, getDocs, getDoc,
   addDoc, updateDoc, doc, Timestamp,
-} from "firebase/firestore";
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { PARENTESCOS } from "@/lib/parentescos";

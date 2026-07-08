@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { Layers, Hash, BedDouble, Search, X } from "lucide-react";

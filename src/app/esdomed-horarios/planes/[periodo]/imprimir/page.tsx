@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { PlanTrabajo } from "@/types";

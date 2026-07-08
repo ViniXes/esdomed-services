@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { arrayRemove, arrayUnion, collection, doc, onSnapshot, setDoc, Timestamp } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, onSnapshot, setDoc, Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { IntentoContactoTS, Paciente, RastreoTS } from "@/types";
