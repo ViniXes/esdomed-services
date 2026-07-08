@@ -250,18 +250,6 @@ export default function DashboardFallecidosPage() {
     }
   };
 
-  const productividad = personal.map(p => ({
-    nombre: p.nombre,
-    simmow:      notificaciones.filter(n => n.digitaSimmow === p.nombre).length,
-    tramita:     notificaciones.filter(n => n.tramitaDefuncion === p.nombre).length,
-    certificado: notificaciones.filter(n => n.entregaCertificado === p.nombre).length,
-    psicologia:  notificaciones.filter(n => n.recibeDePs === p.nombre).length,
-    total:       notificaciones.filter(n =>
-      n.digitaSimmow === p.nombre || n.tramitaDefuncion === p.nombre ||
-      n.entregaCertificado === p.nombre || n.recibeDePs === p.nombre
-    ).length,
-  })).filter(p => p.total > 0).sort((a, b) => b.total - a.total);
-
   const pendientes     = notificaciones.filter(n => n.estado === "pendiente").length;
   const certPendientes = notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente").length;
   const selectedLive   = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
@@ -318,26 +306,6 @@ export default function DashboardFallecidosPage() {
           )}
         </div>
       </div>
-
-      {/* Productividad */}
-      {productividad.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Productividad del equipo</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {productividad.map(p => (
-              <div key={p.nombre} className="bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2.5">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{p.nombre}</p>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                  {p.simmow > 0      && <span className="text-[11px] text-blue-600 dark:text-blue-400">{p.simmow} SIMMOW</span>}
-                  {p.tramita > 0     && <span className="text-[11px] text-teal-600 dark:text-teal-400">{p.tramita} tram.</span>}
-                  {p.certificado > 0 && <span className="text-[11px] text-violet-600 dark:text-violet-400">{p.certificado} cert.</span>}
-                  {p.psicologia > 0  && <span className="text-[11px] text-rose-600 dark:text-rose-400">{p.psicologia} psic.</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
