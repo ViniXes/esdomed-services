@@ -100,28 +100,6 @@ export function LienzoMatrizCuidadosCriticos({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Filas
-            <select
-              value={pageSize}
-              onChange={event => setPageSize(Number(event.target.value))}
-              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            >
-              {PAGE_SIZE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </label>
-
-          <Paginacion
-            pagina={paginaActual}
-            totalPaginas={totalPaginas}
-            inicio={filasFiltradas.length === 0 ? 0 : inicio + 1}
-            fin={fin}
-            total={filasFiltradas.length}
-            totalOriginal={filas.length}
-            onAnterior={() => setPagina(actual => Math.max(1, actual - 1))}
-            onSiguiente={() => setPagina(actual => Math.min(totalPaginas, actual + 1))}
-          />
-
           {onRefresh && (
             <button
               type="button"
@@ -197,20 +175,29 @@ export function LienzoMatrizCuidadosCriticos({
         </table>
       </div>
 
-      {filasFiltradas.length > 0 && (
-        <div className="flex justify-end">
-          <Paginacion
-            pagina={paginaActual}
-            totalPaginas={totalPaginas}
-            inicio={inicio + 1}
-            fin={fin}
-            total={filasFiltradas.length}
-            totalOriginal={filas.length}
-            onAnterior={() => setPagina(actual => Math.max(1, actual - 1))}
-            onSiguiente={() => setPagina(actual => Math.min(totalPaginas, actual + 1))}
-          />
-        </div>
-      )}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+          Filas
+          <select
+            value={pageSize}
+            onChange={event => setPageSize(Number(event.target.value))}
+            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          >
+            {PAGE_SIZE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+
+        <Paginacion
+          pagina={paginaActual}
+          totalPaginas={totalPaginas}
+          inicio={filasFiltradas.length === 0 ? 0 : inicio + 1}
+          fin={fin}
+          total={filasFiltradas.length}
+          totalOriginal={filas.length}
+          onAnterior={() => setPagina(actual => Math.max(1, actual - 1))}
+          onSiguiente={() => setPagina(actual => Math.min(totalPaginas, actual + 1))}
+        />
+      </div>
     </div>
   );
 }
