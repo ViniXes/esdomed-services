@@ -11,9 +11,12 @@ import { PARENTESCOS } from "@/lib/parentescos";
 import { DateField } from "@/components/ui/DateField";
 import type { Paciente, TarjetaVisita, Visita, VisitanteInfo } from "@/types";
 import {
+  consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
+} from "@/lib/trabajosocial/pacientesActivosCache";
+import {
   DoorOpen, Plus, X, LogIn, LogOut, User, UserPlus, IdCard,
   Search, CheckCircle2, CalendarDays, MessageSquare, CreditCard, Ban, Trash2,
-  AlertTriangle, ArrowLeft,
+  AlertTriangle, ArrowLeft, RefreshCw,
 } from "lucide-react";
 
 // ── Estilos compartidos ───────────────────────────────────────────────────────
@@ -110,6 +113,20 @@ async function cargarTarjeta(id: string): Promise<TarjetaVisita | null> {
 
 type TabId = "hoy" | "activos" | "historial";
 
+// Caché de módulo (solo Visitas) de tarjetas activas. La caché de pacientes
+// activos es compartida con Gestiones — mismo censo, ver pacientesActivosCache.
+let cacheTarjetasActivas: TarjetaVisita[] | null = null;
+
+// Orden del roster: servicio → cama → nombre. La caché compartida de pacientes
+// activos no trae ningún orden particular (cada vista ordena a su manera).
+function ordenarRoster(lista: Paciente[]): Paciente[] {
+  return [...lista].sort((a, b) =>
+    (a.servicioActual ?? "").localeCompare(b.servicioActual ?? "") ||
+    (a.camaActual ?? "").localeCompare(b.camaActual ?? "") ||
+    `${a.apellidos} ${a.nombres}`.localeCompare(`${b.apellidos} ${b.nombres}`)
+  );
+}
+
 // ── Feedback (toasts de éxito / error) ────────────────────────────────────────
 
 type Feedback = { id: number; tipo: "success" | "error"; mensaje: string };
@@ -157,9 +174,12 @@ export default function VisitasPage() {
   const [visitasHoy, setVisitasHoy] = useState<Visita[]>([]);
   const [hoyTexto, setHoyTexto] = useState("");
   const [hoyEstado, setHoyEstado] = useState<Visita["estado"] | "todos">("todos");
-  const [tarjetas, setTarjetas] = useState<TarjetaVisita[]>([]);
-  // Roster de pacientes activos (pestaña "Pacientes activos").
-  const [pacientesActivos, setPacientesActivos] = useState<Paciente[]>([]);
+  const [tarjetas, setTarjetas] = useState<TarjetaVisita[]>(() => cacheTarjetasActivas ?? []);
+  // Roster de pacientes activos (pestaña "Pacientes activos"). Lectura puntual
+  // bajo demanda (caché compartida con Gestiones) en lugar de listeners en vivo.
+  const [pacientesActivos, setPacientesActivos] = useState<Paciente[]>(() => ordenarRoster(getPacientesActivosCache() ?? []));
+  const [rosterLoading, setRosterLoading] = useState(() => getPacientesActivosCache() === null || cacheTarjetasActivas === null);
+  const [rosterActualizadoEn, setRosterActualizadoEn] = useState<Date | null>(() => getPacientesActivosCacheEn());
   const [rosterTexto, setRosterTexto] = useState("");
   const [rosterServicio, setRosterServicio] = useState("todos");
   const [rosterSoloSinVisita, setRosterSoloSinVisita] = useState(false);
@@ -233,26 +253,44 @@ export default function VisitasPage() {
     );
   }, [hoy]);
 
-  // Roster: todos los pacientes activos (fuente de verdad del listado diario) + sus tarjetas.
-  useEffect(() => {
-    if (tab !== "activos") return;
-    const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    return onSnapshot(q, s => {
-      const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as Paciente));
-      docs.sort((a, b) =>
-        (a.servicioActual ?? "").localeCompare(b.servicioActual ?? "") ||
-        (a.camaActual ?? "").localeCompare(b.camaActual ?? "") ||
-        `${a.apellidos} ${a.nombres}`.localeCompare(`${b.apellidos} ${b.nombres}`)
-      );
-      setPacientesActivos(docs);
-    });
-  }, [tab]);
+  // Roster: todos los pacientes activos (fuente de verdad del listado diario) + sus
+  // tarjetas. Antes dos listeners en vivo sin límite (censo completo); ahora una
+  // lectura puntual (getDocs) bajo demanda — la caché de pacientes es compartida
+  // con Gestiones (panorama/rastreo/seguimiento navegan al mismo censo).
+  const consultarRoster = useCallback(async () => {
+    setRosterLoading(true);
+    try {
+      const [pacientesList, tarjetasSnap] = await Promise.all([
+        consultarPacientesActivos(),
+        getDocs(query(collection(db, "tarjetas_visita"), where("estado", "==", "activa"))),
+      ]);
+      setPacientesActivos(ordenarRoster(pacientesList));
+      const tarjetasList = tarjetasSnap.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita));
+      cacheTarjetasActivas = tarjetasList;
+      setTarjetas(tarjetasList);
+      setRosterActualizadoEn(getPacientesActivosCacheEn());
+    } finally {
+      setRosterLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (tab !== "activos") return;
-    const q = query(collection(db, "tarjetas_visita"), where("estado", "==", "activa"));
-    return onSnapshot(q, s => setTarjetas(s.docs.map(d => ({ id: d.id, ...d.data() } as TarjetaVisita))));
-  }, [tab]);
+    if (getPacientesActivosCache() !== null && cacheTarjetasActivas !== null) return; // ya hay caché de ambos
+    const t = setTimeout(consultarRoster, 0);
+    return () => clearTimeout(t);
+  }, [tab, consultarRoster]);
+
+  // Sincroniza el estado local de una tarjeta recién creada/actualizada (p. ej. al
+  // capturar la primera visita de un paciente sin tarjeta) sin releer Firestore.
+  const onTarjetaGuardada = useCallback((t: TarjetaVisita) => {
+    setTarjetas(prev => {
+      const idx = prev.findIndex(x => x.id === t.id);
+      const next = idx === -1 ? [...prev, t] : prev.map((x, i) => (i === idx ? t : x));
+      cacheTarjetasActivas = next;
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (tab !== "historial") return;
@@ -501,9 +539,22 @@ export default function VisitasPage() {
               Solo sin visita hoy
             </button>
             <span className="text-sm text-slate-500">{rosterFiltrado.length} paciente(s)</span>
+            <button
+              onClick={consultarRoster}
+              disabled={rosterLoading}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+              title={rosterActualizadoEn ? `Actualizado a las ${rosterActualizadoEn.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Actualizar"}
+            >
+              <RefreshCw size={14} className={rosterLoading ? "animate-spin" : ""} />
+              Actualizar
+            </button>
           </div>
 
-          {pacientesActivos.length === 0 ? (
+          {rosterLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : pacientesActivos.length === 0 ? (
             <EmptyState texto="No hay pacientes activos." sub="Cada paciente internado aparece aquí automáticamente mientras esté activo." />
           ) : rosterFiltrado.length === 0 ? (
             <p className="text-sm text-slate-400 py-10 text-center">Ningún paciente activo coincide con la búsqueda.</p>
@@ -645,6 +696,7 @@ export default function VisitasPage() {
         <PrimeraVisitaModal
           paciente={nuevaTarjetaPaciente}
           onClose={() => setNuevaTarjetaPaciente(null)}
+          onTarjetaGuardada={onTarjetaGuardada}
         />
       )}
 
@@ -900,9 +952,10 @@ function PacienteRosterCard({ paciente, tarjeta, visitaEnCurso, visitoHoy, onEnt
 
 // ── Modal: Primera visita (crea la tarjeta + titular para un paciente sin tarjeta) ──
 
-function PrimeraVisitaModal({ paciente, onClose }: {
+function PrimeraVisitaModal({ paciente, onClose, onTarjetaGuardada }: {
   paciente: Paciente;
   onClose: () => void;
+  onTarjetaGuardada: (t: TarjetaVisita) => void;
 }) {
   const { profile } = useAuth();
   const notify = useFeedback();
@@ -969,6 +1022,9 @@ function PrimeraVisitaModal({ paciente, onClose }: {
           creadoPor: profile.uid, creadoPorNombre: profile.nombre,
         };
       }
+      // Sincroniza la tarjeta en el roster del padre sin esperar a un refresco manual
+      // (antes lo hacía solo el listener en vivo; ahora es una lectura bajo demanda).
+      onTarjetaGuardada(tarjeta);
       await crearVisitaEntrada(tarjeta, limpio, { id: profile.uid, nombre: profile.nombre });
       notify("success", `Entrada registrada · ${limpio.nombre}`);
       onClose();

@@ -91,6 +91,19 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "admin", label: "Administrador Superusuario" },
 ];
 
+// Filtro de la lista: además de un rol puntual, permite "todos" (trae la
+// colección completa — deliberado, no es el valor inicial ni el default).
+type FiltroRol = UserRole | "todos" | "";
+const roleFilterOptions: { value: UserRole | "todos"; label: string }[] = [
+  { value: "todos", label: "Todos los roles (lee toda la colección)" },
+  ...roleOptions,
+];
+
+// Caché por rol consultado. Persiste durante la sesión del SPA (sobrevive a
+// navegación client-side, no a recarga completa), evita releer Firestore al
+// volver a un rol ya consultado.
+const cacheUsuarios = new Map<string, UserProfile[]>();
+
 export default function DashboardUsuariosPage() {
   const { user, profile } = useAuth();
   const { servicios } = useServicios();
@@ -101,7 +114,10 @@ export default function DashboardUsuariosPage() {
   // Modal de confirmación para aprobar/rechazar una solicitud de médico.
   const [accionPend, setAccionPend] = useState<{ tipo: "aprobar" | "rechazar"; p: PendienteMedico } | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState("");
-  const [loading, setLoading] = useState(true);
+  // Lectura de la lista: bajo demanda, acotada por rol. Nada se carga hasta
+  // que se elige un tipo de usuario y se pulsa Consultar.
+  const [loading, setLoading] = useState(false);
+  const [consultado, setConsultado] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<NuevoUsuario>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -117,9 +133,10 @@ export default function DashboardUsuariosPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   // Catálogo de códigos de marcación (nombre → código) para autocompletar.
   const [marcacion, setMarcacion] = useState<{ nombre: string; codigo: string }[]>([]);
-  // Filtros y paginación de la lista.
+  // Filtros y paginación de la lista. filtroRol arranca vacío a propósito: no
+  // se lee nada hasta que se elige un tipo de usuario.
   const [filtroNombre, setFiltroNombre] = useState("");
-  const [filtroRol, setFiltroRol] = useState<UserRole | "todos">("todos");
+  const [filtroRol, setFiltroRol] = useState<FiltroRol>("");
   const [pagina, setPagina] = useState(1);
 
   const getToken = async () => (await user?.getIdToken()) ?? "";
@@ -131,14 +148,21 @@ export default function DashboardUsuariosPage() {
       .catch(() => setMarcacion([]));
   }, []);
 
-  const fetchUsuarios = async () => {
+  // Lectura puntual (getDocs vía API), acotada por rol — nunca trae toda la
+  // colección salvo que se elija explícitamente "todos".
+  const fetchUsuarios = async (rol: FiltroRol) => {
+    if (!rol) return;
+    setLoading(true);
     const token = await getToken();
-    const res = await fetch("/api/usuarios", { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`/api/usuarios?role=${encodeURIComponent(rol)}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) {
       setError((await res.json()).error ?? "No se pudieron cargar los usuarios");
       setUsuarios([]);
     } else {
-      setUsuarios(await res.json());
+      const data = await res.json();
+      cacheUsuarios.set(rol, data);
+      setUsuarios(data);
+      setConsultado(true);
     }
     setLoading(false);
   };
@@ -153,11 +177,21 @@ export default function DashboardUsuariosPage() {
   useEffect(() => {
     if (!user) return;
     const timeout = window.setTimeout(() => {
-      void fetchUsuarios();
       void fetchPendientes();
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Al cambiar de rol: si ya está en caché se muestra al instante (sin leer
+  // Firestore); si no, se deja vacío hasta que se pulse Consultar. Ajuste de
+  // estado en render (mismo patrón que dashboard/pacientes).
+  const [filtroRolPrev, setFiltroRolPrev] = useState(filtroRol);
+  if (filtroRolPrev !== filtroRol) {
+    setFiltroRolPrev(filtroRol);
+    const cached = filtroRol ? cacheUsuarios.get(filtroRol) : undefined;
+    setUsuarios(cached ?? []);
+    setConsultado(!!cached);
+  }
 
   const abrirAccion = (tipo: "aprobar" | "rechazar", p: PendienteMedico) => {
     setMotivoRechazo("");
@@ -182,7 +216,12 @@ export default function DashboardUsuariosPage() {
     setAccionPend(null);
     setMotivoRechazo("");
     // Aprobar mueve el médico a `usuarios`; rechazar solo limpia pendientes.
-    await (tipo === "aprobar" ? Promise.all([fetchPendientes(), fetchUsuarios()]) : fetchPendientes());
+    // Si hay un rol consultado en pantalla, se refresca ESE rol (no toda la
+    // colección); si no hay ninguno elegido aún, no hay nada que refrescar.
+    await Promise.all([
+      fetchPendientes(),
+      tipo === "aprobar" && filtroRol ? fetchUsuarios(filtroRol) : Promise.resolve(),
+    ]);
   };
 
   const setField = (field: keyof NuevoUsuario) =>
@@ -237,7 +276,9 @@ export default function DashboardUsuariosPage() {
       setForm(EMPTY_FORM);
       setShowForm(false);
       setServiciosOpen(false);
-      await fetchUsuarios();
+      // Refresca el rol actualmente en pantalla (si hay uno elegido). Si el
+      // nuevo usuario es de otro rol, no aparecerá hasta que se consulte ese rol.
+      if (filtroRol) await fetchUsuarios(filtroRol);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
@@ -252,7 +293,7 @@ export default function DashboardUsuariosPage() {
     const res = await fetch(`/api/usuarios/${uid}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) setError((await res.json()).error ?? "No se pudo eliminar el usuario");
     setDeletingUid(null);
-    await fetchUsuarios();
+    if (filtroRol) await fetchUsuarios(filtroRol);
   };
 
   const handleResetPassword = async (uid: string, nombre: string) => {
@@ -308,7 +349,9 @@ export default function DashboardUsuariosPage() {
     } else {
       setEditingUser(null);
       setEditForm(null);
-      await fetchUsuarios();
+      // Si el usuario editado cambió de rol, puede desaparecer del rol en
+      // pantalla al refrescar — es lo correcto (ya no pertenece a ese filtro).
+      if (filtroRol) await fetchUsuarios(filtroRol);
     }
     setSavingEdit(false);
   };
@@ -358,20 +401,19 @@ export default function DashboardUsuariosPage() {
     </>
   );
 
-  // ── Filtrado + paginación ──
+  // ── Búsqueda de texto + paginación ──
+  // El rol ya viene acotado desde el servidor (fetchUsuarios); aquí solo se
+  // filtra por texto dentro de ese conjunto ya cargado.
   const usuariosFiltrados = useMemo(() => {
     const q = filtroNombre.trim().toLowerCase();
-    return usuarios.filter(u => {
-      const matchRol = filtroRol === "todos" || u.role === filtroRol;
-      const matchNombre =
-        !q ||
-        u.nombre?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q) ||
-        u.username?.toLowerCase().includes(q) ||
-        u.codigoMarcacion?.toLowerCase().includes(q);
-      return matchRol && matchNombre;
-    });
-  }, [usuarios, filtroNombre, filtroRol]);
+    if (!q) return usuarios;
+    return usuarios.filter(u =>
+      u.nombre?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.username?.toLowerCase().includes(q) ||
+      u.codigoMarcacion?.toLowerCase().includes(q)
+    );
+  }, [usuarios, filtroNombre]);
 
   // Al cambiar filtros, volver a la página 1 (ajuste en render, sin efecto).
   const filtrosKey = `${filtroNombre}|${filtroRol}`;
@@ -385,7 +427,9 @@ export default function DashboardUsuariosPage() {
   const paginaActual = Math.min(pagina, totalPaginas);
   const usuariosPagina = usuariosFiltrados.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
-  const hayFiltros = filtroNombre.trim() !== "" || filtroRol !== "todos";
+  // Con el rol ya acotado en el servidor, "hay filtros" ahora solo se refiere
+  // a la búsqueda de texto dentro de ese conjunto.
+  const hayFiltros = filtroNombre.trim() !== "";
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -593,39 +637,52 @@ export default function DashboardUsuariosPage() {
         <p className="mb-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      {/* Filtros */}
-      {!loading && (
-        <div className="mb-4 flex flex-col sm:flex-row gap-2.5">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={filtroNombre}
-              onChange={e => setFiltroNombre(e.target.value)}
-              placeholder="Buscar por nombre, correo o código..."
-              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-9 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {filtroNombre && (
-              <button onClick={() => setFiltroNombre("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                <X size={15} />
-              </button>
-            )}
-          </div>
-          <select
-            value={filtroRol}
-            onChange={e => setFiltroRol(e.target.value as UserRole | "todos")}
-            className="sm:w-56 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="todos">Todos los roles</option>
-            {roleOptions.map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
+      {/* Filtros: el rol es obligatorio para consultar — nada se carga hasta elegirlo */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-2.5">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={filtroNombre}
+            onChange={e => setFiltroNombre(e.target.value)}
+            placeholder="Buscar por nombre, correo o código..."
+            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-9 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {filtroNombre && (
+            <button onClick={() => setFiltroNombre("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              <X size={15} />
+            </button>
+          )}
         </div>
-      )}
+        <select
+          value={filtroRol}
+          onChange={e => setFiltroRol(e.target.value as FiltroRol)}
+          className="sm:w-64 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="" disabled>Selecciona un tipo de usuario...</option>
+          {roleFilterOptions.map(option => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <button
+          onClick={() => fetchUsuarios(filtroRol)}
+          disabled={!filtroRol || loading}
+          className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shrink-0"
+        >
+          <Search size={15} />
+          {consultado ? "Actualizar" : "Consultar"}
+        </button>
+      </div>
 
       {loading ? (
         <p className="text-sm text-slate-500 text-center py-10">Cargando usuarios...</p>
+      ) : !consultado ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
+          <Users size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
+          <p className="text-sm text-slate-500">
+            Selecciona un tipo de usuario y pulsa Consultar para ver la lista.
+          </p>
+        </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
@@ -639,7 +696,7 @@ export default function DashboardUsuariosPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {usuariosFiltrados.length === 0 && (
                 <tr><td colSpan={5} className="text-center py-10 text-slate-500">
-                  {hayFiltros ? "Ningun usuario coincide con los filtros." : "Sin usuarios registrados."}
+                  {hayFiltros ? "Ningun usuario coincide con la busqueda." : "Sin usuarios con este rol."}
                 </td></tr>
               )}
               {usuariosPagina.map(u => (

@@ -53,13 +53,27 @@ function isSuperAdmin(role: string | null) {
   return role === "admin";
 }
 
-// GET — listar todos los usuarios
+// GET — listar usuarios. Requiere `?role=` para acotar la lectura a ese rol
+// (sin `orderBy` server-side, para no exigir un índice compuesto nuevo; se
+// ordena en cliente). Sin `role` (o `role=todos`) mantiene el comportamiento
+// anterior de traer la colección completa — sigue disponible, pero el front
+// ya no lo dispara por defecto al abrir la página.
 export async function GET(req: NextRequest) {
-  const role = await getCallerRole(req);
-  if (!isSuperAdmin(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const callerRole = await getCallerRole(req);
+  if (!isSuperAdmin(callerRole)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const snap = await adminDb.collection("usuarios").orderBy("nombre").get();
-  const usuarios = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  const { searchParams } = new URL(req.url);
+  const filtroRol = searchParams.get("role");
+
+  const snap =
+    filtroRol && filtroRol !== "todos" && VALID_ROLES.has(filtroRol as UserRole)
+      ? await adminDb.collection("usuarios").where("role", "==", filtroRol).get()
+      : await adminDb.collection("usuarios").orderBy("nombre").get();
+
+  const usuarios = snap.docs.map((d) => ({ uid: d.id, ...d.data() } as { uid: string; nombre?: string }));
+  if (filtroRol && filtroRol !== "todos") {
+    usuarios.sort((a, b) => String(a.nombre ?? "").localeCompare(String(b.nombre ?? "")));
+  }
   return NextResponse.json(usuarios);
 }
 

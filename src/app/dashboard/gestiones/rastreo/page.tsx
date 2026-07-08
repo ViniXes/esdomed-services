@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { arrayRemove, arrayUnion, collection, doc, onSnapshot, query, setDoc, Timestamp, where } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, onSnapshot, setDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { IntentoContactoTS, Paciente, RastreoTS } from "@/types";
@@ -9,10 +9,13 @@ import {
   CANALES_RASTREO, CANAL_RASTREO_LABEL, ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL,
   habilitaSeguimiento, type CanalRastreo, type EstadoRastreo,
 } from "@/lib/trabajosocial/catalogos";
+import {
+  consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
+} from "@/lib/trabajosocial/pacientesActivosCache";
 import { GestionesTabs } from "../_components/GestionesTabs";
 import { DateField } from "@/components/ui/DateField";
 import {
-  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, History, Lock, Loader2, Plus, Radar, Search, Trash2, X,
+  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, History, Lock, Loader2, Plus, Radar, RefreshCw, Search, Trash2, X,
 } from "lucide-react";
 
 const inputCls =
@@ -42,9 +45,10 @@ type Filtro = "pendientes" | "contactados" | "no_efectivo" | "todos";
 export default function RastreoPage() {
   const { profile } = useAuth();
 
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [pacientes, setPacientes] = useState<Paciente[]>(() => getPacientesActivosCache() ?? []);
+  const [loading, setLoading] = useState(() => getPacientesActivosCache() === null);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(() => getPacientesActivosCacheEn());
   const [rastreos, setRastreos] = useState<Map<string, RastreoTS>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("pendientes");
@@ -72,13 +76,23 @@ export default function RastreoPage() {
   const [agregandoIntento, setAgregandoIntento] = useState(false);
 
   // Pacientes activos creados por ESDOMED — origen del worklist de rastreo.
-  useEffect(() => {
-    const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    return onSnapshot(q, (s) => {
-      setPacientes(s.docs.map((d) => ({ id: d.id, ...d.data() } as Paciente)));
+  // Lectura puntual bajo demanda (caché compartida entre las 3 pestañas de
+  // Gestiones + Visitas) en lugar de un listener en vivo sin límite.
+  const consultarPacientes = useCallback(async () => {
+    setLoading(true);
+    try {
+      setPacientes(await consultarPacientesActivos());
+      setActualizadoEn(getPacientesActivosCacheEn());
+    } finally {
       setLoading(false);
-    }, () => setLoading(false));
+    }
   }, []);
+
+  useEffect(() => {
+    if (getPacientesActivosCache() !== null) return;
+    const t = setTimeout(consultarPacientes, 0);
+    return () => clearTimeout(t);
+  }, [consultarPacientes]);
 
   // Rastreos existentes (un doc por expediente).
   useEffect(() => {
@@ -275,12 +289,23 @@ export default function RastreoPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
-          <Radar size={13} /> Trabajo Social
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
+            <Radar size={13} /> Trabajo Social
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Rastreo de pacientes</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Localiza al paciente y su familiar — paso previo obligatorio al seguimiento</p>
         </div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Rastreo de pacientes</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Localiza al paciente y su familiar — paso previo obligatorio al seguimiento</p>
+        <button
+          onClick={consultarPacientes}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+          title={actualizadoEn ? `Actualizado a las ${actualizadoEn.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Actualizar"}
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          Actualizar censo
+        </button>
       </div>
 
       <GestionesTabs />

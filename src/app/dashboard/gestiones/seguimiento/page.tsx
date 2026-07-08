@@ -13,10 +13,13 @@ import {
   GRUPOS_GESTION_TS, habilitaSeguimiento, keyAccionSeguimiento, labelTipoGestion,
   TIPOS_GESTION_TS, type AccionSeguimiento, type EstadoRastreo,
 } from "@/lib/trabajosocial/catalogos";
+import {
+  consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
+} from "@/lib/trabajosocial/pacientesActivosCache";
 import { GestionesTabs } from "../_components/GestionesTabs";
 import {
   AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Loader2, Lock,
-  Phone, PhoneCall, Plus, Search, StickyNote, Stethoscope, Users, Video, X,
+  Phone, PhoneCall, Plus, RefreshCw, Search, StickyNote, Stethoscope, Users, Video, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -52,10 +55,11 @@ type FiltroRapido = "pendientes" | "atendidos" | "adicionales" | "bloqueados" | 
 export default function SeguimientoPage() {
   const { profile } = useAuth();
 
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [pacientes, setPacientes] = useState<Paciente[]>(() => getPacientesActivosCache() ?? []);
+  const [loading, setLoading] = useState(() => getPacientesActivosCache() === null);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(() => getPacientesActivosCacheEn());
   const [rastreos, setRastreos] = useState<Map<string, RastreoTS>>(new Map());
   const [gestionesMes, setGestionesMes] = useState<GestionTS[]>([]);
-  const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
@@ -65,13 +69,23 @@ export default function SeguimientoPage() {
   const [toast, setToast] = useState<{ tipo: "success" | "error"; msg: string } | null>(null);
 
   // Pacientes activos creados por ESDOMED (mismo universo que Rastreo/Panorama).
-  useEffect(() => {
-    const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    return onSnapshot(q, (s) => {
-      setPacientes(s.docs.map((d) => ({ id: d.id, ...d.data() } as Paciente)));
+  // Lectura puntual bajo demanda (caché compartida entre las 3 pestañas de
+  // Gestiones + Visitas) en lugar de un listener en vivo sin límite.
+  const consultarPacientes = useCallback(async () => {
+    setLoading(true);
+    try {
+      setPacientes(await consultarPacientesActivos());
+      setActualizadoEn(getPacientesActivosCacheEn());
+    } finally {
       setLoading(false);
-    }, () => setLoading(false));
+    }
   }, []);
+
+  useEffect(() => {
+    if (getPacientesActivosCache() !== null) return;
+    const t = setTimeout(consultarPacientes, 0);
+    return () => clearTimeout(t);
+  }, [consultarPacientes]);
 
   // Rastreos — el gate (contactado) y los datos de contacto del familiar.
   useEffect(() => {
@@ -285,14 +299,25 @@ export default function SeguimientoPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
-          <ListChecks size={13} /> Trabajo Social
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
+            <ListChecks size={13} /> Trabajo Social
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Seguimiento del día</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Pasa lista de los pacientes contactados: cada marca registra la gestión del día — sin volver a escribir al paciente
+          </p>
         </div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Seguimiento del día</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Pasa lista de los pacientes contactados: cada marca registra la gestión del día — sin volver a escribir al paciente
-        </p>
+        <button
+          onClick={consultarPacientes}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+          title={actualizadoEn ? `Actualizado a las ${actualizadoEn.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Actualizar"}
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          Actualizar censo
+        </button>
       </div>
 
       <GestionesTabs />

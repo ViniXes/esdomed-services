@@ -10,9 +10,12 @@ import {
   ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL, habilitaSeguimiento, labelTipoGestion,
   TIPOS_GESTION_TS, type EstadoRastreo, type GrupoGestionTS,
 } from "@/lib/trabajosocial/catalogos";
+import {
+  consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
+} from "@/lib/trabajosocial/pacientesActivosCache";
 import { GestionesTabs } from "../_components/GestionesTabs";
 import {
-  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, LayoutDashboard, Lock, NotebookPen, Search, User, X,
+  CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, LayoutDashboard, Lock, NotebookPen, RefreshCw, Search, User, X,
 } from "lucide-react";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -70,10 +73,11 @@ interface ResumenGestion {
 export default function PanoramaPage() {
   const { profile } = useAuth();
 
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [pacientes, setPacientes] = useState<Paciente[]>(() => getPacientesActivosCache() ?? []);
+  const [loading, setLoading] = useState(() => getPacientesActivosCache() === null);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(() => getPacientesActivosCacheEn());
   const [rastreos, setRastreos] = useState<Map<string, RastreoTS>>(new Map());
   const [gestiones, setGestiones] = useState<GestionTS[]>([]);
-  const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
@@ -84,14 +88,24 @@ export default function PanoramaPage() {
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
 
-  // Pacientes activos creados por ESDOMED (mismo universo que Rastreo).
-  useEffect(() => {
-    const q = query(collection(db, "pacientes"), where("estado", "==", "activo"));
-    return onSnapshot(q, (s) => {
-      setPacientes(s.docs.map((d) => ({ id: d.id, ...d.data() } as Paciente)));
+  // Pacientes activos creados por ESDOMED (mismo universo que Rastreo/Seguimiento).
+  // Lectura puntual bajo demanda (caché compartida entre las 3 pestañas de
+  // Gestiones + Visitas) en lugar de un listener en vivo sin límite.
+  const consultarPacientes = useCallback(async () => {
+    setLoading(true);
+    try {
+      setPacientes(await consultarPacientesActivos());
+      setActualizadoEn(getPacientesActivosCacheEn());
+    } finally {
       setLoading(false);
-    }, () => setLoading(false));
+    }
   }, []);
+
+  useEffect(() => {
+    if (getPacientesActivosCache() !== null) return;
+    const t = setTimeout(consultarPacientes, 0);
+    return () => clearTimeout(t);
+  }, [consultarPacientes]);
 
   // Rastreos (un doc por expediente).
   useEffect(() => {
@@ -217,12 +231,23 @@ export default function PanoramaPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
-      <div>
-        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
-          <LayoutDashboard size={13} /> Trabajo Social
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
+            <LayoutDashboard size={13} /> Trabajo Social
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Panorama</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Pacientes activos por servicio — rastreo, pipeline y última gestión en una sola vista</p>
         </div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Panorama</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Pacientes activos por servicio — rastreo, pipeline y última gestión en una sola vista</p>
+        <button
+          onClick={consultarPacientes}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50"
+          title={actualizadoEn ? `Actualizado a las ${actualizadoEn.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Actualizar"}
+        >
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          Actualizar censo
+        </button>
       </div>
 
       <GestionesTabs />
