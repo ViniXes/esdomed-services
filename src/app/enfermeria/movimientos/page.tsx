@@ -132,11 +132,7 @@ export default function EnfermeriaMovimientosPage() {
   const [registros, setRegistros] = useState<NotificacionAltaVivo[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoNotificacionAlta | "todos">("todos");
-  const [fechaDesde, setFechaDesde] = useState(() => {
-    const ayer = new Date();
-    ayer.setDate(ayer.getDate() - 1);
-    return fechaLocalStr(ayer);
-  });
+  const [fechaDesde, setFechaDesde] = useState(() => fechaLocalStr(new Date()));
   const [fechaHasta, setFechaHasta] = useState(() => fechaLocalStr(new Date()));
   const [resultadosHistoricos, setResultadosHistoricos] = useState<NotificacionAltaVivo[] | null>(null);
   const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
@@ -147,16 +143,14 @@ export default function EnfermeriaMovimientosPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
-  // índice compuesto). Antes traía hasta 500 notificaciones de toda la
-  // historia cada vez que se abría la ruta.
+  // Vista en vivo acotada al DÍA ACTUAL (mismo campo en where/orderBy, no exige
+  // índice compuesto). Lo anterior a hoy se consulta bajo demanda (getDocs).
   useEffect(() => {
-    const inicioAyer = new Date();
-    inicioAyer.setDate(inicioAyer.getDate() - 1);
-    inicioAyer.setHours(0, 0, 0, 0);
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0, 0, 0, 0);
     const q = query(
       collection(db, "notificaciones_altas"),
-      where("creadoEn", ">=", Timestamp.fromDate(inicioAyer)),
+      where("creadoEn", ">=", Timestamp.fromDate(inicioHoy)),
       orderBy("creadoEn", "desc"),
     );
     return onSnapshot(q, (snap) => {
@@ -168,15 +162,11 @@ export default function EnfermeriaMovimientosPage() {
     });
   }, []);
 
-  // Fecha (YYYY-MM-DD local) de "ayer", límite inferior de la vista en vivo.
-  const limiteVivoStr = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return fechaLocalStr(d);
-  })();
+  // Fecha (YYYY-MM-DD local) de HOY, límite inferior de la vista en vivo.
+  const limiteVivoStr = fechaLocalStr(new Date());
   const fueraDeRangoVivo = !!fechaDesde && fechaDesde < limiteVivoStr;
 
-  // Búsqueda de notificaciones anteriores a ayer: una sola lectura (getDocs), no listener.
+  // Búsqueda de notificaciones anteriores a hoy: una sola lectura (getDocs), no listener.
   const buscarHistoricos = async () => {
     if (!fechaDesde && !fechaHasta) return;
     setBuscandoHistoricos(true);
@@ -198,9 +188,7 @@ export default function EnfermeriaMovimientosPage() {
 
   const volverARecientes = () => {
     setResultadosHistoricos(null);
-    const ayer = new Date();
-    ayer.setDate(ayer.getDate() - 1);
-    setFechaDesde(fechaLocalStr(ayer));
+    setFechaDesde(fechaLocalStr(new Date()));
     setFechaHasta(fechaLocalStr(new Date()));
   };
 
@@ -354,10 +342,10 @@ export default function EnfermeriaMovimientosPage() {
         )}
       </div>
 
-      {/* La vista en vivo solo cubre ayer y hoy; para fechas anteriores hay que pedirlo explícitamente */}
+      {/* La vista en vivo solo cubre hoy; para fechas anteriores hay que pedirlo explícitamente */}
       {fueraDeRangoVivo && resultadosHistoricos === null && (
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
-          <span>Ese rango incluye fechas anteriores a ayer, fuera de la vista en vivo.</span>
+          <span>Ese rango incluye fechas anteriores a hoy, fuera de la vista en vivo.</span>
           <button
             onClick={buscarHistoricos}
             disabled={buscandoHistoricos}
@@ -385,7 +373,7 @@ export default function EnfermeriaMovimientosPage() {
             {resultadosHistoricos !== null
               ? "Sin resultados históricos para ese rango."
               : registrosVisibles.length === 0
-                ? "No hay movimientos de enfermeria en las últimas 24-48 horas."
+                ? "No hay movimientos de enfermeria registrados hoy."
                 : "Sin resultados para los filtros aplicados."}
           </p>
         )}

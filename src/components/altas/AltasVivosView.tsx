@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  collection, query, orderBy, onSnapshot, limit,
+  collection, query, where, orderBy, onSnapshot, getDocs, limit,
   addDoc, Timestamp,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LogIn, Plus, X, CheckCircle2, AlertCircle, Search, Ban,
   Check, MessageSquareWarning, Pencil, ChevronLeft, ChevronRight, Download, Undo2,
+  Inbox, History,
 } from "lucide-react";
 import { BuscadorPacienteActivo } from "@/components/pacientes/BuscadorPacienteActivo";
 import { DateField } from "@/components/ui/DateField";
@@ -84,6 +85,10 @@ const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
 const COUNTER_ESTADOS: EstadoNotificacionAlta[] = [
   "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada", "revertida", "rechazada",
 ];
+
+// Estados accionables: se mantienen en la bandeja en vivo aunque sean de días
+// anteriores, para no perder trabajo sin procesar.
+const ESTADOS_ACCIONABLES: EstadoNotificacionAlta[] = ["pendiente", "observada"];
 
 const PAGE_SIZE = 12;
 
@@ -727,11 +732,16 @@ export function AltasVivosView() {
   const isTS = profile?.role === "trabajo_social";
   const isEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
-  const [notificaciones, setNotificaciones] = useState<NotificacionAltaVivo[]>([]);
+  const [recientes, setRecientes] = useState<NotificacionAltaVivo[]>([]);
+  const [accionables, setAccionables] = useState<NotificacionAltaVivo[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoNotificacionAlta | "todas">("todas");
-  const [fechaDesde, setFechaDesde] = useState(() => new Date().toISOString().split("T")[0]);
-  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split("T")[0]);
+  const [vista, setVista] = useState<"bandeja" | "buscar">("bandeja");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [resultados, setResultados] = useState<NotificacionAltaVivo[] | null>(null); // null = aún no se busca
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
   const [page, setPage] = useState(1);
 
   const [showCreate, setShowCreate] = useState(false);
@@ -754,12 +764,60 @@ export function AltasVivosView() {
   const [rectificando, setRectificando] = useState<NotificacionAltaVivo | null>(null);
   const [exportando, setExportando] = useState(false);
 
+  // ── Bandeja en vivo: altas de HOY + todas las accionables (pendiente/observada)
+  // de cualquier día, para no perder trabajo sin procesar. Dos listeners fusionados.
   useEffect(() => {
-    const q = query(collection(db, "notificaciones_altas"), orderBy("creadoEn", "desc"), limit(500));
-    return onSnapshot(q, snap => {
-      setNotificaciones(snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo)));
-    });
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const q = query(collection(db, "notificaciones_altas"), where("creadoEn", ">=", hoy), orderBy("creadoEn", "desc"));
+    return onSnapshot(q, snap => setRecientes(snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo))));
   }, []);
+  useEffect(() => {
+    const q = query(collection(db, "notificaciones_altas"), where("estado", "in", ESTADOS_ACCIONABLES));
+    return onSnapshot(q, snap => setAccionables(snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo))));
+  }, []);
+
+  // Fuente de datos según la vista: bandeja (en vivo, deduplicada) o resultados de búsqueda.
+  const notificaciones = useMemo(() => {
+    if (vista === "buscar") return resultados ?? [];
+    const m = new Map<string, NotificacionAltaVivo>();
+    [...recientes, ...accionables].forEach(n => { if (n.id) m.set(n.id, n); });
+    return [...m.values()].sort((a, b) => (toDate(b.creadoEn)?.getTime() ?? 0) - (toDate(a.creadoEn)?.getTime() ?? 0));
+  }, [vista, resultados, recientes, accionables]);
+
+  // ── Búsqueda histórica bajo demanda (getDocs puntual, no listener) ──
+  const buscar = async () => {
+    const exp = busqueda.trim();
+    if (!exp && !(fechaDesde && fechaHasta)) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: NotificacionAltaVivo[];
+      if (exp) {
+        // Por expediente exacto: trae solo las altas de ese paciente (cualquier fecha/estado).
+        const snap = await getDocs(query(collection(db, "notificaciones_altas"), where("pacienteExpediente", "==", exp)));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo));
+      } else {
+        // Por rango de fecha (todo sobre creadoEn → sin índice compuesto).
+        const snap = await getDocs(query(
+          collection(db, "notificaciones_altas"),
+          where("creadoEn", ">=", new Date(fechaDesde + "T00:00:00")),
+          where("creadoEn", "<=", new Date(fechaHasta + "T23:59:59")),
+          orderBy("creadoEn", "desc"), limit(500),
+        ));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo));
+      }
+      docs.sort((a, b) => (toDate(b.creadoEn)?.getTime() ?? 0) - (toDate(a.creadoEn)?.getTime() ?? 0));
+      setResultados(docs);
+    } catch (e) {
+      setErrorBusqueda((e as Error).message || "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  // Tras una acción en modo búsqueda, refresca la foto (en bandeja los listeners lo hacen solos).
+  const refrescarBusqueda = () => (vista === "buscar" ? buscar() : undefined);
 
   // Base: búsqueda + rango de fecha (sin filtrar por estado, para los contadores).
   const baseList = useMemo(() => notificaciones.filter(n => {
@@ -767,14 +825,15 @@ export function AltasVivosView() {
       const b = busqueda.toLowerCase();
       if (!n.pacienteNombre.toLowerCase().includes(b) && !n.pacienteExpediente.toLowerCase().includes(b)) return false;
     }
-    if (fechaDesde || fechaHasta) {
+    // El rango de fecha solo aplica en modo búsqueda; la bandeja ya viene acotada a hoy + accionables.
+    if (vista === "buscar" && (fechaDesde || fechaHasta)) {
       const d = toDate(n.creadoEn);
       if (!d) return false;
       if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
       if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
     }
     return true;
-  }), [notificaciones, busqueda, fechaDesde, fechaHasta]);
+  }), [notificaciones, busqueda, fechaDesde, fechaHasta, vista]);
 
   const conteos = useMemo(() => {
     const c: Record<string, number> = { todas: baseList.length };
@@ -789,7 +848,7 @@ export function AltasVivosView() {
   );
 
   // Reset de página al cambiar filtros.
-  const filterKey = `${busqueda}|${filtroEstado}|${fechaDesde}|${fechaHasta}`;
+  const filterKey = `${vista}|${busqueda}|${filtroEstado}|${fechaDesde}|${fechaHasta}|${resultados ? "r" : "n"}`;
   const [filterKeyPrev, setFilterKeyPrev] = useState(filterKey);
   if (filterKeyPrev !== filterKey) { setFilterKeyPrev(filterKey); setPage(1); }
 
@@ -845,6 +904,7 @@ export function AltasVivosView() {
         body: JSON.stringify({ action: "procesar" }),
       });
       if (!res.ok) throw new Error("No se pudo procesar la notificacion.");
+      await refrescarBusqueda();
     } finally {
       setProcesandoLoading(false);
       setProcesandoId(null);
@@ -865,6 +925,7 @@ export function AltasVivosView() {
         body: JSON.stringify({ action: "revertir", nota }),
       });
       if (!res.ok) throw new Error("No se pudo revertir el alta.");
+      await refrescarBusqueda();
     } finally {
       setRevirtiendoLoading(false);
       setRevirtiendoId(null);
@@ -885,6 +946,7 @@ export function AltasVivosView() {
         body: JSON.stringify({ action: "rechazar", nota }),
       });
       if (!res.ok) throw new Error("No se pudo rechazar la notificacion.");
+      await refrescarBusqueda();
     } finally {
       setRechazandoLoading(false);
       setRechazandoId(null);
@@ -905,6 +967,7 @@ export function AltasVivosView() {
         body: JSON.stringify({ action: "reabrir" }),
       });
       if (!res.ok) throw new Error("No se pudo reabrir la notificacion.");
+      await refrescarBusqueda();
     } finally {
       setReabriendoId(null);
     }
@@ -924,6 +987,7 @@ export function AltasVivosView() {
         body: JSON.stringify({ action: "observar", motivo, detalle }),
       });
       if (!res.ok) throw new Error("No se pudo guardar la observacion.");
+      await refrescarBusqueda();
     } finally {
       setObservandoLoading(false);
       setObservandoId(null);
@@ -944,6 +1008,7 @@ export function AltasVivosView() {
         body: JSON.stringify({ action: "quitar_observacion" }),
       });
       if (!res.ok) throw new Error("No se pudo quitar la observacion.");
+      await refrescarBusqueda();
     } finally {
       setQuitandoObservacionId(null);
     }
@@ -992,29 +1057,72 @@ export function AltasVivosView() {
         </div>
       )}
 
+      {/* Cambio de vista: bandeja del día ⇄ búsqueda histórica */}
+      <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl mb-4 w-full sm:w-fit">
+        <button onClick={() => setVista("bandeja")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            vista === "bandeja"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-teal-700 dark:text-teal-300"
+              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}>
+          <Inbox size={15} /> Bandeja del día
+        </button>
+        <button onClick={() => setVista("buscar")}
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            vista === "buscar"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-teal-700 dark:text-teal-300"
+              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          }`}>
+          <History size={15} /> Buscar anteriores
+        </button>
+      </div>
+
+      {vista === "bandeja" && (
+        <p className="text-xs text-slate-500 mb-3">Altas de hoy + todas las pendientes/observadas de días anteriores. Lo ya procesado se consulta en “Buscar anteriores”.</p>
+      )}
+
       {/* Filtros */}
       <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="relative flex-1 min-w-[180px]">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input type="text" placeholder="Buscar paciente o expediente..."
+          <input type="text"
+            placeholder={vista === "buscar" ? "Expediente exacto…" : "Buscar paciente o expediente..."}
             value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            onKeyDown={e => { if (vista === "buscar" && e.key === "Enter") buscar(); }}
             className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
-        </div>
-        {(busqueda || filtroEstado !== "todas") && (
-          <button onClick={() => { setBusqueda(""); setFiltroEstado("todas"); }}
+        {vista === "buscar" && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Desde</span>
+              <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+              <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
+            </div>
+            <button onClick={buscar} disabled={buscando || (!busqueda.trim() && !(fechaDesde && fechaHasta))}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-sm">
+              <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
+            </button>
+          </>
+        )}
+        {(busqueda || filtroEstado !== "todas" || (vista === "buscar" && (fechaDesde || fechaHasta || resultados !== null))) && (
+          <button onClick={() => {
+            setBusqueda(""); setFiltroEstado("todas");
+            if (vista === "buscar") { setFechaDesde(""); setFechaHasta(""); setResultados(null); setErrorBusqueda(""); }
+          }}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
             <X size={12} /> Limpiar
           </button>
         )}
       </div>
+
+      {errorBusqueda && (
+        <div className="mb-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          {errorBusqueda}
+        </div>
+      )}
 
       {/* Contadores por estado (clic para filtrar) */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -1035,7 +1143,11 @@ export function AltasVivosView() {
       <div className="space-y-2">
         {displayList.length === 0 && (
           <p className="text-sm text-slate-500 py-10 text-center">
-            {notificaciones.length === 0 ? "No hay notificaciones de altas vivos." : "Sin resultados para los filtros aplicados."}
+            {vista === "buscar" && resultados === null
+              ? "Escribe un expediente o elige un rango de fechas y pulsa Buscar."
+              : notificaciones.length === 0
+                ? (vista === "buscar" ? "Sin resultados para esa búsqueda." : "No hay altas de hoy ni pendientes por procesar.")
+                : "Sin resultados para los filtros aplicados."}
           </p>
         )}
 
