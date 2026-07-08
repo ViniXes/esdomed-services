@@ -73,51 +73,61 @@ export default function PacientesPage() {
   // Tope de lectura aplicado en la consulta (para avisar de resultados truncados).
   const topeHistorico = filtro === "todos" ? LIMIT_TODOS : LIMIT_HISTORICO;
 
-  // El servicio se aplica en la CONSULTA a Firestore (no en cliente), así que la
-  // caché se llavea por estado + servicio.
+  // Criterio obligatorio para los tabs históricos (todo menos "Activos"): un
+  // expediente exacto, o un rango de fecha (desde Y hasta). Activos no lo exige.
+  const exp = busqueda.trim();
+  const tieneRango = !!(fechaDesde && fechaHasta);
+  const puedeConsultar = filtro === "activo" || !!exp || tieneRango;
+
+  // La caché de sesión SPA solo guarda el censo de activos (para mostrarlo al instante
+  // al abrir/volver); los históricos se consultan siempre bajo demanda.
   const cacheKey = `${filtro}|${servicioFiltro}`;
 
-  // Al cambiar estado/servicio NO se lee Firestore: si hay caché de esa combinación
-  // se muestra al instante; si no, se deja vacío hasta que el usuario pulse Consultar.
-  // Ajuste de estado en render (patrón React para sincronizar con un valor derivado).
-  const [cacheKeyPrev, setCacheKeyPrev] = useState(cacheKey);
-  if (cacheKeyPrev !== cacheKey) {
-    setCacheKeyPrev(cacheKey);
-    const cached = cachePacientes.get(cacheKey);
+  // Trigger de "vaciar la vista": activos depende de estado+servicio (el servicio va al
+  // servidor); históricos solo del estado (el servicio se filtra en cliente, no re-consulta).
+  // No depende de la búsqueda ni del rango, para no borrar la vista mientras se escribe.
+  const resetKey = filtro === "activo" ? cacheKey : filtro;
+  const [resetKeyPrev, setResetKeyPrev] = useState(resetKey);
+  if (resetKeyPrev !== resetKey) {
+    setResetKeyPrev(resetKey);
+    const cached = filtro === "activo" ? cachePacientes.get(cacheKey) : undefined;
     setPacientes(cached ?? []);
     setConsultado(!!cached);
   }
 
   // ── Lectura puntual bajo demanda (botón Consultar / Actualizar) ──
+  // Activos: censo (opcional por servicio, en el servidor). Históricos: exige
+  // expediente exacto o rango de egreso, y trae SOLO eso (no un tope de "recientes").
   const consultar = async () => {
-    if (!profile) return;
+    if (!profile || !puedeConsultar) return;
     setLoading(true);
     try {
       const constraints: QueryConstraint[] = [];
       const grupo = filtro === "alta_vivo_todos" ? ESTADOS_ALTA_VIVO : null;
-      const tope = filtro === "todos" ? LIMIT_TODOS : LIMIT_HISTORICO;
 
-      if (grupo) {
-        // Grupo de estados con `in`: una sola consulta, ordenada por fecha de egreso
-        // (índice compuesto estado+fechaEgreso) para que el límite corte lo más
-        // antiguo, no documentos al azar. El servicio se filtra en cliente.
-        constraints.push(where("estado", "in", grupo));
-        constraints.push(orderBy("fechaEgreso", "desc"));
-        constraints.push(limit(tope));
-      } else if (servicioFiltro) {
-        if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
-        // Filtra el servicio en el servidor (lee solo ese servicio, no todo el censo).
-        // Sin orderBy para no requerir índice compuesto; se ordena en cliente.
-        constraints.push(where("servicioActual", "==", servicioFiltro));
-        if (filtro !== "activo") constraints.push(limit(tope));
+      if (filtro === "activo") {
+        constraints.push(where("estado", "==", "activo"));
+        if (servicioFiltro) {
+          // Servicio en el servidor (lee solo ese servicio); se ordena en cliente.
+          constraints.push(where("servicioActual", "==", servicioFiltro));
+        } else {
+          constraints.push(orderBy("fechaIngreso", "desc"));
+        }
+      } else if (exp) {
+        // Solo ese expediente (consulta exacta): trae únicamente sus registros,
+        // sin importar la fecha. El servicio se afina en cliente si estuviera puesto.
+        constraints.push(where("expediente", "==", exp));
       } else {
-        if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
-        // Estados de egreso: ordenar por fecha de egreso para que el límite corte
-        // lo más antiguo (una alta de hoy siempre entra). Activos/todos: por ingreso.
-        constraints.push(orderBy(usaFechaEgreso ? "fechaEgreso" : "fechaIngreso", "desc"));
-        // Activos: sin límite (acotado por capacidad hospitalaria)
-        // Históricos: límite razonable para no descargar toda la colección
-        if (filtro !== "activo") constraints.push(limit(tope));
+        // Rango de egreso OBLIGATORIO: trae solo lo del período pedido.
+        // where + orderBy sobre fechaEgreso + estado → usa el índice (estado, fechaEgreso).
+        const desde = new Date(fechaDesde + "T00:00:00");
+        const hasta = new Date(fechaHasta + "T23:59:59");
+        if (grupo) constraints.push(where("estado", "in", grupo));
+        else if (filtro !== "todos") constraints.push(where("estado", "==", filtro));
+        constraints.push(where("fechaEgreso", ">=", desde));
+        constraints.push(where("fechaEgreso", "<=", hasta));
+        constraints.push(orderBy("fechaEgreso", "desc"));
+        constraints.push(limit(filtro === "todos" ? LIMIT_TODOS : LIMIT_HISTORICO));
       }
 
       const snap = await getDocs(query(collection(db, "pacientes"), ...constraints));
@@ -140,7 +150,9 @@ export default function PacientesPage() {
             : b.fechaIngreso.getTime() - a.fechaIngreso.getTime()
         );
 
-      cachePacientes.set(cacheKey, lista);
+      // Solo se cachea el censo de activos (para el restore al abrir/volver);
+      // los históricos son consultas puntuales que siempre se re-leen al pulsar.
+      if (filtro === "activo") cachePacientes.set(cacheKey, lista);
       setPacientes(lista);
       setConsultado(true);
     } finally {
@@ -157,17 +169,17 @@ export default function PacientesPage() {
 
   const filtrados = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
-    const usaEgreso = filtro !== "activo" && filtro !== "todos";
     // Rango en hora local para no correr el día (UTC-6).
     const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
     const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return pacientes.filter((p) => {
       if (servicioFiltro && p.servicioActual !== servicioFiltro) return false;
-      if (desde || hasta) {
-        const fecha = usaEgreso ? p.fechaEgreso : p.fechaIngreso;
-        if (!fecha) return false;
-        if (desde && fecha < desde) return false;
-        if (hasta && fecha > hasta) return false;
+      // El rango solo se filtra en cliente para ACTIVOS (por ingreso). En históricos
+      // el rango ya lo aplicó el servidor (por egreso), y la búsqueda por expediente
+      // trae ese expediente completo sin acotar por fecha.
+      if (filtro === "activo" && (desde || hasta)) {
+        if (desde && p.fechaIngreso < desde) return false;
+        if (hasta && p.fechaIngreso > hasta) return false;
       }
       if (!term) return true;
       const hay =
@@ -311,7 +323,7 @@ export default function PacientesPage() {
             type="text"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar por expediente, DUI o nombre..."
+            placeholder={filtro === "activo" ? "Buscar por expediente, DUI o nombre..." : "Expediente exacto (trae solo ese)…"}
             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           />
         </div>
@@ -365,7 +377,8 @@ export default function PacientesPage() {
         )}
         <button
           onClick={consultar}
-          disabled={loading}
+          disabled={loading || !puedeConsultar}
+          title={puedeConsultar ? undefined : "Ingresá un expediente exacto o un rango de fechas (desde y hasta)"}
           className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm shrink-0"
         >
           {loading ? (
@@ -386,12 +399,15 @@ export default function PacientesPage() {
       ) : !consultado ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
           <Search size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
-          <p className="text-sm text-slate-500">
-            Selecciona estado{servicioFiltro ? ` y servicio (${servicioFiltro})` : " y, si quieres, un servicio"}, luego pulsa Consultar.
+          <p className="text-sm text-slate-500 max-w-md mx-auto">
+            {filtro === "activo"
+              ? <>Selecciona{servicioFiltro ? ` el servicio (${servicioFiltro})` : ", si quieres, un servicio"} y pulsa Consultar.</>
+              : "Para los históricos, ingresá un expediente exacto (trae solo ese) o un rango de fechas de egreso — desde y hasta — y pulsá Consultar."}
           </p>
           <button
             onClick={consultar}
-            className="inline-flex items-center gap-1.5 mt-4 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            disabled={!puedeConsultar}
+            className="inline-flex items-center gap-1.5 mt-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
           >
             <Search size={15} /> Consultar
           </button>
@@ -546,9 +562,9 @@ export default function PacientesPage() {
             )}
 
             {/* Aviso de techo histórico */}
-            {filtro !== "activo" && pacientes.length >= topeHistorico && (
+            {filtro !== "activo" && !exp && pacientes.length >= topeHistorico && (
               <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
-                Se muestran los {topeHistorico} más recientes — afina por servicio para ver más antiguos
+                Tope de {topeHistorico} alcanzado — achica el rango de fechas para ver todo
               </span>
             )}
           </div>

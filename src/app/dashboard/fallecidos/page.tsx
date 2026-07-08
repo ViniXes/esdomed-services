@@ -8,7 +8,7 @@ import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2 } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2 } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -32,6 +32,30 @@ const selectCls = "w-full appearance-none bg-white dark:bg-slate-900 border bord
 // Registros por página en la tabla (paginación de a 10).
 const PAGE_SIZE = 10;
 
+// Umbral para alertar un certificado de defunción atascado: más de estos días
+// HÁBILES pendiente de entrega (contados desde la fecha de defunción).
+const DIAS_HABILES_CERT = 5;
+
+// Días hábiles (lunes–viernes) transcurridos entre `desde` y hoy. No excluye
+// feriados (refinamiento posible a futuro con una tabla de feriados de El Salvador).
+function diasHabilesTranscurridos(desde: Date, hasta: Date = new Date()): number {
+  const cur = new Date(desde); cur.setHours(0, 0, 0, 0);
+  const fin = new Date(hasta); fin.setHours(0, 0, 0, 0);
+  let dias = 0;
+  while (cur < fin) {
+    cur.setDate(cur.getDate() + 1);
+    const dow = cur.getDay();          // 0 = domingo, 6 = sábado
+    if (dow !== 0 && dow !== 6) dias++;
+  }
+  return dias;
+}
+
+function tsToDate(ts: unknown): Date | null {
+  if (!ts) return null;
+  const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export default function DashboardFallecidosPage() {
   const { profile } = useAuth();
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
@@ -41,7 +65,7 @@ export default function DashboardFallecidosPage() {
   const [page, setPage] = useState(1);
   const [personal, setPersonal] = useState<UserProfile[]>([]);
   const [personalPsTs, setPersonalPsTs] = useState<UserProfile[]>([]);
-  const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "cert_pendiente" | "todos">("todos");
+  const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "cert_pendiente" | "cert_vencido" | "todos">("todos");
   const [selected, setSelected] = useState<NotificacionFallecido | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("expediente");
   const [saving, setSaving] = useState(false);
@@ -94,19 +118,35 @@ export default function DashboardFallecidosPage() {
     }
   }
 
+  // Certificados "vencidos": pendientes de entrega con más de DIAS_HABILES_CERT
+  // días hábiles desde la defunción. Se calcula sobre lo ya cargado (0 lecturas extra).
+  const certDiasHabiles = new Map<string, number>();
+  notificaciones.forEach(n => {
+    if (n.id && n.estadoEntregaCertificado === "pendiente") {
+      const fd = tsToDate(n.fechaDefuncion);
+      if (fd) certDiasHabiles.set(n.id, diasHabilesTranscurridos(fd));
+    }
+  });
+  const esVencido = (n: NotificacionFallecido) => (certDiasHabiles.get(n.id ?? "") ?? 0) > DIAS_HABILES_CERT;
+  const certVencidos = [...certDiasHabiles.values()].filter(d => d > DIAS_HABILES_CERT).length;
+
   const filtered = filtro === "todos"       ? notificaciones
     : filtro === "cert_pendiente"           ? notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente")
+    : filtro === "cert_vencido"             ? notificaciones.filter(esVencido)
     : notificaciones.filter(n => n.estado === filtro);
 
-  const displayList = filtered.filter(n => {
-    if (busquedaExpediente && !(n.pacienteExpediente?.toLowerCase() ?? "").includes(busquedaExpediente.toLowerCase())) return false;
-    if (fechaDesde || fechaHasta) {
-      const d = ((n.creadoEn as unknown) as { toDate?: () => Date }).toDate?.() ?? n.creadoEn;
-      if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
-      if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
-    }
-    return true;
-  });
+  const displayList = filtered
+    .filter(n => {
+      if (busquedaExpediente && !(n.pacienteExpediente?.toLowerCase() ?? "").includes(busquedaExpediente.toLowerCase())) return false;
+      if (fechaDesde || fechaHasta) {
+        const d = ((n.creadoEn as unknown) as { toDate?: () => Date }).toDate?.() ?? n.creadoEn;
+        if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
+        if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
+      }
+      return true;
+    })
+    // Los certificados vencidos suben al tope (sort estable → conserva el orden por fecha dentro de cada grupo).
+    .sort((a, b) => Number(esVencido(b)) - Number(esVencido(a)));
 
   // Paginación (10 por página). Reinicia a la página 1 al cambiar filtros;
   // pageSafe protege contra el snapshot en vivo que encoge la lista.
@@ -304,6 +344,20 @@ export default function DashboardFallecidosPage() {
               {certPendientes} cert. pendientes
             </button>
           )}
+          {certVencidos > 0 && (
+            <button
+              onClick={() => setFiltro(filtro === "cert_vencido" ? "todos" : "cert_vencido")}
+              title={`Certificados pendientes de entrega con más de ${DIAS_HABILES_CERT} días hábiles desde la defunción`}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl border transition-colors ${
+                filtro === "cert_vencido"
+                  ? "bg-red-600 text-white border-red-600"
+                  : "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 hover:bg-red-100 dark:hover:bg-red-900"
+              }`}
+            >
+              <AlertTriangle size={14} />
+              {certVencidos} cert. vencidos
+            </button>
+          )}
         </div>
       </div>
 
@@ -405,9 +459,16 @@ export default function DashboardFallecidosPage() {
                             </span>
                           )}
                           {n.estadoEntregaCertificado === "pendiente" && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 px-1.5 py-0.5 rounded-md">
-                              <FileWarning size={10} /> Cert. pendiente
-                            </span>
+                            esVencido(n) ? (
+                              <span title={`Más de ${DIAS_HABILES_CERT} días hábiles desde la defunción sin entregar el certificado`}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 px-1.5 py-0.5 rounded-md">
+                                <AlertTriangle size={10} /> {certDiasHabiles.get(n.id ?? "")} días háb. sin entregar
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 px-1.5 py-0.5 rounded-md">
+                                <FileWarning size={10} /> Cert. pendiente
+                              </span>
+                            )
                           )}
                           {n.estadoEntregaCertificado === "entregado" && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 px-1.5 py-0.5 rounded-md">
