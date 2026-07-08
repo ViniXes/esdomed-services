@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, AlertCircle, FileSpreadsheet, Search, Users } from "lucide-react";
+import { Activity, AlertCircle, FileSpreadsheet, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
@@ -196,18 +196,15 @@ export default function CuidadosCriticosDashboardPage() {
                 <option value="cerrados">Cerrados</option>
               </select>
             </label>
-            <button
-              type="button"
-              onClick={consultarFichas}
-              disabled={consultando}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Search size={14} />
-              {consultando ? "Consultando..." : consultadoEn ? "Actualizar" : "Consultar"}
-            </button>
           </div>
         </div>
-        <LienzoMatrizCuidadosCriticos tipo={filtro === "uci" ? "uci" : "ucin"} fichas={fichasFiltradas} />
+        <LienzoMatrizCuidadosCriticos
+          tipo={filtro === "uci" ? "uci" : "ucin"}
+          fichas={fichasFiltradas}
+          onRefresh={consultarFichas}
+          refreshing={consultando}
+          refreshLabel={consultadoEn ? "Actualizar matriz" : "Consultar matriz"}
+        />
       </section>
     </div>
   );
