@@ -2,12 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, query, serverTimestamp, where, writeBatch } from "@/lib/firestoreMeter";
-import { AlertCircle, BarChart3, Calculator, Save } from "lucide-react";
+import { AlertCircle, BarChart3, Calculator, Save, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { CAMAS_POR_SERVICIO } from "@/lib/servicios";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import {
+  consultarFichasCuidadosCriticos,
+  getFichasCuidadosCriticosCache,
+  queryFichasActivas,
+  queryFichasEgresoAnio,
+  queryFichasIngresoAnio,
+} from "@/lib/fichasCuidadosCriticosQueries";
 import {
   calcularDatosBaseCuidadosCriticos,
   calcularIndicadoresCuidadosCriticos,
@@ -107,8 +114,6 @@ function toDate(value: unknown): Date | null {
 export default function IndicadoresCuidadosCriticosPage() {
   const { user, profile, loading } = useAuth();
   const fecha = new Date();
-  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
-  const [configs, setConfigs] = useState<ConfigIndicadoresCuidadosCriticos[]>([]);
   const [anio, setAnio] = useState(fecha.getFullYear());
   const [mes, setMes] = useState<MesIndicadores>(fecha.getMonth() + 1);
   const [servicio, setServicio] = useState("todos");
@@ -123,15 +128,37 @@ export default function IndicadoresCuidadosCriticosPage() {
 
   const puedeVer = puedeVerIndicadoresCuidadosCriticos(profile);
   const esAdmin = profile?.role === "admin";
+  const claveConsulta = `indicadores-cuidados-criticos:${anio}`;
+  const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
+  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => cacheInicial?.fichas ?? []);
+  const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
+  const [consultando, setConsultando] = useState(false);
+  const [configs, setConfigs] = useState<ConfigIndicadoresCuidadosCriticos[]>([]);
 
   useEffect(() => {
-    if (!puedeVer) return;
-    return onSnapshot(collection(db, "fichas_cuidados_criticos"), snap => {
-      const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
-      docs.sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
-      setFichas(docs);
+    const cache = getFichasCuidadosCriticosCache(claveConsulta);
+    queueMicrotask(() => {
+      setFichas(cache?.fichas ?? []);
+      setConsultadoEn(cache?.consultadoEn ?? null);
     });
-  }, [puedeVer]);
+  }, [claveConsulta]);
+
+  const consultarFichas = async () => {
+    if (!puedeVer || consultando) return;
+    setConsultando(true);
+    try {
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [
+        queryFichasIngresoAnio(anio),
+        queryFichasEgresoAnio(anio),
+        queryFichasActivas(),
+      ]);
+      const docs = [...resultado.fichas].sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
+      setFichas(docs);
+      setConsultadoEn(resultado.consultadoEn);
+    } finally {
+      setConsultando(false);
+    }
+  };
 
   useEffect(() => {
     if (!puedeVer) return;
@@ -327,6 +354,15 @@ export default function IndicadoresCuidadosCriticosPage() {
               {serviciosUnidad.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
+          <button
+            type="button"
+            onClick={consultarFichas}
+            disabled={consultando}
+            className="inline-flex items-center justify-center gap-2 self-end rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Search size={14} />
+            {consultando ? "Consultando..." : consultadoEn ? "Actualizar" : "Consultar"}
+          </button>
         </div>
       </section>
 

@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query, where } from "@/lib/firestoreMeter";
 import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
-import { db } from "@/lib/firebase";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import {
+  consultarFichasCuidadosCriticos,
+  getFichasCuidadosCriticosCache,
+  queryFichasActivasServicios,
+  queryFichasIngresoAnioServicios,
+  queryFichasIngresoMesServicios,
+  queryFichasPorIngresoServicios,
+} from "@/lib/fichasCuidadosCriticosQueries";
 import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos } from "@/types";
 
@@ -57,11 +63,24 @@ function fichaEgresada(ficha: FichaCuidadosCriticos) {
     || ficha.datos?.alta === "FALLECIDO";
 }
 
+function ordenarFichas(fichas: FichaCuidadosCriticos[]) {
+  return [...fichas].sort((a, b) => {
+    const mesA = mesFicha(a);
+    const mesB = mesFicha(b);
+    if (mesA !== mesB) return mesA - mesB;
+    const fechaA = fechaIngresoFicha(a)?.getTime();
+    const fechaB = fechaIngresoFicha(b)?.getTime();
+    if (fechaA == null && fechaB == null) return 0;
+    if (fechaA == null) return 1;
+    if (fechaB == null) return -1;
+    return fechaA - fechaB;
+  });
+}
+
 export default function RegistrosCuidadosCriticosMedicoPage() {
   const { profile } = useAuth();
-  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [servicio, setServicio] = useState("todos");
-  const [periodo, setPeriodo] = useState<PeriodoFiltro>("todos");
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>("mes");
   const [cierre, setCierre] = useState<CierreFiltro>("todos");
   const [mes, setMes] = useState(MESES[new Date().getMonth()]);
   const [desde, setDesde] = useState("");
@@ -69,26 +88,38 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [busqueda, setBusqueda] = useState("");
 
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
+  const anioConsulta = new Date().getFullYear();
+  const mesNumero = MESES.indexOf(mes) + 1;
+  const claveConsulta = `medico-registros-cuidados:${anioConsulta}:${periodo}:${mes}:${desde}:${hasta}`;
+  const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
+  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+  const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
+  const [consultando, setConsultando] = useState(false);
 
   useEffect(() => {
-    if (!profile?.tipoMedico || servicios.length === 0) return;
-    const fichasQuery = query(collection(db, "fichas_cuidados_criticos"), where("servicio", "in", servicios));
-    return onSnapshot(fichasQuery, snap => {
-      const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
-      docs.sort((a, b) => {
-        const mesA = mesFicha(a);
-        const mesB = mesFicha(b);
-        if (mesA !== mesB) return mesA - mesB;
-        const fechaA = fechaIngresoFicha(a)?.getTime();
-        const fechaB = fechaIngresoFicha(b)?.getTime();
-        if (fechaA == null && fechaB == null) return 0;
-        if (fechaA == null) return 1;
-        if (fechaB == null) return -1;
-        return fechaA - fechaB;
-      });
-      setFichas(docs);
+    const cache = getFichasCuidadosCriticosCache(claveConsulta);
+    queueMicrotask(() => {
+      setFichas(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+      setConsultadoEn(cache?.consultadoEn ?? null);
     });
-  }, [profile?.tipoMedico, servicios]);
+  }, [claveConsulta, servicios]);
+
+  const consultarFichas = async () => {
+    if (!profile?.tipoMedico || servicios.length === 0 || consultando) return;
+    setConsultando(true);
+    try {
+      const periodoQuery = periodo === "mes" && mesNumero > 0
+        ? queryFichasIngresoMesServicios(anioConsulta, mesNumero, servicios)
+        : periodo === "rango"
+          ? queryFichasPorIngresoServicios(desde || `${anioConsulta}-01-01`, hasta || `${anioConsulta}-12-31`, servicios)
+          : queryFichasIngresoAnioServicios(anioConsulta, servicios);
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [periodoQuery, queryFichasActivasServicios(servicios)]);
+      setFichas(ordenarFichas(resultado.fichas.filter(ficha => servicios.includes(ficha.servicio))));
+      setConsultadoEn(resultado.consultadoEn);
+    } finally {
+      setConsultando(false);
+    }
+  };
 
   const fichasFiltradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -192,6 +223,16 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
               </label>
             </>
           )}
+
+          <button
+            type="button"
+            onClick={consultarFichas}
+            disabled={consultando}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Search size={14} />
+            {consultando ? "Consultando..." : consultadoEn ? "Actualizar" : "Consultar"}
+          </button>
 
           <label className="min-w-64 flex-1">
             <span className="mb-1 block text-xs font-semibold text-slate-500">Buscar</span>
