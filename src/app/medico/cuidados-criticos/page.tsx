@@ -18,6 +18,13 @@ import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lu
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { serviciosPorTipoMedico, tipoUnidadPorServicio, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import {
+  consultarFichasCuidadosCriticos,
+  getFichasCuidadosCriticosCache,
+  queryFichasServicios,
+  unirFichas,
+} from "@/lib/fichasCuidadosCriticosQueries";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
 import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
@@ -27,9 +34,7 @@ const NUEVA_ESTANCIA = "nueva";
 const inputCls = "w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 
 function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  return timestamp.toDate?.() ?? new Date(value as string);
+  return fechaCuidadosCriticos(value);
 }
 
 function fichaEgresada(ficha: FichaCuidadosCriticos) {
@@ -50,14 +55,14 @@ function estadoPacienteLabel(estado: Paciente["estado"]) {
 function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente {
   const [apellidos = ficha.pacienteNombre, nombres = ""] = ficha.pacienteNombre.split(",").map(parte => parte.trim());
   const sexo = valorComoTexto(ficha.datos?.sexo).toLowerCase();
-  const fechaIngreso = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio);
+  const fechaIngreso = fechaCuidadosCriticos(ficha.datos?.fecha_ingreso_al_servicio);
   return {
     id,
     expediente: ficha.pacienteExpediente,
     apellidos,
     nombres,
     genero: sexo === "femenino" ? "femenino" : sexo === "masculino" ? "masculino" : "otro",
-    fechaIngreso: fechaIngreso ? new Date(`${fechaIngreso}T00:00:00`) : new Date(),
+    fechaIngreso: fechaIngreso ?? new Date(),
     establecimientoProcedencia: valorComoTexto(ficha.datos?.centro_de_procedencia),
     servicioIngreso: valorComoTexto(ficha.datos?.servicio_proveniente) || ficha.servicio,
     servicioActual: ficha.servicio,
@@ -80,9 +85,12 @@ function limpiarFichaUrl() {
 export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
   const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
+  const claveConsultaFichas = `medico-cuidados-criticos:${servicios.join("|")}`;
+  const cacheInicialFichas = getFichasCuidadosCriticosCache(claveConsultaFichas);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [pacientesHistoricos, setPacientesHistoricos] = useState<Paciente[]>([]);
-  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
+  const [fichasBase, setFichasBase] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicialFichas?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+  const [fichasBusqueda, setFichasBusqueda] = useState<FichaCuidadosCriticos[]>([]);
   const [pacientePrecargado, setPacientePrecargado] = useState<Paciente | null>(null);
   const [fichaUrlId, setFichaUrlId] = useState("");
   const [selectedId, setSelectedId] = useState("");
@@ -91,6 +99,9 @@ export default function CuidadosCriticosMedicoPage() {
   const [servicioFiltro, setServicioFiltro] = useState("todos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicialFichas?.consultadoEn ?? null);
+  const [consultandoFichas, setConsultandoFichas] = useState(false);
+  const fichas = useMemo(() => unirFichas(fichasBase, fichasBusqueda), [fichasBase, fichasBusqueda]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -102,21 +113,36 @@ export default function CuidadosCriticosMedicoPage() {
   useEffect(() => {
     if (!profile?.tipoMedico || servicios.length === 0) return;
     const pacientesQuery = query(collection(db, "pacientes"), where("servicioActual", "in", servicios));
-    const fichasQuery = query(collection(db, "fichas_cuidados_criticos"), where("servicio", "in", servicios));
     const unsubPacientes = onSnapshot(pacientesQuery, snap => {
       const docs = snap.docs
         .map(item => ({ id: item.id, ...item.data() } as Paciente))
         .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || a.servicioActual.localeCompare(b.servicioActual) || (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
       setPacientes(docs);
     });
-    const unsubFichas = onSnapshot(fichasQuery, snap => {
-      setFichas(snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos)));
-    });
-    return () => {
-      unsubPacientes();
-      unsubFichas();
-    };
+    return () => unsubPacientes();
   }, [profile?.tipoMedico, servicios]);
+
+  useEffect(() => {
+    const cache = getFichasCuidadosCriticosCache(claveConsultaFichas);
+    queueMicrotask(() => {
+      setFichasBase(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+      setConsultadoEn(cache?.consultadoEn ?? null);
+    });
+  }, [claveConsultaFichas, servicios]);
+
+  const consultarFichasBase = async () => {
+    if (!profile?.tipoMedico || servicios.length === 0 || consultandoFichas) return;
+    setConsultandoFichas(true);
+    try {
+      const resultado = await consultarFichasCuidadosCriticos(claveConsultaFichas, [
+        queryFichasServicios(servicios),
+      ]);
+      setFichasBase(ordenarFichas(resultado.fichas.filter(ficha => servicios.includes(ficha.servicio))));
+      setConsultadoEn(resultado.consultadoEn);
+    } finally {
+      setConsultandoFichas(false);
+    }
+  };
 
   useEffect(() => {
     const expediente = busqueda.trim();
@@ -147,9 +173,65 @@ export default function CuidadosCriticosMedicoPage() {
   }, [busqueda]);
 
   useEffect(() => {
-    if (!fichaUrlId || fichas.length === 0) return;
+    const expediente = busqueda.trim();
+    if (expediente.length < 4 || !expediente.includes("-") || servicios.length === 0) {
+      queueMicrotask(() => setFichasBusqueda([]));
+      return;
+    }
+
+    let activo = true;
+    const timeout = window.setTimeout(async () => {
+      try {
+        const snap = await getDocs(query(
+          collection(db, "fichas_cuidados_criticos"),
+          where("pacienteExpediente", "==", expediente),
+          where("servicio", "in", servicios),
+          limit(12)
+        ));
+        if (!activo) return;
+        setFichasBusqueda(snap.docs
+          .map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos))
+          .filter(ficha => servicios.includes(ficha.servicio)));
+      } catch {
+        if (activo) setFichasBusqueda([]);
+      }
+    }, 250);
+
+    return () => {
+      activo = false;
+      window.clearTimeout(timeout);
+    };
+  }, [busqueda, servicios]);
+
+  useEffect(() => {
+    if (!fichaUrlId || fichas.some(item => item.id === fichaUrlId)) return;
+    let activo = true;
+    getDoc(doc(db, "fichas_cuidados_criticos", fichaUrlId))
+      .then(snap => {
+        if (!activo) return;
+        if (!snap.exists()) {
+          limpiarFichaUrl();
+          setFichaUrlId("");
+          return;
+        }
+        const ficha = { id: snap.id, ...snap.data() } as FichaCuidadosCriticos;
+        setFichasBusqueda(prev => unirFichas(prev, [ficha]));
+      })
+      .catch(() => {
+        if (!activo) return;
+        limpiarFichaUrl();
+        setFichaUrlId("");
+      });
+    return () => {
+      activo = false;
+    };
+  }, [fichaUrlId, fichas]);
+
+  useEffect(() => {
+    if (!fichaUrlId) return;
     const ficha = fichas.find(item => item.id === fichaUrlId);
-    if (!ficha || (selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id)) {
+    if (!ficha) return;
+    if (selectedId === ficha.pacienteId && selectedEstanciaId === ficha.id) {
       queueMicrotask(() => {
         limpiarFichaUrl();
         setFichaUrlId("");
@@ -271,6 +353,11 @@ export default function CuidadosCriticosMedicoPage() {
     setError("");
   };
 
+  const upsertFichaLocal = (ficha: FichaCuidadosCriticos) => {
+    setFichasBase(prev => ordenarFichas(unirFichas(prev, [ficha]).filter(item => servicios.includes(item.servicio))));
+    setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, [ficha]).filter(item => servicios.includes(item.servicio))));
+  };
+
   const guardarFicha = async (datos: DatosMatrizCuidadosCriticos) => {
     if (!user || !profile?.tipoMedico || !selected?.id) return;
     if (!esValorRegistrado(datos.fecha_ingreso_al_servicio)) {
@@ -291,7 +378,7 @@ export default function CuidadosCriticosMedicoPage() {
 
     setSaving(true);
     setError("");
-    const estadoEstancia = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
+    const estadoEstancia: FichaCuidadosCriticos["estadoEstancia"] = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
       ? "egresada"
       : "activa";
     const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, tipoRegistroGuardar);
@@ -313,6 +400,7 @@ export default function CuidadosCriticosMedicoPage() {
     }
 
     try {
+      const fechaLocal = new Date();
       if (fichaSeleccionada?.id) {
         await updateDoc(doc(db, "fichas_cuidados_criticos", fichaSeleccionada.id), {
           tipoUnidad: tipoRegistroGuardar,
@@ -324,8 +412,19 @@ export default function CuidadosCriticosMedicoPage() {
           actualizadoPorNombre: profile.nombre,
           actualizadoEn: serverTimestamp(),
         });
+        upsertFichaLocal({
+          ...fichaSeleccionada,
+          tipoUnidad: tipoRegistroGuardar,
+          estadoEstancia,
+          servicio: servicioFicha,
+          cama: selected.camaActual ?? "",
+          datos: datosParaGuardar,
+          actualizadoPorId: user.uid,
+          actualizadoPorNombre: profile.nombre,
+          actualizadoEn: fechaLocal,
+        });
       } else {
-        const creada = await addDoc(collection(db, "fichas_cuidados_criticos"), {
+        const fichaNueva = {
           tipoUnidad: tipoRegistroGuardar,
           estadoEstancia,
           pacienteId: selected.id,
@@ -340,6 +439,13 @@ export default function CuidadosCriticosMedicoPage() {
           actualizadoPorId: user.uid,
           actualizadoPorNombre: profile.nombre,
           actualizadoEn: serverTimestamp(),
+        };
+        const creada = await addDoc(collection(db, "fichas_cuidados_criticos"), fichaNueva);
+        upsertFichaLocal({
+          ...fichaNueva,
+          id: creada.id,
+          creadoEn: fechaLocal,
+          actualizadoEn: fechaLocal,
         });
         setSelectedEstanciaId(creada.id);
       }
@@ -376,10 +482,24 @@ export default function CuidadosCriticosMedicoPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={<Activity size={18} />} label="Pacientes en mis unidades" value={pacientes.length} />
         <Stat icon={<FileSpreadsheet size={18} />} label="Registros guardados" value={fichas.length} />
         <Stat icon={<CheckCircle2 size={18} />} label="Registros activos" value={fichas.filter(item => !fichaEgresada(item)).length} />
+        <button
+          type="button"
+          onClick={consultarFichasBase}
+          disabled={consultandoFichas || servicios.length === 0}
+          className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-left transition-colors hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950 dark:hover:border-blue-800 dark:hover:bg-blue-900"
+        >
+          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-300">
+            <Search size={18} />
+            <span className="text-xs font-semibold">{consultandoFichas ? "Consultando..." : consultadoEn ? "Actualizar registros" : "Consultar registros"}</span>
+          </div>
+          <p className="mt-2 text-xs text-blue-700/80 dark:text-blue-200/80">
+            {consultadoEn ? `Ultima: ${consultadoEn.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" })}` : "Sin consulta"}
+          </p>
+        </button>
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

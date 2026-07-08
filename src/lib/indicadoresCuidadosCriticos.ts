@@ -1,4 +1,5 @@
 import type { ConfigIndicadoresCuidadosCriticos, FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { esValorRegistrado, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 
 export const MESES_INDICADORES = [
@@ -598,10 +599,7 @@ function diasEntreFechasInclusivo(inicio: Date, fin: Date) {
 }
 
 function fechaDato(value: unknown) {
-  const texto = valorComoTexto(value);
-  if (!texto) return null;
-  const fecha = new Date(`${texto}T00:00:00`);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
+  return fechaCuidadosCriticos(value);
 }
 
 function numeroConfig(value: unknown) {

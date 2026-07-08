@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "@/lib/firestoreMeter";
-import { Activity, AlertCircle, FileSpreadsheet, Users } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { Activity, AlertCircle, FileSpreadsheet, Search, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
+import {
+  consultarFichasCuidadosCriticos,
+  getFichasCuidadosCriticosCache,
+  queryFichasTodas,
+} from "@/lib/fichasCuidadosCriticosQueries";
+import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
@@ -30,10 +34,7 @@ const MESES = [
 ] as const;
 
 function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  const timestamp = value as { toDate?: () => Date };
-  const fecha = timestamp.toDate?.() ?? new Date(value as string);
-  return Number.isNaN(fecha.getTime()) ? null : fecha;
+  return fechaCuidadosCriticos(value);
 }
 
 function normalizarTexto(value: unknown) {
@@ -64,30 +65,48 @@ function fechaIngresoOrdenFicha(ficha: FichaCuidadosCriticos) {
 
 export default function CuidadosCriticosDashboardPage() {
   const { profile, loading } = useAuth();
-  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>([]);
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [filtroMes, setFiltroMes] = useState<FiltroMes>(() => new Date().getMonth() + 1);
   const [filtroCierre, setFiltroCierre] = useState<FiltroCierre>("todos");
 
   const puedeVer = puedeVerModuloCuidadosCriticos(profile);
+  const anioConsulta = new Date().getFullYear();
+  const claveConsulta = `dashboard-cuidados-criticos:${anioConsulta}`;
+  const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
+  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => cacheInicial?.fichas ?? []);
+  const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
+  const [consultando, setConsultando] = useState(false);
 
   useEffect(() => {
-    if (!puedeVer) return;
-    return onSnapshot(collection(db, "fichas_cuidados_criticos"), snap => {
-    const docs = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
-    docs.sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
-    setFichas(docs);
+    const cache = getFichasCuidadosCriticosCache(claveConsulta);
+    queueMicrotask(() => {
+      setFichas(cache?.fichas ?? []);
+      setConsultadoEn(cache?.consultadoEn ?? null);
     });
-  }, [puedeVer]);
+  }, [claveConsulta]);
 
-  const fichasPorTipo = filtro === "todos" ? fichas : fichas.filter(ficha => ficha.tipoUnidad === filtro);
-  const fichasFiltradas = fichasPorTipo.filter(ficha => {
+  const consultarFichas = async () => {
+    if (!puedeVer || consultando) return;
+    setConsultando(true);
+    try {
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasTodas()]);
+      const docs = [...resultado.fichas].sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
+      setFichas(docs);
+      setConsultadoEn(resultado.consultadoEn);
+    } finally {
+      setConsultando(false);
+    }
+  };
+
+  const fichasPeriodoCierre = fichas.filter(ficha => {
     const pendiente = fichaPendienteCierreCuidadosCriticos(ficha);
     if (filtroMes !== "todos" && mesFicha(ficha) !== filtroMes) return false;
     if (filtroCierre === "pendientes") return pendiente;
     if (filtroCierre === "cerrados") return !pendiente;
     return true;
-  }).sort((a, b) => {
+  });
+  const fichasPorTipo = filtro === "todos" ? fichasPeriodoCierre : fichasPeriodoCierre.filter(ficha => ficha.tipoUnidad === filtro);
+  const fichasFiltradas = [...fichasPorTipo].sort((a, b) => {
     const mesA = mesFicha(a);
     const mesB = mesFicha(b);
     if (mesA !== mesB) return mesA - mesB;
@@ -127,9 +146,9 @@ export default function CuidadosCriticosDashboardPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={<FileSpreadsheet size={18} />} label="Fichas registradas" value={fichas.length} />
-        <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichas.filter(item => item.tipoUnidad === "uci").length} />
-        <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichas.filter(item => item.tipoUnidad === "ucin").length} />
+        <Stat icon={<FileSpreadsheet size={18} />} label="Fichas registradas" value={fichasPeriodoCierre.length} />
+        <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "uci").length} />
+        <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "ucin").length} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
       </div>
 
@@ -177,6 +196,15 @@ export default function CuidadosCriticosDashboardPage() {
                 <option value="cerrados">Cerrados</option>
               </select>
             </label>
+            <button
+              type="button"
+              onClick={consultarFichas}
+              disabled={consultando}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Search size={14} />
+              {consultando ? "Consultando..." : consultadoEn ? "Actualizar" : "Consultar"}
+            </button>
           </div>
         </div>
         <LienzoMatrizCuidadosCriticos tipo={filtro === "uci" ? "uci" : "ucin"} fichas={fichasFiltradas} />
