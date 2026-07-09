@@ -8,7 +8,6 @@ import {
   getDoc,
   getDocs,
   limit,
-  onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
@@ -22,6 +21,7 @@ import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
   queryFichasServicios,
+  suscribirPacientesCuidadosCriticos,
   unirFichas,
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
@@ -112,14 +112,12 @@ export default function CuidadosCriticosMedicoPage() {
 
   useEffect(() => {
     if (!profile?.tipoMedico || servicios.length === 0) return;
-    const pacientesQuery = query(collection(db, "pacientes"), where("servicioActual", "in", servicios));
-    const unsubPacientes = onSnapshot(pacientesQuery, snap => {
-      const docs = snap.docs
-        .map(item => ({ id: item.id, ...item.data() } as Paciente))
+    const clave = `medico-cuidados-criticos-pacientes:${servicios.join("|")}`;
+    return suscribirPacientesCuidadosCriticos(clave, servicios, docs => {
+      const ordenados = [...docs]
         .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || a.servicioActual.localeCompare(b.servicioActual) || (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
-      setPacientes(docs);
+      setPacientes(ordenados);
     });
-    return () => unsubPacientes();
   }, [profile?.tipoMedico, servicios]);
 
   useEffect(() => {

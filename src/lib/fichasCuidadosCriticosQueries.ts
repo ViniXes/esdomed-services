@@ -2,6 +2,7 @@ import {
   collection,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   where,
@@ -9,7 +10,7 @@ import {
   type Query,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import type { FichaCuidadosCriticos } from "@/types";
+import type { FichaCuidadosCriticos, Paciente } from "@/types";
 
 const COLLECTION = "fichas_cuidados_criticos";
 const LIMITE_RANGO = 1200;
@@ -169,4 +170,48 @@ export async function consultarFichasCuidadosCriticos(
   const entrada = { fichas, consultadoEn: new Date() };
   cache.set(clave, entrada);
   return entrada;
+}
+
+// ── Suscripción compartida de pacientes (en vivo, reutilizada entre pantallas) ──
+// La lista de pacientes debe verse en tiempo real sin que el médico tenga que
+// pedirla (a diferencia de las fichas, que se consultan manualmente). Para no
+// volver a pagar la lectura inicial completa cada vez que el médico entra y
+// sale de esta pantalla, el listener de Firestore se mantiene vivo a nivel de
+// módulo — no se desuscribe al desmontar el componente — y se comparte entre
+// todos los que pidan la misma clave (mismo conjunto de servicios).
+interface SuscripcionPacientes {
+  pacientes: Paciente[];
+  listeners: Set<(pacientes: Paciente[]) => void>;
+}
+
+const suscripcionesPacientes = new Map<string, SuscripcionPacientes>();
+
+export function suscribirPacientesCuidadosCriticos(
+  clave: string,
+  servicios: string[],
+  onCambio: (pacientes: Paciente[]) => void,
+): () => void {
+  let sub = suscripcionesPacientes.get(clave);
+  if (!sub) {
+    sub = { pacientes: [], listeners: new Set() };
+    suscripcionesPacientes.set(clave, sub);
+    onSnapshot(
+      query(collection(db, "pacientes"), where("servicioActual", "in", serviciosParaConsulta(servicios))),
+      snap => {
+        const pacientes = snap.docs.map(item => ({ id: item.id, ...item.data() } as Paciente));
+        const actual = suscripcionesPacientes.get(clave);
+        if (!actual) return;
+        actual.pacientes = pacientes;
+        actual.listeners.forEach(listener => listener(pacientes));
+      },
+    );
+  }
+  sub.listeners.add(onCambio);
+  if (sub.pacientes.length > 0) onCambio(sub.pacientes);
+  return () => {
+    suscripcionesPacientes.get(clave)?.listeners.delete(onCambio);
+    // El listener de Firestore NO se apaga al desmontar: queda vivo para que la
+    // proxima vez que se entre a esta pantalla no se vuelva a pagar el costo de
+    // la carga inicial completa, solo las lecturas incrementales de cambios reales.
+  };
 }
