@@ -16,13 +16,14 @@ import { toDate } from "@/lib/pacientes/helpers";
 import { ESTABLECIMIENTOS } from "@/lib/establecimientos";
 import {
   DEPENDENCIAS_HES, DESTINOS, DESTINO_LABEL, ESPECIALIDADES_EMERGENCIA, HOSPITALES_REFERENCIA,
-  PROCEDIMIENTOS, SERVICIOS_INGRESO, TRIAGES, TRIAGE_LABEL, TURNOS, TURNO_LABEL,
-  diagnosticosACelda, procsACelda, siNo, turnoSegunHora,
+  MEDICOS_GENERALES_EMERGENCIA, PROCEDIMIENTOS, SERVICIOS_INGRESO, STAFF_EMERGENCIA,
+  TRIAGES, TRIAGE_LABEL, TURNOS, TURNO_LABEL,
+  diagnosticosACelda, procsACelda, siNo, tipoEvaluador, turnoSegunHora,
 } from "@/lib/emergencia/censos";
 import { buscarIdentidadPaciente } from "@/lib/emergencia/prefillCenso";
 import {
-  ChipMulti, ChipSelect, DiagnosticosEditor, EstadoRegistroBadge, FaltantesHint, Field,
-  SelectCatalogo, SiNoChips, StaffInput, inputCls,
+  ChipMulti, ChipSelect, DiagnosticosEditor, EstadoRegistroBadge, EvaluadorBadge, EvaluadorSelect,
+  FaltantesHint, Field, SelectCatalogo, SiNoChips, inputCls,
 } from "@/components/emergencia/censoUi";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -80,7 +81,7 @@ function camposFaltantes(f: FormState): string[] {
   if (f.destino === "referencia" && !f.centroRefiere.trim()) faltan.push("centro al que refiere");
   if (f.traeReferencia && !f.lugarReferencia) faltan.push("lugar de referencia");
   if (f.empleadoHes && !f.dependencia) faltan.push("dependencia");
-  if (!f.staffEvalua.trim()) faltan.push("staff que evalúa");
+  if (!f.staffEvalua.trim()) faltan.push("médico que evalúa");
   return faltan;
 }
 
@@ -241,6 +242,7 @@ export default function CensoDemandasPage() {
         servicioIngresar: form.destino === "ingreso" ? form.servicioIngresar : null,
         centroRefiere: form.destino === "referencia" ? form.centroRefiere.trim() : null,
         staffEvalua: form.staffEvalua.trim(),
+        evaluadoPor: tipoEvaluador(form.staffEvalua.trim()),
         reevaluacion: form.reevaluacion.trim() || null,
         ventilacionMecanica: form.ventilacionMecanica,
         consulta48h,
@@ -309,10 +311,13 @@ export default function CensoDemandasPage() {
           "LUGAR DE REFERENCIA": r.lugarReferencia ?? "",
           "DESTINO DE PACIENTE": DESTINO_LABEL[r.destino as DestinoEmergencia] ?? "",
           "SERVICIO A INGRESAR": r.servicioIngresar ?? "",
-          "STAFF QUE EVALUA": r.staffEvalua,
+          // Convención del libro: si evaluó un médico general, la columna de
+          // staff dice "MEDICO GENERAL" y el nombre va en la columna propia.
+          "STAFF QUE EVALUA": r.evaluadoPor === "medico_general" ? "MEDICO GENERAL" : r.staffEvalua,
           "REEVALUACION MEDICA": r.reevaluacion ?? "NO APLICA",
           "VENTILACION MECANICA": r.ventilacionMecanica ? "Sí" : "No",
-          "MEDICO GENERAL QUE ASISTE EN LA ATENCION": r.medicosGenerales ?? "",
+          "MEDICO GENERAL QUE ASISTE EN LA ATENCION":
+            r.evaluadoPor === "medico_general" ? r.staffEvalua : r.medicosGenerales ?? "",
           "CENTRO DE SALUD AL QUE REFIERE": r.centroRefiere ?? "",
           "CONSULTA NUEVAMENTE EN < 48H": siNo(!!r.consulta48h),
           "ASEGURADO ISSS": siNo(!!r.aseguradoIsss),
@@ -494,11 +499,25 @@ export default function CensoDemandasPage() {
           <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Médicos</p>
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="Staff que evalúa" required>
-                <StaffInput value={form.staffEvalua} onChange={(v) => set("staffEvalua", v)} />
+              <Field label="Médico que evalúa" required>
+                <EvaluadorSelect
+                  value={form.staffEvalua}
+                  onChange={(v) => set("staffEvalua", v)}
+                  staff={STAFF_EMERGENCIA}
+                  generales={MEDICOS_GENERALES_EMERGENCIA}
+                />
+                {form.staffEvalua && (
+                  <div className="mt-1.5"><EvaluadorBadge tipo={tipoEvaluador(form.staffEvalua)} /></div>
+                )}
               </Field>
-              <Field label="Reevaluación médica (vacío = no aplica)">
-                <StaffInput value={form.reevaluacion} onChange={(v) => set("reevaluacion", v)} />
+              <Field label="Reevaluación médica">
+                <EvaluadorSelect
+                  value={form.reevaluacion}
+                  onChange={(v) => set("reevaluacion", v)}
+                  staff={STAFF_EMERGENCIA}
+                  generales={MEDICOS_GENERALES_EMERGENCIA}
+                  placeholder="— No aplica"
+                />
               </Field>
             </div>
             <Field label="Médicos generales del turno (se recuerda entre registros)">
@@ -623,12 +642,22 @@ export default function CensoDemandasPage() {
                 {registros.filter((r) => r.estadoRegistro !== "cerrado").length} por cerrar
               </span>
             )}
+            {registros.some((r) => r.evaluadoPor === "staff") && (
+              <span className="text-xs font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 px-2 py-0.5 rounded-full">
+                {registros.filter((r) => r.evaluadoPor === "staff").length} por staff
+              </span>
+            )}
+            {registros.some((r) => r.evaluadoPor === "medico_general") && (
+              <span className="text-xs font-medium text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-900 px-2 py-0.5 rounded-full">
+                {registros.filter((r) => r.evaluadoPor === "medico_general").length} por médico general
+              </span>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-y border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                  {["Hora / Turno", "Expediente", "Paciente", "Triage", "Diagnóstico", "Destino", "Estado", ""].map((h) => (
+                  {["Hora / Turno", "Expediente", "Paciente", "Triage", "Diagnóstico", "Destino", "Evalúa", "Estado", ""].map((h) => (
                     <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -663,6 +692,12 @@ export default function CensoDemandasPage() {
                       <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
                         {r.destino ? DESTINO_LABEL[r.destino] : "—"}
                         {r.consulta48h && <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-medium">&lt; 48 h</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <EvaluadorBadge tipo={r.evaluadoPor} />
+                        <span className="block text-[10px] text-slate-400 max-w-[130px] truncate" title={r.staffEvalua || undefined}>
+                          {r.staffEvalua || "—"}
+                        </span>
                       </td>
                       <td className="px-4 py-2.5">
                         <EstadoRegistroBadge estado={r.estadoRegistro ?? "cerrado"} faltantes={r.camposFaltantes} />

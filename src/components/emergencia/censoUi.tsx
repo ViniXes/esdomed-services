@@ -6,7 +6,7 @@
 
 import { CheckCircle2, Clock, Plus, Trash2 } from "lucide-react";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
-import type { DiagnosticoCIE, EstadoRegistroCenso } from "@/types";
+import type { DiagnosticoCIE, EstadoRegistroCenso, TipoEvaluadorEmergencia } from "@/types";
 
 export const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm disabled:opacity-50";
@@ -168,23 +168,44 @@ export function SelectCatalogo({ options, value, onChange, placeholder = "— Se
   );
 }
 
-// ── Staff: texto libre normalizado a MAYÚSCULAS ──────────────────────────────
-// Pendiente la lista oficial de médicos de emergencia; cuando exista, este
-// input vuelve a sugerir nombres desde el catálogo (datalist).
+// ── Quién evalúa: un select con los dos grupos oficiales ─────────────────────
+// El tipo (staff / médico general) NO se digita: se deriva por pertenencia con
+// tipoEvaluador() al guardar. Los nombres antiguos de texto libre se conservan
+// como opción suelta para no vaciar el campo al editar registros viejos.
 
-export function StaffInput({ value, onChange, placeholder }: {
+export function EvaluadorSelect({ value, onChange, staff, generales, placeholder = "— Seleccionar" }: {
   value: string;
   onChange: (v: string) => void;
+  staff: readonly string[];
+  generales: readonly string[];
   placeholder?: string;
 }) {
+  const conocido = staff.includes(value) || generales.includes(value);
   return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value.toUpperCase())}
-      placeholder={placeholder ?? "DR. APELLIDO"}
-      className={inputCls}
-    />
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} cursor-pointer appearance-none`}>
+      <option value="">{placeholder}</option>
+      {value && !conocido && <option value={value}>{value}</option>}
+      <optgroup label="Staff de emergencia">
+        {staff.map((s) => <option key={s} value={s}>{s}</option>)}
+      </optgroup>
+      <optgroup label="Médicos generales">
+        {generales.map((s) => <option key={s} value={s}>{s}</option>)}
+      </optgroup>
+    </select>
+  );
+}
+
+// Chip que separa visualmente las atenciones del staff de las de generales.
+export function EvaluadorBadge({ tipo }: { tipo: TipoEvaluadorEmergencia | null | undefined }) {
+  if (!tipo) return null;
+  return tipo === "staff" ? (
+    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900 whitespace-nowrap">
+      Staff
+    </span>
+  ) : (
+    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-900 whitespace-nowrap">
+      Méd. general
+    </span>
   );
 }
 

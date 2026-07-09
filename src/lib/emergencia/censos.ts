@@ -10,6 +10,7 @@
 import type {
   ClasificacionSisReferido,
   DestinoEmergencia,
+  TipoEvaluadorEmergencia,
   TriageEmergencia,
   TurnoEmergencia,
 } from "@/types";
@@ -247,10 +248,73 @@ export const PROCEDIMIENTOS = [
   "IC Nefrología",
 ] as const;
 
-// ── Staff de emergencia (columna STAFF QUE EVALUA / REEVALUACION) ────────────
-// Por ahora es texto libre (normalizado a MAYÚSCULAS en StaffInput). Cuando
-// emergencia entregue la lista oficial de médicos staff, se agrega aquí como
-// catálogo y StaffInput vuelve a sugerir nombres.
+// ── Médicos de emergencia (listas oficiales, julio 2026) ────────────────────
+// Dos listas separadas: staff y médicos generales. "¿Quién evalúa?" se elige
+// de un solo select con ambos grupos y el tipo se DERIVA por pertenencia
+// (tipoEvaluador) — así se separan las atenciones del staff de las de los
+// médicos generales sin digitar nada extra.
+
+export const STAFF_EMERGENCIA = [
+  "JOSE DAVID GRANILLO VILLALTA",
+  "KATHYA LIZZETH RIVERA LOPEZ",
+  "MARIA JOSE CASTANEDA HERNANDEZ",
+  "SILVIA STEPHANY ALVARADO GONZALEZ",
+  "JOSUE ISAAC PARADA RAMIREZ",
+  "ELIZABETH PAULINA CHANCHAN MELÉNDEZ",
+  "MARIA JOSE CASTANEDA RUANO",
+  "MARIA ARGELIA MAYEN RAFAEL",
+  "ERNESTO ANTONIO GUILLEN LEIVA",
+  "FERNANDO SALVADOR MEJIA MIRA",
+  "MAURICIO ALEXANDER JUAREZ ALVARADO",
+  "NORA MARISOL CORNEJO RAYMUNDO",
+  "CLAUDIA BEATRIZ ERROA MENENDEZ",
+  "CAROLINA BEATRIZ ASENCIO",
+  "GUILLERMO JOSE DIAZ AREVALO",
+  "LUIS ENRIQUE CASTILLO PALACIOS",
+  "IRENE EDITH GORDILLO MARTINEZ",
+  "EMILIO JOSE SANTILLANA",
+  "DENIS ANTONIO MAGAÑA NOYOLA",
+  "JOSE ANGEL QUINTEROS FLORES",
+  "WILLIAM JOSE SALAS SAYES",
+  "DIANA MARIA COLOCHO ABARCA",
+  "JEAMILETH JASMIN CASTILLO",
+  "MARIANA JUDITH GONZALEZ LINARES",
+  "MANUEL EDUARDO RODRIGUEZ CORNEJO",
+  "VLADIMIR GOMEZ",
+] as const;
+
+export const MEDICOS_GENERALES_EMERGENCIA = [
+  "JENIFFER STEFANIE LINARES CANIZALES",
+  "KATY MARIBEL ESCALANTE GARCIA",
+  "WILFREDO HERNANDEZ MEJIA",
+  "IRIS IVETTE MARQUEZ AVELAR",
+  "AMILCAR ADONAY FUENTES ROSALES",
+  "ELOIZA BEATRIZ MENDOZA LOPEZ",
+  "JUNIOR ALEXANDER VILLATORO RIVAS",
+  "JOSELINE IVANNIA ESCOBAR GARCIA",
+  "STEPHANY MARGARITA HERNANDEZ MENDOZA",
+  "ICELA YASMIN HERNANDEZ REYEZ",
+  "SILVIA MARLENE ALONZO DIAZ",
+  "MERCEDES YOLANDA LOPEZ SANCHEZ",
+  "ADRIANA LETICIA ORELLANA MENENDEZ",
+  "JHEMMY CONCEPCIÓN SANTACRUZ JIMENEZ",
+  "EDUARDO JOSE HERNANDEZ PAZ",
+  "MARIA ELENA MARQUEZ LIZAMA",
+  "GUSTAVO ALEJANDRO GOMEZ CORNEJO",
+] as const;
+
+// Deriva quién evalúa según a qué lista pertenece el nombre; null para
+// nombres fuera de catálogo (registros antiguos digitados como texto libre).
+export function tipoEvaluador(nombre: string): TipoEvaluadorEmergencia | null {
+  if ((STAFF_EMERGENCIA as readonly string[]).includes(nombre)) return "staff";
+  if ((MEDICOS_GENERALES_EMERGENCIA as readonly string[]).includes(nombre)) return "medico_general";
+  return null;
+}
+
+export const TIPO_EVALUADOR_LABEL: Record<TipoEvaluadorEmergencia, string> = {
+  staff: "Staff",
+  medico_general: "Médico general",
+};
 
 // ── Formato para el export a Excel ───────────────────────────────────────────
 

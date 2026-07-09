@@ -1321,6 +1321,12 @@ export type DestinoEmergencia =
 // automáticamente cuando todo está digitado.
 export type EstadoRegistroCenso = "abierto" | "cerrado";
 
+// Quién hizo la atención: DERIVADO al guardar según a qué lista oficial
+// (STAFF_EMERGENCIA / MEDICOS_GENERALES_EMERGENCIA) pertenece el nombre en
+// staffEvalua. Separa las atenciones del staff de las de médicos generales.
+// null = nombre fuera de las listas (registros antiguos de texto libre).
+export type TipoEvaluadorEmergencia = "staff" | "medico_general";
+
 export interface CensoDemandaEspontanea {
   id?: string;
 
@@ -1354,7 +1360,8 @@ export interface CensoDemandaEspontanea {
   centroRefiere?: string;         // solo si destino == "referencia"
 
   // ── Médicos ──
-  staffEvalua: string;
+  staffEvalua: string;            // nombre del médico que evalúa (staff o general)
+  evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
   reevaluacion?: string;          // vacío/undefined = no aplica
   medicosGenerales?: string;      // los del turno (se copia a cada registro)
   ventilacionMecanica: boolean;
@@ -1418,7 +1425,8 @@ export interface CensoReferido {
   servicioIngreso: string;        // catálogo SERVICIOS_INGRESO_REFERIDO
 
   // ── Médicos ──
-  staffEvalua: string;
+  staffEvalua: string;            // nombre del médico que evalúa (staff o general)
+  evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
   reevaluacion?: string;          // vacío/undefined = no aplica
   medicosGenerales?: string;
 
