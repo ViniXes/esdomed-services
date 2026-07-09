@@ -54,8 +54,7 @@ export const DESTINOS: { value: DestinoEmergencia; label: string }[] = [
   { value: "alta",            label: "Alta" },
   { value: "ingreso",         label: "Ingreso" },
   { value: "referencia",      label: "Referencia a otro centro" },
-  { value: "alta_voluntaria", label: "Alta voluntaria" },
-  { value: "alta_exigida",    label: "Alta exigida" },
+  { value: "alta_voluntaria", label: "Alta voluntaria / exigida" },
   { value: "fuga",            label: "Fuga" },
 ];
 
@@ -236,41 +235,9 @@ export const PROCEDIMIENTOS = [
 ] as const;
 
 // ── Staff de emergencia (columna STAFF QUE EVALUA / REEVALUACION) ────────────
-// Lista semilla desde junio 2026; el formulario permite escribir otro nombre
-// (se normaliza a mayúsculas) para no bloquear rotaciones de personal.
-
-export const STAFF_EMERGENCIA = [
-  "DR. SANTILLANA",
-  "DR. QUINTEROS",
-  "DR. CAMILO RIVERA",
-  "DRA. IBAÑEZ",
-  "DRA. GORDILLO",
-  "DRA. CORNEJO",
-  "DR. GUILLEN",
-  "DRA. CASTILLO",
-  "DRA. S. ALVARADO",
-  "DR. MEJIA",
-  "DRA. MAYEN",
-  "DRA. MARTINEZ",
-  "DR. M. JUAREZ",
-  "DR. SALAS",
-  "DR. RODRIGUEZ",
-  "DRA. ASCENCIO",
-  "DRA. COLOCHO",
-  "DR. GRANILLO",
-  "DR. PARADA",
-  "DR. G. DÍAZ",
-  "DR. L. CASTILLO",
-  "DRA. CHANCHAN",
-  "DRA. ERROA",
-  "DR. MAGAÑA",
-  "DRA. MARIANA GONZALEZ",
-  "DRA. CASTANEDA",
-  "DR. GOMEZ",
-  "DRA. K. RIVERA",
-  "RESIDENTE MI",
-  "MEDICO GENERAL",
-] as const;
+// Por ahora es texto libre (normalizado a MAYÚSCULAS en StaffInput). Cuando
+// emergencia entregue la lista oficial de médicos staff, se agrega aquí como
+// catálogo y StaffInput vuelve a sugerir nombres.
 
 // ── Formato para el export a Excel ───────────────────────────────────────────
 

@@ -15,7 +15,7 @@ import { DateTimeField } from "@/components/ui/DateTimeField";
 import { toDate } from "@/lib/pacientes/helpers";
 import {
   DISPOSITIVOS_O2, HOSPITALES_REFERENCIA, PROCEDIMIENTOS, RAZONES_DEMORA,
-  SERVICIOS_INGRESO_REFERIDO, STAFF_EMERGENCIA, TIEMPOS_PERMANENCIA, TURNOS, TURNO_LABEL,
+  SERVICIOS_INGRESO_REFERIDO, TIEMPOS_PERMANENCIA, TURNOS, TURNO_LABEL,
   clasificacionSis, diagnosticosACelda, procsACelda, turnoSegunHora,
 } from "@/lib/emergencia/censos";
 import { buscarIdentidadPaciente } from "@/lib/emergencia/prefillCenso";
@@ -465,10 +465,10 @@ export default function CensoReferidosPage() {
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Médicos</p>
             <div className="grid sm:grid-cols-2 gap-4">
               <Field label="Staff que evalúa" required>
-                <StaffInput id="staff-referidos" value={form.staffEvalua} onChange={(v) => set("staffEvalua", v)} staff={STAFF_EMERGENCIA} />
+                <StaffInput value={form.staffEvalua} onChange={(v) => set("staffEvalua", v)} />
               </Field>
               <Field label="Reevaluación médica (vacío = no aplica)">
-                <StaffInput id="reeval-referidos" value={form.reevaluacion} onChange={(v) => set("reevaluacion", v)} staff={STAFF_EMERGENCIA} />
+                <StaffInput value={form.reevaluacion} onChange={(v) => set("reevaluacion", v)} />
               </Field>
             </div>
             <Field label="Médicos generales del turno (se recuerda entre registros)">

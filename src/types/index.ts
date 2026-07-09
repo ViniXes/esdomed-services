@@ -1307,10 +1307,10 @@ export type TurnoEmergencia = "t00_07" | "t07_15" | "t15_19" | "t19_24";
 export type TriageEmergencia = "rojo" | "amarillo" | "verde";
 
 // Destino del paciente en demanda espontánea (columna DESTINO DE PACIENTE).
+// "alta_voluntaria" cubre también el alta exigida (misma figura en el censo).
 export type DestinoEmergencia =
   | "alta"
   | "alta_voluntaria"
-  | "alta_exigida"
   | "ingreso"
   | "referencia"
   | "fuga";

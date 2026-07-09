@@ -168,29 +168,23 @@ export function SelectCatalogo({ options, value, onChange, placeholder = "— Se
   );
 }
 
-// ── Staff: catálogo + escritura libre normalizada a MAYÚSCULAS ───────────────
+// ── Staff: texto libre normalizado a MAYÚSCULAS ──────────────────────────────
+// Pendiente la lista oficial de médicos de emergencia; cuando exista, este
+// input vuelve a sugerir nombres desde el catálogo (datalist).
 
-export function StaffInput({ id, value, onChange, staff, placeholder }: {
-  id: string;
+export function StaffInput({ value, onChange, placeholder }: {
   value: string;
   onChange: (v: string) => void;
-  staff: readonly string[];
   placeholder?: string;
 }) {
   return (
-    <>
-      <input
-        type="text"
-        list={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value.toUpperCase())}
-        placeholder={placeholder ?? "DR. APELLIDO"}
-        className={inputCls}
-      />
-      <datalist id={id}>
-        {staff.map((s) => <option key={s} value={s} />)}
-      </datalist>
-    </>
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value.toUpperCase())}
+      placeholder={placeholder ?? "DR. APELLIDO"}
+      className={inputCls}
+    />
   );
 }
 
