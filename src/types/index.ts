@@ -283,48 +283,6 @@ export interface SolicitudImpresion {
 }
 
 // ============================================================================
-// Registro de Altas — bitácora interna de egresos de ESDOMED (control SIMMOW)
-// ============================================================================
-// Reemplaza la hoja de cálculo "_ALTAS REGISTRO ESDO3". Cada documento es una
-// alta/egreso que ESDOMED procesó para digitar en SIMMOW. Es solo para control.
-
-// Tipos de alta (columna "ESTADO" de la hoja, normalizada a un catálogo cerrado).
-export type TipoAlta =
-  | "alta_efectiva"
-  | "alta_exigida"
-  | "alta_voluntaria"
-  | "alta_suspendida"
-  | "alta_dengue"
-  | "alta_jornada_cirugia"
-  | "deposito"
-  | "traslado_otro_hospital";
-
-export interface RegistroAlta {
-  id?: string;
-  fecha: string;                 // YYYY-MM-DD — fecha del alta
-  expediente: string;
-  pacienteNombre: string;
-  servicio: string;
-  cama?: string;
-  genero?: Genero;
-  tipoAlta: TipoAlta;
-
-  responsableEsdomed: string;    // quién de ESDOMED procesó (default: usuario actual)
-  digitadorSimmow?: string;      // quién lo digitó en SIMMOW
-  medicoRetira?: string;         // médico/persona que retiró la documentación (texto libre)
-
-  // Estado de la documentación — reemplaza el texto libre de la columna "NOTAS".
-  documentacionCompleta: boolean;
-  documentacionEntregada: boolean;
-  notas?: string;
-
-  creadoEn: Date;
-  creadoPorId: string;
-  creadoPorNombre: string;
-  actualizadoEn?: Date;
-}
-
-// ============================================================================
 // Anexo 5 — Comprobante para el paciente referido en el SIS
 // ============================================================================
 
@@ -506,6 +464,13 @@ export interface NotificacionAltaVivo {
   procesadoPorId?: string;
   procesadoPorNombre?: string;
   procesadoEn?: Date;
+
+  // Digitación del egreso en SIMMOW (solo altas efectivas, estado "procesada").
+  // Default al procesar: quien marca el alta efectiva; se puede indicar otra
+  // persona en el modal o corregirse después (action "asignar_simmow" de la API).
+  // Mismos nombres que en NotificacionFallecido para que productividad cuente igual.
+  digitaSimmow?: string;
+  digitaSimmowEn?: Date;
 
   // Reversión de un alta efectiva por ESDOMED (el paciente no se fue tras todo)
   revertidoPorId?: string;

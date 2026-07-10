@@ -318,7 +318,7 @@ function CreateModal({
 
 function ConfirmModal({
   title, message, confirmLabel, confirmCls,
-  onConfirm, onCancel, loading,
+  onConfirm, onCancel, loading, children,
 }: {
   title: string;
   message: string;
@@ -327,6 +327,7 @@ function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
   loading: boolean;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -335,6 +336,7 @@ function ConfirmModal({
           <p className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</p>
           <p className="text-sm text-slate-500 mt-1">{message}</p>
         </div>
+        {children}
         <div className="flex gap-2">
           <button onClick={onCancel} disabled={loading}
             className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50">
@@ -397,6 +399,71 @@ function RevertirModal({
           <button onClick={() => onConfirm(nota)} disabled={loading}
             className="flex-1 py-2.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500 rounded-xl transition-colors disabled:opacity-50">
             {loading ? "Procesando..." : "Revertir y reactivar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Digitador SIMMOW: select reusable + modal de corrección ───────────────────
+
+function SelectDigitadorSimmow({
+  value, onChange, personal, disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  personal: string[];
+  disabled?: boolean;
+}) {
+  // Si el valor guardado ya no está en el catálogo (personal dado de baja), se
+  // conserva como opción para no perderlo al abrir el select.
+  const opciones = personal.includes(value) || !value ? personal : [value, ...personal];
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      className={`${inputCls} cursor-pointer`}
+    >
+      <option value="">Pendiente / lo digita otra persona</option>
+      {opciones.map((n) => (
+        <option key={n} value={n}>{n}</option>
+      ))}
+    </select>
+  );
+}
+
+function SimmowModal({
+  notificacion, personal, onConfirm, onCancel, loading,
+}: {
+  notificacion: NotificacionAltaVivo;
+  personal: string[];
+  onConfirm: (nombre: string | null) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [nombre, setNombre] = useState(notificacion.digitaSimmow ?? "");
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div>
+          <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+            {notificacion.digitaSimmow ? "Corregir digitador SIMMOW" : "Registrar digitador SIMMOW"}
+          </p>
+          <p className="text-sm text-slate-500 mt-1">
+            Indica quién digitó el egreso de {notificacion.pacienteNombre} en SIMMOW.
+          </p>
+        </div>
+        <SelectDigitadorSimmow value={nombre} onChange={setNombre} personal={personal} disabled={loading} />
+        <div className="flex gap-2">
+          <button onClick={onCancel} disabled={loading}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={() => onConfirm(nombre || null)} disabled={loading}
+            className="flex-1 py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors disabled:opacity-50">
+            {loading ? "Guardando..." : "Guardar"}
           </button>
         </div>
       </div>
@@ -749,6 +816,12 @@ export function AltasVivosView() {
 
   const [procesandoId, setProcesandoId] = useState<string | null>(null);
   const [procesandoLoading, setProcesandoLoading] = useState(false);
+  // Quién digita en SIMMOW: default = quien procesa; editable en el modal de
+  // alta efectiva y corregible después sobre la procesada (SimmowModal).
+  const [digitadorSimmow, setDigitadorSimmow] = useState("");
+  const [simmowId, setSimmowId] = useState<string | null>(null);
+  const [simmowLoading, setSimmowLoading] = useState(false);
+  const [personalEsdomed, setPersonalEsdomed] = useState<string[]>([]);
 
   const [revirtiendoId, setRevirtiendoId] = useState<string | null>(null);
   const [revirtiendoLoading, setRevirtiendoLoading] = useState(false);
@@ -775,6 +848,23 @@ export function AltasVivosView() {
     const q = query(collection(db, "notificaciones_altas"), where("estado", "in", ESTADOS_ACCIONABLES));
     return onSnapshot(q, snap => setAccionables(snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionAltaVivo))));
   }, []);
+
+  // Catálogo de personal ESDOMED para el select "Digita SIMMOW" (lectura puntual,
+  // colección pequeña — mismo patrón que fallecidos).
+  useEffect(() => {
+    if (!isEsdomed) return;
+    getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
+      .then(s => setPersonalEsdomed(
+        s.docs.map(d => d.data().nombre as string).filter(Boolean).sort((a, b) => a.localeCompare(b))
+      ))
+      .catch(() => setPersonalEsdomed([]));
+  }, [isEsdomed]);
+
+  // Abrir el modal de alta efectiva prellenando el digitador con el usuario actual.
+  const abrirProcesar = (id: string) => {
+    setDigitadorSimmow(profile?.nombre ?? "");
+    setProcesandoId(id);
+  };
 
   // Fuente de datos según la vista: bandeja (en vivo, deduplicada) o resultados de búsqueda.
   const notificaciones = useMemo(() => {
@@ -873,6 +963,8 @@ export function AltasVivosView() {
         Rol: n.notificadoPorRol === "enfermeria" ? "Enfermería" : n.notificadoPorRol === "trabajo_social" ? "Trabajo Social" : (n.notificadoPorRol ?? ""),
         "Procesada / recibida por": n.procesadoPorNombre ?? "",
         "Fecha de proceso": n.procesadoEn ? formatFecha(n.procesadoEn) : "",
+        "Digitó SIMMOW": n.digitaSimmow ?? "",
+        "Fecha digitación SIMMOW": n.digitaSimmowEn ? formatFecha(n.digitaSimmowEn) : "",
         "Revertida por": n.revertidoPorNombre ?? "",
         "Fecha de reversión": n.revertidoEn ? formatFecha(n.revertidoEn) : "",
         "Nota de reversión": n.revertidoNota ?? "",
@@ -901,13 +993,35 @@ export function AltasVivosView() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action: "procesar" }),
+        body: JSON.stringify({ action: "procesar", digitaSimmow: digitadorSimmow || null }),
       });
       if (!res.ok) throw new Error("No se pudo procesar la notificacion.");
       await refrescarBusqueda();
     } finally {
       setProcesandoLoading(false);
       setProcesandoId(null);
+    }
+  };
+
+  // Registrar/corregir quién digitó en SIMMOW sobre un alta ya procesada.
+  const asignarSimmow = async (nombre: string | null) => {
+    if (!simmowId || !user) return;
+    setSimmowLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/altas/${simmowId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "asignar_simmow", nombre }),
+      });
+      if (!res.ok) throw new Error("No se pudo guardar el digitador SIMMOW.");
+      await refrescarBusqueda();
+    } finally {
+      setSimmowLoading(false);
+      setSimmowId(null);
     }
   };
 
@@ -1015,6 +1129,7 @@ export function AltasVivosView() {
   };
 
   const procesandoNot = procesandoId ? notificaciones.find(n => n.id === procesandoId) : null;
+  const simmowNot = simmowId ? notificaciones.find(n => n.id === simmowId) : null;
   const observandoNot = observandoId ? notificaciones.find(n => n.id === observandoId) : null;
   const revirtiendoNot = revirtiendoId ? notificaciones.find(n => n.id === revirtiendoId) : null;
   const rechazandoNot = rechazandoId ? notificaciones.find(n => n.id === rechazandoId) : null;
@@ -1210,6 +1325,16 @@ export function AltasVivosView() {
                     Alta efectiva por {nombreEsdomedVisible(mostrarNombresEsdomed, n.procesadoPorNombre)} · {formatFecha(n.procesadoEn)}
                   </p>
                 )}
+                {n.estado === "procesada" && (
+                  n.digitaSimmow ? (
+                    <p className="text-xs text-slate-400">
+                      Digitada en SIMMOW por <span className="text-slate-500 font-medium">{nombreEsdomedVisible(mostrarNombresEsdomed, n.digitaSimmow)}</span>
+                      {n.digitaSimmowEn && <> · {formatFecha(n.digitaSimmowEn)}</>}
+                    </p>
+                  ) : isEsdomed ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">Pendiente de digitar en SIMMOW</p>
+                  ) : null
+                )}
                 {n.estado === "recibida" && n.procesadoPorNombre && (
                   <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
                     Acusada de recibido por {nombreEsdomedVisible(mostrarNombresEsdomed, n.procesadoPorNombre)} · {formatFecha(n.procesadoEn)}
@@ -1276,7 +1401,7 @@ export function AltasVivosView() {
                   ) : isEsdomed && (
                     <>
                       <button
-                        onClick={() => setProcesandoId(n.id!)}
+                        onClick={() => abrirProcesar(n.id!)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
                       >
                         <Check size={13} />
@@ -1321,9 +1446,17 @@ export function AltasVivosView() {
                 </div>
               )}
 
-              {/* ESDOMED: revertir un alta efectiva si el paciente en realidad no se fue */}
+              {/* ESDOMED: corregir digitador SIMMOW / revertir un alta efectiva */}
               {isEsdomed && n.estado === "procesada" && (
-                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSimmowId(n.id!)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <Pencil size={12} />
+                    {n.digitaSimmow ? "Corregir digitador SIMMOW" : "Registrar digitador SIMMOW"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => setRevirtiendoId(n.id!)}
@@ -1341,7 +1474,7 @@ export function AltasVivosView() {
                 <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setProcesandoId(n.id!)}
+                    onClick={() => abrirProcesar(n.id!)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
                   >
                     <Check size={13} />
@@ -1444,6 +1577,34 @@ export function AltasVivosView() {
           onConfirm={procesarNotificacion}
           onCancel={() => setProcesandoId(null)}
           loading={procesandoLoading}
+        >
+          {/* Solo las altas efectivas generan egreso que digitar en SIMMOW */}
+          {!esSoloAcuseRecibido(procesandoNot.tipoAlta) && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                ¿Quién digita el egreso en SIMMOW?
+              </label>
+              <SelectDigitadorSimmow
+                value={digitadorSimmow}
+                onChange={setDigitadorSimmow}
+                personal={personalEsdomed}
+                disabled={procesandoLoading}
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Por defecto, quien da el alta efectiva. Si lo digita otra persona, selecciónala; también se puede corregir después.
+              </p>
+            </div>
+          )}
+        </ConfirmModal>
+      )}
+
+      {simmowId && simmowNot && (
+        <SimmowModal
+          notificacion={simmowNot}
+          personal={personalEsdomed}
+          onConfirm={asignarSimmow}
+          onCancel={() => setSimmowId(null)}
+          loading={simmowLoading}
         />
       )}
 

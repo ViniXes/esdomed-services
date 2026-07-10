@@ -140,12 +140,13 @@ async function reactivarPacienteDelAlta(
 }
 
 type Body =
-  | { action: "procesar" }
+  | { action: "procesar"; digitaSimmow?: string | null }
   | { action: "revertir"; nota?: string }
   | { action: "rechazar"; nota: string }
   | { action: "reabrir" }
   | { action: "observar"; motivo: MotivoObservacionAlta; detalle: string }
-  | { action: "quitar_observacion" };
+  | { action: "quitar_observacion" }
+  | { action: "asignar_simmow"; nombre: string | null };
 
 async function getCaller(req: NextRequest): Promise<Caller | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
@@ -197,6 +198,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       revertidoPorNombre: caller.nombre,
       revertidoEn: FieldValue.serverTimestamp(),
       revertidoNota: body.nota?.trim() || null,
+      // El alta no ocurrió → la digitación en SIMMOW también se deshace. Si luego
+      // se marca efectiva de nuevo, el procesado registra al nuevo digitador.
+      digitaSimmow: FieldValue.delete(),
+      digitaSimmowEn: FieldValue.delete(),
     });
     try {
       await reactivarPacienteDelAlta(actual, id, caller);
@@ -226,6 +231,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       modificadoPorRol: caller.role,
       modificadoEn: FieldValue.serverTimestamp(),
     });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Registrar o corregir quién digitó el egreso en SIMMOW. Solo aplica a altas
+  // efectivas ya procesadas (las "recibida" no generan egreso que digitar). Es la
+  // única edición permitida sobre una procesada además de revertir: las reglas de
+  // Firestore bloquean updates del cliente tras el cierre, por eso pasa por aquí.
+  if (body.action === "asignar_simmow") {
+    if (actual.estado !== "procesada") {
+      return NextResponse.json({ error: "Solo se puede asignar el digitador SIMMOW de un alta efectiva procesada." }, { status: 409 });
+    }
+    const nombre = body.nombre?.trim();
+    await ref.update(
+      nombre
+        ? { digitaSimmow: nombre, digitaSimmowEn: FieldValue.serverTimestamp() }
+        : { digitaSimmow: FieldValue.delete(), digitaSimmowEn: FieldValue.delete() },
+    );
     return NextResponse.json({ ok: true });
   }
 
@@ -263,6 +285,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.action === "procesar") {
     const estadoCierre = TIPOS_SOLO_RECIBIDO.has(String(actual.tipoAlta)) ? "recibida" : "procesada";
 
+    // Quién digita el egreso en SIMMOW (solo altas efectivas). Si el cliente no
+    // manda el campo, default = quien procesa (lo normal: la misma persona da el
+    // alta efectiva y digita). String vacío/null = queda pendiente de asignar.
+    const digitaSimmow =
+      estadoCierre === "procesada"
+        ? (body.digitaSimmow === undefined ? caller.nombre : body.digitaSimmow?.trim() || null)
+        : null;
+
     // Procesar NO es una "modificación": es el cierre normal (alta efectiva /
     // acuse de recibido). Solo se registra el procesadoPor*; el "Modificado por"
     // se reserva para cuando ESDOMED interviene con una observación.
@@ -271,6 +301,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       procesadoPorId: caller.uid,
       procesadoPorNombre: caller.nombre,
       procesadoEn: FieldValue.serverTimestamp(),
+      ...(digitaSimmow
+        ? { digitaSimmow, digitaSimmowEn: FieldValue.serverTimestamp() }
+        : {}),
     });
 
     // Alta efectiva → sacar al paciente de activos de una. (Depósito/suspendida solo

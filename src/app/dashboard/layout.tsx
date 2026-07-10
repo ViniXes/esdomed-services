@@ -72,7 +72,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verPacientes       = esEsdomed || esAdmin;
   const verIncapacidades   = esEsdomed || esAdmin;
   const verAltasVivos = esEsdomed || esAdmin || esTS;
-  const verRegistroAltas = esEsdomed || esAdmin;
   const verConfiguracion = esAdmin;
   const verUsuarios = esAdmin;
   const verBusquedaTelefono = esAdmin;
@@ -186,9 +185,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       badge: pendientes.fallecidos,
       group: G_PACIENTES,
     },
-    ...(verRegistroAltas
-      ? [{ href: "/dashboard/registro-altas", label: "Registro de Altas", icon: ListChecks, group: G_PACIENTES }]
-      : []),
     ...(profile?.role === "trabajo_social"
       ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
       : []),

@@ -15,10 +15,10 @@
 // ============================================================================
 
 /** Versión vigente. Al cambiarla, se vuelve a pedir la aceptación a todos. */
-export const TERMINOS_VERSION = "1.0";
+export const TERMINOS_VERSION = "1.1";
 
 /** Fecha de entrada en vigencia de la versión vigente (solo informativa). */
-export const TERMINOS_FECHA = "29 de junio de 2026";
+export const TERMINOS_FECHA = "10 de julio de 2026";
 
 export interface SeccionTerminos {
   titulo: string;
@@ -35,8 +35,8 @@ export const TERMINOS_SECCIONES: SeccionTerminos[] = [
   {
     titulo: "1. Objeto y aceptación",
     parrafos: [
-      "Estos términos regulan el acceso y uso del portal por parte del personal interno (médicos y personal de ESDOMED, " +
-        "Trabajo Social, Psicología, Enfermería, Recursos Humanos y administración). Al marcar la casilla de aceptación e " +
+      "Estos términos regulan el acceso y uso del portal por parte de todo el personal operativo y administrativo del " +
+        "hospital que haga uso del sistema, sin distinción de área, unidad o cargo. Al marcar la casilla de aceptación e " +
         "ingresar al sistema, usted declara haber leído, comprendido y aceptado estas condiciones en su totalidad.",
       "Si no está de acuerdo con estos términos, no debe utilizar el sistema.",
     ],
