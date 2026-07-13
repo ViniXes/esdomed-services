@@ -8,7 +8,7 @@ import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2 } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -120,9 +120,11 @@ export default function DashboardFallecidosPage() {
 
   // Certificados "vencidos": pendientes de entrega con más de DIAS_HABILES_CERT
   // días hábiles desde la defunción. Se calcula sobre lo ya cargado (0 lecturas extra).
+  // Los privados de libertad quedan en custodia interna: su certificado no se
+  // entrega, así que se excluyen del cálculo de vencidos (no generan alerta).
   const certDiasHabiles = new Map<string, number>();
   notificaciones.forEach(n => {
-    if (n.id && n.estadoEntregaCertificado === "pendiente") {
+    if (n.id && n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad) {
       const fd = tsToDate(n.fechaDefuncion);
       if (fd) certDiasHabiles.set(n.id, diasHabilesTranscurridos(fd));
     }
@@ -131,7 +133,7 @@ export default function DashboardFallecidosPage() {
   const certVencidos = [...certDiasHabiles.values()].filter(d => d > DIAS_HABILES_CERT).length;
 
   const filtered = filtro === "todos"       ? notificaciones
-    : filtro === "cert_pendiente"           ? notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente")
+    : filtro === "cert_pendiente"           ? notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad)
     : filtro === "cert_vencido"             ? notificaciones.filter(esVencido)
     : notificaciones.filter(n => n.estado === filtro);
 
@@ -291,7 +293,7 @@ export default function DashboardFallecidosPage() {
   };
 
   const pendientes     = notificaciones.filter(n => n.estado === "pendiente").length;
-  const certPendientes = notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente").length;
+  const certPendientes = notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad).length;
   const selectedLive   = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
   const lecturaSel     = selectedLive ? getLecturaConfirmada(selectedLive) : null;
 
@@ -458,7 +460,12 @@ export default function DashboardFallecidosPage() {
                               <LockOpen size={9} /> Desbloqueado
                             </span>
                           )}
-                          {n.estadoEntregaCertificado === "pendiente" && (
+                          {n.privadoDeLibertad ? (
+                            <span title="Privado de libertad: el certificado queda en custodia interna de ESDOMED (no se entrega salvo requerimiento de la Fiscalía)"
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 px-1.5 py-0.5 rounded-md">
+                              <ShieldCheck size={10} /> En custodia interna
+                            </span>
+                          ) : n.estadoEntregaCertificado === "pendiente" ? (
                             esVencido(n) ? (
                               <span title={`Más de ${DIAS_HABILES_CERT} días hábiles desde la defunción sin entregar el certificado`}
                                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 px-1.5 py-0.5 rounded-md">
@@ -469,8 +476,8 @@ export default function DashboardFallecidosPage() {
                                 <FileWarning size={10} /> Cert. pendiente
                               </span>
                             )
-                          )}
-                          {n.estadoEntregaCertificado === "entregado" && (
+                          ) : null}
+                          {!n.privadoDeLibertad && n.estadoEntregaCertificado === "entregado" && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 px-1.5 py-0.5 rounded-md">
                               <CheckCircle2 size={10} /> Cert. entregado
                             </span>
@@ -899,12 +906,37 @@ export default function DashboardFallecidosPage() {
               {/* ── Tab: Certificado ── */}
               {activeTab === "certificado" && (
                 <div className="space-y-4">
+                  {/* Privado de libertad: al marcarlo, el certificado queda en custodia
+                      interna de ESDOMED y deja de contar como pendiente/vencido. */}
+                  <label className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border select-none ${
+                    isLocked
+                      ? "opacity-60 cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                      : "cursor-pointer bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900"
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={!!selectedLive.privadoDeLibertad}
+                      disabled={updatingCell === "privadoDeLibertad" || isLocked}
+                      onChange={e => actualizarCampo("privadoDeLibertad", e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                    />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-indigo-700 dark:text-indigo-300">
+                        <ShieldCheck size={14} /> Privado de libertad
+                      </span>
+                      <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        El certificado queda en custodia interna de ESDOMED; no se entrega
+                        salvo requerimiento de la Fiscalía. No genera alerta de vencido.
+                      </span>
+                    </span>
+                  </label>
+
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado de entrega</label>
                     <div className="relative">
                       <select
                         value={selectedLive.estadoEntregaCertificado ?? ""}
-                        disabled={updatingCell === "estadoEntregaCertificado" || isLocked}
+                        disabled={updatingCell === "estadoEntregaCertificado" || isLocked || !!selectedLive.privadoDeLibertad}
                         onChange={e => actualizarCampo("estadoEntregaCertificado", e.target.value || null)}
                         className={selectCls}
                       >
@@ -914,6 +946,11 @@ export default function DashboardFallecidosPage() {
                       </select>
                       <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
+                    {selectedLive.privadoDeLibertad && (
+                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1.5">
+                        En custodia interna — la entrega no aplica mientras sea privado de libertad.
+                      </p>
+                    )}
                   </div>
 
                   <div>

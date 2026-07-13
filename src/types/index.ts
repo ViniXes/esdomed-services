@@ -242,6 +242,10 @@ export interface NotificacionFallecido {
   tramitaDefuncion?: string;
   tramitaDefuncionEn?: Date;
   estadoEntregaCertificado?: "pendiente" | "entregado";
+  // Fallecido privado de libertad: el certificado queda en custodia interna de
+  // ESDOMED (no se entrega a nadie salvo requerimiento de la Fiscalía). Suprime
+  // la alerta de certificado vencido y el conteo de pendientes.
+  privadoDeLibertad?: boolean;
   tipoCertificado?: "digital" | "manual";
   actualizoFieh?: boolean | string;
   familiarNombre?: string;
