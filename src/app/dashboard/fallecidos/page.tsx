@@ -56,6 +56,15 @@ function tsToDate(ts: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// Pasos de seguimiento exigidos para cerrar el trámite. En privados de libertad el
+// certificado queda en custodia interna: la entrega y la recepción por Psic./T.S.
+// no aplican, así que no se exigen para cerrar ni se cuentan en el progreso.
+function pasosRequeridos(n: NotificacionFallecido) {
+  return n.privadoDeLibertad
+    ? COLUMNAS_SEGUIMIENTO.filter(c => c.key !== "entregaCertificado" && c.key !== "recibeDePs")
+    : COLUMNAS_SEGUIMIENTO;
+}
+
 export default function DashboardFallecidosPage() {
   const { profile } = useAuth();
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
@@ -306,7 +315,7 @@ export default function DashboardFallecidosPage() {
 
   const isLocked    = !!(selectedLive?.tramiteCerrado && !selectedLive.tramiteDesbloqueado);
   const isUnlocked  = !!(selectedLive?.tramiteCerrado && selectedLive.tramiteDesbloqueado);
-  const todos4      = selectedLive ? COLUMNAS_SEGUIMIENTO.every(col => !!selectedLive[col.key]) : false;
+  const todos4      = selectedLive ? pasosRequeridos(selectedLive).every(col => !!selectedLive[col.key]) : false;
   const puedeCerrar = todos4 && selectedLive?.estado === "confirmado" && (!selectedLive.tramiteCerrado || isUnlocked);
   const isAdmin     = profile?.role === "admin";
 
@@ -424,7 +433,8 @@ export default function DashboardFallecidosPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginados.map(n => {
-                  const pasos = COLUMNAS_SEGUIMIENTO.filter(col => !!n[col.key]).length;
+                  const colsReq = pasosRequeridos(n);
+                  const pasos = colsReq.filter(col => !!n[col.key]).length;
                   return (
                     <tr key={n.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="px-4 py-3">
@@ -444,11 +454,11 @@ export default function DashboardFallecidosPage() {
                       <td className="px-4 py-3">
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
-                            {COLUMNAS_SEGUIMIENTO.map(col => (
+                            {colsReq.map(col => (
                               <div key={col.key} title={col.label}
                                 className={`w-2 h-2 rounded-full ${!!n[col.key] ? "bg-green-500" : "bg-slate-300 dark:bg-slate-600"}`} />
                             ))}
-                            <span className="text-xs text-slate-500 ml-1">{pasos}/{COLUMNAS_SEGUIMIENTO.length}</span>
+                            <span className="text-xs text-slate-500 ml-1">{pasos}/{colsReq.length}</span>
                           </div>
                           {n.tramiteCerrado && !n.tramiteDesbloqueado && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-1.5 py-0.5 rounded-md">
@@ -704,6 +714,16 @@ export default function DashboardFallecidosPage() {
               {/* ── Tab: Entrega ── */}
               {activeTab === "entrega" && (
                 <div className="space-y-5">
+
+                  {selectedLive.privadoDeLibertad && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-[11px] text-indigo-700 dark:text-indigo-300">
+                      <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+                      <span>
+                        Privado de libertad — certificado en custodia interna. La recepción por
+                        Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
+                      </span>
+                    </div>
+                  )}
 
                   {/* Recibe Psic./TS */}
                   {(() => {
