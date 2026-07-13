@@ -6,7 +6,6 @@ import {
   addDoc, collection, Timestamp, query, orderBy, onSnapshot, limit, doc, updateDoc,
   where, getDocs, QueryConstraint,
 } from "@/lib/firestoreMeter";
-import Image from "next/image";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -273,13 +272,6 @@ export default function ControlIngresosPage() {
 
         {/* Card header */}
         <div className="flex items-center gap-4 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-[#c9a892]/15">
-          <Image
-            src="/logoEsdomed.png"
-            alt="Logo ESDOMED"
-            width={44}
-            height={44}
-            className="object-contain rounded-lg flex-shrink-0"
-          />
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">
               {editingId ? "Editar ingreso" : "Nuevo ingreso"}
