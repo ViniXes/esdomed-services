@@ -430,6 +430,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Tableros resumen de Trabajo Social (1 doc por tablero: ts_resumen/rastreo,
+    // ts_resumen/seguimiento-YYYY-MM). Optimización de lecturas: las vistas leen
+    // el tablero completo con 1 lectura; el doc se actualiza en el MISMO batch
+    // que el detalle (rastreos_ts / gestiones_ts), por cualquier trabajadora.
+    match /ts_resumen/{id} {
+      allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
+      allow create, update: if isTrabajoSocial() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Anexo 5 ──────────────────────────────────────────────────────────────
     match /anexo5/{id} {
       allow read:   if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));

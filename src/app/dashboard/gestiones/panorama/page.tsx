@@ -5,11 +5,12 @@ import Link from "next/link";
 import { collection, onSnapshot, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { GestionTS, Paciente, RastreoTS } from "@/types";
+import type { GestionTS, Paciente } from "@/types";
 import {
   ESTADO_RASTREO_COLOR, ESTADO_RASTREO_LABEL, habilitaSeguimiento, labelTipoGestion,
   TIPOS_GESTION_TS, type EstadoRastreo, type GrupoGestionTS,
 } from "@/lib/trabajosocial/catalogos";
+import { refResumenRastreo, type MapaResumenRastreo } from "@/lib/trabajosocial/resumenTS";
 import {
   consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
 } from "@/lib/trabajosocial/pacientesActivosCache";
@@ -76,7 +77,7 @@ export default function PanoramaPage() {
   const [pacientes, setPacientes] = useState<Paciente[]>(() => getPacientesActivosCache() ?? []);
   const [loading, setLoading] = useState(() => getPacientesActivosCache() === null);
   const [actualizadoEn, setActualizadoEn] = useState<Date | null>(() => getPacientesActivosCacheEn());
-  const [rastreos, setRastreos] = useState<Map<string, RastreoTS>>(new Map());
+  const [rastreos, setRastreos] = useState<MapaResumenRastreo>({});
   const [gestiones, setGestiones] = useState<GestionTS[]>([]);
   const [permissionError, setPermissionError] = useState(false);
 
@@ -107,13 +108,12 @@ export default function PanoramaPage() {
     return () => clearTimeout(t);
   }, [consultarPacientes]);
 
-  // Rastreos (un doc por expediente).
+  // Tablero de rastreo: UN doc resumen (ts_resumen/rastreo) en vez de la
+  // colección completa — leerlo entero cuesta 1 lectura y no crece con la historia.
   useEffect(() => {
-    return onSnapshot(collection(db, "rastreos_ts"), (s) => {
+    return onSnapshot(refResumenRastreo(), (s) => {
       setPermissionError(false);
-      const m = new Map<string, RastreoTS>();
-      s.docs.forEach((d) => m.set(d.id, { id: d.id, ...d.data() } as RastreoTS));
-      setRastreos(m);
+      setRastreos((s.data()?.porExp as MapaResumenRastreo | undefined) ?? {});
     }, (err) => { if (err.code === "permission-denied") setPermissionError(true); });
   }, []);
 
@@ -154,7 +154,7 @@ export default function PanoramaPage() {
   }, [gestiones, profile?.uid]);
 
   const estadoRastreoDe = useCallback(
-    (exp: string): EstadoRastreo | "pendiente" => rastreos.get(exp)?.estado ?? "pendiente",
+    (exp: string): EstadoRastreo | "pendiente" => rastreos[exp]?.e ?? "pendiente",
     [rastreos],
   );
 
@@ -386,9 +386,9 @@ function FilaPaciente({
             <span className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md border ${ESTADO_RASTREO_COLOR[estadoRastreo]}`}>{ESTADO_RASTREO_LABEL[estadoRastreo]}</span>
           )}
           {habilita ? (
-            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={11} /> Habilita seguimiento</span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400"><CheckCircle2 size={11} /> Contacto familiar</span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400"><Lock size={11} /> Bloqueado</span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400"><Lock size={11} /> Sin contacto familiar</span>
           )}
         </div>
         <p className="font-semibold text-slate-800 dark:text-slate-200 truncate mt-0.5">{nombrePac(p)}</p>
