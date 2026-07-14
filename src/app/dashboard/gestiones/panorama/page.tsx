@@ -236,7 +236,6 @@ export default function PanoramaPage() {
             <LayoutDashboard size={13} /> Trabajo Social
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Panorama</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Pacientes activos por servicio — rastreo, pipeline y última gestión en una sola vista</p>
         </div>
         <button
           onClick={consultarPacientes}
