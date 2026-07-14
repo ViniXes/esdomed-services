@@ -119,9 +119,17 @@ export function GraficoPastel({ titulo, datos }: { titulo: string; datos: PuntoD
 
 export function GraficoBarras({ titulo, datos, color = PALETA_PRODUCTIVIDAD[0], sufijo = "" }: { titulo: string; datos: PuntoDato[]; color?: string; sufijo?: string }) {
   const conDatos = datos.filter(d => d.valor > 0);
+  const total = conDatos.reduce((suma, dato) => suma + dato.valor, 0);
   return (
     <div className={tarjetaCls}>
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{titulo}</p>
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">{titulo}</p>
+        {conDatos.length > 0 && (
+          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {total} total
+          </span>
+        )}
+      </div>
       {conDatos.length === 0 ? (
         <p className="text-sm text-slate-400 text-center py-16">Sin datos en el periodo.</p>
       ) : (
@@ -140,9 +148,15 @@ export function GraficoBarras({ titulo, datos, color = PALETA_PRODUCTIVIDAD[0], 
 }
 
 export function GraficoBarrasHorizontalCorto({ titulo, datos, color = PALETA_PRODUCTIVIDAD[0] }: { titulo: string; datos: PuntoDato[]; color?: string }) {
+  const total = datos.reduce((suma, dato) => suma + dato.valor, 0);
   return (
     <div className={tarjetaCls}>
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{titulo}</p>
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">{titulo}</p>
+        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          {total} total
+        </span>
+      </div>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={datos} margin={{ left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} className={gridCls} />

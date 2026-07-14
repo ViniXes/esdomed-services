@@ -22,6 +22,19 @@ import type { NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, S
 const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos"] as const;
 type HojaDrive = (typeof HOJAS_DRIVE)[number];
 
+// Cuentas que pueden existir en ESDOMED, pero no forman parte de la evaluación de productividad.
+const PERSONAS_NO_EVALUABLES = [
+  ["admin"],
+  ["alfonso", "montes", "gutierrez"],
+  ["alfonso", "montes", "gutierres"],
+  ["heber", "benjamin", "cardoza"],
+  ["jose", "daniel", "hernandez"],
+  ["vinicio", "hernandez"],
+  ["vicinio", "hernandez"],
+  ["juan", "marroquin"],
+  ["super", "su"],
+] as const;
+
 type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "drive" | "franjas";
 
 type ControlIngreso = {
@@ -122,8 +135,22 @@ function contarFranjas(fechas: Date[]): number[] {
   return FRANJAS.map(({ desde, hasta }) => fechas.filter(f => f.getHours() >= desde && f.getHours() < hasta).length);
 }
 
+function esPersonalEvaluable(nombre: string): boolean {
+  const tokens = nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-SV")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(" ");
+
+  return !PERSONAS_NO_EVALUABLES.some(exclusion => exclusion.every(parte => tokens.includes(parte)));
+}
+
 function mapaAArray(mapa: Map<string, number>): PuntoDato[] {
-  return Array.from(mapa, ([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor);
+  return Array.from(mapa, ([nombre, valor]) => ({ nombre, valor }))
+    .filter(dato => esPersonalEvaluable(dato.nombre))
+    .sort((a, b) => b.valor - a.valor);
 }
 
 function franjasAArray(franjas: number[]): PuntoDato[] {
@@ -288,7 +315,9 @@ export default function ProductividadEsdomedPage() {
     for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]) {
       for (const nombre of mapa.keys()) set.add(nombre);
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    return Array.from(set)
+      .filter(esPersonalEvaluable)
+      .sort((a, b) => a.localeCompare(b));
   }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]);
 
   const totales = {
