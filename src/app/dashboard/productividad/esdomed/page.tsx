@@ -348,8 +348,7 @@ export default function ProductividadEsdomedPage() {
       actualizacionesDrive: actualizacionesDrive.get(nombre) ?? 0,
       consentimientosDrive: consentimientosDrive.get(nombre) ?? 0,
     };
-    const total = Object.values(valores).reduce((sum, valor) => sum + valor, 0);
-    return { nombre, valores, total };
+    return { nombre, valores };
   }), [
     nombres,
     expedientesCreados,
@@ -396,7 +395,7 @@ export default function ProductividadEsdomedPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="mx-auto max-w-[1600px] space-y-5 p-4 md:p-6">
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
           <BarChart3 size={13} /> Productividad
@@ -479,7 +478,6 @@ export default function ProductividadEsdomedPage() {
                             <span className="xl:hidden">{columna.corto}</span>
                           </th>
                         ))}
-                        <th className="px-4 py-3 text-center text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -495,11 +493,6 @@ export default function ProductividadEsdomedPage() {
                               </span>
                             </td>
                           ))}
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex min-w-10 justify-center rounded-lg bg-blue-600 px-2.5 py-1 text-sm font-bold tabular-nums text-white shadow-sm shadow-blue-600/20">
-                              {fila.total}
-                            </span>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
