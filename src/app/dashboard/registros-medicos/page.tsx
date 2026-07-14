@@ -47,6 +47,8 @@ export default function RegistrosMedicosHistorialPage() {
 
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [pagina, setPagina] = useState(1);
+  // true cuando la lista viene de "ver todos los rechazados" (sin criterio de búsqueda)
+  const [modoRechazados, setModoRechazados] = useState(false);
 
   // Totales por agregación (getCountFromServer): no lee documentos, no es en vivo.
   const [totalAprobados, setTotalAprobados] = useState<number | null>(null);
@@ -86,6 +88,7 @@ export default function RegistrosMedicosHistorialPage() {
     if (!jvpmInput && !nombreInput) return;
     setBuscando(true);
     setErrorBusqueda("");
+    setModoRechazados(false);
     try {
       let docs: RegistroMedicoResuelto[];
       if (jvpmInput) {
@@ -121,6 +124,31 @@ export default function RegistrosMedicosHistorialPage() {
   const limpiarBusqueda = () => {
     setBusquedaJvpm(""); setBusquedaNombre("");
     setResultados(null); setErrorBusqueda("");
+    setModoRechazados(false);
+  };
+
+  // Listado completo de rechazados: un solo getDocs filtrado por estado. Suelen
+  // ser pocos (ver contador), así que no rompe la búsqueda bajo demanda; el
+  // orden se resuelve en el cliente para no requerir índice compuesto.
+  const verRechazados = async () => {
+    setBusquedaJvpm(""); setBusquedaNombre("");
+    setBuscando(true);
+    setErrorBusqueda("");
+    setModoRechazados(true);
+    setFiltro("todos");
+    try {
+      const snap = await getDocs(
+        query(collection(db, "registros_medicos_historial"), where("estado", "==", "rechazado"), limit(500))
+      );
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RegistroMedicoResuelto));
+      docs.sort((a, b) => (toDate(b.resueltoEn)?.getTime() ?? 0) - (toDate(a.resueltoEn)?.getTime() ?? 0));
+      setResultados(docs);
+    } catch (e) {
+      setErrorBusqueda((e as Error).message || "No se pudo cargar el listado de rechazados.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
   };
 
   const filtrados = useMemo(() => {
@@ -129,7 +157,7 @@ export default function RegistrosMedicosHistorialPage() {
   }, [resultados, filtro]);
 
   // Al cambiar filtro/resultados, volver a la página 1 (ajuste en render, sin efecto).
-  const filtrosKey = `${resultados === null ? "null" : resultados.length}|${filtro}`;
+  const filtrosKey = `${resultados === null ? "null" : resultados.length}|${filtro}|${modoRechazados}`;
   const [prevFiltros, setPrevFiltros] = useState(filtrosKey);
   if (filtrosKey !== prevFiltros) {
     setPrevFiltros(filtrosKey);
@@ -211,10 +239,22 @@ export default function RegistrosMedicosHistorialPage() {
           <p className="text-xs text-emerald-700 dark:text-emerald-400">Aprobados</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{totalAprobados ?? "…"}</p>
         </div>
-        <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-4 py-3">
-          <p className="text-xs text-red-700 dark:text-red-400">Rechazados</p>
-          <p className="text-2xl font-bold text-red-700 dark:text-red-300">{totalRechazados ?? "…"}</p>
-        </div>
+        <button
+          onClick={verRechazados}
+          disabled={buscando}
+          title="Ver todos los rechazados"
+          className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-left hover:bg-red-100 dark:hover:bg-red-950/70 transition-colors disabled:opacity-60 group"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-red-700 dark:text-red-400">Rechazados</p>
+              <p className="text-2xl font-bold text-red-700 dark:text-red-300">{totalRechazados ?? "…"}</p>
+            </div>
+            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-red-600 dark:text-red-400 opacity-70 group-hover:opacity-100 transition-opacity">
+              Ver todos <ChevronRight size={12} />
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* Búsqueda bajo demanda: JVPM (exacto) o nombre (coincidencia desde el inicio) */}
@@ -271,7 +311,7 @@ export default function RegistrosMedicosHistorialPage() {
         )}
       </div>
 
-      {resultados !== null && (
+      {resultados !== null && !modoRechazados && (
         <div className="flex gap-2 mb-5">
           {filtroBtn("todos", "Todos")}
           {filtroBtn("aprobado", "Aprobados")}
@@ -279,17 +319,26 @@ export default function RegistrosMedicosHistorialPage() {
         </div>
       )}
 
+      {resultados !== null && modoRechazados && !buscando && (
+        <div className="flex items-center gap-2 mb-5">
+          <XCircle size={14} className="text-red-500 flex-shrink-0" />
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            Mostrando todos los registros rechazados ({filtrados.length})
+          </p>
+        </div>
+      )}
+
       {/* Lista */}
       {resultados === null ? (
         <p className="text-sm text-slate-400 py-16 text-center">
-          Escribe un JVPM o un nombre y pulsa Buscar.
+          Escribe un JVPM o un nombre y pulsa Buscar, o haz clic en la tarjeta de rechazados para ver el listado completo.
         </p>
       ) : buscando ? (
         <p className="text-sm text-slate-400 py-10 text-center">Buscando...</p>
       ) : filtrados.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <ClipboardList size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">Sin resultados para esa búsqueda.</p>
+          <p className="text-sm">{modoRechazados ? "No hay registros rechazados." : "Sin resultados para esa búsqueda."}</p>
         </div>
       ) : (
         <div className="space-y-2.5">
