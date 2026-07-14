@@ -32,7 +32,9 @@ const PERSONAS_NO_EVALUABLES = [
   ["vinicio", "hernandez"],
   ["vicinio", "hernandez"],
   ["juan", "marroquin"],
+  ["denys", "ricardo", "alvarez"],
   ["super", "su"],
+  ["supersu"],
 ] as const;
 
 type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "drive" | "franjas";
