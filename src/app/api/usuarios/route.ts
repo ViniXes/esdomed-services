@@ -14,6 +14,8 @@ const VALID_ROLES = new Set<UserRole>([
   "admin",
   "enfermeria",
   "rrhh",
+  "transporte",
+  "motorista",
 ]);
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
