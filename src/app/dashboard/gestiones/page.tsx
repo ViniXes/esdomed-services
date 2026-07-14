@@ -8,7 +8,6 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { getPersona } from "@/lib/pacientes/persona";
-import { GestionesTabs } from "./_components/GestionesTabs";
 import { DateField } from "@/components/ui/DateField";
 import {
   ESTADO_PACIENTE_GESTION_LABEL, esTipoVisita, GRUPOS_GESTION_TS, labelTipoGestion,
@@ -339,7 +338,7 @@ export default function GestionesPage() {
   }, [gestiones]);
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto flex flex-col gap-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto flex flex-col gap-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
       {/* Header */}
       <div className="shrink-0">
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
@@ -350,7 +349,6 @@ export default function GestionesPage() {
       </div>
 
       <div className="shrink-0">
-        <GestionesTabs />
       </div>
 
       {permissionError && (

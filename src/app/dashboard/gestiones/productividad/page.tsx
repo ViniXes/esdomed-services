@@ -9,7 +9,6 @@ import {
 } from "@/lib/trabajosocial/catalogos";
 import type { GestionTS } from "@/types";
 import { BarChart3, ChevronDown, ChevronRight, Download } from "lucide-react";
-import { GestionesTabs } from "../_components/GestionesTabs";
 
 const selectCls =
   "appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer";
@@ -235,7 +234,7 @@ export default function ProductividadPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
@@ -245,7 +244,6 @@ export default function ProductividadPage() {
         <p className="text-xs text-slate-500 mt-0.5">Gestiones por trabajadora y día — producción diaria del mes</p>
       </div>
 
-      <GestionesTabs />
 
       {permissionError && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">

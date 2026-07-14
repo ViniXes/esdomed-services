@@ -16,7 +16,6 @@ import {
 import {
   consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
 } from "@/lib/trabajosocial/pacientesActivosCache";
-import { GestionesTabs } from "../_components/GestionesTabs";
 import { DateField } from "@/components/ui/DateField";
 import {
   AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, History, Loader2, Plus, Radar,
@@ -362,7 +361,7 @@ export default function RastreoPage() {
     );
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -396,22 +395,12 @@ export default function RastreoPage() {
         </div>
       </div>
 
-      <GestionesTabs />
 
       {permissionError && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
           Sin permisos para leer el tablero de rastreo. Pide al administrador que despliegue las reglas de <strong>ts_resumen</strong> y <strong>rastreos_ts</strong>.
         </div>
       )}
-
-      {/* Regla de negocio */}
-      <div className="flex items-start gap-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
-        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-        <span>
-          El rastreo ya <strong>no bloquea</strong> el seguimiento: si una gestión con el familiar se registra primero,
-          el contacto se marca solo. Este tablero existe para que ningún paciente activo quede <strong>sin familiar localizado</strong>.
-        </span>
-      </div>
 
       {/* Stats — la fila de totales de su hoja */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -585,11 +574,12 @@ export default function RastreoPage() {
         </div>
       )}
 
-      {/* Modal de captura */}
+      {/* Modal de captura — sheet a pantalla completa en móvil, diálogo ancho
+          de 2 columnas en escritorio (header y botonera fijos, cuerpo scrollable). */}
       {sel && (
-        <div className="fixed inset-0 z-50 flex justify-center items-start pt-8 px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden mb-10">
-            <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4 lg:p-8 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 sm:border border-slate-200 dark:border-slate-800 sm:rounded-3xl w-full sm:max-w-2xl lg:max-w-5xl shadow-2xl overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[92vh]">
+            <div className="shrink-0 flex items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50">
               <div className="min-w-0">
                 <p className="font-mono text-[11px] text-slate-500">{sel.expediente}</p>
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 truncate">{nombrePac(sel)}</h2>
@@ -601,11 +591,14 @@ export default function RastreoPage() {
             </div>
 
             {!detalleListo ? (
-              <div className="p-10 flex items-center justify-center gap-2 text-sm text-slate-400">
+              <div className="flex-1 p-10 flex items-center justify-center gap-2 text-sm text-slate-400">
                 <Loader2 size={16} className="animate-spin" /> Cargando rastreo…
               </div>
             ) : (
-            <div className="p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4 items-start">
+            {/* Columna 1: a quién buscamos y por dónde */}
+            <div className="space-y-4">
               {/* Datos de contacto */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
@@ -657,7 +650,10 @@ export default function RastreoPage() {
                   })}
                 </div>
               </div>
+            </div>
 
+            {/* Columna 2: qué pasó en cada intento y el resultado */}
+            <div className="space-y-4">
               {/* Bitácora de intentos de contacto (por fecha, se guarda al instante) */}
               <div>
                 <label className={labelCls}>
@@ -690,7 +686,7 @@ export default function RastreoPage() {
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Se guarda al instante — no hace falta pulsar &quot;Guardar rastreo&quot;.</p>
                 {bitacora.length > 0 && (
-                  <ul className="mt-2 space-y-1 max-h-44 overflow-y-auto pr-1">
+                  <ul className="mt-2 space-y-1 max-h-44 lg:max-h-72 overflow-y-auto pr-1">
                     {bitacora.map((it) => (
                       <li
                         key={`${it.fecha}|${(it.creadoEn as unknown as { toMillis?: () => number })?.toMillis?.() ?? 0}|${it.trabajadoraId}`}
@@ -758,14 +754,16 @@ export default function RastreoPage() {
                 <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} className={inputCls + " resize-y"} placeholder="Detalle de los intentos de contacto…" />
               </div>
             </div>
+            </div>
+            </div>
             )}
 
             {detalleListo && (
-              <div className="px-6 pb-6 flex justify-end gap-3">
-                <button onClick={() => setSel(null)} disabled={saving} className="px-5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+              <div className="shrink-0 flex gap-3 sm:justify-end px-4 sm:px-6 py-3.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50">
+                <button onClick={() => setSel(null)} disabled={saving} className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
                   Cancelar
                 </button>
-                <button onClick={guardar} disabled={saving} className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl transition-colors">
+                <button onClick={guardar} disabled={saving} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl transition-colors">
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                   Guardar rastreo
                 </button>
