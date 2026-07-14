@@ -396,7 +396,7 @@ export default function ProductividadEsdomedPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="mx-auto max-w-[1600px] space-y-5 p-4 md:p-6">
       <div>
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
           <BarChart3 size={13} /> Productividad
