@@ -23,6 +23,13 @@ service cloud.firestore {
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
     function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
+    function isTransporte()   { return isAuth() && getRole() == 'transporte'; }
+    function isMotorista()    { return isAuth() && getRole() == 'motorista'; }
+    // Sesión real (no anónima). El formulario público de transporte usa sesiones
+    // anónimas: NO deben poder leer datos internos del portal.
+    function isRealUser() {
+      return isAuth() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
     function isMedicoCuidadosCriticos() {
       return isMedico()
         && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin', 'uci_ucin'];
@@ -45,7 +52,9 @@ service cloud.firestore {
     // Cualquier usuario autenticado puede leer perfiles (necesario para
     // selects de personal y para que las reglas lean el rol).
     match /usuarios/{userId} {
-      allow read:   if isAuth();
+      // Sesiones anónimas: solo pueden intentar leer su propio doc (no existe),
+      // necesario para que el AuthContext resuelva "sin perfil" sin error.
+      allow read:   if isRealUser() || (isAuth() && uid() == userId);
       allow create: if isAdmin();
       // El admin puede actualizar cualquier campo. Además, cada usuario puede
       // registrar SOLO su propia aceptación de términos (campo terminosAceptados).
@@ -338,7 +347,7 @@ service cloud.firestore {
     }
 
     match /control_ingresos/{id} {
-      allow read:   if isAuth();
+      allow read:   if isRealUser();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin();
       allow delete: if isAdmin();
@@ -437,6 +446,60 @@ service cloud.firestore {
     match /ts_resumen/{id} {
       allow read:   if isTrabajoSocial() || isEsdomed() || isAdmin();
       allow create, update: if isTrabajoSocial() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Transporte institucional ─────────────────────────────────────────────
+    // La solicitud entra por un formulario PÚBLICO con sesión anónima: create
+    // acepta cualquier sesión pero valida la forma del documento y sella el
+    // solicitanteUid. El docId es el FOLIO (código no adivinable): conocerlo
+    // equivale a poder consultar ESA solicitud (get); listar es solo del área.
+    match /viajes_transporte/{folio} {
+      allow get:  if isAuth();
+      allow list: if isTransporte() || isMotorista() || isAdmin();
+      allow create: if isAuth()
+        && request.resource.data.folio == folio
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.solicitanteUid == uid()
+        && request.resource.data.solicitanteNombre is string
+        && request.resource.data.solicitanteNombre.size() >= 5
+        && request.resource.data.solicitanteNombre.size() <= 120
+        && request.resource.data.solicitanteDui is string
+        && request.resource.data.solicitanteDui.size() <= 15
+        && request.resource.data.solicitanteCodigoEmpleado is string
+        && request.resource.data.solicitanteCodigoEmpleado.size() <= 30
+        && request.resource.data.area is string
+        && request.resource.data.area.size() <= 80
+        && request.resource.data.mision is string
+        && request.resource.data.mision.size() >= 5
+        && request.resource.data.mision.size() <= 600
+        && request.resource.data.destinoTexto is string
+        && request.resource.data.destinoTexto.size() >= 3
+        && request.resource.data.destinoTexto.size() <= 300
+        && request.resource.data.fechaNecesita is string
+        && request.resource.data.horaNecesita is string;
+      // Jefe/admin gestionan; el motorista solo toca viajes asignados a él.
+      allow update: if isTransporte() || isAdmin()
+        || (isMotorista() && resource.data.motoristaId == uid());
+      allow delete: if isAdmin();
+    }
+
+    match /vehiculos_transporte/{id} {
+      allow read:   if isTransporte() || isMotorista() || isAdmin();
+      allow create: if isTransporte() || isAdmin();
+      // El motorista actualiza el kilometraje del vehículo al cerrar un viaje.
+      allow update: if isTransporte() || isMotorista() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Checklist diario por vehículo (requisito para iniciar ruta); cada motorista
+    // crea y corrige solo los propios.
+    match /checklists_vehiculo/{id} {
+      allow read:   if isTransporte() || isMotorista() || isAdmin();
+      allow create: if (isTransporte() || isMotorista() || isAdmin())
+        && request.resource.data.motoristaId == uid();
+      allow update: if isAdmin()
+        || ((isTransporte() || isMotorista()) && resource.data.motoristaId == uid());
       allow delete: if isAdmin();
     }
 

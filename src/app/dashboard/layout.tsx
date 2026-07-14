@@ -52,7 +52,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       (!profile ||
         profile.role === "medico" ||
         profile.role === "psicologia" ||
-        profile.role === "enfermeria")
+        profile.role === "enfermeria" ||
+        profile.role === "transporte" ||
+        profile.role === "motorista")
     ) {
       router.replace("/login");
     }

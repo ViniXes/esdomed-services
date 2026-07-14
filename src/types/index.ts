@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh";
+export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista";
 export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin";
 
 export interface UserProfile {
@@ -1450,4 +1450,82 @@ export interface RegistroDiarioEmergencia {
   importadoPorId: string;
   importadoPorNombre: string;
   archivoOrigen?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transporte institucional
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Vehículo o equipo de la flota. Colección: vehiculos_transporte
+export interface VehiculoTransporte {
+  id?: string;
+  placa: string;               // "N-17895" (los equipos sin placa usan un alias, ej. "PODADORA")
+  nombre: string;              // "TOYOTA HILUX 2BLE CABINA"
+  tipo: import("@/lib/transporte/catalogos").TipoVehiculo;
+  combustible: "diesel" | "gasolina";
+  kmActual?: number;           // último odómetro conocido (lo actualiza cada viaje finalizado)
+  estado: "activo" | "taller" | "baja";
+  notas?: string;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+}
+
+// Un viaje/misión: la solicitud pública y todo su ciclo de vida en UN doc.
+// Colección: viajes_transporte — docId = folio (código no adivinable: conocerlo
+// equivale a poder consultar esa solicitud sin cuenta).
+export interface ViajeTransporte {
+  id?: string;
+  folio: string;
+  estado: import("@/lib/transporte/catalogos").EstadoViaje;
+
+  // Solicitud (formulario público — identidad autodeclarada, la valida el jefe)
+  solicitanteUid: string;      // uid (normalmente anónimo) que creó la solicitud
+  solicitanteNombre: string;
+  solicitanteDui: string;
+  solicitanteCodigoEmpleado: string;
+  telefono?: string;           // teléfono o extensión de contacto
+  area: string;                // código+nombre del centro de costos ("659-Lavandería")
+  mision: string;
+  personal?: string;           // nombres del personal que participa en la misión
+  destinoTexto: string;
+  destinoLat?: number;         // pin opcional del mapa
+  destinoLng?: number;
+  fechaNecesita: string;       // "YYYY-MM-DD"
+  horaNecesita: string;        // "HH:MM"
+
+  // Gestión (jefe de transporte)
+  vehiculoId?: string;
+  vehiculoNombre?: string;     // snapshot "placa · nombre"
+  motoristaId?: string;
+  motoristaNombre?: string;
+  autorizadoPorId?: string;
+  autorizadoPorNombre?: string;
+  motivoRechazo?: string;      // obligatorio al rechazar
+  esTraslado?: boolean;        // clasificación PERC (664_1) — la marca el jefe
+
+  // Ejecución (motorista)
+  horaSalida?: string;         // "HH:MM"
+  kmSalida?: number;
+  horaEntrada?: string;
+  kmEntrada?: number;
+  kmRecorrido?: number;        // kmEntrada - kmSalida (calculado al finalizar)
+
+  creadoEn: Date;
+  actualizadoEn?: Date;
+}
+
+// Checklist diario del vehículo (requisito para iniciar ruta).
+// Colección: checklists_vehiculo — docId = `${vehiculoId}_${fecha}_${motoristaId}`
+export interface ChecklistVehiculo {
+  id?: string;
+  vehiculoId: string;
+  vehiculoNombre: string;
+  fecha: string;               // "YYYY-MM-DD"
+  motoristaId: string;
+  motoristaNombre: string;
+  items: Record<string, boolean>; // id del ítem del catálogo → Sí/No
+  nivelCombustible: import("@/lib/transporte/catalogos").NivelCombustible;
+  kilometraje?: number;
+  observaciones?: string;
+  creadoEn: Date;
 }
