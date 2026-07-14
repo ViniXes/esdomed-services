@@ -241,7 +241,6 @@ export default function ProductividadPage() {
           <BarChart3 size={13} /> Trabajo Social
         </div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Productividad</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Gestiones por trabajadora y día — producción diaria del mes</p>
       </div>
 
 

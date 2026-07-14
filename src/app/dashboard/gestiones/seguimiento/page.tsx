@@ -365,9 +365,6 @@ export default function SeguimientoPage() {
             <ListChecks size={13} /> Trabajo Social
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Seguimiento del día</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Cada marca registra la gestión del día; si es con el familiar, completa el rastreo como Contactado
-          </p>
         </div>
         <button
           onClick={consultarPacientes}

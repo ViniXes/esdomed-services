@@ -369,7 +369,6 @@ export default function RastreoPage() {
             <Radar size={13} /> Trabajo Social
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Rastreo de pacientes</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Localiza al paciente y su familiar responsable — la meta: que nadie quede sin rastrear</p>
         </div>
         <div className="flex items-center gap-2">
           {esAdmin && (
@@ -405,10 +404,10 @@ export default function RastreoPage() {
       {/* Stats — la fila de totales de su hoja */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {[
-          { k: "todos" as Filtro, label: "Activos", n: stats.total, sub: "censo ESDOMED", cls: "text-slate-800 dark:text-slate-200" },
+          { k: "todos" as Filtro, label: "Activos", n: stats.total, cls: "text-slate-800 dark:text-slate-200" },
           { k: "pendientes" as Filtro, label: "Por rastrear", n: stats.pend, sub: `${stats.sin} sin iniciar · ${stats.ges} en gestión`, cls: "text-amber-600 dark:text-amber-400" },
-          { k: "contactados" as Filtro, label: "Contactados", n: stats.cont, sub: "con familiar localizado", cls: "text-emerald-600 dark:text-emerald-400" },
-          { k: "no_efectivo" as Filtro, label: "No efectivos", n: stats.noef, sub: "sin lograr contacto", cls: "text-rose-600 dark:text-rose-400" },
+          { k: "contactados" as Filtro, label: "Contactados", n: stats.cont, cls: "text-emerald-600 dark:text-emerald-400" },
+          { k: "no_efectivo" as Filtro, label: "No efectivos", n: stats.noef, cls: "text-rose-600 dark:text-rose-400" },
         ].map((s) => (
           <button
             key={s.k}
@@ -419,7 +418,7 @@ export default function RastreoPage() {
           >
             <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{s.label}</p>
             <p className={`text-2xl font-bold font-heading tabular-nums ${s.cls}`}>{s.n}</p>
-            <p className="text-[10px] text-slate-400 truncate">{s.sub}</p>
+            {s.sub && <p className="text-[10px] text-slate-400 truncate">{s.sub}</p>}
           </button>
         ))}
       </div>
@@ -684,7 +683,6 @@ export default function RastreoPage() {
                     Agregar
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Se guarda al instante — no hace falta pulsar &quot;Guardar rastreo&quot;.</p>
                 {bitacora.length > 0 && (
                   <ul className="mt-2 space-y-1 max-h-44 lg:max-h-72 overflow-y-auto pr-1">
                     {bitacora.map((it) => (
@@ -719,15 +717,6 @@ export default function RastreoPage() {
                 <select value={estado} onChange={(e) => setEstado(e.target.value as EstadoRastreo)} className={selectCls}>
                   {ESTADOS.map((e) => <option key={e} value={e}>{ESTADO_RASTREO_LABEL[e]}</option>)}
                 </select>
-                {estado === "contactado" ? (
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> El paciente aparecerá como contactado en Seguimiento y Panorama.
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
-                    <AlertTriangle size={12} /> Seguirá contando como pendiente de contacto familiar.
-                  </p>
-                )}
               </div>
 
               {/* Datos del contacto efectivo */}

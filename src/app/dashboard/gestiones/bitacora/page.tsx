@@ -157,7 +157,6 @@ export default function BitacoraPage() {
           <FileClock size={13} /> Trabajo Social
         </div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Bitácora del paciente</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Historial de todas las gestiones de un expediente</p>
       </div>
 
 
