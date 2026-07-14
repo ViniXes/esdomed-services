@@ -479,7 +479,7 @@ export default function ProductividadEsdomedPage() {
           )}
 
           {vista === "expedientes" && (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4">
               <GraficoPastel titulo="Expedientes creados por persona" datos={mapaAArray(expedientesCreados)} />
               <GraficoPastel titulo="Defunciones procesadas por persona" datos={mapaAArray(defuncionesProcesadas)} />
             </div>
