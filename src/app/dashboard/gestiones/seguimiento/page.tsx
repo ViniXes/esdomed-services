@@ -19,7 +19,6 @@ import {
 import {
   consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
 } from "@/lib/trabajosocial/pacientesActivosCache";
-import { GestionesTabs } from "../_components/GestionesTabs";
 import {
   AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, Loader2,
   Phone, PhoneCall, Plus, RefreshCw, Search, StickyNote, Stethoscope, Users, Video, X,
@@ -358,7 +357,7 @@ export default function SeguimientoPage() {
   });
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -367,7 +366,7 @@ export default function SeguimientoPage() {
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Seguimiento del día</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Pasa lista de los pacientes activos: cada marca registra la gestión del día — sin volver a escribir al paciente
+            Cada marca registra la gestión del día; si es con el familiar, completa el rastreo como Contactado
           </p>
         </div>
         <button
@@ -381,22 +380,12 @@ export default function SeguimientoPage() {
         </button>
       </div>
 
-      <GestionesTabs />
 
       {permissionError && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
           Sin permisos para leer las gestiones o el tablero. Pide al administrador que despliegue las reglas de <strong>gestiones_ts</strong>, <strong>rastreos_ts</strong> y <strong>ts_resumen</strong>.
         </div>
       )}
-
-      {/* Regla de negocio (el gate invertido) */}
-      <div className="flex items-start gap-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
-        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-        <span>
-          Todos los pacientes activos pueden recibir gestiones. Al marcar una acción <strong>con el familiar</strong>,
-          el rastreo se completa como <strong>Contactado</strong> automáticamente — los marcados en ámbar siguen pendientes de rastreo.
-        </span>
-      </div>
 
       {/* Stats clicables */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">

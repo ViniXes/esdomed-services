@@ -12,6 +12,7 @@ import {
   CheckCheck,
   ClipboardCheck,
   ClipboardList,
+  FileClock,
   FileText,
   HeartPulse,
   History,
@@ -23,6 +24,7 @@ import {
   Phone,
   PhoneCall,
   Printer,
+  Radar,
   Settings,
   Syringe,
   Table2,
@@ -192,9 +194,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_PACIENTES }]
       : []),
 
-    // ── Trabajo Social ──
+    // ── Trabajo Social ── cada flujo con entrada propia (antes: 1 ítem + tabs).
     ...(esTS || esAdmin
-      ? [{ href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen, group: G_TRABAJO_SOCIAL }]
+      ? [
+          { href: "/dashboard/gestiones/panorama", label: "Panorama", icon: LayoutDashboard, group: G_TRABAJO_SOCIAL },
+          { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar, group: G_TRABAJO_SOCIAL },
+          { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento del día", icon: ListChecks, group: G_TRABAJO_SOCIAL },
+          { href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen, group: G_TRABAJO_SOCIAL, exact: true },
+          { href: "/dashboard/gestiones/productividad", label: "Productividad", icon: BarChart3, group: G_TRABAJO_SOCIAL },
+          { href: "/dashboard/gestiones/bitacora", label: "Bitácora", icon: FileClock, group: G_TRABAJO_SOCIAL },
+        ]
       : []),
 
     // ── Documentos ──

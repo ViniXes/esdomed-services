@@ -11,7 +11,6 @@ import {
 } from "@/lib/trabajosocial/catalogos";
 import type { GestionTS, IntentoContactoTS, Persona } from "@/types";
 import { FileClock, History, Loader2, Search, User } from "lucide-react";
-import { GestionesTabs } from "../_components/GestionesTabs";
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
@@ -161,7 +160,6 @@ export default function BitacoraPage() {
         <p className="text-xs text-slate-500 mt-0.5">Historial de todas las gestiones de un expediente</p>
       </div>
 
-      <GestionesTabs />
 
       {/* La bitácora es una vista de lectura: chrome a lo ancho (alineado con las
           demás tabs), pero el contenido en una columna angosta y legible. */}

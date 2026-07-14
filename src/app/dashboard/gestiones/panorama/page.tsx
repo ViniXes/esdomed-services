@@ -14,7 +14,6 @@ import { refResumenRastreo, type MapaResumenRastreo } from "@/lib/trabajosocial/
 import {
   consultarPacientesActivos, getPacientesActivosCache, getPacientesActivosCacheEn,
 } from "@/lib/trabajosocial/pacientesActivosCache";
-import { GestionesTabs } from "../_components/GestionesTabs";
 import {
   CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, LayoutDashboard, Lock, NotebookPen, RefreshCw, Search, User, X,
 } from "lucide-react";
@@ -229,7 +228,7 @@ export default function PanoramaPage() {
   const limpiar = () => { setBusqueda(""); setServicioFiltro(""); setSoloMios(false); setFiltroRapido("todos"); };
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1800px] mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -250,7 +249,6 @@ export default function PanoramaPage() {
         </button>
       </div>
 
-      <GestionesTabs />
 
       {permissionError && (
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
