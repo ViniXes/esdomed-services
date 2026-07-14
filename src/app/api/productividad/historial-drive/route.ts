@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
   const fin = new Date(anio, mesNumero, 0, 23, 59, 59, 999);
 
   try {
-    const respuesta = await fetch(csvUrl(gid), { next: { revalidate: 300 } });
+    const respuesta = await fetch(csvUrl(gid), { next: { revalidate: 900 } });
     if (!respuesta.ok) return NextResponse.json({ error: "No se pudo leer la hoja" }, { status: 502 });
     const texto = await respuesta.text();
 
