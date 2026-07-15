@@ -112,7 +112,6 @@ export default function EditorPlanPage() {
     cellsDragged: number;
     undoGuardado: boolean;
     soloCasillasSugeridas: boolean;
-    casillasSugeridas: boolean[];
   } | null>(null);
   const filasRef = useRef<FilaPlanTrabajo[]>([]);
   const undoRef = useRef<FilaPlanTrabajo[][]>([]);
@@ -317,15 +316,19 @@ export default function EditorPlanPage() {
     const filaActual = filasRef.current[filaIdx];
     if (!filaActual) return;
 
-    const desde = Math.min(drag.diaIdxOrigen, diaIdxFinal);
-    const hasta = Math.max(drag.diaIdxOrigen, diaIdxFinal);
-    const destinos = drag.casillasSugeridas
-      .map((esSugerida, indice) => ({ esSugerida, indice }))
-      .filter(({ esSugerida, indice }) => {
-        if (!esSugerida || indice < desde || indice > hasta) return false;
-        return !validarAsignacionPlan(filaActual, indice + 1, drag.valor, anio, mes, prevPlanData);
-      })
-      .map(({ indice }) => indice);
+    const direccion = diaIdxFinal > drag.diaIdxOrigen ? 1 : -1;
+    const destinos: number[] = [];
+    for (
+      let indice = drag.diaIdxOrigen + (4 * direccion);
+      direccion > 0 ? indice <= diaIdxFinal : indice >= diaIdxFinal;
+      indice += 4 * direccion
+    ) {
+      // El arrastre completa el ciclo sin reemplazar códigos colocados manualmente.
+      if ((filaActual.asignaciones[indice] ?? "").trim()) continue;
+      if (!validarAsignacionPlan(filaActual, indice + 1, drag.valor, anio, mes, prevPlanData)) {
+        destinos.push(indice);
+      }
+    }
     if (destinos.length === 0) return;
 
     if (!drag.undoGuardado) {
@@ -765,7 +768,7 @@ export default function EditorPlanPage() {
       ) : (
         <>
           <p className="mb-2 text-[11px] text-slate-400">
-            Un clic selecciona una casilla; usa las flechas para moverte y Ctrl+C, Ctrl+V o Backspace/Supr para editar. En operativos, arrastra un turno para repetirlo solo en los cuadros sugeridos.
+            Un clic selecciona una casilla; usa las flechas para moverte y Ctrl+C, Ctrl+V o Backspace/Supr para editar. En operativos, arrastra un turno a izquierda o derecha para repetirlo cada cuatro días.
           </p>
           <div className="overflow-auto max-h-[calc(100vh-14rem)] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <table className="border-collapse text-xs">
@@ -898,7 +901,6 @@ export default function EditorPlanPage() {
                                       cellsDragged: 0,
                                       undoGuardado: false,
                                       soloCasillasSugeridas: repetirEnCiclo,
-                                      casillasSugeridas: repetirEnCiclo ? [...sugerencias] : [],
                                     };
                                   }}
                                   onMouseEnter={() => {
