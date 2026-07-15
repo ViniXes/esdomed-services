@@ -104,7 +104,16 @@ export default function EditorPlanPage() {
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
   const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void } | null>(null);
-  const dragRef = useRef<{ filaIdx: number; valor: string; isDragging: boolean; cellsDragged: number; undoGuardado: boolean } | null>(null);
+  const dragRef = useRef<{
+    filaIdx: number;
+    diaIdxOrigen: number;
+    valor: string;
+    isDragging: boolean;
+    cellsDragged: number;
+    undoGuardado: boolean;
+    soloCasillasSugeridas: boolean;
+    casillasSugeridas: boolean[];
+  } | null>(null);
   const filasRef = useRef<FilaPlanTrabajo[]>([]);
   const undoRef = useRef<FilaPlanTrabajo[][]>([]);
   const inicializadoRef = useRef(false);
@@ -300,6 +309,41 @@ export default function EditorPlanPage() {
     );
     setGuardado(false);
     return true;
+  };
+
+  const aplicarArrastreCicloOperativo = (filaIdx: number, diaIdxFinal: number) => {
+    const drag = dragRef.current;
+    if (!drag?.isDragging || !drag.soloCasillasSugeridas || drag.filaIdx !== filaIdx) return;
+    const filaActual = filasRef.current[filaIdx];
+    if (!filaActual) return;
+
+    const desde = Math.min(drag.diaIdxOrigen, diaIdxFinal);
+    const hasta = Math.max(drag.diaIdxOrigen, diaIdxFinal);
+    const destinos = drag.casillasSugeridas
+      .map((esSugerida, indice) => ({ esSugerida, indice }))
+      .filter(({ esSugerida, indice }) => {
+        if (!esSugerida || indice < desde || indice > hasta) return false;
+        return !validarAsignacionPlan(filaActual, indice + 1, drag.valor, anio, mes, prevPlanData);
+      })
+      .map(({ indice }) => indice);
+    if (destinos.length === 0) return;
+
+    if (!drag.undoGuardado) {
+      registrarUndo();
+      drag.undoGuardado = true;
+    }
+    const destinosSet = new Set(destinos);
+    setFilas((prev) => prev.map((fila, indiceFila) => (
+      indiceFila === filaIdx
+        ? {
+            ...fila,
+            asignaciones: fila.asignaciones.map((codigo, indiceDia) => (
+              destinosSet.has(indiceDia) ? drag.valor : codigo
+            )),
+          }
+        : fila
+    )));
+    setGuardado(false);
   };
 
   const setGrupo = (filaIdx: number, grupo: string) => {
@@ -509,6 +553,29 @@ export default function EditorPlanPage() {
     [filas],
   );
 
+  const moverFocoCuadricula = (
+    displayIdx: number,
+    diaIdx: number,
+    tecla: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight",
+  ) => {
+    let siguienteFila = displayIdx;
+    let siguienteDia = diaIdx;
+    if (tecla === "ArrowUp") siguienteFila--;
+    if (tecla === "ArrowDown") siguienteFila++;
+    if (tecla === "ArrowLeft") siguienteDia--;
+    if (tecla === "ArrowRight") siguienteDia++;
+    if (
+      siguienteFila < 0 ||
+      siguienteFila >= filasOrdenadas.length ||
+      siguienteDia < 0 ||
+      siguienteDia >= dias.length
+    ) return;
+
+    document.querySelector<HTMLButtonElement>(
+      `button[data-plan-cell="true"][data-display-idx="${siguienteFila}"][data-dia-idx="${siguienteDia}"]`,
+    )?.focus();
+  };
+
   const pegarBloqueCodigos = (
     texto: string,
     inicio: { filaIdx: number; diaIdx: number } | null = picker,
@@ -698,7 +765,7 @@ export default function EditorPlanPage() {
       ) : (
         <>
           <p className="mb-2 text-[11px] text-slate-400">
-            Un clic selecciona cualquier casilla para copiar, pegar o borrar con Backspace/Supr. El selector de códigos se abre siempre con doble clic.
+            Un clic selecciona una casilla; usa las flechas para moverte y Ctrl+C, Ctrl+V o Backspace/Supr para editar. En operativos, arrastra un turno para repetirlo solo en los cuadros sugeridos.
           </p>
           <div className="overflow-auto max-h-[calc(100vh-14rem)] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <table className="border-collapse text-xs">
@@ -818,12 +885,26 @@ export default function EditorPlanPage() {
                             return (
                               <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
                                 <button
+                                  data-plan-cell="true"
+                                  data-display-idx={displayIdx}
+                                  data-dia-idx={diaIdx}
                                   onMouseDown={() => {
-                                    dragRef.current = { filaIdx, valor: celda, isDragging: true, cellsDragged: 0, undoGuardado: false };
+                                    const repetirEnCiclo = !isAdministrativo && Boolean(getHorario(celda));
+                                    dragRef.current = {
+                                      filaIdx,
+                                      diaIdxOrigen: diaIdx,
+                                      valor: celda,
+                                      isDragging: true,
+                                      cellsDragged: 0,
+                                      undoGuardado: false,
+                                      soloCasillasSugeridas: repetirEnCiclo,
+                                      casillasSugeridas: repetirEnCiclo ? [...sugerencias] : [],
+                                    };
                                   }}
                                   onMouseEnter={() => {
                                     if (dragRef.current && dragRef.current.isDragging) {
                                       dragRef.current.cellsDragged++;
+                                      if (dragRef.current.soloCasillasSugeridas) return;
                                       // El personal administrativo omite fines de semana y asuetos.
                                       const noLaboralAdmin = isAdministrativo && esDiaNoLaboralAdministrativo(anio, mes, d);
                                       if (!noLaboralAdmin) {
@@ -835,6 +916,7 @@ export default function EditorPlanPage() {
                                       }
                                     }
                                   }}
+                                  onMouseUp={() => aplicarArrastreCicloOperativo(filaIdx, diaIdx)}
                                   onDoubleClick={() => {
                                     if (dragRef.current && dragRef.current.cellsDragged > 0) return;
                                     setPicker({ filaIdx, diaIdx });
@@ -851,6 +933,16 @@ export default function EditorPlanPage() {
                                     event.clipboardData.setData("text/plain", celda.toUpperCase());
                                   }}
                                   onKeyDown={(event) => {
+                                    if (
+                                      event.key === "ArrowUp" ||
+                                      event.key === "ArrowDown" ||
+                                      event.key === "ArrowLeft" ||
+                                      event.key === "ArrowRight"
+                                    ) {
+                                      event.preventDefault();
+                                      moverFocoCuadricula(displayIdx, diaIdx, event.key);
+                                      return;
+                                    }
                                     if (event.key !== "Backspace" && event.key !== "Delete") return;
                                     if (!celda) return;
                                     event.preventDefault();
@@ -858,8 +950,8 @@ export default function EditorPlanPage() {
                                   }}
                                   title={
                                     sugerido
-                                      ? "Siguiente turno sugerido; un clic selecciona, Backspace/Supr borra y doble clic abre el selector"
-                                      : "Un clic para seleccionar; Backspace/Supr borra y doble clic abre el selector"
+                                      ? "Siguiente turno sugerido; usa flechas para moverte y doble clic para abrir el selector"
+                                      : "Usa flechas para moverte; Backspace/Supr borra y doble clic abre el selector"
                                   }
                                   className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors cursor-cell hover:ring-2 hover:ring-blue-400 focus:ring-2 focus:ring-blue-500 focus:outline-none hover:z-10 relative ${
                                     sugerido
