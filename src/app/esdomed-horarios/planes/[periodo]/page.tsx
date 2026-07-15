@@ -659,11 +659,15 @@ export default function EditorPlanPage() {
   };
 
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
+  const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
   filas.forEach((fila) => {
     fila.asignaciones.forEach((celda, diaIdx) => {
       const horario = getHorario(celda);
       if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
         conteoOperativosPorDia[diaIdx]++;
+        if (fila.grupo?.trim() === "Equipo de emergencia") {
+          conteoEmergenciaPorDia[diaIdx]++;
+        }
       }
     });
   });
@@ -1002,6 +1006,22 @@ export default function EditorPlanPage() {
                 })()}
               </tbody>
               <tfoot>
+                <tr className="bg-rose-50 dark:bg-rose-950/20 border-t-2 border-rose-200 dark:border-rose-900/60">
+                  <td className="sticky left-0 z-10 bg-rose-50 dark:bg-rose-950 px-2 py-2 font-bold text-[10px] text-right text-rose-700 dark:text-rose-300 border-r border-rose-200 dark:border-rose-900/60 uppercase tracking-wider">
+                    Total Emergencia / Día:
+                  </td>
+                  {dias.map((d, diaIdx) => {
+                    const count = conteoEmergenciaPorDia[diaIdx];
+                    return (
+                      <td key={`tot-emergencia-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-rose-100 dark:border-rose-900/40 last:border-r-0">
+                        <div className="mx-auto w-7 h-6 flex items-center justify-center rounded bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
+                          {count}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="border-l border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950"></td>
+                </tr>
                 <tr className="bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-200 dark:border-slate-700">
                   <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-2 py-2 font-bold text-[10px] text-right text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                     Total Operativos / Día:
