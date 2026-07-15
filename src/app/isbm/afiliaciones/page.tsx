@@ -263,7 +263,7 @@ function ModalAfiliar({
   };
 
   return (
-    <Modal titulo="Afiliar paciente al convenio" onCerrar={onCerrar}>
+    <Modal titulo="Afiliar paciente al convenio" onCerrar={onCerrar} maxW="max-w-5xl">
       {!seleccionado ? (
         <div className="space-y-3">
           <p className="text-xs text-slate-500">
@@ -279,7 +279,7 @@ function ModalAfiliar({
               className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="max-h-[55vh] overflow-y-auto grid sm:grid-cols-2 gap-1.5 content-start">
+          <div className="max-h-[58vh] overflow-y-auto grid sm:grid-cols-2 xl:grid-cols-3 gap-1.5 content-start">
             {!activos && !error && (
               <div className="p-6 flex justify-center sm:col-span-2">
                 <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -410,7 +410,7 @@ function ModalEditar({
   };
 
   return (
-    <Modal titulo={`Editar afiliación — ${afiliacion.paciente_nombre}`} onCerrar={onCerrar}>
+    <Modal titulo={`Editar afiliación — ${afiliacion.paciente_nombre}`} onCerrar={onCerrar} maxW="max-w-3xl">
       <div className="space-y-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <Campo label="N° de afiliación ISBM">
@@ -492,7 +492,7 @@ function ModalEgreso({
   };
 
   return (
-    <Modal titulo={`Egreso de cobertura — ${ingreso.paciente_nombre}`} onCerrar={onCerrar} maxW="max-w-lg">
+    <Modal titulo={`Egreso de cobertura — ${ingreso.paciente_nombre}`} onCerrar={onCerrar} maxW="max-w-2xl">
       <p className="text-xs text-slate-500 mb-3">
         Cierra la cobertura ISBM de este ingreso: deja de aparecer en el censo diario.
         Los censos y cargos ya registrados se conservan para la facturación.
@@ -542,6 +542,7 @@ function ModalEgreso({
 function Modal({
   titulo, onCerrar, children, maxW = "max-w-2xl",
 }: { titulo: string; onCerrar: () => void; children: React.ReactNode; maxW?: string }) {
+  // Default max-w-2xl; cada modal pide más ancho cuando su contenido lo aprovecha.
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
       <div className={`w-full ${maxW} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto`}>

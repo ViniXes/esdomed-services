@@ -227,7 +227,7 @@ function NuevoCargoModal({
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">Nuevo cargo</h2>
@@ -264,7 +264,7 @@ function NuevoCargoModal({
                 />
               </div>
             </div>
-            <div className="max-h-[55vh] overflow-y-auto space-y-1">
+            <div className="max-h-[58vh] overflow-y-auto grid lg:grid-cols-2 gap-1 content-start">
               {!resultados && (
                 <div className="p-6 flex justify-center">
                   <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />

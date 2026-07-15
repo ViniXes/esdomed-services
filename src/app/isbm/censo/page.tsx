@@ -295,7 +295,7 @@ function ModalCenso({
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">
@@ -507,9 +507,10 @@ function ModalCenso({
   );
 }
 
-// Selector de médico alimentado por TODOS los médicos del sistema (generales
-// y de UCI/UCIN). Si el valor actual vino de un snapshot y no está en la
-// lista (ej. texto libre antiguo), se conserva como opción para no perderlo.
+// Combobox de médico con buscador, alimentado por TODOS los médicos del
+// sistema (generales y de UCI/UCIN). Se escribe para filtrar y se elige de la
+// lista; al perder el foco sin elegir, vuelve al valor confirmado. El dato es
+// sensible: de los médicos tratantes saldrán los honorarios en el futuro.
 function SelectMedico({
   valor, medicos, placeholder, autoFocus, onChange,
 }: {
@@ -519,23 +520,64 @@ function SelectMedico({
   autoFocus?: boolean;
   onChange: (v: string) => void;
 }) {
-  const valorFueraDeLista = valor && !medicos.some((m) => m.nombre === valor);
+  const [texto, setTexto] = useState(valor);
+  const [abierto, setAbierto] = useState(false);
+
+  const etiqueta = (m: MedicoSistema) =>
+    m.tipoMedico ? `${m.nombre} · ${m.tipoMedico.replace("_", "/").toUpperCase()}` : m.nombre;
+
+  const term = texto.trim().toLowerCase();
+  const filtrados = (term && texto !== valor
+    ? medicos.filter((m) => m.nombre.toLowerCase().includes(term))
+    : medicos
+  ).slice(0, 30);
+
+  const elegir = (nombre: string) => {
+    onChange(nombre);
+    setTexto(nombre);
+    setAbierto(false);
+  };
+
   return (
-    <select
-      value={valor}
-      autoFocus={autoFocus}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      <option value="">— {placeholder} —</option>
-      {valorFueraDeLista && <option value={valor}>{valor}</option>}
-      {medicos.map((m) => (
-        <option key={m.nombre} value={m.nombre}>
-          {m.nombre}
-          {m.tipoMedico ? ` · ${m.tipoMedico.replace("_", "/").toUpperCase()}` : ""}
-        </option>
-      ))}
-    </select>
+    <div className="relative">
+      <input
+        value={texto}
+        autoFocus={autoFocus}
+        onFocus={() => setAbierto(true)}
+        onChange={(e) => {
+          setTexto(e.target.value);
+          setAbierto(true);
+          if (e.target.value === "") onChange("");
+        }}
+        onBlur={() => {
+          // Deja pasar el click de una opción (onMouseDown) antes de cerrar.
+          setTimeout(() => {
+            setAbierto(false);
+            setTexto((t) => (medicos.some((m) => m.nombre === t) ? t : valor));
+          }, 150);
+        }}
+        placeholder={placeholder}
+        className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      {abierto && filtrados.length > 0 && (
+        <div className="absolute z-20 mt-1 left-0 right-0 max-h-44 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1">
+          {filtrados.map((m) => (
+            <button
+              key={m.nombre}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); elegir(m.nombre); }}
+              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                m.nombre === valor
+                  ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-medium"
+                  : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              }`}
+            >
+              {etiqueta(m)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
