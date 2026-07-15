@@ -11,9 +11,11 @@ import {
   cerrarDia,
   censosDeFecha,
   hoyISO,
+  listarMedicos,
   listarServicios,
   reabrirDia,
   registrarVisita,
+  type MedicoSistema,
 } from "@/lib/isbm/api";
 import {
   estadoCenso,
@@ -42,6 +44,7 @@ export default function CensoDiarioPage() {
   const [fecha, setFecha] = useState(hoyISO());
   const [censos, setCensos] = useState<CensoDiarioConRelaciones[]>([]);
   const [servicios, setServicios] = useState<ServicioHospitalarioIsbm[]>([]);
+  const [medicos, setMedicos] = useState<MedicoSistema[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   // Solo se guarda el id; el censo del modal se deriva de la última recarga.
@@ -58,9 +61,14 @@ export default function CensoDiarioPage() {
       if (abrir && f <= hoyISO()) {
         await abrirDia(f, { uid: profile.uid, nombre: profile.nombre });
       }
-      const [lista, cats] = await Promise.all([censosDeFecha(f), listarServicios()]);
+      const [lista, cats, meds] = await Promise.all([
+        censosDeFecha(f),
+        listarServicios(),
+        listarMedicos(),
+      ]);
       setCensos(lista);
       setServicios(cats);
+      setMedicos(meds);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -177,6 +185,7 @@ export default function CensoDiarioPage() {
           key={detalle.id}
           censo={detalle}
           servicios={servicios}
+          medicos={medicos}
           actor={{ uid: profile.uid, nombre: profile.nombre }}
           onCerrar={() => setDetalleId(null)}
           onCambio={() => cargar(fecha, false)}
@@ -204,10 +213,11 @@ function VisitaChip({ turno, registrada, hora }: { turno: string; registrada: bo
 // ── Modal de detalle: visitas, servicios y cierre ────────────────────────────
 
 function ModalCenso({
-  censo, servicios, actor, onCerrar, onCambio,
+  censo, servicios, medicos, actor, onCerrar, onCambio,
 }: {
   censo: CensoDiarioConRelaciones;
   servicios: ServicioHospitalarioIsbm[];
+  medicos: MedicoSistema[];
   actor: { uid: string; nombre: string };
   onCerrar: () => void;
   onCambio: () => void;
@@ -359,11 +369,11 @@ function ModalCenso({
                   placeholder="Cama"
                   className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <input
-                  value={medicoTratante}
-                  onChange={(e) => setMedicoTratante(e.target.value)}
+                <SelectMedico
+                  valor={medicoTratante}
+                  medicos={medicos}
                   placeholder="Médico tratante"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={setMedicoTratante}
                 />
               </div>
               <div className="flex gap-2">
@@ -422,12 +432,12 @@ function ModalCenso({
             <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
               Registrar visita {visitaTurno.toUpperCase()}
             </p>
-            <input
-              value={visitaMedico}
-              onChange={(e) => setVisitaMedico(e.target.value)}
+            <SelectMedico
+              valor={visitaMedico}
+              medicos={medicos}
               placeholder="Médico que pasó visita"
               autoFocus
-              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={setVisitaMedico}
             />
             <input
               type="time"
@@ -494,6 +504,38 @@ function ModalCenso({
         )}
       </div>
     </div>
+  );
+}
+
+// Selector de médico alimentado por TODOS los médicos del sistema (generales
+// y de UCI/UCIN). Si el valor actual vino de un snapshot y no está en la
+// lista (ej. texto libre antiguo), se conserva como opción para no perderlo.
+function SelectMedico({
+  valor, medicos, placeholder, autoFocus, onChange,
+}: {
+  valor: string;
+  medicos: MedicoSistema[];
+  placeholder: string;
+  autoFocus?: boolean;
+  onChange: (v: string) => void;
+}) {
+  const valorFueraDeLista = valor && !medicos.some((m) => m.nombre === valor);
+  return (
+    <select
+      value={valor}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">— {placeholder} —</option>
+      {valorFueraDeLista && <option value={valor}>{valor}</option>}
+      {medicos.map((m) => (
+        <option key={m.nombre} value={m.nombre}>
+          {m.nombre}
+          {m.tipoMedico ? ` · ${m.tipoMedico.replace("_", "/").toUpperCase()}` : ""}
+        </option>
+      ))}
+    </select>
   );
 }
 

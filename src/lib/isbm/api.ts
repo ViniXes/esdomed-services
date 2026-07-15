@@ -109,6 +109,30 @@ export async function listarPacientesActivosEsdomed(): Promise<PacienteActivoEsd
 
 // Fecha local (El Salvador) → "YYYY-MM-DD". No usar toISOString: convierte a
 // UTC y corre un día las fechas con hora nocturna.
+// Médicos del sistema (rol "medico", incluye UCI/UCIN por tipoMedico) para
+// los selectores de médico tratante y visitas del censo. Solo lectura.
+export interface MedicoSistema {
+  nombre: string;
+  tipoMedico?: string; // "uci" | "ucin" | "uci_ucin" — ausente = médico general
+}
+
+let medicosCache: MedicoSistema[] | null = null;
+
+export async function listarMedicos(): Promise<MedicoSistema[]> {
+  if (medicosCache) return medicosCache;
+  const snap = await getDocs(
+    query(collection(db, "usuarios"), where("role", "==", "medico"))
+  );
+  medicosCache = snap.docs
+    .map((d) => {
+      const u = d.data();
+      return { nombre: (u.nombre as string) ?? "", tipoMedico: u.tipoMedico as string | undefined };
+    })
+    .filter((m) => m.nombre)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  return medicosCache;
+}
+
 const aFechaSql = (d: Date | null) =>
   d
     ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
