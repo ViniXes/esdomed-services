@@ -11,8 +11,8 @@ const G_CONVENIO = "Convenio";
 
 const navItems: NavItem[] = [
   { href: "/isbm", label: "Inicio", icon: LayoutDashboard, exact: true },
-  { href: "/isbm/censo", label: "Censo diario", icon: CalendarCheck, group: G_CONVENIO },
   { href: "/isbm/afiliaciones", label: "Afiliaciones", icon: UserPlus, group: G_CONVENIO },
+  { href: "/isbm/censo", label: "Censo diario", icon: CalendarCheck, group: G_CONVENIO },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
