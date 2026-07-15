@@ -672,7 +672,7 @@ export default function EditorPlanPage() {
       {/* Encabezado + acciones */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <Link href="/esdomed-horarios/planes" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+          <Link prefetch={false} href="/esdomed-horarios/planes" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
             <ArrowLeft size={13} /> Planes
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading">
@@ -687,10 +687,10 @@ export default function EditorPlanPage() {
             <Copy size={14} /> Copiar mes anterior
           </button>
           <div className="flex gap-2">
-            <Link href={`/esdomed-horarios/planes/${periodo}/imprimir?tipo=institucional`} target="_blank" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <Link prefetch={false} href={`/esdomed-horarios/planes/${periodo}/imprimir?tipo=institucional`} target="_blank" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               <Printer size={14} /> Imprimir Inst.
             </Link>
-            <Link href={`/esdomed-horarios/planes/${periodo}/imprimir?tipo=manpower`} target="_blank" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <Link prefetch={false} href={`/esdomed-horarios/planes/${periodo}/imprimir?tipo=manpower`} target="_blank" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               <Printer size={14} /> Imprimir MPW
             </Link>
           </div>

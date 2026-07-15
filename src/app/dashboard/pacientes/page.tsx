@@ -278,14 +278,14 @@ export default function PacientesPage() {
             <FileDown size={15} />
             Exportar Excel
           </button>
-          <Link
+          <Link prefetch={false}
             href="/dashboard/pacientes/importar"
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
           >
             <Upload size={15} />
             Importar reporte
           </Link>
-          <Link
+          <Link prefetch={false}
             href="/dashboard/pacientes/nuevo"
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
           >
@@ -421,7 +421,7 @@ export default function PacientesPage() {
               : "Sin coincidencias para los filtros actuales."}
           </p>
           {pacientes.length === 0 && (
-            <Link
+            <Link prefetch={false}
               href="/dashboard/pacientes/nuevo"
               className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500"
             >

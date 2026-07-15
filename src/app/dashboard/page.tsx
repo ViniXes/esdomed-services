@@ -168,7 +168,7 @@ export default function DashboardPage() {
           const Icon = cfg.icon;
           const pct = total > 0 ? Math.round((pendientes / total) * 100) : 0;
           return (
-            <Link key={tipo} href={cfg.href} className="group block">
+            <Link prefetch={false} key={tipo} href={cfg.href} className="group block">
               <div className={`bg-white dark:bg-slate-900 rounded-2xl border ${cfg.border} p-4 hover:shadow-md transition-all duration-200 group-hover:-translate-y-0.5`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className={`w-10 h-10 rounded-xl ${cfg.bg} flex items-center justify-center`}>

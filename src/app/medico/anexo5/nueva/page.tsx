@@ -209,7 +209,7 @@ export default function NuevaAnexo5Page() {
 
       {/* Encabezado */}
       <div className="flex items-center gap-3 shrink-0">
-        <Link
+        <Link prefetch={false}
           href="/medico"
           className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors"
         >

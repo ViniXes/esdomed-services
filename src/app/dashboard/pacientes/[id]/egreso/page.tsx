@@ -160,7 +160,7 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <p className="text-sm text-slate-500">Paciente no encontrado.</p>
-        <Link href="/dashboard/pacientes" className="text-sm text-blue-600 hover:underline">
+        <Link prefetch={false} href="/dashboard/pacientes" className="text-sm text-blue-600 hover:underline">
           ← Volver
         </Link>
       </div>
@@ -259,7 +259,7 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link
+        <Link prefetch={false}
           href={`/dashboard/pacientes/${paciente.id}`}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
@@ -482,7 +482,7 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
           </div>
         )}
         <div className="flex items-center gap-3 justify-end">
-          <Link
+          <Link prefetch={false}
             href={`/dashboard/pacientes/${paciente.id}`}
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >

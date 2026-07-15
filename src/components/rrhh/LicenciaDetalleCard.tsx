@@ -61,7 +61,7 @@ export function LicenciaDetalleCard({ licencia: l, onClose, ocultarEnlaceEmplead
               {l.empleadoDepartamento && <> · {l.empleadoDepartamento}</>}
             </p>
             {!ocultarEnlaceEmpleado && (
-              <Link
+              <Link prefetch={false}
                 href={`/rrhh/empleados/${encodeURIComponent(l.empleadoCodigo)}`}
                 className="text-xs font-medium text-blue-600 hover:underline mt-0.5 inline-block"
               >

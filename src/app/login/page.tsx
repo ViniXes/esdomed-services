@@ -137,7 +137,7 @@ export default function LoginPage() {
 
           <p className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
             ¿Eres médico y no tienes cuenta?{" "}
-            <Link href="/registro-medico" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
+            <Link prefetch={false} href="/registro-medico" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
               Regístrate aquí
             </Link>
           </p>

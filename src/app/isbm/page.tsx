@@ -128,7 +128,7 @@ function AccionCard({
   href, icon: Icon, title, desc,
 }: { href: string; icon: typeof Users; title: string; desc: string }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={href}
       className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start gap-3 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
     >

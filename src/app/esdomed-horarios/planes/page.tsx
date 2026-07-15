@@ -138,7 +138,7 @@ export default function PlanesPage() {
       ) : (
         <div className="space-y-2">
           {planes.map((plan) => (
-            <Link
+            <Link prefetch={false}
               key={plan.id}
               href={`/esdomed-horarios/planes/${plan.periodo}`}
               className="group flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3.5 transition-all hover:border-amber-300 dark:hover:border-[#c9a892]/50 hover:shadow-sm"

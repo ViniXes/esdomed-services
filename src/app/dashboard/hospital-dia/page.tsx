@@ -101,7 +101,7 @@ export default function HospitalDiaPage() {
             {loading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
             {consultado ? "Actualizar" : "Consultar"}
           </button>
-          <Link
+          <Link prefetch={false}
             href="/dashboard/hospital-dia/nuevo"
             className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
           >
@@ -157,7 +157,7 @@ export default function HospitalDiaPage() {
               : "Sin coincidencias para la búsqueda."}
           </p>
           {registros.length === 0 && (
-            <Link
+            <Link prefetch={false}
               href="/dashboard/hospital-dia/nuevo"
               className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500"
             >

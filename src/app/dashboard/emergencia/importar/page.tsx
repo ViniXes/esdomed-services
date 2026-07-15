@@ -189,7 +189,7 @@ export default function ImportarEmergenciaPage() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link
+        <Link prefetch={false}
           href="/dashboard/emergencia"
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
@@ -340,7 +340,7 @@ export default function ImportarEmergenciaPage() {
             >
               Importar otro
             </button>
-            <Link
+            <Link prefetch={false}
               href="/dashboard/emergencia"
               className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
             >

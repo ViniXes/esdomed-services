@@ -125,7 +125,7 @@ export default function MedicoTrasladosPage() {
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Mis traslados</h1>
         </div>
-        <Link href="/medico/traslados/nueva"
+        <Link prefetch={false} href="/medico/traslados/nueva"
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
           <Plus size={15} /> Nueva solicitud
         </Link>

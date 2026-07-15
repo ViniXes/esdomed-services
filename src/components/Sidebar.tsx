@@ -67,10 +67,9 @@ function NavLink({
 }) {
   const { href, label, icon: Icon, badge } = item;
   return (
-    <Link
+    <Link prefetch={false}
       href={href}
       onClick={onNavigate}
-      prefetch={false}
       className={`flex items-center gap-3 rounded-xl font-medium transition-all duration-150 ${
         nested ? "px-3 py-2 text-[13px]" : "px-3 py-2.5 text-sm"
       } ${active ? ACTIVE_CLS : IDLE_CLS}`}
@@ -101,7 +100,7 @@ function NavExpandable({
   return (
     <div>
       <div className={`flex items-center rounded-xl transition-all duration-150 ${active ? ACTIVE_CLS : IDLE_CLS}`}>
-        <Link href={href} onClick={onNavigate} prefetch={false} className="flex items-center gap-3 pl-3 pr-1 py-2.5 text-sm font-medium flex-1 min-w-0">
+        <Link prefetch={false} href={href} onClick={onNavigate} className="flex items-center gap-3 pl-3 pr-1 py-2.5 text-sm font-medium flex-1 min-w-0">
           <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
           <span className="flex-1 truncate">{label}</span>
         </Link>

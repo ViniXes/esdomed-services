@@ -131,7 +131,7 @@ export default function SolicitarTransportePage() {
               {folioCreado}
             </p>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
-              <Link
+              <Link prefetch={false}
                 href={`/transporte/solicitud/${folioCreado}`}
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl transition-colors"
               >

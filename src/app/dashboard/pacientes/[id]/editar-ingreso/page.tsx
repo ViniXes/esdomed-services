@@ -121,7 +121,7 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
       <div className="p-6 max-w-3xl mx-auto">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
           <p className="text-sm text-slate-500">Paciente no encontrado.</p>
-          <Link href="/dashboard/pacientes" className="inline-block mt-3 text-sm text-blue-600 hover:underline">
+          <Link prefetch={false} href="/dashboard/pacientes" className="inline-block mt-3 text-sm text-blue-600 hover:underline">
             ← Volver al listado
           </Link>
         </div>
@@ -133,7 +133,7 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link
+        <Link prefetch={false}
           href={`/dashboard/pacientes/${id}`}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
@@ -154,7 +154,7 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
         <p className="text-xs">
           Estos datos clínicos pertenecen <strong>solo a este ingreso</strong>. Para cambiar
           nombre, DUI, dirección u otros datos personales, usa
-          {" "}<Link href={`/dashboard/pacientes/${id}/editar-persona`} className="text-blue-600 dark:text-blue-400 hover:underline">
+          {" "}<Link prefetch={false} href={`/dashboard/pacientes/${id}/editar-persona`} className="text-blue-600 dark:text-blue-400 hover:underline">
             Editar datos del paciente
           </Link>.
         </p>
@@ -193,7 +193,7 @@ export default function EditarIngresoPage({ params }: { params: Promise<{ id: st
           </div>
         )}
         <div className="flex items-center gap-3 justify-end">
-          <Link
+          <Link prefetch={false}
             href={`/dashboard/pacientes/${id}`}
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >

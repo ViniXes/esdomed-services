@@ -336,7 +336,7 @@ export function AtencionesEmergenciaConsulta({ permiteImportar, fichaHref, vista
             {exportando ? "Generando..." : "Excel"}
           </button>
           {permiteImportar && (
-            <Link
+            <Link prefetch={false}
               href="/dashboard/emergencia/importar"
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
@@ -648,7 +648,7 @@ function FichaEmergencia({
               )}
               {/* Enlace al padrón si el paciente está registrado en personas */}
               {pacienteId && fichaHref ? (
-                <Link href={fichaHref(pacienteId)} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500">
+                <Link prefetch={false} href={fichaHref(pacienteId)} className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500">
                   <ArrowUpRight size={12} /> Ver ficha en padrón
                 </Link>
               ) : enPadron ? (
@@ -797,7 +797,7 @@ function EnlacePadron({
 }) {
   if (pacienteId && fichaHref) {
     return (
-      <Link
+      <Link prefetch={false}
         href={fichaHref(pacienteId)}
         onClick={(e) => e.stopPropagation()}
         className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 mt-1"

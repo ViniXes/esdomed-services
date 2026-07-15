@@ -60,7 +60,7 @@ export default function MedicoTrasladoExternoPage() {
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Traslado a otro hospital</h1>
         </div>
-        <Link href="/medico/traslado-externo/nueva"
+        <Link prefetch={false} href="/medico/traslado-externo/nueva"
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
           <Plus size={15} /> Nueva solicitud
         </Link>

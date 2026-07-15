@@ -224,7 +224,7 @@ export default function RegistrosMedicosHistorialPage() {
           >
             <Download size={15} /> Exportar Excel
           </button>
-          <Link
+          <Link prefetch={false}
             href="/dashboard/usuarios"
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >

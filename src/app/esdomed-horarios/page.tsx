@@ -24,7 +24,7 @@ export default function EsdomedHorariosInicio() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
+        <Link prefetch={false}
           href="/esdomed-horarios/mi-horario"
           className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 transition-all hover:border-blue-300 dark:hover:border-[#c9a892]/50 hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-none"
         >
@@ -40,7 +40,7 @@ export default function EsdomedHorariosInicio() {
           </span>
         </Link>
 
-        <Link
+        <Link prefetch={false}
           href="/esdomed-horarios/mi-grupo"
           className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 transition-all hover:border-blue-300 dark:hover:border-[#c9a892]/50 hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-none"
         >
@@ -57,7 +57,7 @@ export default function EsdomedHorariosInicio() {
         </Link>
 
         {puedePlanificar && (
-          <Link
+          <Link prefetch={false}
             href="/esdomed-horarios/planes"
             className="group relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 transition-all hover:border-amber-300 dark:hover:border-[#c9a892]/50 hover:shadow-lg hover:shadow-amber-100/50 dark:hover:shadow-none"
           >
