@@ -136,7 +136,7 @@ export default function MedicoIncapacidadesPage() {
             Incapacidades
           </h1>
         </div>
-        <Link
+        <Link prefetch={false}
           href="/medico/incapacidades/nueva"
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
         >
@@ -246,7 +246,7 @@ export default function MedicoIncapacidadesPage() {
             {vista === "mias" ? "No has solicitado incapacidades." : "No hay incapacidades registradas."}
           </p>
           {vista === "mias" && (
-            <Link
+            <Link prefetch={false}
               href="/medico/incapacidades/nueva"
               className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500"
             >
@@ -308,7 +308,7 @@ export default function MedicoIncapacidadesPage() {
                 </div>
                 {esMia && s.estado === "pendiente" && (
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link
+                    <Link prefetch={false}
                       href={`/medico/incapacidades/${s.id}/editar`}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
                     >

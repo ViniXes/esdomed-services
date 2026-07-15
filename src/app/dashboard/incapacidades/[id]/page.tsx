@@ -107,7 +107,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <p className="text-sm text-slate-500">Solicitud no encontrada.</p>
-        <Link href="/dashboard/incapacidades" className="text-sm text-blue-600 hover:underline">
+        <Link prefetch={false} href="/dashboard/incapacidades" className="text-sm text-blue-600 hover:underline">
           ← Volver
         </Link>
       </div>

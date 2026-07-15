@@ -76,7 +76,7 @@ export default function RRHHInicioPage() {
           <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
             Aún no hay empleados cargados. Sube el export del padrón (hoja CONSULTA) para registrar licencias.
           </p>
-          <Link
+          <Link prefetch={false}
             href="/rrhh/empleados/importar"
             className="inline-flex items-center gap-2 mt-4 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
           >
@@ -132,7 +132,7 @@ function AccionCard({
   href, icon: Icon, title, desc,
 }: { href: string; icon: typeof Users; title: string; desc: string }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={href}
       className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start gap-3 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
     >

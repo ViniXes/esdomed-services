@@ -93,7 +93,7 @@ export default function NuevoEmpleadoPage() {
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/rrhh/empleados" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors" aria-label="Volver">
+        <Link prefetch={false} href="/rrhh/empleados" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors" aria-label="Volver">
           <ArrowLeft size={16} />
         </Link>
         <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-800">
@@ -211,7 +211,7 @@ export default function NuevoEmpleadoPage() {
         )}
 
         <div className="flex justify-end gap-3 pt-4">
-          <Link href="/rrhh/empleados" className="px-5 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+          <Link prefetch={false} href="/rrhh/empleados" className="px-5 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
             Cancelar
           </Link>
           <button

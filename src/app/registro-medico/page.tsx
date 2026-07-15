@@ -104,7 +104,7 @@ export default function RegistroMedicoPage() {
                 ESDOMED la apruebe, podrás iniciar sesión con tu JVPM como usuario y la contraseña que
                 elegiste.
               </p>
-              <Link
+              <Link prefetch={false}
                 href="/login"
                 className="inline-block w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
               >
@@ -245,7 +245,7 @@ export default function RegistroMedicoPage() {
 
                 <p className="sm:col-span-2 lg:col-span-6 text-center text-xs text-slate-500">
                   ¿Ya tienes cuenta?{" "}
-                  <Link href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  <Link prefetch={false} href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
                     Iniciar sesión
                   </Link>
                 </p>

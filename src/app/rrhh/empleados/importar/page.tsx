@@ -107,7 +107,7 @@ export default function ImportarEmpleadosPage() {
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <Link href="/rrhh/empleados" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors" aria-label="Volver">
+        <Link prefetch={false} href="/rrhh/empleados" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors" aria-label="Volver">
           <ArrowLeft size={16} />
         </Link>
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Importar padrón</h1>
@@ -170,7 +170,7 @@ export default function ImportarEmpleadosPage() {
                 {resultado.omitidos > resultado.motivos.length && <li>…y {resultado.omitidos - resultado.motivos.length} más</li>}
               </ul>
             )}
-            <Link href="/rrhh/empleados" className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-blue-600 hover:underline">
+            <Link prefetch={false} href="/rrhh/empleados" className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-blue-600 hover:underline">
               <Upload size={13} /> Ver empleados
             </Link>
           </div>

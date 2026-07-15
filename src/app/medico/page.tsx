@@ -123,7 +123,7 @@ export default function MedicoDashboardPage() {
             { href: "/medico/fallecidos",      label: "Notificar fallecido", desc: "Registrar defunción de paciente",    icon: HeartPulse,     color: "text-rose-600 dark:text-rose-400",   bg: "bg-rose-50 dark:bg-rose-950",   border: "border-rose-200 dark:border-rose-900",   hoverBorder: "hover:border-rose-400" },
             { href: "/medico/impresiones",     label: "Subir impresión",     desc: "Enviar PDF para imprimir",           icon: Printer,        color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950", border: "border-violet-200 dark:border-violet-900", hoverBorder: "hover:border-violet-400" },
           ].map(({ href, label, desc, icon: Icon, color, bg, border, hoverBorder }) => (
-            <Link key={href} href={href}
+            <Link prefetch={false} key={href} href={href}
               className={`group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl border ${border} ${hoverBorder} p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5`}
             >
               <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
@@ -146,7 +146,7 @@ export default function MedicoDashboardPage() {
         <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Mis solicitudes</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
-          <Link href="/medico/traslados" className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 p-4 hover:shadow-md transition-all duration-200">
+          <Link prefetch={false} href="/medico/traslados" className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-900 p-4 hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-blue-50 dark:bg-blue-950 rounded-lg flex items-center justify-center">
@@ -163,7 +163,7 @@ export default function MedicoDashboardPage() {
             </div>
           </Link>
 
-          <Link href="/medico/fallecidos" className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-900 p-4 hover:shadow-md transition-all duration-200">
+          <Link prefetch={false} href="/medico/fallecidos" className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-900 p-4 hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-rose-50 dark:bg-rose-950 rounded-lg flex items-center justify-center">
@@ -179,7 +179,7 @@ export default function MedicoDashboardPage() {
             </div>
           </Link>
 
-          <Link href="/medico/impresiones" className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-violet-200 dark:hover:border-violet-900 p-4 hover:shadow-md transition-all duration-200">
+          <Link prefetch={false} href="/medico/impresiones" className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-violet-200 dark:hover:border-violet-900 p-4 hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 bg-violet-50 dark:bg-violet-950 rounded-lg flex items-center justify-center">

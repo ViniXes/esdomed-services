@@ -180,7 +180,7 @@ export default function NuevaLicenciaPage() {
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <Link href="/rrhh/licencias" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors" aria-label="Volver">
+        <Link prefetch={false} href="/rrhh/licencias" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors" aria-label="Volver">
           <ArrowLeft size={16} />
         </Link>
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Registrar licencia</h1>

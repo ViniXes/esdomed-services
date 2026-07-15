@@ -82,7 +82,7 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <p className="text-sm text-slate-500">{error ?? "No se pudo cargar el empleado."}</p>
-        <Link href="/rrhh/empleados" className="text-sm text-blue-600 hover:underline mt-2 inline-block">← Volver</Link>
+        <Link prefetch={false} href="/rrhh/empleados" className="text-sm text-blue-600 hover:underline mt-2 inline-block">← Volver</Link>
       </div>
     );
   }
@@ -93,7 +93,7 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <Link href="/rrhh/empleados" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors mt-0.5" aria-label="Volver">
+        <Link prefetch={false} href="/rrhh/empleados" className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors mt-0.5" aria-label="Volver">
           <ArrowLeft size={16} />
         </Link>
         <div className="flex-1 min-w-0">
@@ -103,7 +103,7 @@ export default function EmpleadoDetallePage({ params }: { params: Promise<{ codi
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">{empleado.nombre}</h1>
         </div>
-        <Link
+        <Link prefetch={false}
           href={`/rrhh/licencias/nueva?empleado=${encodeURIComponent(empleado.codigo)}`}
           className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0"
         >

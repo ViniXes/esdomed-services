@@ -256,7 +256,7 @@ export default function NuevaIncapacidadPage() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link
+        <Link prefetch={false}
           href="/medico/incapacidades"
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
@@ -416,7 +416,7 @@ export default function NuevaIncapacidadPage() {
                       {s.estado === "emitida" ? " · ya emitida" : " · pendiente"}
                     </span>
                     {s.estado === "pendiente" && (
-                      <Link
+                      <Link prefetch={false}
                         href={`/medico/incapacidades/${s.id}/editar`}
                         className="flex items-center gap-1 font-medium text-amber-800 dark:text-amber-300 hover:underline flex-shrink-0"
                       >

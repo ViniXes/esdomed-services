@@ -470,7 +470,7 @@ export default function DashboardUsuariosPage() {
                 Solicitudes de médicos pendientes ({pendientes.length})
               </p>
             </div>
-            <Link href="/dashboard/registros-medicos"
+            <Link prefetch={false} href="/dashboard/registros-medicos"
               className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline whitespace-nowrap">
               Ver historial
             </Link>

@@ -146,7 +146,7 @@ export function LienzoMatrizCuidadosCriticos({
                   return (
                     <td key={campo.key} className="max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-300">
                       {href ? (
-                        <Link
+                        <Link prefetch={false}
                           href={href}
                           className={`block max-h-20 overflow-hidden whitespace-pre-wrap font-semibold underline-offset-2 hover:underline ${
                             expedientePendiente

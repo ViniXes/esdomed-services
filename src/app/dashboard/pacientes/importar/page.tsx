@@ -305,7 +305,7 @@ export default function ImportarReportePage() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link
+        <Link prefetch={false}
           href="/dashboard/pacientes"
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
@@ -497,7 +497,7 @@ export default function ImportarReportePage() {
             >
               Importar otro
             </button>
-            <Link
+            <Link prefetch={false}
               href="/dashboard/pacientes"
               className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
             >
@@ -571,7 +571,7 @@ function Fila({ exp, nombre, detalle, href }: { exp: string; nombre: string; det
     </div>
   );
   return href ? (
-    <Link href={href} className="block hover:bg-slate-50 dark:hover:bg-slate-800/40 -mx-1 px-1 rounded transition-colors">
+    <Link prefetch={false} href={href} className="block hover:bg-slate-50 dark:hover:bg-slate-800/40 -mx-1 px-1 rounded transition-colors">
       {contenido}
     </Link>
   ) : (

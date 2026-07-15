@@ -176,7 +176,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
   if (bloqueoMotivo) {
     return (
       <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
-        <Link
+        <Link prefetch={false}
           href="/medico/incapacidades"
           className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
         >
@@ -199,7 +199,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link
+        <Link prefetch={false}
           href="/medico/incapacidades"
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
@@ -261,7 +261,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
           </div>
         )}
         <div className="flex items-center gap-3 justify-end">
-          <Link
+          <Link prefetch={false}
             href="/medico/incapacidades"
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >
