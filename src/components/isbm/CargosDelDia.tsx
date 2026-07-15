@@ -457,6 +457,7 @@ function DetalleCargoModal({
   const [comentarios, setComentarios] = useState(cargo.comentarios ?? "");
   const [docTipo, setDocTipo] = useState(cargo.tipo_documento_respaldo ?? "");
   const [docRef, setDocRef] = useState(cargo.documento_respaldo_ref ?? "");
+  const [enObservacion, setEnObservacion] = useState(cargo.pendiente_revision);
   const [justificacion, setJustificacion] = useState("");
 
   // Diferido: regla react-hooks/set-state-in-effect.
@@ -567,6 +568,20 @@ function DetalleCargoModal({
             <Campo label="Comentarios">
               <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} rows={2} className={inputCls} />
             </Campo>
+            <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 border border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/30 rounded-xl px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enObservacion}
+                onChange={(e) => setEnObservacion(e.target.checked)}
+                className="accent-orange-600 mt-0.5"
+              />
+              <span>
+                <span className="font-medium inline-flex items-center gap-1.5"><Hourglass size={13} /> En observación</span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  Pendiente de confirmar que se realizó (ej. cultivos). Se confirma después desde este detalle.
+                </span>
+              </span>
+            </label>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-3 items-start">
@@ -692,6 +707,7 @@ function DetalleCargoModal({
                         comentarios,
                         tipoDocumentoRespaldo: docTipo || undefined,
                         documentoRespaldoRef: docRef || undefined,
+                        pendienteRevision: enObservacion,
                       }, actor.nombre)
                     )
                   }

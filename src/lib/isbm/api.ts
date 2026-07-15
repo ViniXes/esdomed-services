@@ -629,6 +629,7 @@ export interface EdicionCargo {
   comentarios?: string;
   tipoDocumentoRespaldo?: string;
   documentoRespaldoRef?: string;
+  pendienteRevision: boolean; // permite marcar/quitar la observación al editar
 }
 
 // Edita cantidad/precio/documentación de un cargo (día abierto, no anulado).
@@ -665,6 +666,7 @@ export async function editarCargo(
       comentarios: ed.comentarios?.trim() || null,
       tipo_documento_respaldo: ed.tipoDocumentoRespaldo || null,
       documento_respaldo_ref: ed.documentoRespaldoRef?.trim() || null,
+      pendiente_revision: ed.pendienteRevision,
       modificado_por_nombre: actorNombre,
       modificado_en: new Date().toISOString(),
     })
