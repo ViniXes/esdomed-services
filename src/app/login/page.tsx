@@ -37,6 +37,7 @@ export default function LoginPage() {
     else if (profile.role === "enfermeria") router.replace("/enfermeria");
     else if (profile.role === "rrhh") router.replace("/rrhh");
     else if (profile.role === "transporte" || profile.role === "motorista") router.replace("/transporte");
+    else if (profile.role === "isbm_tecnico" || profile.role === "isbm_supervisor" || profile.role === "isbm_jefe") router.replace("/isbm");
     else router.replace("/dashboard");
   }, [loading, profile, router]);
 
