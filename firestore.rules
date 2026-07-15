@@ -25,6 +25,9 @@ service cloud.firestore {
     function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
     function isTransporte()   { return isAuth() && getRole() == 'transporte'; }
     function isMotorista()    { return isAuth() && getRole() == 'motorista'; }
+    // Roles del módulo Convenio ISBM. Sus datos viven en Supabase; en Firestore
+    // solo LEEN el padrón (pacientes/personas) para afiliar — nunca escriben.
+    function isIsbm()         { return isAuth() && getRole() in ['isbm_tecnico', 'isbm_supervisor', 'isbm_jefe']; }
     // Sesión real (no anónima). El formulario público de transporte usa sesiones
     // anónimas: NO deben poder leer datos internos del portal.
     function isRealUser() {
@@ -221,7 +224,7 @@ service cloud.firestore {
 
     // ─── Pacientes ────────────────────────────────────────────────────────────
     match /pacientes/{id} {
-      allow read:   if isStaff() || isMedico() || isEnfermeria();
+      allow read:   if isStaff() || isMedico() || isEnfermeria() || isIsbm();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin();
       allow delete: if isAdmin();
@@ -231,7 +234,7 @@ service cloud.firestore {
     // Datos personales canónicos del paciente (clave = expediente). Mismo acceso
     // que pacientes: el personal los consulta y ESDOMED/admin los crean y editan.
     match /personas/{expediente} {
-      allow read:   if isStaff() || isMedico() || isEnfermeria();
+      allow read:   if isStaff() || isMedico() || isEnfermeria() || isIsbm();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin();
       allow delete: if isAdmin();
