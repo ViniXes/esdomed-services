@@ -295,9 +295,36 @@ export async function censosDeIngreso(ingresoId: string): Promise<CensoDiarioCon
   return (data ?? []) as unknown as CensoDiarioConRelaciones[];
 }
 
+// Mapeo del servicio de ESDOMED (texto libre) → servicio de facturación del
+// convenio. Regla confirmada por ESDOMED (2026-07-15): solo existen 3 tipos BM:
+//   · "Bienestar Magisterial"            → Hospitalización General (HOSPI)
+//   · todo lo que diga "Intermedios"     → Cuidados Intermedios (INTERM)
+//   · todo lo que diga "Intensivos"      → UCI (el convenio distingue además
+//     UCI_ECMO, pero esa la decide el técnico en el censo: ESDOMED no la separa)
+// "Paliativos" se mapea de bonus; CRONICOS es reclasificación por estancia
+// (>90 días), no un servicio físico de ESDOMED.
+export function mapearServicioEsdomed(
+  nombre: string | null | undefined,
+  servicios: ServicioHospitalarioIsbm[]
+): ServicioHospitalarioIsbm {
+  const n = (nombre ?? "").toLowerCase();
+  const codigo = n.includes("intermedi")
+    ? "INTERM"
+    : n.includes("intensiv") || n.includes("uci")
+      ? "UCI"
+      : n.includes("paliativ")
+        ? "PALIT"
+        : "HOSPI";
+  const servicio =
+    servicios.find((s) => s.codigo === codigo) ?? servicios.find((s) => s.codigo === "HOSPI");
+  if (!servicio) throw new Error("Catálogo de servicios ISBM incompleto (falta HOSPI)");
+  return servicio;
+}
+
 // "Abrir día" idempotente: crea el censo de la fecha para todo ingreso ISBM
 // activo que aún no lo tenga. Hereda servicios/cama/médico del censo del día
-// anterior si existe; si no, arranca en Hospitalización General (HOSPI).
+// anterior si existe; si no, arranca en el servicio mapeado desde el servicio
+// actual de ESDOMED (regla de los 3 tipos BM, ver mapearServicioEsdomed).
 // El UNIQUE (ingreso_id, fecha) + ignoreDuplicates hace imposible duplicar.
 export async function abrirDia(
   fecha: string,
@@ -318,9 +345,6 @@ export async function abrirDia(
   );
   if (!pendientes.length) return 0;
 
-  const hospi = servicios.find((s) => s.codigo === "HOSPI");
-  if (!hospi) throw new Error("No se encontró el servicio HOSPI en el catálogo");
-
   const ayer = new Date(`${fecha}T12:00:00`);
   ayer.setDate(ayer.getDate() - 1);
   const fechaAyer = ayer.toISOString().slice(0, 10);
@@ -332,12 +356,15 @@ export async function abrirDia(
 
   const filas = pendientes.map((ing) => {
     const previo = porIngresoAyer.get(ing.id);
+    // Primer día sin censo previo: el servicio sale del servicio actual de
+    // ESDOMED mapeado a los 3 tipos BM (los días siguientes heredan del anterior).
+    const mapeado = mapearServicioEsdomed(ing.servicio_actual, servicios);
     return {
       ingreso_id: ing.id,
       expediente: ing.expediente,
       fecha,
-      servicio_fisico_id: previo?.servicio_fisico_id ?? hospi.id,
-      servicio_facturacion_id: previo?.servicio_facturacion_id ?? hospi.id,
+      servicio_fisico_id: previo?.servicio_fisico_id ?? mapeado.id,
+      servicio_facturacion_id: previo?.servicio_facturacion_id ?? mapeado.id,
       cama: previo?.cama ?? ing.cama_actual,
       medico_tratante_nombre: previo?.medico_tratante_nombre ?? ing.medico_tratante_nombre,
       registrado_por_uid: actor.uid,
@@ -460,6 +487,9 @@ export interface NuevoCargoInput {
   especialidadInterconsulta?: string;
   tipoDocumentoRespaldo?: string;
   documentoRespaldoRef?: string;
+  // "Observado" del Excel: el servicio se indicó pero aún no se confirma que
+  // se realizó (ej. cultivos). Se confirma días después desde el detalle.
+  pendienteRevision?: boolean;
 }
 
 const TIPO_AUTORIZACION_POR_RUBRO: Record<string, string> = {
@@ -556,6 +586,7 @@ export async function crearCargo(
       especialidad_interconsulta: input.especialidadInterconsulta ?? null,
       tipo_documento_respaldo: input.tipoDocumentoRespaldo || null,
       documento_respaldo_ref: input.documentoRespaldoRef?.trim() || null,
+      pendiente_revision: input.pendienteRevision ?? false,
       capturado_por_uid: actor.uid,
       capturado_por_nombre: actor.nombre,
     })
@@ -690,6 +721,23 @@ export async function marcarCobrable(cargo: CargoConArancel, actorNombre: string
     })
     .eq("id", cargo.id);
   lanzar("Error marcando el cargo como cobrable", error);
+}
+
+// Confirma un cargo que estaba "en observación" (pendiente_revision): se
+// verificó que el servicio SÍ se realizó. No toca montos, por eso se permite
+// aunque el día ya esté cerrado. Si NO se realizó, el camino es reabrir el
+// día y anular el cargo (eso sí recalcula totales).
+export async function confirmarCargoObservado(cargoId: number, actorNombre: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      pendiente_revision: false,
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargoId)
+    .eq("pendiente_revision", true);
+  lanzar("Error confirmando el cargo", error);
 }
 
 // Anulación lógica: el cargo queda en cero pero visible para auditoría.

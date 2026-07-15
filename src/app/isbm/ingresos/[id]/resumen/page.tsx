@@ -320,6 +320,9 @@ function SeccionTabla({ seccion, cargos }: { seccion: SeccionDef; cargos: CargoC
                     {formatoDolares(c.monto_facturable)}
                   </td>
                   <td className="px-3 py-1.5 text-center">
+                    {c.pendiente_revision && !c.anulado && (
+                      <Estado texto="⏳ Obs." tono="ambar" titulo="En observación: pendiente de confirmar que se realizó" />
+                    )}{" "}
                     {c.anulado ? (
                       <Estado texto="Anulado" tono="rojo" />
                     ) : c.monto_facturable === 0 ? (

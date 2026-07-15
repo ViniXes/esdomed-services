@@ -7,9 +7,10 @@
 --     corregidos a DIA_CAMA aquí.
 --   • es_controlado = FALSE para todos; actualizar manualmente los
 --     medicamentos de la lista de sustancias controladas (JVPM).
---   • requiere_autorizacion = TRUE solo para MEDICAMENTOS_ADICIONALES
---     (bolsón). Para servicios no arancelados que se agreguen después,
---     setear manualmente.
+--   • requiere_autorizacion = FALSE para TODO el catálogo (regla ESDOMED
+--     2026-07-15: los adicionales a cuadro/bolsón NO requieren autorización;
+--     solo los servicios NO ARANCELADOS que se agreguen después la requieren
+--     — se marcan al crearlos desde la página de Aranceles).
 -- ============================================================
 
 INSERT INTO aranceles
@@ -657,39 +658,39 @@ VALUES
     ('MQ203', 'MEDICAMENTOS_CUADRO', 'Verapamilo Clorhidrato - tableta', 0.20, TRUE, FALSE, FALSE, FALSE, NULL, NULL, '2023-06-29'),
     ('MQ204', 'MEDICAMENTOS_CUADRO', 'Warfarina Sódica', 0.35, TRUE, FALSE, FALSE, FALSE, NULL, NULL, '2023-06-29'),
     ('MQ205', 'MEDICAMENTOS_CUADRO', 'Zinc Sulfato', 0.50, TRUE, FALSE, FALSE, FALSE, NULL, NULL, '2023-06-29'),
-    ('MB001', 'MEDICAMENTOS_ADICIONALES', 'Agua estéril para inyección 1000 ml (no cobrable)', 0.89, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB002', 'MEDICAMENTOS_ADICIONALES', 'Albumina Humana 50 ml - IV', 34.28, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB003', 'MEDICAMENTOS_ADICIONALES', 'Amfotericina B 50 mg - IV', 14.85, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB004', 'MEDICAMENTOS_ADICIONALES', 'Bupivacaína Clorhidrato + Dextrosa anhidra 4 ml - IV', 1.10, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB005', 'MEDICAMENTOS_ADICIONALES', 'Dexketoprofeno 25 mg', 1.55, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB006', 'MEDICAMENTOS_ADICIONALES', 'Edoxaban 30 mg', 3.90, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB007', 'MEDICAMENTOS_ADICIONALES', 'Edoxaban 60 mg', 3.90, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB008', 'MEDICAMENTOS_ADICIONALES', 'Enoxaparina Sódica 60 mg', 5.10, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB009', 'MEDICAMENTOS_ADICIONALES', 'Eritropoyetina alfa humana recombinante 0.4 ml (no cobrable)', 25.00, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB010', 'MEDICAMENTOS_ADICIONALES', 'Eritropoyetina Beta Humana Recombinante 50000 UI', 2.55, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB011', 'MEDICAMENTOS_ADICIONALES', 'ERITROPOYETINA RECOMBINANTE HUMANA 2000 UI', 25.00, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB012', 'MEDICAMENTOS_ADICIONALES', 'Etomidato 2 mg/Ml - IV', 4.25, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB013', 'MEDICAMENTOS_ADICIONALES', 'Expansor de volumen plasmático a base de gelatina 500 ml', 13.00, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB014', 'MEDICAMENTOS_ADICIONALES', 'Fórmula hipercalórica', 3.50, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB015', 'MEDICAMENTOS_ADICIONALES', 'Fórmula Polimérica Adulto, con distribución completa Normal de Nutrientes', 5.49, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB016', 'MEDICAMENTOS_ADICIONALES', 'Fórmula polimérica con fibra y libre de lactosa, para paciente con intolerancia a carbohidratos o diabético', 9.01, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB017', 'MEDICAMENTOS_ADICIONALES', 'Fórmula para paciente renal', 3.10, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB018', 'MEDICAMENTOS_ADICIONALES', 'Fórmula para pacientes con intolerancia a los Carbohidratos o Diabético', 9.00, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB019', 'MEDICAMENTOS_ADICIONALES', 'Inmunoglobulina Humana Normal', 287.75, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB020', 'MEDICAMENTOS_ADICIONALES', 'Ketamina Clorhidrato', 6.75, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB021', 'MEDICAMENTOS_ADICIONALES', 'LEVETIRACETAM 100 mg/ml', 22.50, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB022', 'MEDICAMENTOS_ADICIONALES', 'Levosulpiride 25 mg', 2.09, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB023', 'MEDICAMENTOS_ADICIONALES', 'Lidocaína Clorhidrato 2% 50 ml (no cobrable)', 2.00, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB024', 'MEDICAMENTOS_ADICIONALES', 'Metil Prednisolona (Succinato Sódico) 40 mg', 10.90, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB025', 'MEDICAMENTOS_ADICIONALES', 'Octeotrida Acetato 0.1 mg/mL', 1.90, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB026', 'MEDICAMENTOS_ADICIONALES', 'Oligoelementos 20 ml - parenteral', 2.50, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB027', 'MEDICAMENTOS_ADICIONALES', 'Piridostigmina bromuro 60 mg', 0.90, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB028', 'MEDICAMENTOS_ADICIONALES', 'Remifentanilo, Clorhidrato 5 mg', 12.00, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB029', 'MEDICAMENTOS_ADICIONALES', 'Solución de aminoácidos cristalinos sin electrolitos 500 ml', 7.90, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB030', 'MEDICAMENTOS_ADICIONALES', 'Solución electrolítica en agua estéril para inyección con Na, K, Ca y Lactato, (Hartmann o Ringer) 1000 ml (no cobrable)', 0.60, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB031', 'MEDICAMENTOS_ADICIONALES', 'Sodio Cloruro en agua estéril 100 ml (no cobrable)', 0.60, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB032', 'MEDICAMENTOS_ADICIONALES', 'Sodio Cloruro en agua estéril para inyección 10 ml (no cobrable)', 0.77, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29'),
-    ('MB033', 'MEDICAMENTOS_ADICIONALES', 'Succinilcolina Cloruro 500 mg', 8.40, FALSE, TRUE, FALSE, TRUE, 200.00, 200.01, '2023-06-29');
+    ('MB001', 'MEDICAMENTOS_ADICIONALES', 'Agua estéril para inyección 1000 ml (no cobrable)', 0.89, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB002', 'MEDICAMENTOS_ADICIONALES', 'Albumina Humana 50 ml - IV', 34.28, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB003', 'MEDICAMENTOS_ADICIONALES', 'Amfotericina B 50 mg - IV', 14.85, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB004', 'MEDICAMENTOS_ADICIONALES', 'Bupivacaína Clorhidrato + Dextrosa anhidra 4 ml - IV', 1.10, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB005', 'MEDICAMENTOS_ADICIONALES', 'Dexketoprofeno 25 mg', 1.55, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB006', 'MEDICAMENTOS_ADICIONALES', 'Edoxaban 30 mg', 3.90, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB007', 'MEDICAMENTOS_ADICIONALES', 'Edoxaban 60 mg', 3.90, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB008', 'MEDICAMENTOS_ADICIONALES', 'Enoxaparina Sódica 60 mg', 5.10, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB009', 'MEDICAMENTOS_ADICIONALES', 'Eritropoyetina alfa humana recombinante 0.4 ml (no cobrable)', 25.00, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB010', 'MEDICAMENTOS_ADICIONALES', 'Eritropoyetina Beta Humana Recombinante 50000 UI', 2.55, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB011', 'MEDICAMENTOS_ADICIONALES', 'ERITROPOYETINA RECOMBINANTE HUMANA 2000 UI', 25.00, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB012', 'MEDICAMENTOS_ADICIONALES', 'Etomidato 2 mg/Ml - IV', 4.25, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB013', 'MEDICAMENTOS_ADICIONALES', 'Expansor de volumen plasmático a base de gelatina 500 ml', 13.00, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB014', 'MEDICAMENTOS_ADICIONALES', 'Fórmula hipercalórica', 3.50, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB015', 'MEDICAMENTOS_ADICIONALES', 'Fórmula Polimérica Adulto, con distribución completa Normal de Nutrientes', 5.49, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB016', 'MEDICAMENTOS_ADICIONALES', 'Fórmula polimérica con fibra y libre de lactosa, para paciente con intolerancia a carbohidratos o diabético', 9.01, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB017', 'MEDICAMENTOS_ADICIONALES', 'Fórmula para paciente renal', 3.10, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB018', 'MEDICAMENTOS_ADICIONALES', 'Fórmula para pacientes con intolerancia a los Carbohidratos o Diabético', 9.00, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB019', 'MEDICAMENTOS_ADICIONALES', 'Inmunoglobulina Humana Normal', 287.75, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB020', 'MEDICAMENTOS_ADICIONALES', 'Ketamina Clorhidrato', 6.75, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB021', 'MEDICAMENTOS_ADICIONALES', 'LEVETIRACETAM 100 mg/ml', 22.50, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB022', 'MEDICAMENTOS_ADICIONALES', 'Levosulpiride 25 mg', 2.09, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB023', 'MEDICAMENTOS_ADICIONALES', 'Lidocaína Clorhidrato 2% 50 ml (no cobrable)', 2.00, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB024', 'MEDICAMENTOS_ADICIONALES', 'Metil Prednisolona (Succinato Sódico) 40 mg', 10.90, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB025', 'MEDICAMENTOS_ADICIONALES', 'Octeotrida Acetato 0.1 mg/mL', 1.90, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB026', 'MEDICAMENTOS_ADICIONALES', 'Oligoelementos 20 ml - parenteral', 2.50, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB027', 'MEDICAMENTOS_ADICIONALES', 'Piridostigmina bromuro 60 mg', 0.90, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB028', 'MEDICAMENTOS_ADICIONALES', 'Remifentanilo, Clorhidrato 5 mg', 12.00, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB029', 'MEDICAMENTOS_ADICIONALES', 'Solución de aminoácidos cristalinos sin electrolitos 500 ml', 7.90, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB030', 'MEDICAMENTOS_ADICIONALES', 'Solución electrolítica en agua estéril para inyección con Na, K, Ca y Lactato, (Hartmann o Ringer) 1000 ml (no cobrable)', 0.60, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB031', 'MEDICAMENTOS_ADICIONALES', 'Sodio Cloruro en agua estéril 100 ml (no cobrable)', 0.60, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB032', 'MEDICAMENTOS_ADICIONALES', 'Sodio Cloruro en agua estéril para inyección 10 ml (no cobrable)', 0.77, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
+    ('MB033', 'MEDICAMENTOS_ADICIONALES', 'Succinilcolina Cloruro 500 mg', 8.40, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29');
 
 -- Verificación: debe devolver 672
 -- SELECT COUNT(*) FROM aranceles;
