@@ -5,11 +5,12 @@
 // anularlos lógicamente mientras el día esté abierto.
 
 import { useCallback, useEffect, useState } from "react";
-import { Ban, ChevronRight, Pencil, Plus, Search, X } from "lucide-react";
+import { Ban, CheckCircle2, ChevronRight, Hourglass, Pencil, Plus, Search, X } from "lucide-react";
 import {
   anularCargo,
   buscarAranceles,
   cargosDeCenso,
+  confirmarCargoObservado,
   crearCargo,
   editarCargo,
   marcarCobrable,
@@ -122,6 +123,11 @@ export function CargosDelDia({
                     {RUBRO_LABEL[c.arancel.rubro]} · {Number(c.cantidad)} × {formatoDolares(c.precio_unitario)}
                   </p>
                 </div>
+                {c.pendiente_revision && !c.anulado && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-full px-2 py-0.5">
+                    <Hourglass size={10} /> En observación
+                  </span>
+                )}
                 {c.motivo_no_facturable && !c.anulado && (
                   <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-full px-2 py-0.5">
                     {MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable]}
@@ -190,6 +196,7 @@ function NuevoCargoModal({
   const [docTipo, setDocTipo] = useState("");
   const [docRef, setDocRef] = useState("");
   const [comentarios, setComentarios] = useState("");
+  const [enObservacion, setEnObservacion] = useState(false);
 
   // Búsqueda con debounce sobre el catálogo vigente
   useEffect(() => {
@@ -225,6 +232,7 @@ function NuevoCargoModal({
         especialidadInterconsulta: esInterconsulta ? especialidad : undefined,
         tipoDocumentoRespaldo: docTipo || undefined,
         documentoRespaldoRef: docRef || undefined,
+        pendienteRevision: enObservacion,
       };
       const avisos = await crearCargo(censo, arancel, input, actor);
       onListo(avisos);
@@ -367,6 +375,21 @@ function NuevoCargoModal({
               <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} rows={2} className={inputCls} />
             </Campo>
 
+            <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 border border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/30 rounded-xl px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enObservacion}
+                onChange={(e) => setEnObservacion(e.target.checked)}
+                className="accent-orange-600 mt-0.5"
+              />
+              <span>
+                <span className="font-medium inline-flex items-center gap-1.5"><Hourglass size={13} /> Dejar en observación</span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  Para servicios que se confirman días después (ej. cultivos). Se confirma desde el detalle del cargo, aunque el día ya esté cerrado.
+                </span>
+              </span>
+            </label>
+
             {error && (
               <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
             )}
@@ -496,6 +519,31 @@ function DetalleCargoModal({
             <X size={16} />
           </button>
         </div>
+
+        {cargo.pendiente_revision && !cargo.anulado && modo === "ver" && (
+          <div className="mb-3 border border-orange-200 dark:border-orange-900 bg-orange-50/60 dark:bg-orange-950/40 rounded-xl p-3 flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[220px]">
+              <p className="text-xs font-semibold text-orange-800 dark:text-orange-200 inline-flex items-center gap-1.5">
+                <Hourglass size={13} /> En observación — pendiente de confirmar que se realizó
+              </p>
+              <p className="text-xs text-orange-700/80 dark:text-orange-300/80 mt-0.5">
+                {diaCerrado
+                  ? "Confirmar no cambia montos (se permite con el día cerrado). Si NO se realizó: reabre el día y anúlalo."
+                  : "Si NO se realizó, anúlalo con el botón de abajo."}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (!window.confirm("¿Confirmar que este servicio SÍ se realizó?")) return;
+                ejecutar(() => confirmarCargoObservado(cargo.id, actor.nombre));
+              }}
+              disabled={ocupado}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-500 rounded-lg disabled:opacity-50 transition-colors flex-shrink-0"
+            >
+              <CheckCircle2 size={14} /> Confirmar realizado
+            </button>
+          </div>
+        )}
 
         {modo === "editar" ? (
           <div className="space-y-3">

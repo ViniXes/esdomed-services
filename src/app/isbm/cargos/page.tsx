@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Hourglass, Search } from "lucide-react";
 import { listarCargos } from "@/lib/isbm/api";
 import {
   MOTIVO_NO_FACTURABLE_LABEL,
@@ -22,6 +22,7 @@ export default function CargosPage() {
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [rubro, setRubro] = useState("");
   const [verAnulados, setVerAnulados] = useState(false);
+  const [soloObservados, setSoloObservados] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [cargos, setCargos] = useState<CargoListado[] | null>(null);
   const [error, setError] = useState("");
@@ -45,14 +46,16 @@ export default function CargosPage() {
   const filtrados = useMemo(() => {
     if (!cargos) return [];
     const t = busqueda.trim().toLowerCase();
-    if (!t) return cargos;
-    return cargos.filter(
-      (c) =>
+    return cargos.filter((c) => {
+      if (soloObservados && (!c.pendiente_revision || c.anulado)) return false;
+      if (!t) return true;
+      return (
         c.expediente.toLowerCase().includes(t) ||
         (c.afiliacion?.paciente_nombre ?? "").toLowerCase().includes(t) ||
         c.arancel.descripcion.toLowerCase().includes(t)
-    );
-  }, [cargos, busqueda]);
+      );
+    });
+  }, [cargos, busqueda, soloObservados]);
 
   const vivos = filtrados.filter((c) => !c.anulado);
   const totalServicio = vivos.reduce((s, c) => s + c.costo_total, 0);
@@ -83,6 +86,10 @@ export default function CargosPage() {
         <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 px-1 cursor-pointer">
           <input type="checkbox" checked={verAnulados} onChange={(e) => setVerAnulados(e.target.checked)} className="accent-blue-600" />
           Incluir anulados
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 px-1 cursor-pointer">
+          <input type="checkbox" checked={soloObservados} onChange={(e) => setSoloObservados(e.target.checked)} className="accent-orange-600" />
+          <Hourglass size={13} className="text-orange-500" /> Solo en observación
         </label>
         <div className="relative flex-1 min-w-[200px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -155,11 +162,18 @@ export default function CargosPage() {
                     <td className="px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{formatoDolares(c.costo_total)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">{formatoDolares(c.monto_facturable)}</td>
                     <td className="px-4 py-2.5">
-                      {c.motivo_no_facturable && (
-                        <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-full px-2 py-0.5 whitespace-nowrap">
-                          {MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable]}
-                        </span>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {c.pendiente_revision && !c.anulado && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-full px-2 py-0.5 whitespace-nowrap">
+                            <Hourglass size={10} /> En observación
+                          </span>
+                        )}
+                        {c.motivo_no_facturable && (
+                          <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-full px-2 py-0.5 whitespace-nowrap">
+                            {MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable]}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
