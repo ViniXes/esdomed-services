@@ -1,4 +1,9 @@
-export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista";
+export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
+
+// Roles del módulo Convenio ISBM (los datos del módulo viven en Supabase;
+// ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.
+export const ISBM_ROLES: UserRole[] = ["isbm_tecnico", "isbm_supervisor", "isbm_jefe"];
+export const esRolIsbm = (role?: UserRole) => !!role && ISBM_ROLES.includes(role);
 export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin";
 
 export interface UserProfile {
