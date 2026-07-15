@@ -130,6 +130,7 @@ function AccionCard({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex items-start gap-3 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
     >
       <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center flex-shrink-0">
