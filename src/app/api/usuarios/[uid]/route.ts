@@ -15,6 +15,11 @@ const VALID_ROLES = new Set<UserRole>([
   "admin",
   "enfermeria",
   "rrhh",
+  "transporte",
+  "motorista",
+  "isbm_tecnico",
+  "isbm_supervisor",
+  "isbm_jefe",
 ]);
 
 function esPersonalEsdomed(role: string | undefined) {

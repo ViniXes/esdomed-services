@@ -412,6 +412,7 @@ function FilaPaciente({
         </div>
         <Link
           href={`/dashboard/gestiones?exp=${encodeURIComponent(p.expediente)}`}
+          prefetch={false}
           className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 px-2.5 py-1.5 rounded-lg transition-colors"
         >
           <NotebookPen size={12} /> Registrar

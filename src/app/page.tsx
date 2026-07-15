@@ -15,7 +15,11 @@ export default function Home() {
     else if (profile?.role === "psicologia") router.replace("/psicologia");
     else if (profile?.role === "enfermeria") router.replace("/enfermeria");
     else if (profile?.role === "rrhh") router.replace("/rrhh");
+    else if (profile?.role === "transporte" || profile?.role === "motorista") router.replace("/transporte");
+    else if (profile?.role === "isbm_tecnico" || profile?.role === "isbm_supervisor" || profile?.role === "isbm_jefe") router.replace("/isbm");
     else if (profile) router.replace("/dashboard");
+    // Sesión sin perfil (anónima del formulario público de transporte): al login.
+    else router.replace("/login");
   }, [user, profile, loading, router]);
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CondicionEgresoIncapacidad } from "@/types";
-import { calcularDiasHospitalizacion, calcularFechaHasta, formatFechaCorta, parseDateInput } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, formatFechaCorta, parseDateInput } from "@/lib/incapacidades/helpers";
 import { DateField } from "@/components/ui/DateField";
 
 const inputCls =
@@ -39,7 +39,9 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergenci
 
   // Hospitalización: total = días de estancia + adicionales (fechaDesde = ingreso).
   // Emergencia: total = solo los días prescritos (fechaDesde = la fecha de inicio).
-  const altaAntesDqIngreso = !emergencia && fAlta !== null && !!fechaIngreso && fAlta < fechaIngreso;
+  // Comparación por DÍA calendario: ingreso y alta el mismo día es válido
+  // (alta voluntaria / retiro el mismo día) y cuenta 1 día de estancia.
+  const altaAntesDqIngreso = !emergencia && fAlta !== null && !!fechaIngreso && altaAntesDelIngreso(fAlta, fechaIngreso);
 
   const diasHosp = !emergencia && fAlta && fechaIngreso && !altaAntesDqIngreso
     ? calcularDiasHospitalizacion(fechaIngreso, fAlta)

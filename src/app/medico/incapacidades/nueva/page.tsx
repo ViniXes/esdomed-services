@@ -16,7 +16,7 @@ import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
 import { condicionEgreso, CONDICION_LABEL } from "@/lib/emergencia/helpers";
-import { calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput } from "@/lib/incapacidades/helpers";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -228,7 +228,8 @@ export default function NuevaIncapacidadPage() {
         if (atencion.genero) doc.pacienteGenero = atencion.genero;
       } else if (paciente) {
         const fDesde = paciente.fechaIngreso;
-        if (fAlta < fDesde) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
+        // Por día calendario: mismo día de ingreso y alta es válido (alta voluntaria).
+        if (altaAntesDelIngreso(fAlta, fDesde)) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
         doc.origen = "hospitalizacion";
         doc.pacienteId = paciente.id!;
         doc.pacienteExpediente = paciente.expediente;

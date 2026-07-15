@@ -52,7 +52,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       (!profile ||
         profile.role === "medico" ||
         profile.role === "psicologia" ||
-        profile.role === "enfermeria")
+        profile.role === "enfermeria" ||
+        profile.role === "transporte" ||
+        profile.role === "motorista" ||
+        profile.role === "isbm_tecnico" ||
+        profile.role === "isbm_supervisor" ||
+        profile.role === "isbm_jefe")
     ) {
       router.replace("/login");
     }

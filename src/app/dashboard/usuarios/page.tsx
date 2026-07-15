@@ -67,6 +67,11 @@ const roleColors: Record<UserRole, string> = {
   admin: "bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900",
   enfermeria: "bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-900",
   rrhh: "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900",
+  transporte: "bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900",
+  motorista: "bg-lime-50 dark:bg-lime-950 text-lime-700 dark:text-lime-400 border-lime-200 dark:border-lime-900",
+  isbm_tecnico: "bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-900",
+  isbm_supervisor: "bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900",
+  isbm_jefe: "bg-fuchsia-50 dark:bg-fuchsia-950 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-900",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -78,6 +83,11 @@ const roleLabels: Record<UserRole, string> = {
   admin: "Administrador Superusuario",
   enfermeria: "Enfermeria",
   rrhh: "Recursos Humanos",
+  transporte: "Jefe de Transporte",
+  motorista: "Motorista",
+  isbm_tecnico: "Técnico ISBM",
+  isbm_supervisor: "Supervisor ISBM",
+  isbm_jefe: "Jefe ISBM",
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -88,6 +98,11 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "psicologia", label: "Psicologia" },
   { value: "enfermeria", label: "Enfermeria" },
   { value: "rrhh", label: "Recursos Humanos" },
+  { value: "transporte", label: "Jefe de Transporte" },
+  { value: "motorista", label: "Motorista" },
+  { value: "isbm_tecnico", label: "Técnico ISBM" },
+  { value: "isbm_supervisor", label: "Supervisor ISBM" },
+  { value: "isbm_jefe", label: "Jefe ISBM" },
   { value: "admin", label: "Administrador Superusuario" },
 ];
 

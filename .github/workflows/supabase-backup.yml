@@ -1,0 +1,53 @@
+# Backup diario de la base PostgreSQL del módulo ISBM (Supabase).
+#
+# Doble propósito:
+#   1. Respaldo: el plan gratuito de Supabase NO tiene backups automáticos.
+#      Cada corrida guarda un pg_dump comprimido como artifact (90 días).
+#   2. Keep-alive: la conexión diaria cuenta como actividad y evita que
+#      Supabase pause el proyecto por inactividad (~7 días en free tier).
+#
+# Requiere el secret SUPABASE_DB_URL (Settings → Secrets → Actions):
+#   cadena de conexión del SESSION POOLER (Dashboard → Connect → Session
+#   pooler), que es IPv4 — la conexión directa es solo IPv6 y GitHub
+#   Actions no la alcanza. Formato:
+#   postgresql://postgres.<ref>:<PASSWORD>@aws-1-us-east-1.pooler.supabase.com:5432/postgres
+
+name: Backup Supabase (ISBM)
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # 08:00 UTC = 02:00 El Salvador, todos los días
+  workflow_dispatch: {} # permite correrlo a mano desde la pestaña Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente PostgreSQL 17
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: pg_dump
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Falta el secret SUPABASE_DB_URL"; exit 1
+          fi
+          FECHA=$(date -u +%Y-%m-%d)
+          pg_dump "$DB_URL" \
+            --no-owner --no-privileges \
+            --schema=public \
+            --file="isbm_backup_${FECHA}.sql"
+          gzip "isbm_backup_${FECHA}.sql"
+          ls -lh isbm_backup_*.sql.gz
+
+      - name: Guardar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: isbm-backup-${{ github.run_id }}
+          path: isbm_backup_*.sql.gz
+          retention-days: 90

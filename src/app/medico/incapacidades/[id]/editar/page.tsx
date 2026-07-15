@@ -11,7 +11,7 @@ import type { Paciente, SolicitudIncapacidad } from "@/types";
 import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -139,7 +139,8 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         fHasta = calcularFechaHasta(fAlta, diasExtras - 1);
       } else {
         fDesde = paciente?.fechaIngreso ?? incapacidad.fechaDesde;
-        if (fAlta < fDesde) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
+        // Por día calendario: mismo día de ingreso y alta es válido (alta voluntaria).
+        if (altaAntesDelIngreso(fAlta, fDesde)) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
         diasTotal = calcularDiasHospitalizacion(fDesde, fAlta) + diasExtras;
         fHasta = calcularFechaHasta(fAlta, diasExtras);
       }

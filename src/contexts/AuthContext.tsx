@@ -34,8 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-        setProfile(snap.exists() ? { uid: firebaseUser.uid, ...snap.data() } as UserProfile : null);
+        // Las sesiones ANÓNIMAS (formulario público de transporte) no tienen
+        // perfil; y si las reglas negaran la lectura, no debe colgar la carga.
+        try {
+          const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
+          setProfile(snap.exists() ? { uid: firebaseUser.uid, ...snap.data() } as UserProfile : null);
+        } catch {
+          setProfile(null);
+        }
       } else {
         setProfile(null);
       }

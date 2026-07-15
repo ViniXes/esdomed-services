@@ -52,8 +52,19 @@ export function parseDateInput(s: string): Date {
 // ── Cálculo de fechas ────────────────────────────────────────────────────────
 
 /** Devuelve una copia de la fecha a medianoche local (sin hora). */
-function aMedianocheLocal(d: Date): Date {
+export function aMedianocheLocal(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * ¿La fecha de alta cae en un día calendario ANTERIOR al del ingreso?
+ * Compara solo días (medianoche local): `fechaIngreso` trae hora (p. ej. 10:30)
+ * y la fecha de alta del formulario se parsea a medianoche — comparar con hora
+ * rechazaba el caso legítimo de ingreso y alta EL MISMO DÍA (alta voluntaria,
+ * retiro el mismo día del ingreso).
+ */
+export function altaAntesDelIngreso(fechaAlta: Date, fechaIngreso: Date): boolean {
+  return aMedianocheLocal(fechaAlta).getTime() < aMedianocheLocal(fechaIngreso).getTime();
 }
 
 /**
