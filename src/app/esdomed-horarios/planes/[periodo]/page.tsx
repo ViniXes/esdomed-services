@@ -29,9 +29,21 @@ import {
   formatPeriodo,
   sincronizarFilas,
   compararFilasPlan,
+  prepararFilasNuevoPeriodo,
+  copiarFilasMesAnterior,
+  casillasSugeridasPlan,
+  validarAsignacionPlan,
+  validarReglasFilasPlan,
+  autocompletarAdministrativoSiCorresponde,
   GRUPOS_ESDOMED,
   COLOR_GRUPO,
 } from "@/lib/esdomed/plan";
+import {
+  configPersonalPlan,
+  esAdministrativoPlan,
+  normalizarMetadatosFilaPlan,
+} from "@/lib/esdomed/catalogo-plan";
+import { esDiaNoLaboralAdministrativo } from "@/lib/esdomed/calendario-plan";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
 import { exportarPlanExcel, type TipoPlan } from "@/lib/esdomed/exportar-plan";
 import {
@@ -52,6 +64,25 @@ import {
 
 type RosterUser = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;
 
+interface BorradorPlanLocal {
+  periodo: string;
+  actualizadoEn: number;
+  filas: FilaPlanTrabajo[];
+  numeroHoras: string;
+  metaHorasAdmin: number | "";
+  metaHorasOperativas: number | "";
+}
+
+function parsearBloqueCodigos(texto: string): string[][] {
+  const lineas = texto.replace(/\r/g, "").split("\n");
+  while (lineas.length > 1 && lineas[lineas.length - 1] === "") lineas.pop();
+  return lineas.map((linea) => {
+    if (linea.includes("\t")) return linea.split("\t");
+    const limpia = linea.trim();
+    return limpia ? limpia.split(/[\s,;]+/) : [""];
+  });
+}
+
 export default function EditorPlanPage() {
   const params = useParams();
   const periodo = String(params.periodo);
@@ -69,12 +100,32 @@ export default function EditorPlanPage() {
   const [metaHorasAdmin, setMetaHorasAdmin] = useState<number | "">("");
   const [metaHorasOperativas, setMetaHorasOperativas] = useState<number | "">("");
   const [creadoMeta, setCreadoMeta] = useState<Pick<PlanTrabajo, "creadoEn" | "creadoPorId" | "creadoPorNombre"> | null>(null);
-  const [roster, setRoster] = useState<RosterUser[]>([]);
   const [prevPlanData, setPrevPlanData] = useState<PlanTrabajo | null>(null);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
   const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void } | null>(null);
-  const dragRef = useRef<{ filaIdx: number; valor: string; isDragging: boolean; cellsDragged: number } | null>(null);
+  const dragRef = useRef<{ filaIdx: number; valor: string; isDragging: boolean; cellsDragged: number; undoGuardado: boolean } | null>(null);
+  const filasRef = useRef<FilaPlanTrabajo[]>([]);
+  const undoRef = useRef<FilaPlanTrabajo[][]>([]);
+  const inicializadoRef = useRef(false);
+  const borradorKey = useMemo(() => `plan-trabajo-borrador:${periodo}`, [periodo]);
+
+  useEffect(() => {
+    filasRef.current = filas;
+  }, [filas]);
+
+  const registrarUndo = useCallback(() => {
+    const snapshot = JSON.parse(JSON.stringify(filasRef.current)) as FilaPlanTrabajo[];
+    undoRef.current = [...undoRef.current.slice(-29), snapshot];
+  }, []);
+
+  const deshacer = useCallback(() => {
+    const anterior = undoRef.current.pop();
+    if (!anterior) return;
+    filasRef.current = anterior;
+    setFilas(anterior);
+    setGuardado(false);
+  }, []);
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -86,6 +137,29 @@ export default function EditorPlanPage() {
     window.addEventListener("mouseup", handleMouseUp);
     return () => window.removeEventListener("mouseup", handleMouseUp);
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (undoRef.current.length === 0) return;
+      event.preventDefault();
+      deshacer();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deshacer]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!inicializadoRef.current || guardado) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [guardado]);
 
   const cargarRoster = useCallback(async (): Promise<RosterUser[]> => {
     // Incluimos admin además del personal ESDOMED: un superusuario que también es
@@ -109,12 +183,13 @@ export default function EditorPlanPage() {
         } as RosterUser;
       })
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
-    setRoster(lista);
     return lista;
   }, []);
 
   useEffect(() => {
     (async () => {
+      inicializadoRef.current = false;
+      undoRef.current = [];
       setLoading(true);
       try {
         const prevPeriodo = formatPeriodo(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
@@ -130,22 +205,60 @@ export default function EditorPlanPage() {
           setPrevPlanData(null);
         }
 
+        let filasBase: FilaPlanTrabajo[];
+        let numeroHorasBase = "";
+        let metaAdminBase: number | "" = "";
+        let metaOperativaBase: number | "" = "";
         if (snap.exists()) {
           const plan = snap.data() as PlanTrabajo;
-          setNumeroHoras(plan.numeroHoras ?? "");
-          setMetaHorasAdmin(plan.metaHorasAdmin ?? "");
-          setMetaHorasOperativas(plan.metaHorasOperativas ?? "");
+          numeroHorasBase = plan.numeroHoras ?? "";
+          metaAdminBase = plan.metaHorasAdmin ?? "";
+          metaOperativaBase = plan.metaHorasOperativas ?? "";
           setCreadoMeta({
             creadoEn: plan.creadoEn,
             creadoPorId: plan.creadoPorId,
             creadoPorNombre: plan.creadoPorNombre,
           });
           // Mezcla con el roster para incluir personal nuevo, conservando lo guardado.
-          setFilas(sincronizarFilas(lista, plan.filas ?? [], dias.length));
+          filasBase = sincronizarFilas(lista, plan.filas ?? [], dias.length);
         } else {
           setCreadoMeta(null);
-          setFilas(sincronizarFilas(lista, [], dias.length));
+          const planAnterior = prevSnap.exists() ? prevSnap.data() as PlanTrabajo : null;
+          numeroHorasBase = planAnterior?.numeroHoras ?? "";
+          metaAdminBase = planAnterior?.metaHorasAdmin ?? "";
+          metaOperativaBase = planAnterior?.metaHorasOperativas ?? "";
+          filasBase = prepararFilasNuevoPeriodo(lista, planAnterior, anio, mes);
         }
+
+        let borradorRecuperado = false;
+        try {
+          const raw = window.localStorage.getItem(borradorKey);
+          const borrador = raw ? JSON.parse(raw) as BorradorPlanLocal : null;
+          if (borrador?.periodo === periodo && Array.isArray(borrador.filas)) {
+            filasBase = sincronizarFilas(lista, borrador.filas, dias.length);
+            numeroHorasBase = borrador.numeroHoras ?? numeroHorasBase;
+            metaAdminBase = borrador.metaHorasAdmin ?? metaAdminBase;
+            metaOperativaBase = borrador.metaHorasOperativas ?? metaOperativaBase;
+            borradorRecuperado = true;
+          }
+        } catch {
+          window.localStorage.removeItem(borradorKey);
+        }
+
+        filasRef.current = filasBase;
+        setFilas(filasBase);
+        setNumeroHoras(numeroHorasBase);
+        setMetaHorasAdmin(metaAdminBase);
+        setMetaHorasOperativas(metaOperativaBase);
+        setGuardado(snap.exists() && !borradorRecuperado);
+        if (borradorRecuperado) {
+          setModalState({
+            tipo: "alerta",
+            titulo: "Borrador recuperado",
+            mensaje: "Se recuperaron los cambios locales que estaban pendientes de guardar en este mes.",
+          });
+        }
+        inicializadoRef.current = true;
       } finally {
         setLoading(false);
       }
@@ -153,23 +266,59 @@ export default function EditorPlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo]);
 
-  const setCelda = (filaIdx: number, diaIdx: number, valor: string) => {
+  useEffect(() => {
+    if (loading || !inicializadoRef.current || guardado) return;
+    const timer = window.setTimeout(() => {
+      const borrador: BorradorPlanLocal = {
+        periodo,
+        actualizadoEn: Date.now(),
+        filas,
+        numeroHoras,
+        metaHorasAdmin,
+        metaHorasOperativas,
+      };
+      window.localStorage.setItem(borradorKey, JSON.stringify(borrador));
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [borradorKey, filas, guardado, loading, metaHorasAdmin, metaHorasOperativas, numeroHoras, periodo]);
+
+  const setCelda = (filaIdx: number, diaIdx: number, valor: string, guardarUndo = true): boolean => {
+    const filaActual = filasRef.current[filaIdx];
+    if (!filaActual) return false;
+    const restriccion = validarAsignacionPlan(filaActual, diaIdx + 1, valor, anio, mes, prevPlanData);
+    if (restriccion) return false;
+    if (guardarUndo) registrarUndo();
     setFilas((prev) =>
       prev.map((f, i) =>
-        i === filaIdx
-          ? { ...f, asignaciones: f.asignaciones.map((c, j) => (j === diaIdx ? valor : c)) }
-          : f,
+        i === filaIdx ? (
+          autocompletarAdministrativoSiCorresponde(f, diaIdx + 1, valor, anio, mes) ?? {
+            ...f,
+            asignaciones: f.asignaciones.map((c, j) => (j === diaIdx ? valor : c)),
+          }
+        ) : f,
       ),
     );
     setGuardado(false);
+    return true;
   };
 
   const setGrupo = (filaIdx: number, grupo: string) => {
-    setFilas((prev) => prev.map((f, i) => (i === filaIdx ? { ...f, grupo } : f)));
+    registrarUndo();
+    setFilas((prev) => prev.map((f, i) => (
+      i === filaIdx ? normalizarMetadatosFilaPlan({
+        ...f,
+        grupo,
+        tipoJornada:
+          configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo" || grupo === "Administrativo"
+            ? "Administrativo"
+            : "Operativo",
+      }) : f
+    )));
     setGuardado(false);
   };
 
   const limpiarFila = (filaIdx: number) => {
+    registrarUndo();
     setFilas((prev) =>
       prev.map((f, i) =>
         i === filaIdx ? { ...f, asignaciones: f.asignaciones.map(() => "") } : f,
@@ -181,6 +330,7 @@ export default function EditorPlanPage() {
   // Mueve una fila arriba/abajo dentro de su mismo grupo. Renumera `orden`
   // según el orden visible actual y luego intercambia con el vecino.
   const moverFila = (filaIdx: number, dir: -1 | 1) => {
+    registrarUndo();
     setFilas((prev) => {
       const display = prev.map((f, i) => ({ f, i })).sort((a, b) => compararFilasPlan(a.f, b.f));
       const pos = display.findIndex((d) => d.i === filaIdx);
@@ -211,6 +361,7 @@ export default function EditorPlanPage() {
           codigoMarcacion: f.codigoMarcacion ?? "",
           nombre: f.nombre,
           puesto: f.puesto ?? "",
+          tipoJornada: f.tipoJornada,
           grupo: f.grupo ?? "",
           asignaciones: f.asignaciones,
           observaciones: f.observaciones ?? "",
@@ -224,6 +375,7 @@ export default function EditorPlanPage() {
 
   const sincronizar = async () => {
     const lista = await cargarRoster();
+    registrarUndo();
     setFilas((prev) => sincronizarFilas(lista, prev, dias.length));
     setModalState({ tipo: "exito", titulo: "Sincronización Completa", mensaje: "El listado de personal se ha actualizado correctamente con los usuarios ESDOMED vigentes." });
     setGuardado(false);
@@ -237,21 +389,8 @@ export default function EditorPlanPage() {
       return;
     }
     const prevPlan = snap.data() as PlanTrabajo;
-    // Copia patrón: empareja por uid o código y rellena los días de este mes.
-    setFilas((prev) =>
-      prev.map((f) => {
-        const origen =
-          prevPlan.filas.find((pf) => pf.uid && pf.uid === f.uid) ||
-          prevPlan.filas.find((pf) => pf.codigoMarcacion && pf.codigoMarcacion === f.codigoMarcacion);
-        if (!origen) return f;
-        return {
-          ...f,
-          asignaciones: dias.map((_, j) => origen.asignaciones[j] ?? ""),
-          observaciones: origen.observaciones ?? f.observaciones,
-          orden: origen.orden ?? f.orden, // conserva el orden manual del mes anterior
-        };
-      }),
-    );
+    registrarUndo();
+    setFilas((prev) => copiarFilasMesAnterior(prev, prevPlan, anio, mes));
     if (!numeroHoras && prevPlan.numeroHoras) setNumeroHoras(prevPlan.numeroHoras);
     if (metaHorasAdmin === "" && prevPlan.metaHorasAdmin) setMetaHorasAdmin(prevPlan.metaHorasAdmin);
     if (metaHorasOperativas === "" && prevPlan.metaHorasOperativas) setMetaHorasOperativas(prevPlan.metaHorasOperativas);
@@ -263,6 +402,18 @@ export default function EditorPlanPage() {
     if (!profile) return;
 
     const advertencias: string[] = [];
+    const reglas = validarReglasFilasPlan(filas, anio, mes, prevPlanData);
+    if (reglas.errores.length > 0) {
+      setModalState({
+        tipo: "error",
+        titulo: "Plan con asignaciones inválidas",
+        mensaje: `${reglas.errores.slice(0, 12).join("\n")}${reglas.errores.length > 12 ? `\n\nY ${reglas.errores.length - 12} error(es) más.` : ""}`,
+      });
+      return;
+    }
+    if (reglas.advertencias.length > 0) {
+      advertencias.push(reglas.advertencias.join("\n"));
+    }
 
     const diasIncompletos = conteoOperativosPorDia
       .map((count, idx) => count < 2 ? idx + 1 : null)
@@ -308,13 +459,14 @@ export default function EditorPlanPage() {
         anio,
         mes,
         numeroHoras: numeroHoras.trim(),
-        metaHorasAdmin: metaHorasAdmin === "" ? undefined : Number(metaHorasAdmin),
-        metaHorasOperativas: metaHorasOperativas === "" ? undefined : Number(metaHorasOperativas),
+        ...(metaHorasAdmin === "" ? {} : { metaHorasAdmin: Number(metaHorasAdmin) }),
+        ...(metaHorasOperativas === "" ? {} : { metaHorasOperativas: Number(metaHorasOperativas) }),
         filas: filas.map((f) => ({
           uid: f.uid,
           codigoMarcacion: f.codigoMarcacion ?? "",
           nombre: f.nombre,
           puesto: f.puesto ?? "",
+          ...(f.tipoJornada ? { tipoJornada: f.tipoJornada } : {}),
           grupo: f.grupo ?? "",
           asignaciones: f.asignaciones,
           observaciones: f.observaciones ?? "",
@@ -331,6 +483,8 @@ export default function EditorPlanPage() {
       // Firestore no acepta `undefined`; uid puede faltar en filas sin usuario.
       payload.filas = payload.filas.map((f) => (f.uid ? f : { ...f, uid: "" }));
       await setDoc(doc(db, "planes_trabajo", periodo), payload);
+      window.localStorage.removeItem(borradorKey);
+      undoRef.current = [];
       if (!creadoMeta) {
         setCreadoMeta({ creadoEn: ahora, creadoPorId: profile.uid, creadoPorNombre: profile.nombre });
       }
@@ -355,18 +509,94 @@ export default function EditorPlanPage() {
     [filas],
   );
 
-  const conteoOperativosPorDia = useMemo(() => {
-    const conteos = new Array(dias.length).fill(0);
-    filas.forEach(f => {
-      f.asignaciones.forEach((celda, diaIdx) => {
-        const h = getHorario(celda);
-        if (h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario")) {
-          conteos[diaIdx]++;
+  const pegarBloqueCodigos = (
+    texto: string,
+    inicio: { filaIdx: number; diaIdx: number } | null = picker,
+  ) => {
+    if (!inicio) return;
+    const bloque = parsearBloqueCodigos(texto);
+    const display = filasRef.current
+      .map((f, i) => ({ f, i }))
+      .sort((a, b) => compararFilasPlan(a.f, b.f));
+    const inicioFilaVisual = display.findIndex(({ i }) => i === inicio.filaIdx);
+    if (inicioFilaVisual < 0) return;
+
+    const siguientes = filasRef.current.map((fila) => ({
+      ...fila,
+      asignaciones: [...fila.asignaciones],
+    }));
+    const incidencias: string[] = [];
+    let aplicados = 0;
+    let fueraDeRango = 0;
+
+    bloque.forEach((filaPegada, desplazamientoFila) => {
+      const destinoVisual = display[inicioFilaVisual + desplazamientoFila];
+      if (!destinoVisual) {
+        fueraDeRango += filaPegada.filter((valor) => valor.trim()).length;
+        return;
+      }
+      const filaDestino = siguientes[destinoVisual.i];
+      filaPegada.forEach((valorPegado, desplazamientoDia) => {
+        const codigo = valorPegado.trim().toUpperCase();
+        if (!codigo) return;
+        const diaIdx = inicio.diaIdx + desplazamientoDia;
+        if (diaIdx >= filaDestino.asignaciones.length) {
+          fueraDeRango++;
+          return;
         }
+        if (!getHorario(codigo) && !esMarcaEspecial(codigo)) {
+          incidencias.push(`${codigo}: código no reconocido`);
+          return;
+        }
+        const restriccion = validarAsignacionPlan(
+          filaDestino,
+          diaIdx + 1,
+          codigo,
+          anio,
+          mes,
+          prevPlanData,
+        );
+        if (restriccion) {
+          incidencias.push(restriccion);
+          return;
+        }
+        filaDestino.asignaciones[diaIdx] = codigo;
+        aplicados++;
       });
     });
-    return conteos;
-  }, [filas, dias.length]);
+
+    if (fueraDeRango > 0) incidencias.push(`${fueraDeRango} código(s) quedaron fuera del mes o de la lista.`);
+    if (aplicados > 0) {
+      registrarUndo();
+      filasRef.current = siguientes;
+      setFilas(siguientes);
+      setGuardado(false);
+    }
+    setPicker(null);
+
+    if (incidencias.length > 0 || aplicados === 0) {
+      const unicas = [...new Set(incidencias)];
+      setModalState({
+        tipo: aplicados > 0 ? "alerta" : "error",
+        titulo: aplicados > 0 ? "Pegado parcial" : "No se pegaron códigos",
+        mensaje: [
+          aplicados > 0 ? `Se pegaron ${aplicados} código(s).` : "No se encontró ningún código válido para pegar.",
+          ...unicas.slice(0, 5),
+          ...(unicas.length > 5 ? [`Y ${unicas.length - 5} incidencia(s) más.`] : []),
+        ].join("\n"),
+      });
+    }
+  };
+
+  const conteoOperativosPorDia = new Array(dias.length).fill(0);
+  filas.forEach((fila) => {
+    fila.asignaciones.forEach((celda, diaIdx) => {
+      const horario = getHorario(celda);
+      if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
+        conteoOperativosPorDia[diaIdx]++;
+      }
+    });
+  });
 
   const colSpanTotal = dias.length + 2; // Personal + días + Hrs
 
@@ -468,7 +698,7 @@ export default function EditorPlanPage() {
       ) : (
         <>
           <p className="mb-2 text-[11px] text-slate-400">
-            Toca una celda para asignar un código de horario, vacaciones, incapacidad/permiso o descanso.
+            Un clic selecciona cualquier casilla para copiar, pegar o borrar con Backspace/Supr. El selector de códigos se abre siempre con doble clic.
           </p>
           <div className="overflow-auto max-h-[calc(100vh-14rem)] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
             <table className="border-collapse text-xs">
@@ -496,7 +726,7 @@ export default function EditorPlanPage() {
                     const total = totalHorasFila(fila.asignaciones);
                     const vac = contarMarca(fila.asignaciones, "VAC");
                     const grupoActual = fila.grupo?.trim() || "";
-                    const isAdministrativo = grupoActual.toLowerCase().includes("administrativo");
+                    const isAdministrativo = esAdministrativoPlan(fila);
                     const metaBase = isAdministrativo ? metaHorasAdmin : metaHorasOperativas;
                     // Regla: un operativo con periodo de vacaciones (15 días VAC)
                     // trabaja medio mes, así que su meta de horas baja a la mitad.
@@ -506,7 +736,7 @@ export default function EditorPlanPage() {
                     const dif = metaValida ? total - targetHoras : 0;
 
                     // Guía de turnos cada 4 días (solo operativos).
-                    const sugerencias = isAdministrativo ? [] : casillasSugeridas(fila.asignaciones);
+                    const sugerencias = isAdministrativo ? [] : casillasSugeridasPlan(fila, prevPlanData);
 
                     // ¿Hay vecino del mismo grupo arriba/abajo? (para habilitar mover)
                     const grupoVecino = (di: number) => (filasOrdenadas[di]?.f.grupo?.trim() || "") === grupoActual;
@@ -589,24 +819,49 @@ export default function EditorPlanPage() {
                               <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
                                 <button
                                   onMouseDown={() => {
-                                    dragRef.current = { filaIdx, valor: celda, isDragging: true, cellsDragged: 0 };
+                                    dragRef.current = { filaIdx, valor: celda, isDragging: true, cellsDragged: 0, undoGuardado: false };
                                   }}
                                   onMouseEnter={() => {
                                     if (dragRef.current && dragRef.current.isDragging) {
                                       dragRef.current.cellsDragged++;
-                                      // Solo el personal administrativo descansa fin de semana;
-                                      // el operativo sí puede tener turnos sábado/domingo.
-                                      if (!finde || !isAdministrativo) {
-                                        setCelda(filaIdx, diaIdx, dragRef.current.valor);
+                                      // El personal administrativo omite fines de semana y asuetos.
+                                      const noLaboralAdmin = isAdministrativo && esDiaNoLaboralAdministrativo(anio, mes, d);
+                                      if (!noLaboralAdmin) {
+                                        if (!dragRef.current.undoGuardado) {
+                                          registrarUndo();
+                                          dragRef.current.undoGuardado = true;
+                                        }
+                                        setCelda(filaIdx, diaIdx, dragRef.current.valor, false);
                                       }
                                     }
                                   }}
-                                  onClick={() => {
+                                  onDoubleClick={() => {
                                     if (dragRef.current && dragRef.current.cellsDragged > 0) return;
                                     setPicker({ filaIdx, diaIdx });
                                   }}
-                                  title={sugerido ? "Siguiente turno sugerido (cada 4 días)" : undefined}
-                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors cursor-cell hover:ring-2 hover:ring-blue-400 hover:z-10 relative ${
+                                  onPaste={(event) => {
+                                    const textoPegado = event.clipboardData.getData("text/plain");
+                                    if (!textoPegado.trim()) return;
+                                    event.preventDefault();
+                                    pegarBloqueCodigos(textoPegado, { filaIdx, diaIdx });
+                                  }}
+                                  onCopy={(event) => {
+                                    if (!celda) return;
+                                    event.preventDefault();
+                                    event.clipboardData.setData("text/plain", celda.toUpperCase());
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key !== "Backspace" && event.key !== "Delete") return;
+                                    if (!celda) return;
+                                    event.preventDefault();
+                                    setCelda(filaIdx, diaIdx, "");
+                                  }}
+                                  title={
+                                    sugerido
+                                      ? "Siguiente turno sugerido; un clic selecciona, Backspace/Supr borra y doble clic abre el selector"
+                                      : "Un clic para seleccionar; Backspace/Supr borra y doble clic abre el selector"
+                                  }
+                                  className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors cursor-cell hover:ring-2 hover:ring-blue-400 focus:ring-2 focus:ring-blue-500 focus:outline-none hover:z-10 relative ${
                                     sugerido
                                       ? "bg-indigo-50 dark:bg-indigo-950/40 ring-2 ring-inset ring-indigo-400/70 dark:ring-indigo-500/50 text-indigo-400"
                                       : colorCelda(celda)
@@ -681,42 +936,25 @@ export default function EditorPlanPage() {
           titulo={filaActiva.nombre}
           subtitulo={`${labelPeriodo(periodo)} · Día ${picker.diaIdx + 1} (${iniciales[picker.diaIdx]})`}
           valorActual={filaActiva.asignaciones[picker.diaIdx] ?? ""}
+          onPasteCodigos={pegarBloqueCodigos}
           onSelect={(codigo) => {
-            // Validación de 2 días de descanso inter-mensual para operativos
-            const h = getHorario(codigo);
-            const isOperativo = h && (h.tipo === "Turno Operativo" || h.tipo === "Turno Hospitalario");
-            
-            if (isOperativo && prevPlanData && !filaActiva.grupo?.toLowerCase().includes("administrativo")) {
-              const filaAnterior = prevPlanData.filas.find(f => f.codigoMarcacion === filaActiva.codigoMarcacion || f.uid === filaActiva.uid);
-              if (filaAnterior) {
-                const prevDias = diasDelMesArray(prevPlanData.anio, prevPlanData.mes).length;
-                let lastShiftIdx = -1;
-                for (let i = prevDias - 1; i >= prevDias - 3; i--) {
-                  if (i < 0) break;
-                  const celdaPrev = filaAnterior.asignaciones[i] || "";
-                  const hPrev = getHorario(celdaPrev);
-                  if (hPrev && (hPrev.tipo === "Turno Operativo" || hPrev.tipo === "Turno Hospitalario")) {
-                    lastShiftIdx = i;
-                    break;
-                  }
-                }
-                
-                if (lastShiftIdx !== -1) {
-                  const diasDescansoPrev = prevDias - 1 - lastShiftIdx;
-                  const reqDescanso = 2 - diasDescansoPrev;
-                  if (picker.diaIdx < reqDescanso) {
-                    setModalState({ 
-                      tipo: "error", 
-                      titulo: "Asignación Inválida", 
-                      mensaje: `No se puede asignar este turno.\n\nEl empleado tuvo su último turno operativo el día ${lastShiftIdx + 1} del mes pasado. Necesita al menos 2 días de descanso inter-mensual para iniciar un nuevo turno.\n\nSolo ha tenido ${diasDescansoPrev + picker.diaIdx} día(s) de descanso acumulados.`
-                    });
-                    setPicker(null);
-                    return; // Cancela la asignación
-                  }
-                }
-              }
+            const restriccion = validarAsignacionPlan(
+              filaActiva,
+              picker.diaIdx + 1,
+              codigo,
+              anio,
+              mes,
+              prevPlanData,
+            );
+            if (restriccion) {
+              setModalState({
+                tipo: "error",
+                titulo: "Asignación inválida",
+                mensaje: restriccion,
+              });
+              setPicker(null);
+              return;
             }
-            
             setCelda(picker.filaIdx, picker.diaIdx, codigo);
             setPicker(null);
           }}
@@ -809,29 +1047,6 @@ export default function EditorPlanPage() {
       )}
     </div>
   );
-}
-
-/**
- * Para operativos: los turnos de 24h se repiten cada 4 días (entra el 1, vuelve
- * el 5). A partir del último código de horario real puesto en la fila, marca las
- * casillas VACÍAS que caen cada 4 días como "siguiente turno sugerido". Es solo
- * una guía visual; si al final no se asigna horas ahí, no pasa nada.
- */
-function casillasSugeridas(asignaciones: string[]): boolean[] {
-  const n = asignaciones.length;
-  const out = new Array(n).fill(false);
-  let ultimoTurno = -1; // índice del último código de horario real visto
-  for (let i = 0; i < n; i++) {
-    const celda = (asignaciones[i] ?? "").trim();
-    if (getHorario(celda)) {
-      ultimoTurno = i; // ancla: a partir de aquí se proyecta cada 4 días
-      continue;
-    }
-    if (celda === "" && ultimoTurno >= 0 && (i - ultimoTurno) % 4 === 0) {
-      out[i] = true;
-    }
-  }
-  return out;
 }
 
 function colorCelda(celda: string): string {
