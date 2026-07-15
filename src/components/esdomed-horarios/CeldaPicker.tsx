@@ -30,6 +30,7 @@ interface Props {
   subtitulo?: string;
   valorActual: string;
   onSelect: (codigo: string) => void;
+  onPasteCodigos?: (texto: string) => void;
   onClose: () => void;
 }
 
@@ -38,7 +39,7 @@ interface Props {
  * modal centrado en desktop. Permite buscar por código/hora, elegir una marca
  * especial (VAC/INC/PER) o marcar Descanso (vaciar la celda).
  */
-export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose }: Props) {
+export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onPasteCodigos, onClose }: Props) {
   const [buscar, setBuscar] = useState("");
 
   useEffect(() => {
@@ -68,7 +69,22 @@ export function CeldaPicker({ titulo, subtitulo, valorActual, onSelect, onClose 
   const actual = valorActual.trim().toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+      onPaste={(event) => {
+        if (!onPasteCodigos) return;
+        const texto = event.clipboardData.getData("text/plain");
+        if (!texto.trim()) return;
+        event.preventDefault();
+        onPasteCodigos(texto);
+      }}
+      onCopy={(event) => {
+        if (!actual) return;
+        event.preventDefault();
+        event.clipboardData.setData("text/plain", actual);
+      }}
+    >
       <div
         className="w-full sm:max-w-lg bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
