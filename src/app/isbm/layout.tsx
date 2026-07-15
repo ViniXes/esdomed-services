@@ -2,24 +2,27 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, CalendarCheck, UserPlus } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, UserPlus, Receipt, ShieldCheck, Table2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { esRolIsbm } from "@/types";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 
-const G_CONVENIO = "Convenio";
+const G_CONVENIO = "Convenios";
 
 const navItems: NavItem[] = [
   { href: "/isbm", label: "Inicio", icon: LayoutDashboard, exact: true },
   { href: "/isbm/afiliaciones", label: "Afiliaciones", icon: UserPlus, group: G_CONVENIO },
   { href: "/isbm/censo", label: "Censo diario", icon: CalendarCheck, group: G_CONVENIO },
+  { href: "/isbm/cargos", label: "Cargos", icon: Receipt, group: G_CONVENIO },
+  { href: "/isbm/autorizaciones", label: "Autorizaciones", icon: ShieldCheck, group: G_CONVENIO },
+  { href: "/isbm/tabuladores", label: "Tabuladores", icon: Table2, group: G_CONVENIO },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
   isbm_tecnico: "Técnico ISBM",
   isbm_supervisor: "Supervisor ISBM",
   isbm_jefe: "Jefe ISBM",
-  admin: "Convenio ISBM",
+  admin: "Convenios ISBM",
 };
 
 export default function IsbmLayout({ children }: { children: React.ReactNode }) {
@@ -34,7 +37,7 @@ export default function IsbmLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
-      <Sidebar navItems={navItems} roleLabel={ROLE_LABEL[profile?.role ?? ""] ?? "Convenio ISBM"} />
+      <Sidebar navItems={navItems} roleLabel={ROLE_LABEL[profile?.role ?? ""] ?? "Convenios ISBM"} />
       <main className="flex-1 overflow-y-auto pt-mobile-bar md:pt-0 bg-slate-50 dark:bg-[var(--color-institutional-dark)]">
         {loading || !profile ? (
           <div className="flex items-center justify-center h-full">

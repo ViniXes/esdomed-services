@@ -7,12 +7,18 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getSupabase } from "./supabase";
-import type {
-  AfiliacionIsbm,
-  ArancelIsbm,
-  CensoDiarioConRelaciones,
-  IngresoIsbm,
-  ServicioHospitalarioIsbm,
+import {
+  RUBROS_EXAMENES,
+  RUBROS_INTERCONSULTA,
+  type AfiliacionIsbm,
+  type ArancelIsbm,
+  type AutorizacionConCargo,
+  type CargoConArancel,
+  type CargoListado,
+  type CensoDiarioConRelaciones,
+  type IngresoIsbm,
+  type ServicioHospitalarioIsbm,
+  type TabuladorRow,
 } from "./types";
 
 // Embeds del censo: dos FKs a servicios_hospitalarios se desambiguan por columna.
@@ -336,4 +342,273 @@ export async function reabrirDia(censoId: number, actorNombre: string): Promise<
     p_nombre: actorNombre,
   });
   lanzar("Error reabriendo el día", error);
+}
+
+// ── Cargos ───────────────────────────────────────────────────────────────────
+
+const redondear2 = (n: number) => Math.round(n * 100) / 100;
+
+const restarDias = (fechaISO: string, dias: number) => {
+  const d = new Date(`${fechaISO}T12:00:00`);
+  d.setDate(d.getDate() - dias);
+  return d.toISOString().slice(0, 10);
+};
+
+export async function cargosDeCenso(censoId: number): Promise<CargoConArancel[]> {
+  const { data, error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .select("*, arancel:aranceles(*)")
+    .eq("censo_id", censoId)
+    .order("capturado_en");
+  lanzar("Error cargando cargos del día", error);
+  return (data ?? []) as unknown as CargoConArancel[];
+}
+
+export interface FiltrosCargos {
+  anio: number;
+  mes: number; // 1-12; 0 = todo el año
+  rubro?: string;
+  anulado?: boolean;
+}
+
+export async function listarCargos(f: FiltrosCargos): Promise<CargoListado[]> {
+  const desde = f.mes ? `${f.anio}-${String(f.mes).padStart(2, "0")}-01` : `${f.anio}-01-01`;
+  const hasta = f.mes
+    ? new Date(f.anio, f.mes, 0).toISOString().slice(0, 10) // último día del mes
+    : `${f.anio}-12-31`;
+  let q = getSupabase()
+    .from("cargos_paciente_dia")
+    .select("*, arancel:aranceles(*), afiliacion:afiliaciones(paciente_nombre)")
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
+  if (f.anulado !== undefined) q = q.eq("anulado", f.anulado);
+  const { data, error } = await q.order("fecha", { ascending: false }).order("capturado_en", { ascending: false });
+  lanzar("Error cargando cargos", error);
+  const filas = (data ?? []) as unknown as CargoListado[];
+  return f.rubro ? filas.filter((c) => c.arancel.rubro === f.rubro) : filas;
+}
+
+export interface NuevoCargoInput {
+  cantidad: number;
+  precioUnitario?: number; // default: precio del arancel
+  comentarios?: string;
+  tipoCirugia?: "AMBULATORIA" | "EMERGENCIA" | "ELECTIVA";
+  especialidadInterconsulta?: string;
+  tipoDocumentoRespaldo?: string;
+  documentoRespaldoRef?: string;
+}
+
+const TIPO_AUTORIZACION_POR_RUBRO: Record<string, string> = {
+  QUIRURGICO: "PAQUETE_QUIRURGICO",
+  MEDICAMENTOS_CUADRO: "MEDICAMENTO",
+  MEDICAMENTOS_ADICIONALES: "MEDICAMENTO",
+  OTROS: "INTERCONSULTA",
+  MISCELANEOS: "INTERCONSULTA",
+  LABORATORIO_BASICO: "LABORATORIO_RADIOLOGIA",
+  LABORATORIO_ADICIONAL: "LABORATORIO_RADIOLOGIA",
+  LABORATORIO_BIOLOGIA_MOLECULAR: "LABORATORIO_RADIOLOGIA",
+  RX_BASICO: "LABORATORIO_RADIOLOGIA",
+  ESTUDIOS_NEUROFISIOLOGICOS: "LABORATORIO_RADIOLOGIA",
+  BANCO_SANGRE: "LABORATORIO_RADIOLOGIA",
+};
+
+// Captura un cargo. Las validaciones aquí (tope diario, 48 h) son UX: avisan
+// y ajustan el monto para que el técnico lo vea de inmediato. El recálculo
+// AUTORITATIVO ocurre al cerrar el día (RPC cerrar_dia_censo).
+// Devuelve los avisos generados (montos ajustados, autorización creada).
+export async function crearCargo(
+  censo: CensoDiarioConRelaciones,
+  arancel: ArancelIsbm,
+  input: NuevoCargoInput,
+  actor: { uid: string; nombre: string }
+): Promise<string[]> {
+  if (censo.dia_cerrado) throw new Error("El día está cerrado: reábrelo para capturar cargos");
+  const sb = getSupabase();
+  const avisos: string[] = [];
+
+  const precio = redondear2(input.precioUnitario ?? arancel.precio_hnes);
+  const costo = redondear2(input.cantidad * precio);
+  let facturable = costo;
+  let motivo: string | null = null;
+
+  // Tope diario de exámenes del servicio de facturación
+  if (RUBROS_EXAMENES.includes(arancel.rubro)) {
+    const delDia = await cargosDeCenso(censo.id);
+    const consumido = delDia
+      .filter((c) => !c.anulado && RUBROS_EXAMENES.includes(c.arancel.rubro))
+      .reduce((s, c) => s + c.monto_facturable, 0);
+    const disponible = redondear2(censo.servicio_facturacion.tope_diario_examenes - consumido);
+    if (disponible <= 0) {
+      facturable = 0;
+      motivo = "EXCEDE_TOPE_DIARIO_RUBRO";
+      avisos.push("Tope diario de exámenes agotado: el cargo queda NO facturable.");
+    } else if (costo > disponible) {
+      facturable = disponible;
+      motivo = "EXCEDE_TOPE_DIARIO_RUBRO";
+      avisos.push(`Solo ${disponible.toFixed(2)} del tope diario disponible: el excedente no se factura.`);
+    }
+  }
+
+  // Regla 48 h: interconsulta repetida de la misma especialidad
+  if (
+    RUBROS_INTERCONSULTA.includes(arancel.rubro) &&
+    input.especialidadInterconsulta
+  ) {
+    const { data: previos, error: errPrev } = await sb
+      .from("cargos_paciente_dia")
+      .select("id, fecha, arancel:aranceles(rubro)")
+      .eq("ingreso_id", censo.ingreso_id)
+      .eq("especialidad_interconsulta", input.especialidadInterconsulta)
+      .eq("anulado", false)
+      .gte("fecha", restarDias(censo.fecha, 2))
+      .lte("fecha", censo.fecha);
+    lanzar("Error validando regla de 48 h", errPrev);
+    const hayPrevia = (previos ?? []).some((p) => {
+      const rubro = (p as unknown as { arancel: { rubro: string } }).arancel?.rubro;
+      return rubro && RUBROS_INTERCONSULTA.includes(rubro as (typeof RUBROS_INTERCONSULTA)[number]);
+    });
+    if (hayPrevia) {
+      facturable = 0;
+      motivo = "INTERCONSULTA_DENTRO_48H";
+      avisos.push("Ya hay una interconsulta de esa especialidad en las últimas 48 h: NO facturable.");
+    }
+  }
+
+  const { data: creado, error } = await sb
+    .from("cargos_paciente_dia")
+    .insert({
+      censo_id: censo.id,
+      ingreso_id: censo.ingreso_id,
+      expediente: censo.expediente,
+      fecha: censo.fecha,
+      arancel_id: arancel.id,
+      cantidad: input.cantidad,
+      precio_unitario: precio,
+      costo_total: costo,
+      monto_facturable: facturable,
+      motivo_no_facturable: motivo,
+      comentarios: input.comentarios?.trim() || null,
+      tipo_cirugia: input.tipoCirugia ?? null,
+      especialidad_interconsulta: input.especialidadInterconsulta ?? null,
+      tipo_documento_respaldo: input.tipoDocumentoRespaldo || null,
+      documento_respaldo_ref: input.documentoRespaldoRef?.trim() || null,
+      capturado_por_uid: actor.uid,
+      capturado_por_nombre: actor.nombre,
+    })
+    .select("id")
+    .single();
+  lanzar("Error creando el cargo", error);
+
+  // Autorización automática cuando el arancel la requiere
+  if (arancel.requiere_autorizacion && creado) {
+    const umbral = arancel.monto_umbral_supervisor;
+    const nivel = umbral != null && costo > umbral ? "JEFE" : "SUPERVISOR";
+    const { error: errAut } = await sb.from("autorizaciones_servicio").insert({
+      cargo_id: creado.id,
+      tipo: TIPO_AUTORIZACION_POR_RUBRO[arancel.rubro] ?? "OTRO",
+      nivel_requerido: nivel,
+      monto_solicitado: costo,
+      solicitado_por_uid: actor.uid,
+      solicitado_por_nombre: actor.nombre,
+    });
+    lanzar("Error creando la autorización", errAut);
+    avisos.push(`Requiere autorización (${nivel === "JEFE" ? "Jefe" : "Supervisor"} ISBM): el día no podrá cerrarse hasta resolverla.`);
+  }
+
+  return avisos;
+}
+
+// Anulación lógica: el cargo queda en cero pero visible para auditoría.
+export async function anularCargo(cargoId: number, actorNombre: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      anulado: true,
+      monto_facturable: 0,
+      motivo_no_facturable: "ANULADO",
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargoId);
+  lanzar("Error anulando el cargo", error);
+}
+
+// ── Autorizaciones ───────────────────────────────────────────────────────────
+
+const AUTORIZACION_SELECT =
+  "*, cargo:cargos_paciente_dia(*, arancel:aranceles(*), afiliacion:afiliaciones(paciente_nombre))";
+
+export async function listarAutorizaciones(estado?: string): Promise<AutorizacionConCargo[]> {
+  let q = getSupabase().from("autorizaciones_servicio").select(AUTORIZACION_SELECT);
+  if (estado) q = q.eq("estado", estado);
+  const { data, error } = await q.order("solicitado_en", { ascending: false });
+  lanzar("Error cargando autorizaciones", error);
+  return (data ?? []) as unknown as AutorizacionConCargo[];
+}
+
+export async function aprobarAutorizacion(
+  id: number,
+  actor: { uid: string; nombre: string; rol: string },
+  comentario?: string
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("autorizaciones_servicio")
+    .update({
+      estado: "APROBADA",
+      resuelto_por_uid: actor.uid,
+      resuelto_por_nombre: actor.nombre,
+      resuelto_por_rol: actor.rol,
+      resuelto_en: new Date().toISOString(),
+      comentario: comentario?.trim() || null,
+    })
+    .eq("id", id)
+    .eq("estado", "PENDIENTE");
+  lanzar("Error aprobando la autorización", error);
+}
+
+export async function rechazarAutorizacion(
+  aut: AutorizacionConCargo,
+  comentario: string,
+  actor: { uid: string; nombre: string; rol: string }
+): Promise<void> {
+  if (comentario.trim().length < 10) {
+    throw new Error("El comentario del rechazo debe tener al menos 10 caracteres");
+  }
+  const sb = getSupabase();
+  const { error } = await sb
+    .from("autorizaciones_servicio")
+    .update({
+      estado: "RECHAZADA",
+      resuelto_por_uid: actor.uid,
+      resuelto_por_nombre: actor.nombre,
+      resuelto_por_rol: actor.rol,
+      resuelto_en: new Date().toISOString(),
+      comentario: comentario.trim(),
+    })
+    .eq("id", aut.id)
+    .eq("estado", "PENDIENTE");
+  lanzar("Error rechazando la autorización", error);
+
+  // El cargo queda no facturable de inmediato (el cierre lo confirma igual).
+  const { error: errCargo } = await sb
+    .from("cargos_paciente_dia")
+    .update({
+      monto_facturable: 0,
+      motivo_no_facturable: "SIN_AUTORIZACION",
+      modificado_por_nombre: actor.nombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", aut.cargo_id);
+  lanzar("Error actualizando el cargo rechazado", errCargo);
+}
+
+// ── Tabulador ────────────────────────────────────────────────────────────────
+
+export async function consultarTabulador(): Promise<TabuladorRow[]> {
+  const { data, error } = await getSupabase()
+    .from("v_tabulador_ingresos")
+    .select("*")
+    .order("fecha_ingreso", { ascending: false });
+  lanzar("Error consultando el tabulador", error);
+  return (data ?? []) as TabuladorRow[];
 }

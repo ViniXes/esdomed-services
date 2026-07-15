@@ -234,3 +234,70 @@ export const formatoDolares = (n: number | null | undefined) =>
   n == null
     ? "—"
     : n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+// Cargo con los joins que usa la UI de listados (arancel + nombre del paciente).
+export interface CargoListado extends CargoIsbm {
+  arancel: ArancelIsbm;
+  afiliacion?: { paciente_nombre: string } | null;
+}
+
+export interface AutorizacionConCargo extends AutorizacionIsbm {
+  cargo: CargoListado;
+}
+
+// Renglón de la vista v_tabulador_ingresos (un ingreso con sus agregados).
+export interface TabuladorRow {
+  id: string;
+  expediente: string;
+  paciente_nombre: string;
+  numero_afiliacion_isbm: string | null;
+  fecha_ingreso: string;
+  fecha_egreso: string | null;
+  condicion_egreso: CondicionEgresoIsbm;
+  servicio_actual: string | null;
+  dias_estancia: number;
+  dias_censados: number;
+  dias_cerrados: number;
+  total_servicio: number;
+  total_cobrable: number;
+}
+
+export const MOTIVO_NO_FACTURABLE_LABEL: Record<MotivoNoFacturableIsbm, string> = {
+  EXCEDE_TOPE_DIARIO_RUBRO: "Excede tope diario de exámenes",
+  EXCEDE_TOPE_MENSUAL: "Excede tope mensual",
+  SIN_AUTORIZACION: "Sin autorización",
+  INTERCONSULTA_DENTRO_48H: "Interconsulta dentro de 48 h",
+  EXCLUIDO_ART_25: "Excluido por Art. 25",
+  INCLUIDO_EN_DIA_CAMA: "Incluido en día-cama",
+  DUPLICADO: "Duplicado",
+  SIN_DOCUMENTO_RESPALDO: "Sin documento de respaldo",
+  ANULADO: "Anulado",
+  DECISION_ISBM: "Decisión ISBM",
+};
+
+export const CONDICION_EGRESO_LABEL: Record<CondicionEgresoIsbm, string> = {
+  PENDIENTE: "Activo",
+  MEJORADO: "Mejorado / alta",
+  FALLECIDO: "Fallecido",
+  TRASLADO: "Traslado",
+  ALTA_VOLUNTARIA: "Alta voluntaria",
+};
+
+// Rubros que consumen el tope diario de exámenes del servicio.
+export const RUBROS_EXAMENES: RubroArancelIsbm[] = [
+  "LABORATORIO_BASICO",
+  "LABORATORIO_ADICIONAL",
+  "LABORATORIO_BIOLOGIA_MOLECULAR",
+  "RX_BASICO",
+  "ESTUDIOS_NEUROFISIOLOGICOS",
+  "BANCO_SANGRE",
+];
+
+// Rubros de interconsulta (aplica la regla de 48 h por especialidad).
+export const RUBROS_INTERCONSULTA: RubroArancelIsbm[] = ["OTROS", "MISCELANEOS"];
+
+export const ESPECIALIDADES_INTERCONSULTA = [
+  "MEDICINA_INTERNA", "CIRUGIA", "GINECO_OBSTETRICIA", "PEDIATRIA",
+  "PSIQUIATRIA", "NEONATOS", "MEDICINA_INTENSIVA", "NEUROLOGIA",
+  "CARDIOLOGIA", "DERMATOLOGIA", "OFTALMOLOGIA", "ORTOPEDIA", "OTRA",
+] as const;

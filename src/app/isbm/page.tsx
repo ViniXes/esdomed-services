@@ -54,13 +54,10 @@ export default function IsbmInicioPage() {
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenio ISBM · HNES</p>
+        <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM · HNES</p>
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
           Bienvenido{profile?.nombre ? `, ${profile.nombre.split(" ")[0]}` : ""}
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Censo diario y cobro de aranceles del convenio N° 25/01/2023-ISBM
-        </p>
       </div>
 
       {error && (

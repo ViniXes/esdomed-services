@@ -81,11 +81,8 @@ export default function AfiliacionesPage() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenio ISBM</p>
+          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Afiliaciones</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            La llave es el expediente HNES; el N° de afiliación ISBM se agrega cuando se conozca.
-          </p>
         </div>
         <button
           onClick={() => setModalAfiliar(true)}
@@ -282,14 +279,14 @@ function ModalAfiliar({
               className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="max-h-72 overflow-y-auto space-y-1.5">
+          <div className="max-h-[55vh] overflow-y-auto grid sm:grid-cols-2 gap-1.5 content-start">
             {!activos && !error && (
-              <div className="p-6 flex justify-center">
+              <div className="p-6 flex justify-center sm:col-span-2">
                 <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             {activos && candidatos.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-4">Sin pacientes activos que coincidan.</p>
+              <p className="text-sm text-slate-500 text-center py-4 sm:col-span-2">Sin pacientes activos que coincidan.</p>
             )}
             {candidatos.map((p) => (
               <button
@@ -318,27 +315,29 @@ function ModalAfiliar({
             </button>
           </div>
 
-          <Campo label="N° de afiliación ISBM (opcional)">
-            <input
-              value={numeroAfiliacion}
-              onChange={(e) => setNumeroAfiliacion(e.target.value)}
-              placeholder="Se puede agregar después"
-              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </Campo>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Campo label="N° de afiliación ISBM (opcional)">
+              <input
+                value={numeroAfiliacion}
+                onChange={(e) => setNumeroAfiliacion(e.target.value)}
+                placeholder="Se puede agregar después"
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </Campo>
 
-          <Campo label="Tipo de beneficiario (opcional)">
-            <select
-              value={tipoBeneficiario}
-              onChange={(e) => setTipoBeneficiario(e.target.value)}
-              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— Sin especificar —</option>
-              {(Object.keys(TIPO_BENEFICIARIO_LABEL) as TipoBeneficiarioIsbm[]).map((t) => (
-                <option key={t} value={t}>{TIPO_BENEFICIARIO_LABEL[t]}</option>
-              ))}
-            </select>
-          </Campo>
+            <Campo label="Tipo de beneficiario (opcional)">
+              <select
+                value={tipoBeneficiario}
+                onChange={(e) => setTipoBeneficiario(e.target.value)}
+                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— Sin especificar —</option>
+                {(Object.keys(TIPO_BENEFICIARIO_LABEL) as TipoBeneficiarioIsbm[]).map((t) => (
+                  <option key={t} value={t}>{TIPO_BENEFICIARIO_LABEL[t]}</option>
+                ))}
+              </select>
+            </Campo>
+          </div>
 
           <Campo label="Observaciones (opcional)">
             <textarea
@@ -413,25 +412,27 @@ function ModalEditar({
   return (
     <Modal titulo={`Editar afiliación — ${afiliacion.paciente_nombre}`} onCerrar={onCerrar}>
       <div className="space-y-3">
-        <Campo label="N° de afiliación ISBM">
-          <input
-            value={numero}
-            onChange={(e) => setNumero(e.target.value)}
-            className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </Campo>
-        <Campo label="Tipo de beneficiario">
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">— Sin especificar —</option>
-            {(Object.keys(TIPO_BENEFICIARIO_LABEL) as TipoBeneficiarioIsbm[]).map((t) => (
-              <option key={t} value={t}>{TIPO_BENEFICIARIO_LABEL[t]}</option>
-            ))}
-          </select>
-        </Campo>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Campo label="N° de afiliación ISBM">
+            <input
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </Campo>
+          <Campo label="Tipo de beneficiario">
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">— Sin especificar —</option>
+              {(Object.keys(TIPO_BENEFICIARIO_LABEL) as TipoBeneficiarioIsbm[]).map((t) => (
+                <option key={t} value={t}>{TIPO_BENEFICIARIO_LABEL[t]}</option>
+              ))}
+            </select>
+          </Campo>
+        </div>
         <Campo label="Observaciones">
           <textarea
             value={observaciones}
@@ -491,26 +492,28 @@ function ModalEgreso({
   };
 
   return (
-    <Modal titulo={`Egreso de cobertura — ${ingreso.paciente_nombre}`} onCerrar={onCerrar}>
+    <Modal titulo={`Egreso de cobertura — ${ingreso.paciente_nombre}`} onCerrar={onCerrar} maxW="max-w-lg">
       <p className="text-xs text-slate-500 mb-3">
         Cierra la cobertura ISBM de este ingreso: deja de aparecer en el censo diario.
         Los censos y cargos ya registrados se conservan para la facturación.
       </p>
       <div className="space-y-3">
-        <Campo label="Fecha de egreso">
-          <DateField value={fecha} onChange={setFecha} ariaLabel="Fecha de egreso" />
-        </Campo>
-        <Campo label="Condición de egreso">
-          <select
-            value={condicion}
-            onChange={(e) => setCondicion(e.target.value as typeof condicion)}
-            className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {CONDICIONES_EGRESO.map((c) => (
-              <option key={c.valor} value={c.valor}>{c.label}</option>
-            ))}
-          </select>
-        </Campo>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Campo label="Fecha de egreso">
+            <DateField value={fecha} onChange={setFecha} ariaLabel="Fecha de egreso" />
+          </Campo>
+          <Campo label="Condición de egreso">
+            <select
+              value={condicion}
+              onChange={(e) => setCondicion(e.target.value as typeof condicion)}
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {CONDICIONES_EGRESO.map((c) => (
+                <option key={c.valor} value={c.valor}>{c.label}</option>
+              ))}
+            </select>
+          </Campo>
+        </div>
         {error && (
           <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
         )}
@@ -537,11 +540,11 @@ function ModalEgreso({
 // ── Piezas compartidas ───────────────────────────────────────────────────────
 
 function Modal({
-  titulo, onCerrar, children,
-}: { titulo: string; onCerrar: () => void; children: React.ReactNode }) {
+  titulo, onCerrar, children, maxW = "max-w-2xl",
+}: { titulo: string; onCerrar: () => void; children: React.ReactNode; maxW?: string }) {
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
+      <div className={`w-full ${maxW} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto`}>
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">{titulo}</h2>
           <button

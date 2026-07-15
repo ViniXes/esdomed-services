@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarCheck, Lock, LockOpen, Pencil, Stethoscope, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
+import { CargosDelDia } from "@/components/isbm/CargosDelDia";
 import {
   abrirDia,
   actualizarServiciosCenso,
@@ -92,11 +93,8 @@ export default function CensoDiarioPage() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenio ISBM</p>
+          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Censo diario</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Visitas AM/PM y cierre del día por paciente. Al cerrar se genera el día-cama y se congelan los totales.
-          </p>
         </div>
         <div className="w-44">
           <DateField value={fecha} onChange={(v) => v && setFecha(v)} ariaLabel="Fecha del censo" />
@@ -286,8 +284,8 @@ function ModalCenso({
   const est = ESTADO_UI[estadoCenso(censo)];
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
+      <div className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">
@@ -310,8 +308,9 @@ function ModalCenso({
           {est.label}
         </span>
 
-        {/* ── Servicios del día ── */}
-        <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-3">
+        <div className="grid md:grid-cols-2 gap-3 items-start mb-3">
+        {/* ── Columna izquierda: servicios del día ── */}
+        <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Servicios del día</p>
             {!censo.dia_cerrado && !editandoServicios && (
@@ -386,8 +385,9 @@ function ModalCenso({
           )}
         </div>
 
-        {/* ── Visitas AM / PM ── */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* ── Columna derecha: visitas AM / PM ── */}
+        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
           {(["am", "pm"] as const).map((turno) => {
             const registrada = turno === "am" ? censo.visita_am_registrada : censo.visita_pm_registrada;
             const medico = turno === "am" ? censo.visita_am_medico : censo.visita_pm_medico;
@@ -452,6 +452,11 @@ function ModalCenso({
             </div>
           </div>
         )}
+        </div>
+        </div>
+
+        {/* ── Cargos del día ── */}
+        <CargosDelDia censo={censo} actor={actor} />
 
         {/* ── Totales (día cerrado) ── */}
         {censo.dia_cerrado && (
