@@ -45,6 +45,46 @@ export async function listarServicios(): Promise<ServicioHospitalarioIsbm[]> {
   return serviciosCache;
 }
 
+// Catálogo completo para la administración de aranceles (incluye inactivos
+// y versiones no vigentes si se pide). El "borrado" es desactivar: los cargos
+// históricos referencian el arancel y nunca se elimina físicamente.
+export async function listarArancelesCatalogo(incluirInactivos: boolean): Promise<ArancelIsbm[]> {
+  let q = getSupabase().from("aranceles").select("*").limit(2000);
+  if (!incluirInactivos) q = q.eq("activo", true);
+  const { data, error } = await q.order("rubro").order("descripcion");
+  lanzar("Error cargando el catálogo de aranceles", error);
+  return data ?? [];
+}
+
+export interface DatosArancel {
+  codigo: string;
+  rubro: string;
+  descripcion: string;
+  precio_hnes: number;
+  es_cuadro_basico: boolean;
+  es_bolson: boolean;
+  es_controlado: boolean;
+  requiere_autorizacion: boolean;
+  monto_umbral_supervisor: number | null;
+  monto_umbral_gerente: number | null;
+  vigente_desde: string; // "YYYY-MM-DD"
+}
+
+export async function crearArancel(d: DatosArancel): Promise<void> {
+  const { error } = await getSupabase().from("aranceles").insert(d);
+  lanzar("Error creando el arancel", error);
+}
+
+export async function editarArancel(id: number, d: Partial<DatosArancel>): Promise<void> {
+  const { error } = await getSupabase().from("aranceles").update(d).eq("id", id);
+  lanzar("Error editando el arancel", error);
+}
+
+export async function setArancelActivo(id: number, activo: boolean): Promise<void> {
+  const { error } = await getSupabase().from("aranceles").update({ activo }).eq("id", id);
+  lanzar(activo ? "Error reactivando el arancel" : "Error desactivando el arancel", error);
+}
+
 export async function buscarAranceles(termino: string, rubro?: string): Promise<ArancelIsbm[]> {
   let q = getSupabase()
     .from("aranceles")
@@ -542,6 +582,116 @@ export async function crearCargo(
   return avisos;
 }
 
+export async function obtenerAutorizacionDeCargo(cargoId: number) {
+  const { data, error } = await getSupabase()
+    .from("autorizaciones_servicio")
+    .select("*")
+    .eq("cargo_id", cargoId)
+    .maybeSingle();
+  lanzar("Error consultando la autorización del cargo", error);
+  return data as import("./types").AutorizacionIsbm | null;
+}
+
+export interface EdicionCargo {
+  cantidad: number;
+  precioUnitario: number;
+  comentarios?: string;
+  tipoDocumentoRespaldo?: string;
+  documentoRespaldoRef?: string;
+}
+
+// Edita cantidad/precio/documentación de un cargo (día abierto, no anulado).
+// Recalcula costo y facturable; el override manual DECISION_ISBM se conserva.
+// Si el cargo tiene autorización PENDIENTE se actualiza su monto/nivel; si ya
+// fue resuelta, los montos no se tocan (habría que anular y recapturar).
+export async function editarCargo(
+  cargo: CargoConArancel,
+  ed: EdicionCargo,
+  actorNombre: string
+): Promise<void> {
+  if (cargo.anulado) throw new Error("El cargo está anulado");
+  const precio = redondear2(ed.precioUnitario);
+  const costo = redondear2(ed.cantidad * precio);
+  if (!ed.cantidad || ed.cantidad <= 0 || precio < 0) {
+    throw new Error("Cantidad y precio deben ser válidos");
+  }
+
+  const aut = await obtenerAutorizacionDeCargo(cargo.id);
+  const cambiaMonto = costo !== cargo.costo_total;
+  if (aut && aut.estado !== "PENDIENTE" && cambiaMonto) {
+    throw new Error("La autorización de este cargo ya fue resuelta: no se puede cambiar el monto (anúlalo y captúralo de nuevo)");
+  }
+
+  const esOverride = cargo.motivo_no_facturable === "DECISION_ISBM";
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      cantidad: ed.cantidad,
+      precio_unitario: precio,
+      costo_total: costo,
+      monto_facturable: esOverride ? 0 : costo, // el cierre reaplica las demás reglas
+      motivo_no_facturable: esOverride ? "DECISION_ISBM" : null,
+      comentarios: ed.comentarios?.trim() || null,
+      tipo_documento_respaldo: ed.tipoDocumentoRespaldo || null,
+      documento_respaldo_ref: ed.documentoRespaldoRef?.trim() || null,
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargo.id);
+  lanzar("Error editando el cargo", error);
+
+  if (aut && aut.estado === "PENDIENTE" && cambiaMonto) {
+    const umbral = cargo.arancel.monto_umbral_supervisor;
+    const { error: errAut } = await getSupabase()
+      .from("autorizaciones_servicio")
+      .update({
+        monto_solicitado: costo,
+        nivel_requerido: umbral != null && costo > umbral ? "JEFE" : "SUPERVISOR",
+      })
+      .eq("id", aut.id);
+    lanzar("Error actualizando la autorización", errAut);
+  }
+}
+
+// Override manual: fuerza un cargo cobrable a NO cobrable (con justificación
+// de auditoría). El recálculo del cierre respeta este override siempre.
+export async function marcarNoCobrable(
+  cargoId: number,
+  justificacion: string,
+  actorNombre: string
+): Promise<void> {
+  if (justificacion.trim().length < 10) {
+    throw new Error("La justificación debe tener al menos 10 caracteres");
+  }
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      monto_facturable: 0,
+      motivo_no_facturable: "DECISION_ISBM",
+      justificacion_no_facturable: justificacion.trim(),
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargoId);
+  lanzar("Error marcando el cargo como no cobrable", error);
+}
+
+// Revierte el override: vuelve cobrable. Las reglas automáticas (tope, 48h,
+// autorización) se reaplican de todas formas al cerrar el día.
+export async function marcarCobrable(cargo: CargoConArancel, actorNombre: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      monto_facturable: cargo.costo_total,
+      motivo_no_facturable: null,
+      justificacion_no_facturable: null,
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargo.id);
+  lanzar("Error marcando el cargo como cobrable", error);
+}
+
 // Anulación lógica: el cargo queda en cero pero visible para auditoría.
 export async function anularCargo(cargoId: number, actorNombre: string): Promise<void> {
   const { error } = await getSupabase()
@@ -624,6 +774,33 @@ export async function rechazarAutorizacion(
     })
     .eq("id", aut.cargo_id);
   lanzar("Error actualizando el cargo rechazado", errCargo);
+}
+
+// ── Resumen por paciente (ficha estilo Excel del convenio) ──────────────────
+
+export type IngresoConAfiliacion = IngresoIsbm & {
+  afiliacion?: { numero_afiliacion_isbm: string | null } | null;
+};
+
+export async function obtenerIngreso(id: string): Promise<IngresoConAfiliacion | null> {
+  const { data, error } = await getSupabase()
+    .from("ingresos")
+    .select("*, afiliacion:afiliaciones(numero_afiliacion_isbm)")
+    .eq("id", id)
+    .maybeSingle();
+  lanzar("Error cargando el ingreso", error);
+  return data as IngresoConAfiliacion | null;
+}
+
+export async function cargosDeIngreso(ingresoId: string): Promise<CargoConArancel[]> {
+  const { data, error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .select("*, arancel:aranceles(*)")
+    .eq("ingreso_id", ingresoId)
+    .order("fecha")
+    .order("capturado_en");
+  lanzar("Error cargando los cargos del ingreso", error);
+  return (data ?? []) as unknown as CargoConArancel[];
 }
 
 // ── Tabulador ────────────────────────────────────────────────────────────────

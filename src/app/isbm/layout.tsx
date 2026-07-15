@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, CalendarCheck, UserPlus, Receipt, ShieldCheck, Table2 } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, UserPlus, Receipt, ShieldCheck, Table2, BookOpenText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { esRolIsbm } from "@/types";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
@@ -16,6 +16,7 @@ const navItems: NavItem[] = [
   { href: "/isbm/cargos", label: "Cargos", icon: Receipt, group: G_CONVENIO },
   { href: "/isbm/autorizaciones", label: "Autorizaciones", icon: ShieldCheck, group: G_CONVENIO },
   { href: "/isbm/tabuladores", label: "Tabuladores", icon: Table2, group: G_CONVENIO },
+  { href: "/isbm/aranceles", label: "Aranceles", icon: BookOpenText, group: G_CONVENIO },
 ];
 
 const ROLE_LABEL: Record<string, string> = {

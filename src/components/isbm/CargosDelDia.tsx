@@ -5,8 +5,18 @@
 // anularlos lógicamente mientras el día esté abierto.
 
 import { useCallback, useEffect, useState } from "react";
-import { Ban, Plus, Search, X } from "lucide-react";
-import { buscarAranceles, anularCargo, cargosDeCenso, crearCargo, type NuevoCargoInput } from "@/lib/isbm/api";
+import { Ban, ChevronRight, Pencil, Plus, Search, X } from "lucide-react";
+import {
+  anularCargo,
+  buscarAranceles,
+  cargosDeCenso,
+  crearCargo,
+  editarCargo,
+  marcarCobrable,
+  marcarNoCobrable,
+  obtenerAutorizacionDeCargo,
+  type NuevoCargoInput,
+} from "@/lib/isbm/api";
 import {
   MOTIVO_NO_FACTURABLE_LABEL,
   RUBRO_LABEL,
@@ -14,6 +24,7 @@ import {
   ESPECIALIDADES_INTERCONSULTA,
   formatoDolares,
   type ArancelIsbm,
+  type AutorizacionIsbm,
   type CargoConArancel,
   type CensoDiarioConRelaciones,
   type RubroArancelIsbm,
@@ -32,6 +43,8 @@ export function CargosDelDia({
   const [error, setError] = useState("");
   const [capturando, setCapturando] = useState(false);
   const [avisos, setAvisos] = useState<string[]>([]);
+  // Solo el id: el cargo del detalle se deriva de la última recarga.
+  const [detalleId, setDetalleId] = useState<number | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -46,15 +59,7 @@ export function CargosDelDia({
     return () => clearTimeout(t);
   }, [cargar]);
 
-  const anular = async (c: CargoConArancel) => {
-    if (!window.confirm(`¿Anular el cargo "${c.arancel.descripcion}"? Queda en $0 pero visible para auditoría.`)) return;
-    try {
-      await anularCargo(c.id, actor.nombre);
-      cargar();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
+  const detalle = detalleId == null ? null : (cargos ?? []).find((c) => c.id === detalleId) ?? null;
 
   const vivos = (cargos ?? []).filter((c) => !c.anulado);
   const totalServicio = vivos.reduce((s, c) => s + c.costo_total, 0);
@@ -100,9 +105,10 @@ export function CargosDelDia({
         <>
           <div className="space-y-1">
             {cargos.map((c) => (
-              <div
+              <button
                 key={c.id}
-                className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg px-2.5 py-2 border ${
+                onClick={() => setDetalleId(c.id)}
+                className={`w-full text-left flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg px-2.5 py-2 border transition-colors hover:border-blue-300 dark:hover:border-blue-700 ${
                   c.anulado
                     ? "border-slate-200 dark:border-slate-700 opacity-50"
                     : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
@@ -124,16 +130,8 @@ export function CargosDelDia({
                 <span className="text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                   {formatoDolares(c.monto_facturable)}
                 </span>
-                {!censo.dia_cerrado && !c.anulado && (
-                  <button
-                    onClick={() => anular(c)}
-                    title="Anular cargo"
-                    className="p-1 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                  >
-                    <Ban size={13} />
-                  </button>
-                )}
-              </div>
+                <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
+              </button>
             ))}
           </div>
           <div className="flex justify-end gap-4 text-xs pt-2 text-slate-500">
@@ -151,6 +149,17 @@ export function CargosDelDia({
           actor={actor}
           onCerrar={() => setCapturando(false)}
           onListo={(avs) => { setCapturando(false); setAvisos(avs); cargar(); }}
+        />
+      )}
+
+      {detalle && (
+        <DetalleCargoModal
+          key={`${detalle.id}-${detalle.modificado_en ?? ""}`}
+          cargo={detalle}
+          diaCerrado={censo.dia_cerrado}
+          actor={actor}
+          onCerrar={() => setDetalleId(null)}
+          onCambio={cargar}
         />
       )}
     </div>
@@ -389,6 +398,311 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
       {children}
+    </div>
+  );
+}
+
+// ── Detalle de un cargo: ver todo + editar / cobrable / anular ──────────────
+
+const DOC_LABEL: Record<string, string> = {
+  RECETA_MEDICA: "Receta médica",
+  FORMULARIO_QUIRURGICO: "Formulario quirúrgico",
+  RESULTADO_LAB: "Resultado de laboratorio",
+  IMAGEN_RX: "Imagen / RX",
+  OTRO: "Otro",
+};
+
+const fechaHora = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) : "—";
+
+function DetalleCargoModal({
+  cargo, diaCerrado, actor, onCerrar, onCambio,
+}: {
+  cargo: CargoConArancel;
+  diaCerrado: boolean;
+  actor: { uid: string; nombre: string };
+  onCerrar: () => void;
+  onCambio: () => void;
+}) {
+  const [modo, setModo] = useState<"ver" | "editar" | "nocobrable">("ver");
+  const [aut, setAut] = useState<AutorizacionIsbm | null | undefined>(undefined);
+  const [error, setError] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  const [cantidad, setCantidad] = useState(String(Number(cargo.cantidad)));
+  const [precio, setPrecio] = useState(String(cargo.precio_unitario));
+  const [comentarios, setComentarios] = useState(cargo.comentarios ?? "");
+  const [docTipo, setDocTipo] = useState(cargo.tipo_documento_respaldo ?? "");
+  const [docRef, setDocRef] = useState(cargo.documento_respaldo_ref ?? "");
+  const [justificacion, setJustificacion] = useState("");
+
+  // Diferido: regla react-hooks/set-state-in-effect.
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        setAut(await obtenerAutorizacionDeCargo(cargo.id));
+      } catch {
+        setAut(null);
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [cargo.id]);
+
+  const editable = !diaCerrado && !cargo.anulado;
+  const esOverride = cargo.motivo_no_facturable === "DECISION_ISBM";
+
+  const ejecutar = async (fn: () => Promise<void>) => {
+    setOcupado(true);
+    setError("");
+    try {
+      await fn();
+      onCambio();
+      setModo("ver");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const anular = () => {
+    if (!window.confirm(`¿Anular "${cargo.arancel.descripcion}"? Queda en $0 pero visible para auditoría.`)) return;
+    ejecutar(() => anularCargo(cargo.id, actor.nombre));
+  };
+
+  const volverCobrable = () => {
+    if (!window.confirm("¿Volver este cargo cobrable? Las reglas automáticas del convenio se reaplican al cerrar el día.")) return;
+    ejecutar(() => marcarCobrable(cargo, actor.nombre));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
+      <div className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">
+              {cargo.arancel.descripcion}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {cargo.arancel.codigo} · {RUBRO_LABEL[cargo.arancel.rubro]} · {cargo.fecha}
+              {cargo.anulado && <span className="text-red-500 font-semibold"> · ANULADO</span>}
+            </p>
+          </div>
+          <button
+            onClick={onCerrar}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Cerrar"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {modo === "editar" ? (
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Campo label="Cantidad">
+                <input type="number" min="0.5" step="0.5" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className={inputCls} />
+              </Campo>
+              <Campo label="Precio unitario">
+                <input type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} className={inputCls} />
+              </Campo>
+              <Campo label="Documento de respaldo">
+                <select value={docTipo} onChange={(e) => setDocTipo(e.target.value)} className={inputCls}>
+                  <option value="">— Ninguno —</option>
+                  {Object.entries(DOC_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Campo>
+              <Campo label="Referencia física (ampo, folio…)">
+                <input value={docRef} onChange={(e) => setDocRef(e.target.value)} className={inputCls} />
+              </Campo>
+            </div>
+            <Campo label="Comentarios">
+              <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} rows={2} className={inputCls} />
+            </Campo>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-3 items-start">
+            <div className="space-y-3">
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Montos</p>
+                <div className="text-sm text-slate-700 dark:text-slate-300 space-y-0.5">
+                  <p><span className="text-slate-400">Cantidad:</span> {Number(cargo.cantidad)} × {formatoDolares(cargo.precio_unitario)}</p>
+                  <p><span className="text-slate-400">Total servicio:</span> {formatoDolares(cargo.costo_total)}</p>
+                  <p className="font-semibold">
+                    <span className="text-slate-400 font-normal">Facturable:</span> {formatoDolares(cargo.monto_facturable)}
+                  </p>
+                  {cargo.motivo_no_facturable && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      {MOTIVO_NO_FACTURABLE_LABEL[cargo.motivo_no_facturable]}
+                      {cargo.justificacion_no_facturable && ` — ${cargo.justificacion_no_facturable}`}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Documentación y comentarios</p>
+                <div className="text-sm text-slate-700 dark:text-slate-300 space-y-0.5">
+                  <p>
+                    <span className="text-slate-400">Respaldo:</span>{" "}
+                    {cargo.tipo_documento_respaldo ? DOC_LABEL[cargo.tipo_documento_respaldo] ?? cargo.tipo_documento_respaldo : "—"}
+                    {cargo.documento_respaldo_ref && ` · ${cargo.documento_respaldo_ref}`}
+                  </p>
+                  <p className="whitespace-pre-wrap">
+                    <span className="text-slate-400">Comentarios:</span> {cargo.comentarios || "—"}
+                  </p>
+                  {cargo.especialidad_interconsulta && (
+                    <p><span className="text-slate-400">Interconsulta:</span> {cargo.especialidad_interconsulta.replaceAll("_", " ")}</p>
+                  )}
+                  {cargo.tipo_cirugia && (
+                    <p><span className="text-slate-400">Cirugía:</span> {cargo.tipo_cirugia}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Trazabilidad</p>
+                <div className="text-sm text-slate-700 dark:text-slate-300 space-y-0.5">
+                  <p><span className="text-slate-400">Capturado por:</span> {cargo.capturado_por_nombre}</p>
+                  <p><span className="text-slate-400">El:</span> {fechaHora(cargo.capturado_en)}</p>
+                  {cargo.modificado_por_nombre && (
+                    <p className="text-xs text-slate-500">
+                      Última modificación: {cargo.modificado_por_nombre} · {fechaHora(cargo.modificado_en)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Autorización</p>
+                {aut === undefined ? (
+                  <p className="text-xs text-slate-400">Consultando…</p>
+                ) : aut === null ? (
+                  <p className="text-xs text-slate-400">Este cargo no requiere autorización.</p>
+                ) : (
+                  <div className="text-sm text-slate-700 dark:text-slate-300 space-y-0.5">
+                    <p>
+                      <span
+                        className={`text-[10px] font-medium rounded-full px-2 py-0.5 border ${
+                          aut.estado === "APROBADA"
+                            ? "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900"
+                            : aut.estado === "RECHAZADA"
+                              ? "text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900"
+                              : "text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900"
+                        }`}
+                      >
+                        {aut.estado === "PENDIENTE" ? `Pendiente · nivel ${aut.nivel_requerido === "JEFE" ? "Jefe" : "Supervisor"}` : aut.estado === "APROBADA" ? "Aprobada" : "Rechazada"}
+                      </span>
+                    </p>
+                    {aut.resuelto_por_nombre && (
+                      <p className="text-xs text-slate-500">
+                        {aut.resuelto_por_nombre}{aut.comentario ? ` — ${aut.comentario}` : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modo === "nocobrable" && (
+          <div className="mt-3 border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/40 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+              Marcar como NO cobrable (decisión manual — queda en auditoría)
+            </p>
+            <input
+              autoFocus
+              value={justificacion}
+              onChange={(e) => setJustificacion(e.target.value)}
+              placeholder="Justificación (mínimo 10 caracteres)"
+              className={inputCls}
+            />
+          </div>
+        )}
+
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 mt-3">{error}</p>
+        )}
+
+        {/* Acciones */}
+        <div className="flex flex-wrap justify-end gap-2 pt-4">
+          {modo !== "ver" ? (
+            <>
+              <button
+                onClick={() => { setModo("ver"); setError(""); }}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              {modo === "editar" ? (
+                <button
+                  onClick={() =>
+                    ejecutar(() =>
+                      editarCargo(cargo, {
+                        cantidad: Number(cantidad),
+                        precioUnitario: Number(precio),
+                        comentarios,
+                        tipoDocumentoRespaldo: docTipo || undefined,
+                        documentoRespaldoRef: docRef || undefined,
+                      }, actor.nombre)
+                    )
+                  }
+                  disabled={ocupado}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {ocupado ? "Guardando…" : "Guardar cambios"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => ejecutar(() => marcarNoCobrable(cargo.id, justificacion, actor.nombre))}
+                  disabled={ocupado || justificacion.trim().length < 10}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {ocupado ? "Guardando…" : "Confirmar no cobrable"}
+                </button>
+              )}
+            </>
+          ) : editable ? (
+            <>
+              <button
+                onClick={anular}
+                disabled={ocupado}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
+              >
+                <Ban size={14} /> Anular
+              </button>
+              {esOverride ? (
+                <button
+                  onClick={volverCobrable}
+                  disabled={ocupado}
+                  className="px-3.5 py-2 text-sm font-medium rounded-lg border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 disabled:opacity-50 transition-colors"
+                >
+                  Volver cobrable
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setModo("nocobrable"); setJustificacion(""); setError(""); }}
+                  disabled={ocupado}
+                  className="px-3.5 py-2 text-sm font-medium rounded-lg border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950 disabled:opacity-50 transition-colors"
+                >
+                  Marcar no cobrable
+                </button>
+              )}
+              <button
+                onClick={() => { setModo("editar"); setError(""); }}
+                disabled={ocupado}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                <Pencil size={14} /> Editar
+              </button>
+            </>
+          ) : (
+            <p className="text-xs text-slate-400 self-center">
+              {cargo.anulado ? "Cargo anulado: solo lectura." : "Día cerrado: reábrelo para modificar cargos."}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -484,24 +484,35 @@ function ModalCenso({
           <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 mb-3">{error}</p>
         )}
 
-        {/* ── Cierre / reapertura ── */}
-        {!censo.dia_cerrado ? (
-          <button
-            onClick={confirmarCierre}
-            disabled={ocupado || editandoServicios || visitaTurno !== null}
-            className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg disabled:opacity-50 transition-colors"
-          >
-            <Lock size={14} /> {ocupado ? "Cerrando…" : "Cerrar día"}
-          </button>
-        ) : (
-          <button
-            onClick={confirmarReapertura}
-            disabled={ocupado}
-            className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg disabled:opacity-50 transition-colors"
-          >
-            <LockOpen size={14} /> {ocupado ? "Reabriendo…" : "Reabrir día"}
-          </button>
-        )}
+        {/* ── Cierre / reapertura: sección propia y discreta para evitar
+               clics accidentales (antes era un botón grande al fondo) ── */}
+        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[220px]">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cierre del día</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {censo.dia_cerrado
+                ? `Cerrado por ${censo.cerrado_por_nombre}. Reabrir permite corregir; al volver a cerrar se recalcula todo.`
+                : "Genera el día-cama, aplica las reglas del convenio y congela los totales. Pide confirmación antes de ejecutar."}
+            </p>
+          </div>
+          {!censo.dia_cerrado ? (
+            <button
+              onClick={confirmarCierre}
+              disabled={ocupado || editandoServicios || visitaTurno !== null}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors flex-shrink-0"
+            >
+              <Lock size={13} /> {ocupado ? "Cerrando…" : "Cerrar día"}
+            </button>
+          ) : (
+            <button
+              onClick={confirmarReapertura}
+              disabled={ocupado}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors flex-shrink-0"
+            >
+              <LockOpen size={13} /> {ocupado ? "Reabriendo…" : "Reabrir día"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { Download, TriangleAlert } from "lucide-react";
 import { consultarTabulador } from "@/lib/isbm/api";
@@ -25,6 +26,7 @@ const inputCls =
   "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function TabuladoresPage() {
+  const router = useRouter();
   const hoy = new Date();
   const [tab, setTab] = useState<Tab>("activos");
   const [anio, setAnio] = useState(hoy.getFullYear());
@@ -190,7 +192,12 @@ export default function TabuladoresPage() {
               </thead>
               <tbody>
                 {visibles.map((f) => (
-                  <tr key={f.id} className="border-b border-slate-50 dark:border-slate-800/60 last:border-0">
+                  <tr
+                    key={f.id}
+                    onClick={() => router.push(`/isbm/ingresos/${f.id}/resumen`)}
+                    title="Ver resumen de cargos del paciente"
+                    className="border-b border-slate-50 dark:border-slate-800/60 last:border-0 cursor-pointer hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition-colors"
+                  >
                     <td className="px-4 py-2.5">
                       <p className="text-slate-900 dark:text-slate-100">{f.paciente_nombre}</p>
                       <p className="text-[10px] font-mono text-slate-400">{f.expediente}</p>
