@@ -127,6 +127,19 @@ export type RubroArancelIsbm =
   | "MISCELANEOS"
   | "BANCO_SANGRE";
 
+// Sección del consolidado (las 7 del libro Excel del convenio). Es un dato
+// propio del arancel, independiente del rubro: en el tarifario las
+// interconsultas y las fisioterapias viven dentro del rubro OTROS, y los
+// ecos/EKG (rubro MISCELANEOS) se presentan como estudios de imagen.
+export type SeccionConsolidadoIsbm =
+  | "DIA_CAMA"
+  | "LABORATORIO"
+  | "RADIOLOGIA"
+  | "MEDICAMENTOS"
+  | "OTROS_SERVICIOS"
+  | "INTERCONSULTAS"
+  | "FISIOTERAPIA";
+
 export interface ArancelIsbm {
   id: number;
   codigo: string;
@@ -137,6 +150,13 @@ export interface ArancelIsbm {
   es_bolson: boolean;
   es_controlado: boolean;
   requiere_autorizacion: boolean;
+  // Interconsulta real del tarifario: pide especialidad al capturar y
+  // participa en la regla de 48 h. No confundir con el rubro OTROS.
+  es_interconsulta: boolean;
+  seccion_consolidado: SeccionConsolidadoIsbm;
+  // Ítem del tarifario que se registra pero NO se factura al ISBM
+  // (el hospital lo absorbe): el cargo queda en $0 automáticamente.
+  es_no_cobrable: boolean;
   monto_umbral_supervisor: number | null;
   monto_umbral_gerente: number | null;
   vigente_desde: string;
@@ -151,6 +171,7 @@ export type MotivoNoFacturableIsbm =
   | "INTERCONSULTA_DENTRO_48H"
   | "EXCLUIDO_ART_25"
   | "INCLUIDO_EN_DIA_CAMA"
+  | "NO_COBRABLE_ARANCEL"
   | "DUPLICADO"
   | "SIN_DOCUMENTO_RESPALDO"
   | "ANULADO"
@@ -217,11 +238,43 @@ export const RUBRO_LABEL: Record<RubroArancelIsbm, string> = {
   QUIRURGICO: "Paquete Quirúrgico",
   MEDICAMENTOS_CUADRO: "Medicamentos Cuadro Básico",
   MEDICAMENTOS_ADICIONALES: "Medicamentos Adicionales (Bolsón)",
-  OTROS: "Otros / Interconsultas",
+  OTROS: "Otros",
   ESTUDIOS_NEUROFISIOLOGICOS: "Neurofisiología",
   MISCELANEOS: "Misceláneos",
   BANCO_SANGRE: "Banco de Sangre",
 };
+
+export const SECCION_CONSOLIDADO_LABEL: Record<SeccionConsolidadoIsbm, string> = {
+  DIA_CAMA: "1. Día cama",
+  LABORATORIO: "2. Exámenes de laboratorio",
+  RADIOLOGIA: "3. Estudios radiológicos o imágenes",
+  MEDICAMENTOS: "4. Medicamentos",
+  OTROS_SERVICIOS: "5. Otros servicios",
+  INTERCONSULTAS: "6. Interconsultas",
+  FISIOTERAPIA: "7. Fisioterapia",
+};
+
+// Sección sugerida al crear un arancel nuevo — espejo del mapeo por rubro
+// del seed/migración (isbm_fase3_secciones.sql).
+export function seccionPorDefecto(rubro: RubroArancelIsbm): SeccionConsolidadoIsbm {
+  switch (rubro) {
+    case "DIA_CAMA":
+      return "DIA_CAMA";
+    case "LABORATORIO_BASICO":
+    case "LABORATORIO_ADICIONAL":
+    case "LABORATORIO_BIOLOGIA_MOLECULAR":
+    case "BANCO_SANGRE":
+      return "LABORATORIO";
+    case "RX_BASICO":
+    case "ESTUDIOS_NEUROFISIOLOGICOS":
+      return "RADIOLOGIA";
+    case "MEDICAMENTOS_CUADRO":
+    case "MEDICAMENTOS_ADICIONALES":
+      return "MEDICAMENTOS";
+    default:
+      return "OTROS_SERVICIOS";
+  }
+}
 
 export const TIPO_BENEFICIARIO_LABEL: Record<TipoBeneficiarioIsbm, string> = {
   COTIZANTE: "Cotizante",
@@ -269,6 +322,7 @@ export const MOTIVO_NO_FACTURABLE_LABEL: Record<MotivoNoFacturableIsbm, string> 
   INTERCONSULTA_DENTRO_48H: "Interconsulta dentro de 48 h",
   EXCLUIDO_ART_25: "Excluido por Art. 25",
   INCLUIDO_EN_DIA_CAMA: "Incluido en día-cama",
+  NO_COBRABLE_ARANCEL: "No cobrable según el convenio",
   DUPLICADO: "Duplicado",
   SIN_DOCUMENTO_RESPALDO: "Sin documento de respaldo",
   ANULADO: "Anulado",
@@ -293,9 +347,8 @@ export const RUBROS_EXAMENES: RubroArancelIsbm[] = [
   "BANCO_SANGRE",
 ];
 
-// Rubros de interconsulta (aplica la regla de 48 h por especialidad).
-export const RUBROS_INTERCONSULTA: RubroArancelIsbm[] = ["OTROS", "MISCELANEOS"];
-
+// La regla de 48 h aplica por arancel (es_interconsulta), no por rubro:
+// el rubro OTROS mezcla interconsultas con parenteral, curaciones, etc.
 export const ESPECIALIDADES_INTERCONSULTA = [
   "MEDICINA_INTERNA", "CIRUGIA", "GINECO_OBSTETRICIA", "PEDIATRIA",
   "PSIQUIATRIA", "NEONATOS", "MEDICINA_INTENSIVA", "NEUROLOGIA",
