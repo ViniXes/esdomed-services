@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -51,21 +51,46 @@ const PAGE_SIZE = 50;
 // Evita releer Firestore al volver a una consulta ya hecha.
 const cachePacientes = new Map<string, Paciente[]>();
 
+// Snapshot de la última vista consultada (tab, filtros, resultados y página).
+// Al volver del detalle la página se desmonta y remonta; este snapshot restaura
+// exactamente lo que había en pantalla sin releer Firestore — también para los
+// tabs históricos, que a propósito no entran en cachePacientes.
+let ultimaConsulta: {
+  filtro: FiltroEstado;
+  servicioFiltro: string;
+  busqueda: string;
+  fechaDesde: string;
+  fechaHasta: string;
+  page: number;
+  pacientes: Paciente[];
+} | null = null;
+
 export default function PacientesPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const { servicios: catalogoServicios } = useServicios();
-  // Mount: si ya hay caché de la combinación por defecto (activo, sin servicio), se
-  // muestra sin leer Firestore; si no, vacío hasta que el usuario pulse Consultar.
-  const [pacientes, setPacientes] = useState<Paciente[]>(() => cachePacientes.get("activo|") ?? []);
+  // Mount: primero restaura la última vista consultada (volver del detalle); si no
+  // hay, cae a la caché del censo de activos; si tampoco, vacío hasta Consultar.
+  const [pacientes, setPacientes] = useState<Paciente[]>(
+    () => ultimaConsulta?.pacientes ?? cachePacientes.get("activo|") ?? []
+  );
   const [loading, setLoading] = useState(false);
-  const [consultado, setConsultado] = useState(() => cachePacientes.has("activo|"));
-  const [filtro, setFiltro] = useState<FiltroEstado>("activo");
-  const [servicioFiltro, setServicioFiltro] = useState<string>("");
-  const [busqueda, setBusqueda] = useState("");
-  const [fechaDesde, setFechaDesde] = useState("");
-  const [fechaHasta, setFechaHasta] = useState("");
-  const [page, setPage] = useState(1);
+  const [consultado, setConsultado] = useState(() => !!ultimaConsulta || cachePacientes.has("activo|"));
+  const [filtro, setFiltro] = useState<FiltroEstado>(() => ultimaConsulta?.filtro ?? "activo");
+  const [servicioFiltro, setServicioFiltro] = useState<string>(() => ultimaConsulta?.servicioFiltro ?? "");
+  const [busqueda, setBusqueda] = useState(() => ultimaConsulta?.busqueda ?? "");
+  const [fechaDesde, setFechaDesde] = useState(() => ultimaConsulta?.fechaDesde ?? "");
+  const [fechaHasta, setFechaHasta] = useState(() => ultimaConsulta?.fechaHasta ?? "");
+  const [page, setPage] = useState(() => ultimaConsulta?.page ?? 1);
+
+  // Mantener el snapshot al día con lo que está en pantalla. Solo mientras hay
+  // una vista consultada; al cambiar de tab (que vacía la vista) no se pisa, así
+  // el snapshot conserva la última consulta real.
+  useEffect(() => {
+    if (consultado) {
+      ultimaConsulta = { filtro, servicioFiltro, busqueda, fechaDesde, fechaHasta, page, pacientes };
+    }
+  }, [consultado, filtro, servicioFiltro, busqueda, fechaDesde, fechaHasta, page, pacientes]);
 
   // Para estados de egreso, el rango filtra por fecha de egreso; si no, por ingreso.
   const usaFechaEgreso = filtro !== "activo" && filtro !== "todos";
@@ -79,8 +104,9 @@ export default function PacientesPage() {
   const tieneRango = !!(fechaDesde && fechaHasta);
   const puedeConsultar = filtro === "activo" || !!exp || tieneRango;
 
-  // La caché de sesión SPA solo guarda el censo de activos (para mostrarlo al instante
-  // al abrir/volver); los históricos se consultan siempre bajo demanda.
+  // cachePacientes solo guarda el censo de activos (para mostrarlo al instante al
+  // abrir/volver); los históricos se consultan bajo demanda, pero la última vista
+  // queda en `ultimaConsulta` para restaurarla al volver del detalle.
   const cacheKey = `${filtro}|${servicioFiltro}`;
 
   // Trigger de "vaciar la vista": activos depende de estado+servicio (el servicio va al
@@ -150,8 +176,8 @@ export default function PacientesPage() {
             : b.fechaIngreso.getTime() - a.fechaIngreso.getTime()
         );
 
-      // Solo se cachea el censo de activos (para el restore al abrir/volver);
-      // los históricos son consultas puntuales que siempre se re-leen al pulsar.
+      // Solo se cachea el censo de activos; los históricos se re-leen al pulsar
+      // Consultar/Actualizar (volver del detalle los restaura vía `ultimaConsulta`).
       if (filtro === "activo") cachePacientes.set(cacheKey, lista);
       setPacientes(lista);
       setConsultado(true);

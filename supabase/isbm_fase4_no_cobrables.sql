@@ -7,9 +7,7 @@
 -- El tarifario del convenio incluye ítems que se registran pero NO
 -- se facturan al ISBM (el hospital los absorbe). Hasta ahora eso
 -- solo existía como texto "(no cobrable)" en la descripción de 6
--- aranceles — nada lo aplicaba — y el personal de ISBM confirmó
--- (2026-07-16) que el Expansor de volumen plasmático (MB013)
--- también es no cobrable aunque no trae el rótulo.
+-- aranceles — nada lo aplicaba.
 --
 -- Cambios:
 --   1. aranceles.es_no_cobrable — al capturar un cargo de estos
@@ -17,9 +15,16 @@
 --      en captura, cargos, consolidado). Editable por el jefe
 --      desde la página de Aranceles.
 --   2. Nuevo motivo NO_COBRABLE_ARANCEL en cargos_paciente_dia.
---   3. Marca los 6 "(no cobrable)" + MB013; sanea los cargos ya
---      capturados de esos ítems y recalcula snapshots.
+--   3. Marca SOLO los 6 rotulados "(no cobrable)"; sanea los
+--      cargos ya capturados de esos ítems y recalcula snapshots.
 --   4. cerrar_dia_censo lo aplica como primera regla automática.
+--
+-- CORRECCIÓN 2026-07-16: una versión anterior de este archivo
+-- marcaba también MB013 (Expansor de volumen plasmático) — ERROR:
+-- es medicamento adicional a cuadro (bolsón) y SÍ se cobra. Este
+-- archivo es re-ejecutable: si corriste la versión anterior,
+-- vuelve a correr esta versión completa y lo deja bien (desmarca
+-- MB013 y restaura sus cargos).
 -- ============================================================
 
 -- ── 1: flag en aranceles ─────────────────────────────────────
@@ -43,10 +48,26 @@ ALTER TABLE cargos_paciente_dia
 
 -- ── 3: marcar ítems y sanear cargos existentes ───────────────
 
--- Los 6 rotulados "(no cobrable)" en el tarifario + MB013 Expansor
--- (confirmado por personal ISBM 2026-07-16)
+-- Los 6 rotulados "(no cobrable)" en el tarifario
 UPDATE aranceles SET es_no_cobrable = TRUE
-WHERE codigo IN ('MB001', 'MB009', 'MB013', 'MB023', 'MB030', 'MB031', 'MB032');
+WHERE codigo IN ('MB001', 'MB009', 'MB023', 'MB030', 'MB031', 'MB032');
+
+-- MB013 Expansor NO va: es bolsón (adicional a cuadro), SÍ se cobra
+-- (desmarca por si corrió la versión anterior de este archivo)
+UPDATE aranceles SET es_no_cobrable = FALSE WHERE codigo = 'MB013';
+
+-- Restaura cargos que quedaron en $0 por NO_COBRABLE_ARANCEL pero
+-- cuyo arancel ya no está marcado (corrección MB013)
+UPDATE cargos_paciente_dia c
+SET monto_facturable = c.costo_total,
+    motivo_no_facturable = NULL,
+    modificado_por_nombre = 'Migración fase 4 (corrección no cobrables)',
+    modificado_en = NOW()
+FROM aranceles a
+WHERE a.id = c.arancel_id
+  AND NOT a.es_no_cobrable
+  AND c.motivo_no_facturable = 'NO_COBRABLE_ARANCEL'
+  AND NOT c.anulado;
 
 -- Cargos ya capturados de ítems no cobrables → $0
 UPDATE cargos_paciente_dia c

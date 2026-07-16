@@ -724,11 +724,12 @@ UPDATE aranceles SET seccion_consolidado = 'RADIOLOGIA'
 WHERE codigo IN ('MC002', 'MC003', 'MC004', 'MC005', 'MC006', 'MC007',
                  'MC008', 'MC009', 'MC010', 'MC011', 'MC014');
 
--- Ítems no cobrables (fase 4): los 6 rotulados "(no cobrable)" en el
--- tarifario + MB013 Expansor (confirmado por personal ISBM 2026-07-16).
--- Se capturan para trazabilidad pero quedan en $0.
+-- Ítems no cobrables (fase 4): SOLO los 6 rotulados "(no cobrable)" en
+-- el tarifario. Se capturan para trazabilidad pero quedan en $0.
+-- OJO: MB013 Expansor NO va aquí — es bolsón (adicional a cuadro) y SÍ
+-- se cobra (corrección del usuario 2026-07-16).
 UPDATE aranceles SET es_no_cobrable = TRUE
-WHERE codigo IN ('MB001', 'MB009', 'MB013', 'MB023', 'MB030', 'MB031', 'MB032');
+WHERE codigo IN ('MB001', 'MB009', 'MB023', 'MB030', 'MB031', 'MB032');
 
 -- Verificación: debe devolver 672
 -- SELECT COUNT(*) FROM aranceles;

@@ -299,6 +299,14 @@ function SeccionTabla({ seccion, cargos }: { seccion: SeccionDef; cargos: CargoC
                   <td className="px-3 py-1.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{c.fecha}</td>
                   <td className={`px-3 py-1.5 text-slate-800 dark:text-slate-200 ${c.anulado ? "line-through" : ""}`}>
                     {c.arancel.descripcion}
+                    {c.arancel.es_bolson && (
+                      <span
+                        title="Medicamento adicional a cuadro básico (bolsón): se cobra aparte"
+                        className="ml-1.5 inline-block rounded-full border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-px text-[9px] font-semibold uppercase text-indigo-700 dark:text-indigo-300 align-middle"
+                      >
+                        Adicional a cuadro
+                      </span>
+                    )}
                   </td>
                   {extraCol && (
                     <td className="px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-400">
