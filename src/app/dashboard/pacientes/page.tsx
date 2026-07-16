@@ -46,10 +46,23 @@ const LIMIT_HISTORICO = 300;
 const LIMIT_TODOS = 1000;
 const PAGE_SIZE = 50;
 
-// Caché de resultados por combinación estado|servicio. Persiste durante la sesión
-// del SPA (sobrevive a navegación client-side, no a recarga completa de la página).
-// Evita releer Firestore al volver a una consulta ya hecha.
+// Caché de consultas ya hechas en la sesión del SPA (sobrevive a navegación
+// client-side, no a recarga completa). Volver a una combinación ya consultada
+// la muestra sin releer Firestore; "Actualizar" siempre re-lee y refresca la
+// entrada. Con techo de entradas para no acumular rangos grandes toda la sesión.
 const cachePacientes = new Map<string, Paciente[]>();
+const CACHE_MAX = 20;
+
+// Llave según los criterios que realmente van al servidor: activos por servicio;
+// históricos por tab + expediente exacto, o tab + rango de egreso.
+const claveConsulta = (
+  filtro: FiltroEstado, servicio: string, exp: string, desde: string, hasta: string
+) =>
+  filtro === "activo"
+    ? `activo|${servicio}`
+    : exp
+      ? `${filtro}|exp:${exp}`
+      : `${filtro}|${desde}|${hasta}`;
 
 // Snapshot de la última vista consultada (tab, filtros, resultados y página).
 // Al volver del detalle la página se desmonta y remonta; este snapshot restaura
@@ -104,10 +117,8 @@ export default function PacientesPage() {
   const tieneRango = !!(fechaDesde && fechaHasta);
   const puedeConsultar = filtro === "activo" || !!exp || tieneRango;
 
-  // cachePacientes solo guarda el censo de activos (para mostrarlo al instante al
-  // abrir/volver); los históricos se consultan bajo demanda, pero la última vista
-  // queda en `ultimaConsulta` para restaurarla al volver del detalle.
-  const cacheKey = `${filtro}|${servicioFiltro}`;
+  // Llave de caché de la consulta actual según sus criterios efectivos.
+  const cacheKey = claveConsulta(filtro, servicioFiltro, exp, fechaDesde, fechaHasta);
 
   // Trigger de "vaciar la vista": activos depende de estado+servicio (el servicio va al
   // servidor); históricos solo del estado (el servicio se filtra en cliente, no re-consulta).
@@ -116,7 +127,9 @@ export default function PacientesPage() {
   const [resetKeyPrev, setResetKeyPrev] = useState(resetKey);
   if (resetKeyPrev !== resetKey) {
     setResetKeyPrev(resetKey);
-    const cached = filtro === "activo" ? cachePacientes.get(cacheKey) : undefined;
+    // Si la combinación del tab entrante ya se consultó en la sesión, se
+    // restaura de caché (0 lecturas); si no, vacío hasta pulsar Consultar.
+    const cached = cachePacientes.get(cacheKey);
     setPacientes(cached ?? []);
     setConsultado(!!cached);
   }
@@ -176,9 +189,13 @@ export default function PacientesPage() {
             : b.fechaIngreso.getTime() - a.fechaIngreso.getTime()
         );
 
-      // Solo se cachea el censo de activos; los históricos se re-leen al pulsar
-      // Consultar/Actualizar (volver del detalle los restaura vía `ultimaConsulta`).
-      if (filtro === "activo") cachePacientes.set(cacheKey, lista);
+      // Guardar/refrescar la entrada de esta combinación; si la caché está
+      // llena, se descarta la más vieja (Map conserva orden de inserción).
+      if (!cachePacientes.has(cacheKey) && cachePacientes.size >= CACHE_MAX) {
+        const masVieja = cachePacientes.keys().next().value;
+        if (masVieja !== undefined) cachePacientes.delete(masVieja);
+      }
+      cachePacientes.set(cacheKey, lista);
       setPacientes(lista);
       setConsultado(true);
     } finally {
