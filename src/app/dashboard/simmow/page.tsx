@@ -15,6 +15,7 @@ import {
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
+import { FormularioRevision } from "@/components/simmow/FormularioRevision";
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100";
@@ -107,6 +108,10 @@ export default function SimmowPage() {
     }
   };
 
+  const actualizar = (patch: Partial<DatosSimmow>) => {
+    setDatos((d) => (d ? { ...d, ...patch } : d));
+  };
+
   const reiniciar = () => {
     setDocumento(null);
     setResultado(null);
@@ -157,29 +162,13 @@ export default function SimmowPage() {
               </div>
             )}
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-              Panel de depuración temporal — el formulario de revisión definitivo (con CIE-10, selects y validación)
-              todavía no está construido. Esto muestra lo que el motor detectó, campo por campo.
-            </p>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-              {Object.entries(datos).map(([campo, valor]) => (
-                <div
-                  key={campo}
-                  className={`rounded-lg border px-2 py-1.5 ${
-                    resultado.camposNoEncontrados.includes(campo as keyof DatosSimmow)
-                      ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20"
-                      : "border-slate-200 dark:border-slate-800"
-                  }`}
-                >
-                  <div className="text-slate-400 dark:text-slate-500 truncate">{campo}</div>
-                  <div className="text-slate-800 dark:text-slate-200 truncate">
-                    {String(valor) || <span className="text-slate-300 dark:text-slate-600">—</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
+
+          <FormularioRevision
+            datos={datos}
+            camposNoEncontrados={resultado.camposNoEncontrados}
+            onChange={actualizar}
+          />
 
           <details className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
             <summary className="text-sm font-semibold text-slate-700 dark:text-slate-200 cursor-pointer">

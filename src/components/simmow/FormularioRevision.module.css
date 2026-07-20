@@ -1,0 +1,142 @@
+/*
+ * Réplica visual de la tabla de SIMMOW (colores/estructura tal cual el
+ * formulario real), portada de la herramienta original de Apps Script.
+ * A propósito NO usa las convenciones Tailwind del resto de esdomed-services:
+ * aquí el requisito es que se vea igual a la pantalla real de SIMMOW para
+ * poder comparar campo por campo mientras se revisa.
+ */
+
+.wrap {
+  background: #003063;
+  padding: 18px;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.form {
+  width: 980px;
+  margin: 0 auto;
+  font-family: Arial, Tahoma, Verdana, Helvetica, sans-serif;
+  font-size: 8pt;
+  color: #000000;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #ffffff;
+  background: #cccccc;
+}
+
+.table td {
+  border: 1px solid #ffffff;
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.title {
+  background: #cccccc;
+  color: #000000;
+  font-size: 10pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.section {
+  background: #003063;
+  color: #ffffff;
+  font-size: 8pt;
+  font-weight: bold;
+}
+
+.label {
+  background: #ffcc66;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.labelDef {
+  background: #c5908e;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.cell {
+  background: #cccccc;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.cellAlt {
+  background: #cccc99;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.form input,
+.form select,
+.form textarea {
+  width: auto;
+  border-radius: 0;
+  border: 1px solid #777;
+  padding: 1px 2px;
+  font-family: Arial, Tahoma, Verdana, Helvetica, sans-serif;
+  font-size: 8pt;
+  background: #ffffff;
+  color: #000000;
+}
+
+.form textarea {
+  vertical-align: middle;
+  resize: vertical;
+}
+
+.mini {
+  width: 42px !important;
+}
+
+.codigo {
+  width: 55px !important;
+}
+
+.fecha {
+  width: 85px !important;
+}
+
+.doc {
+  width: 130px !important;
+}
+
+.exp {
+  width: 120px !important;
+}
+
+.nombre {
+  width: 190px !important;
+}
+
+.dir {
+  width: 430px !important;
+}
+
+.dx {
+  width: 360px !important;
+  height: 38px;
+}
+
+.observacion {
+  width: 520px !important;
+  height: 45px;
+}
+
+.referencia {
+  width: 520px !important;
+}
+
+.alerta {
+  border: 2px solid #f97316 !important;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.25);
+  background: #fff7ed !important;
+}
