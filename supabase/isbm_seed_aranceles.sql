@@ -692,6 +692,45 @@ VALUES
     ('MB032', 'MEDICAMENTOS_ADICIONALES', 'Sodio Cloruro en agua estéril para inyección 10 ml (no cobrable)', 0.77, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29'),
     ('MB033', 'MEDICAMENTOS_ADICIONALES', 'Succinilcolina Cloruro 500 mg', 8.40, FALSE, TRUE, FALSE, FALSE, 200.00, 200.01, '2023-06-29');
 
+-- ============================================================
+-- Clasificación fase 3: interconsulta + sección del consolidado
+-- (mismo bloque de isbm_fase3_secciones.sql — aquí para que las
+-- instalaciones frescas queden bien desde el seed)
+-- ============================================================
+
+-- Sección por defecto según rubro (las mismas 7 del libro Excel)
+UPDATE aranceles SET seccion_consolidado = CASE
+    WHEN rubro = 'DIA_CAMA' THEN 'DIA_CAMA'
+    WHEN rubro IN ('LABORATORIO_BASICO', 'LABORATORIO_ADICIONAL',
+                   'LABORATORIO_BIOLOGIA_MOLECULAR', 'BANCO_SANGRE') THEN 'LABORATORIO'
+    WHEN rubro IN ('RX_BASICO', 'ESTUDIOS_NEUROFISIOLOGICOS') THEN 'RADIOLOGIA'
+    WHEN rubro IN ('MEDICAMENTOS_CUADRO', 'MEDICAMENTOS_ADICIONALES') THEN 'MEDICAMENTOS'
+    ELSE 'OTROS_SERVICIOS'
+END;
+
+-- Interconsultas reales del tarifario (solo estas piden especialidad
+-- y participan en la regla de 48 h)
+UPDATE aranceles
+SET es_interconsulta = TRUE, seccion_consolidado = 'INTERCONSULTAS'
+WHERE codigo IN ('OT020', 'OT021');
+
+-- Fisioterapias → sección 7
+UPDATE aranceles SET seccion_consolidado = 'FISIOTERAPIA' WHERE codigo = 'OT016';
+
+-- Estudios de imagen del rubro MISCELANEOS → sección 3 (ecos, EKG,
+-- FAST, rastreo); monitoreos MC012/MC013 y colecistostomía MC001 se
+-- quedan en OTROS_SERVICIOS.
+UPDATE aranceles SET seccion_consolidado = 'RADIOLOGIA'
+WHERE codigo IN ('MC002', 'MC003', 'MC004', 'MC005', 'MC006', 'MC007',
+                 'MC008', 'MC009', 'MC010', 'MC011', 'MC014');
+
+-- Ítems no cobrables (fase 4): SOLO los 6 rotulados "(no cobrable)" en
+-- el tarifario. Se capturan para trazabilidad pero quedan en $0.
+-- OJO: MB013 Expansor NO va aquí — es bolsón (adicional a cuadro) y SÍ
+-- se cobra (corrección del usuario 2026-07-16).
+UPDATE aranceles SET es_no_cobrable = TRUE
+WHERE codigo IN ('MB001', 'MB009', 'MB023', 'MB030', 'MB031', 'MB032');
+
 -- Verificación: debe devolver 672
 -- SELECT COUNT(*) FROM aranceles;
 

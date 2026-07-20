@@ -19,7 +19,7 @@ import {
   MOTIVO_NO_FACTURABLE_LABEL,
   formatoDolares,
   type CargoConArancel,
-  type RubroArancelIsbm,
+  type SeccionConsolidadoIsbm,
 } from "@/lib/isbm/types";
 
 type ModoFecha = "estancia" | "dia" | "rango";
@@ -28,54 +28,56 @@ interface SeccionDef {
   id: string;
   titulo: string;
   subtitulo?: string;
-  rubros: RubroArancelIsbm[];
+  seccion: SeccionConsolidadoIsbm;
   color: { border: string; headerBg: string; headerText: string; badge: string };
 }
 
 // Mismas secciones y orden del libro Excel del convenio (sistema anterior).
+// Cada cargo cae en la sección que dicta su arancel (seccion_consolidado),
+// no el rubro: interconsultas y fisioterapias viven en el rubro OTROS.
 const SECCIONES: SeccionDef[] = [
   {
     id: "dia_cama",
     titulo: "1. DÍA CAMA",
-    rubros: ["DIA_CAMA"],
+    seccion: "DIA_CAMA",
     color: { border: "border-l-sky-500", headerBg: "bg-sky-500/10", headerText: "text-sky-800 dark:text-sky-300", badge: "text-sky-700 dark:text-sky-400" },
   },
   {
     id: "laboratorio",
     titulo: "2. EXÁMENES DE LABORATORIO",
-    rubros: ["LABORATORIO_BASICO", "LABORATORIO_ADICIONAL", "LABORATORIO_BIOLOGIA_MOLECULAR", "BANCO_SANGRE"],
+    seccion: "LABORATORIO",
     color: { border: "border-l-violet-500", headerBg: "bg-violet-500/10", headerText: "text-violet-800 dark:text-violet-300", badge: "text-violet-700 dark:text-violet-400" },
   },
   {
     id: "radiologia",
     titulo: "3. ESTUDIOS RADIOLÓGICOS O IMÁGENES",
-    rubros: ["RX_BASICO", "ESTUDIOS_NEUROFISIOLOGICOS"],
+    seccion: "RADIOLOGIA",
     color: { border: "border-l-teal-500", headerBg: "bg-teal-500/10", headerText: "text-teal-800 dark:text-teal-300", badge: "text-teal-700 dark:text-teal-400" },
   },
   {
     id: "medicamentos",
     titulo: "4. MEDICAMENTOS",
-    rubros: ["MEDICAMENTOS_CUADRO", "MEDICAMENTOS_ADICIONALES"],
+    seccion: "MEDICAMENTOS",
     color: { border: "border-l-emerald-500", headerBg: "bg-emerald-500/10", headerText: "text-emerald-800 dark:text-emerald-300", badge: "text-emerald-700 dark:text-emerald-400" },
   },
   {
     id: "quirurgico",
     titulo: "5. OTROS SERVICIOS",
-    rubros: ["QUIRURGICO"],
+    seccion: "OTROS_SERVICIOS",
     color: { border: "border-l-amber-500", headerBg: "bg-amber-500/10", headerText: "text-amber-800 dark:text-amber-300", badge: "text-amber-700 dark:text-amber-400" },
   },
   {
     id: "interconsultas",
     titulo: "6. INTERCONSULTAS",
     subtitulo: "detallar la especialidad y el nombre del médico",
-    rubros: ["OTROS"],
+    seccion: "INTERCONSULTAS",
     color: { border: "border-l-indigo-500", headerBg: "bg-indigo-500/10", headerText: "text-indigo-800 dark:text-indigo-300", badge: "text-indigo-700 dark:text-indigo-400" },
   },
   {
     id: "fisioterapia",
     titulo: "7. FISIOTERAPIA",
     subtitulo: "detallar el nombre de quien la realizó",
-    rubros: ["MISCELANEOS"],
+    seccion: "FISIOTERAPIA",
     color: { border: "border-l-rose-500", headerBg: "bg-rose-500/10", headerText: "text-rose-800 dark:text-rose-300", badge: "text-rose-700 dark:text-rose-400" },
   },
 ];
@@ -241,7 +243,7 @@ export default function ResumenIngresoPage() {
 // ── Tabla de una sección ─────────────────────────────────────────────────────
 
 function SeccionTabla({ seccion, cargos }: { seccion: SeccionDef; cargos: CargoConArancel[] }) {
-  const items = cargos.filter((c) => seccion.rubros.includes(c.arancel.rubro));
+  const items = cargos.filter((c) => c.arancel.seccion_consolidado === seccion.seccion);
   const vivos = items.filter((c) => !c.anulado);
   const totalCosto = vivos.reduce((s, c) => s + c.costo_total, 0);
   const totalFacturable = vivos.reduce((s, c) => s + c.monto_facturable, 0);
@@ -297,6 +299,14 @@ function SeccionTabla({ seccion, cargos }: { seccion: SeccionDef; cargos: CargoC
                   <td className="px-3 py-1.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">{c.fecha}</td>
                   <td className={`px-3 py-1.5 text-slate-800 dark:text-slate-200 ${c.anulado ? "line-through" : ""}`}>
                     {c.arancel.descripcion}
+                    {c.arancel.es_bolson && (
+                      <span
+                        title="Medicamento adicional a cuadro básico (bolsón): se cobra aparte"
+                        className="ml-1.5 inline-block rounded-full border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-px text-[9px] font-semibold uppercase text-indigo-700 dark:text-indigo-300 align-middle"
+                      >
+                        Adicional a cuadro
+                      </span>
+                    )}
                   </td>
                   {extraCol && (
                     <td className="px-3 py-1.5 text-[11px] text-slate-600 dark:text-slate-400">

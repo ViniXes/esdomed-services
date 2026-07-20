@@ -188,6 +188,20 @@ CREATE TABLE aranceles (
     es_bolson               BOOLEAN NOT NULL DEFAULT FALSE,
     es_controlado           BOOLEAN NOT NULL DEFAULT FALSE,
     requiere_autorizacion   BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Interconsulta real del tarifario (fase 3): pide especialidad al
+    -- capturar y participa en la regla de 48 h. NO es lo mismo que el
+    -- rubro OTROS, que mezcla interconsultas con parenteral, curaciones…
+    es_interconsulta        BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Sección del consolidado del libro Excel (1-7) donde se presenta el
+    -- cargo. Solo presentación: el tope de exámenes sigue siendo por rubro.
+    seccion_consolidado     TEXT NOT NULL DEFAULT 'OTROS_SERVICIOS'
+                            CHECK (seccion_consolidado IN (
+                                'DIA_CAMA', 'LABORATORIO', 'RADIOLOGIA',
+                                'MEDICAMENTOS', 'OTROS_SERVICIOS',
+                                'INTERCONSULTAS', 'FISIOTERAPIA')),
+    -- Ítem del tarifario que se registra pero NO se factura al ISBM
+    -- (fase 4): el cargo queda en $0 con motivo NO_COBRABLE_ARANCEL.
+    es_no_cobrable          BOOLEAN NOT NULL DEFAULT FALSE,
     -- Umbrales cláusula decimotercera: hasta el umbral aprueba el
     -- supervisor; por encima, el jefe (antes "gerente GTASS").
     monto_umbral_supervisor NUMERIC(10,2),
@@ -228,6 +242,7 @@ CREATE TABLE cargos_paciente_dia (
                                     'EXCEDE_TOPE_DIARIO_RUBRO', 'EXCEDE_TOPE_MENSUAL',
                                     'SIN_AUTORIZACION', 'INTERCONSULTA_DENTRO_48H',
                                     'EXCLUIDO_ART_25', 'INCLUIDO_EN_DIA_CAMA',
+                                    'NO_COBRABLE_ARANCEL',
                                     'DUPLICADO', 'SIN_DOCUMENTO_RESPALDO',
                                     'ANULADO', 'DECISION_ISBM')),
     justificacion_no_facturable TEXT,               -- auditoría de overrides manuales
@@ -240,7 +255,7 @@ CREATE TABLE cargos_paciente_dia (
     -- Solo rubro QUIRURGICO
     tipo_cirugia                TEXT CHECK (tipo_cirugia IN (
                                     'AMBULATORIA', 'EMERGENCIA', 'ELECTIVA')),
-    -- Solo interconsultas (OTROS / MISCELANEOS): regla de 48 h
+    -- Solo aranceles con es_interconsulta: regla de 48 h
     especialidad_interconsulta  TEXT,
     -- Marcado para revisión antes de facturar (no afecta montos)
     pendiente_revision          BOOLEAN NOT NULL DEFAULT FALSE,

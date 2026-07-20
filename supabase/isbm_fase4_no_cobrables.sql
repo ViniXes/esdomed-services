@@ -1,26 +1,107 @@
 -- ============================================================
--- MÓDULO ISBM — Fase 2: cierre recalculador + vista del tabulador
+-- MÓDULO ISBM — Fase 4: ítems no cobrables del tarifario
 -- ============================================================
 -- Ejecutar UNA VEZ en el SQL Editor de Supabase (después de
--- isbm_schema.sql e isbm_rpc.sql; reemplaza cerrar_dia_censo).
+-- isbm_fase3_secciones.sql; reemplaza cerrar_dia_censo).
 --
--- El cierre del día ahora es el RECALCULADOR AUTORITATIVO:
--- reevalúa la facturabilidad de TODOS los cargos del día en orden
--- de captura, con las reglas del convenio:
---   1. Sin autorizaciones PENDIENTES del día (bloquea el cierre).
---   2. Autorización RECHAZADA  → no facturable (SIN_AUTORIZACION).
---   3. Tope diario de exámenes → el excedente no se factura
---      (EXCEDE_TOPE_DIARIO_RUBRO); tope según servicio facturación.
---   4. Interconsulta repetida de la misma especialidad dentro de
---      48 h → no facturable (INTERCONSULTA_DENTRO_48H).
---   5. El override manual DECISION_ISBM se respeta siempre.
--- Las validaciones del cliente al capturar son solo UX; lo que
--- se cobra es SIEMPRE lo que deja este recálculo.
+-- El tarifario del convenio incluye ítems que se registran pero NO
+-- se facturan al ISBM (el hospital los absorbe). Hasta ahora eso
+-- solo existía como texto "(no cobrable)" en la descripción de 6
+-- aranceles — nada lo aplicaba.
 --
--- OJO: cerrar_dia_censo fue reemplazada de nuevo en
--- isbm_fase3_secciones.sql (regla de 48 h por es_interconsulta,
--- no por rubro). Este archivo queda como historial.
+-- Cambios:
+--   1. aranceles.es_no_cobrable — al capturar un cargo de estos
+--      ítems queda en $0 con motivo NO_COBRABLE_ARANCEL (visible
+--      en captura, cargos, consolidado). Editable por el jefe
+--      desde la página de Aranceles.
+--   2. Nuevo motivo NO_COBRABLE_ARANCEL en cargos_paciente_dia.
+--   3. Marca SOLO los 6 rotulados "(no cobrable)"; sanea los
+--      cargos ya capturados de esos ítems y recalcula snapshots.
+--   4. cerrar_dia_censo lo aplica como primera regla automática.
+--
+-- CORRECCIÓN 2026-07-16: una versión anterior de este archivo
+-- marcaba también MB013 (Expansor de volumen plasmático) — ERROR:
+-- es medicamento adicional a cuadro (bolsón) y SÍ se cobra. Este
+-- archivo es re-ejecutable: si corriste la versión anterior,
+-- vuelve a correr esta versión completa y lo deja bien (desmarca
+-- MB013 y restaura sus cargos).
 -- ============================================================
+
+-- ── 1: flag en aranceles ─────────────────────────────────────
+
+ALTER TABLE aranceles
+    ADD COLUMN IF NOT EXISTS es_no_cobrable BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ── 2: nuevo motivo en el CHECK de cargos ────────────────────
+
+ALTER TABLE cargos_paciente_dia
+    DROP CONSTRAINT IF EXISTS cargos_paciente_dia_motivo_no_facturable_check;
+ALTER TABLE cargos_paciente_dia
+    ADD CONSTRAINT cargos_paciente_dia_motivo_no_facturable_check
+    CHECK (motivo_no_facturable IN (
+        'EXCEDE_TOPE_DIARIO_RUBRO', 'EXCEDE_TOPE_MENSUAL',
+        'SIN_AUTORIZACION', 'INTERCONSULTA_DENTRO_48H',
+        'EXCLUIDO_ART_25', 'INCLUIDO_EN_DIA_CAMA',
+        'NO_COBRABLE_ARANCEL',
+        'DUPLICADO', 'SIN_DOCUMENTO_RESPALDO',
+        'ANULADO', 'DECISION_ISBM'));
+
+-- ── 3: marcar ítems y sanear cargos existentes ───────────────
+
+-- Los 6 rotulados "(no cobrable)" en el tarifario
+UPDATE aranceles SET es_no_cobrable = TRUE
+WHERE codigo IN ('MB001', 'MB009', 'MB023', 'MB030', 'MB031', 'MB032');
+
+-- MB013 Expansor NO va: es bolsón (adicional a cuadro), SÍ se cobra
+-- (desmarca por si corrió la versión anterior de este archivo)
+UPDATE aranceles SET es_no_cobrable = FALSE WHERE codigo = 'MB013';
+
+-- Restaura cargos que quedaron en $0 por NO_COBRABLE_ARANCEL pero
+-- cuyo arancel ya no está marcado (corrección MB013)
+UPDATE cargos_paciente_dia c
+SET monto_facturable = c.costo_total,
+    motivo_no_facturable = NULL,
+    modificado_por_nombre = 'Migración fase 4 (corrección no cobrables)',
+    modificado_en = NOW()
+FROM aranceles a
+WHERE a.id = c.arancel_id
+  AND NOT a.es_no_cobrable
+  AND c.motivo_no_facturable = 'NO_COBRABLE_ARANCEL'
+  AND NOT c.anulado;
+
+-- Cargos ya capturados de ítems no cobrables → $0
+UPDATE cargos_paciente_dia c
+SET monto_facturable = 0,
+    motivo_no_facturable = 'NO_COBRABLE_ARANCEL',
+    modificado_por_nombre = 'Migración fase 4 (no cobrables)',
+    modificado_en = NOW()
+FROM aranceles a
+WHERE a.id = c.arancel_id
+  AND a.es_no_cobrable
+  AND NOT c.anulado
+  AND c.monto_facturable <> 0;
+
+-- Snapshots de días cerrados reflejan los montos corregidos
+UPDATE censo_diario cd
+SET total_servicio_dia = t.serv,
+    total_cobrable_dia = t.cobr,
+    updated_at = NOW()
+FROM (
+    SELECT censo_id,
+           COALESCE(SUM(costo_total), 0)      AS serv,
+           COALESCE(SUM(monto_facturable), 0) AS cobr
+    FROM cargos_paciente_dia
+    WHERE NOT anulado
+    GROUP BY censo_id
+) t
+WHERE cd.id = t.censo_id
+  AND cd.dia_cerrado
+  AND (cd.total_servicio_dia IS DISTINCT FROM t.serv
+       OR cd.total_cobrable_dia IS DISTINCT FROM t.cobr);
+
+-- ── 4: recalculador autoritativo con la regla no cobrable ────
+-- Idéntico al de fase 3 más la regla 0: arancel no cobrable → $0
+-- antes de evaluar autorización/tope/48 h.
 
 CREATE OR REPLACE FUNCTION cerrar_dia_censo(p_censo_id BIGINT, p_nombre TEXT)
 RETURNS VOID
@@ -102,7 +183,7 @@ BEGIN
         SELECT c.id, c.ingreso_id, c.fecha, c.capturado_en, c.costo_total,
                c.monto_facturable, c.motivo_no_facturable,
                c.especialidad_interconsulta,
-               a.rubro
+               a.rubro, a.es_interconsulta, a.es_no_cobrable
         FROM cargos_paciente_dia c
         JOIN aranceles a ON a.id = c.arancel_id
         WHERE c.censo_id = p_censo_id AND NOT c.anulado
@@ -116,8 +197,13 @@ BEGIN
         v_fact := r.costo_total;
         v_motivo := NULL;
 
+        -- Regla 0: ítem no cobrable según el tarifario del convenio
+        IF r.es_no_cobrable THEN
+            v_fact := 0;
+            v_motivo := 'NO_COBRABLE_ARANCEL';
+
         -- Regla 2: autorización rechazada
-        IF EXISTS (
+        ELSIF EXISTS (
             SELECT 1 FROM autorizaciones_servicio a
             WHERE a.cargo_id = r.id AND a.estado = 'RECHAZADA'
         ) THEN
@@ -139,7 +225,8 @@ BEGIN
             v_acum_ex := v_acum_ex + v_fact;
 
         -- Regla 4: interconsulta de la misma especialidad dentro de 48 h
-        ELSIF r.rubro IN ('OTROS', 'MISCELANEOS')
+        --          (solo aranceles marcados es_interconsulta)
+        ELSIF r.es_interconsulta
               AND r.especialidad_interconsulta IS NOT NULL THEN
             IF EXISTS (
                 SELECT 1
@@ -148,7 +235,7 @@ BEGIN
                 WHERE c2.ingreso_id = r.ingreso_id
                   AND c2.id <> r.id
                   AND NOT c2.anulado
-                  AND a2.rubro IN ('OTROS', 'MISCELANEOS')
+                  AND a2.es_interconsulta
                   AND c2.especialidad_interconsulta = r.especialidad_interconsulta
                   AND c2.fecha >= r.fecha - 2
                   AND (c2.fecha < r.fecha
@@ -186,32 +273,7 @@ BEGIN
 END;
 $$;
 
-
--- ============================================================
--- Vista del tabulador — un renglón por ingreso con agregados
--- ============================================================
--- security_invoker: la vista corre con los permisos del usuario,
--- así las RLS de las tablas base siguen aplicando (solo roles ISBM).
-
-CREATE OR REPLACE VIEW v_tabulador_ingresos
-WITH (security_invoker = true) AS
-SELECT
-    i.id,
-    i.expediente,
-    i.paciente_nombre,
-    af.numero_afiliacion_isbm,
-    i.fecha_ingreso,
-    i.fecha_egreso,
-    i.condicion_egreso,
-    i.servicio_actual,
-    GREATEST(0, COALESCE(i.fecha_egreso, CURRENT_DATE) - i.fecha_ingreso) AS dias_estancia,
-    (SELECT COUNT(*) FROM censo_diario cd
-      WHERE cd.ingreso_id = i.id)                                   AS dias_censados,
-    (SELECT COUNT(*) FROM censo_diario cd
-      WHERE cd.ingreso_id = i.id AND cd.dia_cerrado)                AS dias_cerrados,
-    (SELECT COALESCE(SUM(c.costo_total), 0) FROM cargos_paciente_dia c
-      WHERE c.ingreso_id = i.id AND NOT c.anulado)                  AS total_servicio,
-    (SELECT COALESCE(SUM(c.monto_facturable), 0) FROM cargos_paciente_dia c
-      WHERE c.ingreso_id = i.id AND NOT c.anulado)                  AS total_cobrable
-FROM ingresos i
-JOIN afiliaciones af ON af.expediente = i.expediente;
+-- Verificación sugerida tras ejecutar:
+--   SELECT codigo, descripcion, es_no_cobrable FROM aranceles WHERE es_no_cobrable;
+--   SELECT COUNT(*) FROM cargos_paciente_dia
+--   WHERE motivo_no_facturable = 'NO_COBRABLE_ARANCEL';

@@ -14,9 +14,12 @@ import {
 } from "@/lib/isbm/api";
 import {
   RUBRO_LABEL,
+  SECCION_CONSOLIDADO_LABEL,
   formatoDolares,
+  seccionPorDefecto,
   type ArancelIsbm,
   type RubroArancelIsbm,
+  type SeccionConsolidadoIsbm,
 } from "@/lib/isbm/types";
 
 const inputCls =
@@ -130,6 +133,7 @@ export default function ArancelesPage() {
                   <th className="px-4 py-2.5 font-medium">Código</th>
                   <th className="px-4 py-2.5 font-medium">Descripción</th>
                   <th className="px-4 py-2.5 font-medium">Rubro</th>
+                  <th className="px-4 py-2.5 font-medium">Sección consolidado</th>
                   <th className="px-4 py-2.5 font-medium text-right">Precio</th>
                   <th className="px-4 py-2.5 font-medium">Marcas</th>
                   {puedeEditar && <th className="px-4 py-2.5 font-medium text-right">Acciones</th>}
@@ -144,6 +148,7 @@ export default function ArancelesPage() {
                       {!a.activo && <span className="ml-2 text-[10px] font-semibold text-red-500 uppercase">Inactivo</span>}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">{RUBRO_LABEL[a.rubro]}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">{SECCION_CONSOLIDADO_LABEL[a.seccion_consolidado]}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">
                       {formatoDolares(a.precio_hnes)}
                     </td>
@@ -153,6 +158,8 @@ export default function ArancelesPage() {
                         {a.es_bolson && <Marca texto="Bolsón" />}
                         {a.es_controlado && <Marca texto="Controlado" />}
                         {a.requiere_autorizacion && <Marca texto="Req. autorización" ambar />}
+                        {a.es_interconsulta && <Marca texto="Interconsulta 48 h" ambar />}
+                        {a.es_no_cobrable && <Marca texto="No cobrable" ambar />}
                       </div>
                     </td>
                     {puedeEditar && (
@@ -230,6 +237,11 @@ function ModalArancel({
 }) {
   const [codigo, setCodigo] = useState(arancel?.codigo ?? "");
   const [rubro, setRubro] = useState<string>(arancel?.rubro ?? "OTROS");
+  const [seccion, setSeccion] = useState<SeccionConsolidadoIsbm>(
+    arancel?.seccion_consolidado ?? seccionPorDefecto("OTROS")
+  );
+  const [esInterconsulta, setEsInterconsulta] = useState(arancel?.es_interconsulta ?? false);
+  const [esNoCobrable, setEsNoCobrable] = useState(arancel?.es_no_cobrable ?? false);
   const [descripcion, setDescripcion] = useState(arancel?.descripcion ?? "");
   const [precio, setPrecio] = useState(arancel ? String(arancel.precio_hnes) : "");
   const [vigenteDesde, setVigenteDesde] = useState(arancel?.vigente_desde ?? hoyISO());
@@ -258,6 +270,9 @@ function ModalArancel({
       es_bolson: bolson,
       es_controlado: controlado,
       requiere_autorizacion: reqAut,
+      es_interconsulta: esInterconsulta,
+      seccion_consolidado: seccion,
+      es_no_cobrable: esNoCobrable,
       monto_umbral_supervisor: umbralSup.trim() ? Number(umbralSup) : null,
       monto_umbral_gerente: umbralGer.trim() ? Number(umbralGer) : null,
       vigente_desde: vigenteDesde,
@@ -296,7 +311,15 @@ function ModalArancel({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Rubro</label>
-              <select value={rubro} onChange={(e) => setRubro(e.target.value)} className={inputCls}>
+              <select
+                value={rubro}
+                onChange={(e) => {
+                  setRubro(e.target.value);
+                  // Al crear, la sección se sugiere desde el rubro; al editar no se toca.
+                  if (!arancel) setSeccion(seccionPorDefecto(e.target.value as RubroArancelIsbm));
+                }}
+                className={inputCls}
+              >
                 {(Object.keys(RUBRO_LABEL) as RubroArancelIsbm[]).map((r) => (
                   <option key={r} value={r}>{RUBRO_LABEL[r]}</option>
                 ))}
@@ -328,12 +351,54 @@ function ModalArancel({
             </div>
           </div>
 
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Sección del consolidado</label>
+              <select
+                value={seccion}
+                onChange={(e) => setSeccion(e.target.value as SeccionConsolidadoIsbm)}
+                className={inputCls}
+              >
+                {(Object.keys(SECCION_CONSOLIDADO_LABEL) as SeccionConsolidadoIsbm[]).map((s) => (
+                  <option key={s} value={s}>{SECCION_CONSOLIDADO_LABEL[s]}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors self-end">
+              <input
+                type="checkbox"
+                checked={esInterconsulta}
+                onChange={(e) => {
+                  setEsInterconsulta(e.target.checked);
+                  if (e.target.checked) setSeccion("INTERCONSULTAS");
+                }}
+                className="accent-blue-600"
+              />
+              Interconsulta (pide especialidad y aplica la regla de 48 h)
+            </label>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Check label="Cuadro básico" valor={cuadro} onChange={setCuadro} />
             <Check label="Bolsón" valor={bolson} onChange={setBolson} />
             <Check label="Controlado" valor={controlado} onChange={setControlado} />
             <Check label="Req. autorización" valor={reqAut} onChange={setReqAut} />
           </div>
+
+          <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/30 rounded-xl px-3 py-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={esNoCobrable}
+              onChange={(e) => setEsNoCobrable(e.target.checked)}
+              className="accent-amber-600 mt-0.5"
+            />
+            <span>
+              <span className="font-medium">No cobrable según el convenio</span>
+              <span className="block text-xs text-slate-500 mt-0.5">
+                Se captura para trazabilidad pero el cargo queda en $0 (lo absorbe el hospital).
+              </span>
+            </span>
+          </label>
 
           {error && (
             <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>

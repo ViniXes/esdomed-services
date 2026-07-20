@@ -21,7 +21,6 @@ import {
 import {
   MOTIVO_NO_FACTURABLE_LABEL,
   RUBRO_LABEL,
-  RUBROS_INTERCONSULTA,
   ESPECIALIDADES_INTERCONSULTA,
   formatoDolares,
   type ArancelIsbm,
@@ -210,8 +209,9 @@ function NuevoCargoModal({
     return () => clearTimeout(t);
   }, [busqueda, rubro]);
 
-  const esInterconsulta = arancel ? RUBROS_INTERCONSULTA.includes(arancel.rubro) : false;
+  const esInterconsulta = arancel?.es_interconsulta ?? false;
   const esQuirurgico = arancel?.rubro === "QUIRURGICO";
+  const esFisioterapia = arancel?.seccion_consolidado === "FISIOTERAPIA";
 
   const guardar = async () => {
     if (!arancel) return;
@@ -301,6 +301,9 @@ function NuevoCargoModal({
                     <p className="text-[10px] text-slate-400">
                       {a.codigo} · {RUBRO_LABEL[a.rubro]}
                       {a.requiere_autorizacion ? " · requiere autorización" : ""}
+                      {a.es_no_cobrable && (
+                        <span className="font-bold text-amber-600 dark:text-amber-400"> · NO COBRABLE</span>
+                      )}
                     </p>
                   </div>
                   <span className="text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-300">
@@ -323,6 +326,13 @@ function NuevoCargoModal({
                 Cambiar
               </button>
             </div>
+
+            {arancel.es_no_cobrable && (
+              <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
+                Este ítem es <strong>no cobrable</strong> según el convenio: se captura para
+                trazabilidad pero queda en $0 (lo absorbe el hospital).
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Cantidad">
@@ -371,7 +381,7 @@ function NuevoCargoModal({
               </Campo>
             </div>
 
-            <Campo label="Comentarios (opcional)">
+            <Campo label={esFisioterapia ? "Realizado por (sale en la sección Fisioterapia del consolidado)" : "Comentarios (opcional)"}>
               <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} rows={2} className={inputCls} />
             </Campo>
 
@@ -457,6 +467,7 @@ function DetalleCargoModal({
   const [comentarios, setComentarios] = useState(cargo.comentarios ?? "");
   const [docTipo, setDocTipo] = useState(cargo.tipo_documento_respaldo ?? "");
   const [docRef, setDocRef] = useState(cargo.documento_respaldo_ref ?? "");
+  const [enObservacion, setEnObservacion] = useState(cargo.pendiente_revision);
   const [justificacion, setJustificacion] = useState("");
 
   // Diferido: regla react-hooks/set-state-in-effect.
@@ -567,6 +578,20 @@ function DetalleCargoModal({
             <Campo label="Comentarios">
               <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} rows={2} className={inputCls} />
             </Campo>
+            <label className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 border border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/30 rounded-xl px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enObservacion}
+                onChange={(e) => setEnObservacion(e.target.checked)}
+                className="accent-orange-600 mt-0.5"
+              />
+              <span>
+                <span className="font-medium inline-flex items-center gap-1.5"><Hourglass size={13} /> En observación</span>
+                <span className="block text-xs text-slate-500 mt-0.5">
+                  Pendiente de confirmar que se realizó (ej. cultivos). Se confirma después desde este detalle.
+                </span>
+              </span>
+            </label>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-3 items-start">
@@ -692,6 +717,7 @@ function DetalleCargoModal({
                         comentarios,
                         tipoDocumentoRespaldo: docTipo || undefined,
                         documentoRespaldoRef: docRef || undefined,
+                        pendienteRevision: enObservacion,
                       }, actor.nombre)
                     )
                   }

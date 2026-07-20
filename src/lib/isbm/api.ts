@@ -9,7 +9,6 @@ import { db } from "@/lib/firebase";
 import { getSupabase } from "./supabase";
 import {
   RUBROS_EXAMENES,
-  RUBROS_INTERCONSULTA,
   type AfiliacionIsbm,
   type ArancelIsbm,
   type AutorizacionConCargo,
@@ -17,6 +16,7 @@ import {
   type CargoListado,
   type CensoDiarioConRelaciones,
   type IngresoIsbm,
+  type SeccionConsolidadoIsbm,
   type ServicioHospitalarioIsbm,
   type TabuladorRow,
 } from "./types";
@@ -65,6 +65,9 @@ export interface DatosArancel {
   es_bolson: boolean;
   es_controlado: boolean;
   requiere_autorizacion: boolean;
+  es_interconsulta: boolean;
+  seccion_consolidado: SeccionConsolidadoIsbm;
+  es_no_cobrable: boolean;
   monto_umbral_supervisor: number | null;
   monto_umbral_gerente: number | null;
   vigente_desde: string; // "YYYY-MM-DD"
@@ -496,8 +499,6 @@ const TIPO_AUTORIZACION_POR_RUBRO: Record<string, string> = {
   QUIRURGICO: "PAQUETE_QUIRURGICO",
   MEDICAMENTOS_CUADRO: "MEDICAMENTO",
   MEDICAMENTOS_ADICIONALES: "MEDICAMENTO",
-  OTROS: "INTERCONSULTA",
-  MISCELANEOS: "INTERCONSULTA",
   LABORATORIO_BASICO: "LABORATORIO_RADIOLOGIA",
   LABORATORIO_ADICIONAL: "LABORATORIO_RADIOLOGIA",
   LABORATORIO_BIOLOGIA_MOLECULAR: "LABORATORIO_RADIOLOGIA",
@@ -525,8 +526,16 @@ export async function crearCargo(
   let facturable = costo;
   let motivo: string | null = null;
 
+  // Ítem no cobrable según el tarifario: se registra para trazabilidad
+  // pero queda en $0 (el hospital lo absorbe).
+  if (arancel.es_no_cobrable) {
+    facturable = 0;
+    motivo = "NO_COBRABLE_ARANCEL";
+    avisos.push("Ítem no cobrable según el convenio: queda registrado en $0.");
+  }
+
   // Tope diario de exámenes del servicio de facturación
-  if (RUBROS_EXAMENES.includes(arancel.rubro)) {
+  if (!arancel.es_no_cobrable && RUBROS_EXAMENES.includes(arancel.rubro)) {
     const delDia = await cargosDeCenso(censo.id);
     const consumido = delDia
       .filter((c) => !c.anulado && RUBROS_EXAMENES.includes(c.arancel.rubro))
@@ -543,24 +552,21 @@ export async function crearCargo(
     }
   }
 
-  // Regla 48 h: interconsulta repetida de la misma especialidad
-  if (
-    RUBROS_INTERCONSULTA.includes(arancel.rubro) &&
-    input.especialidadInterconsulta
-  ) {
+  // Regla 48 h: interconsulta repetida de la misma especialidad. Solo entre
+  // aranceles marcados es_interconsulta — no todo el rubro OTROS.
+  if (!arancel.es_no_cobrable && arancel.es_interconsulta && input.especialidadInterconsulta) {
     const { data: previos, error: errPrev } = await sb
       .from("cargos_paciente_dia")
-      .select("id, fecha, arancel:aranceles(rubro)")
+      .select("id, fecha, arancel:aranceles(es_interconsulta)")
       .eq("ingreso_id", censo.ingreso_id)
       .eq("especialidad_interconsulta", input.especialidadInterconsulta)
       .eq("anulado", false)
       .gte("fecha", restarDias(censo.fecha, 2))
       .lte("fecha", censo.fecha);
     lanzar("Error validando regla de 48 h", errPrev);
-    const hayPrevia = (previos ?? []).some((p) => {
-      const rubro = (p as unknown as { arancel: { rubro: string } }).arancel?.rubro;
-      return rubro && RUBROS_INTERCONSULTA.includes(rubro as (typeof RUBROS_INTERCONSULTA)[number]);
-    });
+    const hayPrevia = (previos ?? []).some(
+      (p) => (p as unknown as { arancel: { es_interconsulta: boolean } }).arancel?.es_interconsulta
+    );
     if (hayPrevia) {
       facturable = 0;
       motivo = "INTERCONSULTA_DENTRO_48H";
@@ -600,7 +606,9 @@ export async function crearCargo(
     const nivel = umbral != null && costo > umbral ? "JEFE" : "SUPERVISOR";
     const { error: errAut } = await sb.from("autorizaciones_servicio").insert({
       cargo_id: creado.id,
-      tipo: TIPO_AUTORIZACION_POR_RUBRO[arancel.rubro] ?? "OTRO",
+      tipo: arancel.es_interconsulta
+        ? "INTERCONSULTA"
+        : TIPO_AUTORIZACION_POR_RUBRO[arancel.rubro] ?? "OTRO",
       nivel_requerido: nivel,
       monto_solicitado: costo,
       solicitado_por_uid: actor.uid,
@@ -629,6 +637,7 @@ export interface EdicionCargo {
   comentarios?: string;
   tipoDocumentoRespaldo?: string;
   documentoRespaldoRef?: string;
+  pendienteRevision: boolean; // permite marcar/quitar la observación al editar
 }
 
 // Edita cantidad/precio/documentación de un cargo (día abierto, no anulado).
@@ -654,17 +663,20 @@ export async function editarCargo(
   }
 
   const esOverride = cargo.motivo_no_facturable === "DECISION_ISBM";
+  const esNoCobrable = cargo.arancel.es_no_cobrable;
   const { error } = await getSupabase()
     .from("cargos_paciente_dia")
     .update({
       cantidad: ed.cantidad,
       precio_unitario: precio,
       costo_total: costo,
-      monto_facturable: esOverride ? 0 : costo, // el cierre reaplica las demás reglas
-      motivo_no_facturable: esOverride ? "DECISION_ISBM" : null,
+      // El cierre reaplica las demás reglas (tope, 48 h, autorización)
+      monto_facturable: esOverride || esNoCobrable ? 0 : costo,
+      motivo_no_facturable: esOverride ? "DECISION_ISBM" : esNoCobrable ? "NO_COBRABLE_ARANCEL" : null,
       comentarios: ed.comentarios?.trim() || null,
       tipo_documento_respaldo: ed.tipoDocumentoRespaldo || null,
       documento_respaldo_ref: ed.documentoRespaldoRef?.trim() || null,
+      pendiente_revision: ed.pendienteRevision,
       modificado_por_nombre: actorNombre,
       modificado_en: new Date().toISOString(),
     })
