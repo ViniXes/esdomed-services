@@ -2,11 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileCode2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { FileCode2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { extraerDocumento } from "@/lib/simmow/pdfEngine";
 import { esFieh, extraerFieh } from "@/lib/simmow/fiehExtractor";
+import {
+  esCertificado,
+  extraerCertificado,
+  fusionarCertificado,
+  limpiarCamposCertificado,
+} from "@/lib/simmow/certificadoExtractor";
+import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
+import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100";
@@ -39,35 +47,64 @@ export default function SimmowPage() {
     );
   }
 
-  const procesarFieh = async (file: File) => {
+  const procesar = async ({ condicion, archivoFieh, archivoCertificado }: DatosCarga) => {
     setError(null);
     setProcesando(true);
     try {
-      const doc = await extraerDocumento(file);
-      if (!esFieh(doc.textoCompleto)) {
+      const docFieh = await extraerDocumento(archivoFieh);
+      if (!esFieh(docFieh.textoCompleto)) {
         setError(
-          doc.textoCompleto.trim().length < 100
-            ? "El PDF parece un escaneo (imagen) sin texto digital — esta herramienta solo procesa el FIEH generado por el sistema, no fotocopias."
+          docFieh.textoCompleto.trim().length < 100
+            ? "El FIEH parece un escaneo (imagen) sin texto digital — esta herramienta solo procesa el PDF generado por el sistema, no fotocopias."
             : "El PDF no parece ser un FIEH (Formulario de Ingreso y Egreso Hospitalario)."
         );
-        setProcesando(false);
         return;
       }
-      const res = extraerFieh(doc);
-      setDocumento(doc);
-      setResultado(res);
-      setDatos(res.datos);
+
+      const resFieh = extraerFieh(docFieh);
+      let datosFinal = resFieh.datos;
+      let advertencias = [...resFieh.advertencias];
+      let camposNoEncontrados = [...resFieh.camposNoEncontrados];
+
+      // La condición seleccionada manualmente tiene prioridad sobre la casilla
+      // detectada en el FIEH (que puede no ser legible en todos los casos).
+      datosFinal.CONDICION_EGRESO = condicion;
+
+      if (condicion === "MUERTO") {
+        if (!archivoCertificado) {
+          setError("Debe subir el Certificado de Defunción para un paciente fallecido.");
+          return;
+        }
+
+        const docCert = await extraerDocumento(archivoCertificado);
+        if (!esCertificado(docCert.textoCompleto)) {
+          setError(
+            docCert.textoCompleto.trim().length < 100
+              ? "El Certificado parece un escaneo (imagen) sin texto digital — esta herramienta solo procesa el PDF generado por el sistema."
+              : "El PDF no parece ser un Certificado de Defunción."
+          );
+          return;
+        }
+
+        const resCert = extraerCertificado(docCert);
+        datosFinal = fusionarCertificado(datosFinal, resCert.datos);
+        advertencias = [...advertencias, ...resCert.advertencias];
+        camposNoEncontrados = [...camposNoEncontrados, ...resCert.camposNoEncontrados];
+      } else {
+        datosFinal = limpiarCamposCertificado(datosFinal);
+      }
+
+      datosFinal = aplicarReglasCondicionEgreso(datosFinal);
+
+      setDocumento(docFieh);
+      setResultado({ datos: datosFinal, advertencias, camposNoEncontrados });
+      setDatos(datosFinal);
       setPaso("revision");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error procesando el PDF.");
     } finally {
       setProcesando(false);
     }
-  };
-
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) procesarFieh(file);
   };
 
   const reiniciar = () => {
@@ -88,35 +125,7 @@ export default function SimmowPage() {
       </div>
 
       {paso === "carga" && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
-            1. Subir FIEH (Formulario de Ingreso y Egreso Hospitalario)
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            El PDF se procesa aquí mismo en el navegador — no se sube a ningún servidor.
-          </p>
-
-          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl py-10 cursor-pointer hover:border-blue-400 dark:hover:border-[#c9a892] transition-colors">
-            <Upload className="h-8 w-8 text-slate-400" />
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {procesando ? "Procesando..." : "Clic para seleccionar el PDF del FIEH"}
-            </span>
-            <input
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              disabled={procesando}
-              onChange={onFile}
-            />
-          </label>
-
-          {error && (
-            <div className="mt-4 flex items-start gap-2 text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-3">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
+        <PasoCarga procesando={procesando} error={error} onProcesar={procesar} />
       )}
 
       {paso === "revision" && resultado && datos && documento && (
@@ -125,7 +134,7 @@ export default function SimmowPage() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Extracción completada — {documento.numPaginas} páginas
+                Extracción completada — {documento.numPaginas} páginas — {datos.CONDICION_EGRESO}
               </h2>
               <button
                 onClick={reiniciar}
