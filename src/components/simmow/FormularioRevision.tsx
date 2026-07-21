@@ -10,6 +10,7 @@ import {
   OPCIONES_TIPO_DOCUMENTO,
   SERVICIOS_SIMMOW,
 } from "@/lib/simmow/catalogoSimmow";
+import { EstablecimientoCombobox } from "./EstablecimientoCombobox";
 import styles from "./FormularioRevision.module.css";
 
 interface Props {
@@ -507,21 +508,39 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
               <td className={styles.label}>
                 &nbsp;&nbsp;<b>Referido al Establecimiento</b>
               </td>
-              <td className={styles.cell}>{texto("REFERIDO_A_ESTABLECIMIENTO", styles.referencia)}</td>
+              <td className={styles.cell}>
+                <EstablecimientoCombobox
+                  value={v("REFERIDO_A_ESTABLECIMIENTO")}
+                  onChange={(nombre) => onChange({ REFERIDO_A_ESTABLECIMIENTO: nombre })}
+                  className={styles.referencia + marcarFaltante("REFERIDO_A_ESTABLECIMIENTO")}
+                />
+              </td>
             </tr>
 
             <tr>
               <td className={styles.label}>
                 &nbsp;&nbsp;<b>Referido del Establecimiento</b>
               </td>
-              <td className={styles.cell}>{texto("REFERIDO_DEL_ESTABLECIMIENTO", styles.referencia)}</td>
+              <td className={styles.cell}>
+                <EstablecimientoCombobox
+                  value={v("REFERIDO_DEL_ESTABLECIMIENTO")}
+                  onChange={(nombre) => onChange({ REFERIDO_DEL_ESTABLECIMIENTO: nombre })}
+                  className={styles.referencia + marcarFaltante("REFERIDO_DEL_ESTABLECIMIENTO")}
+                />
+              </td>
             </tr>
 
             <tr>
               <td className={styles.label}>
                 &nbsp;&nbsp;<b>Retorno hacia</b>
               </td>
-              <td className={styles.cell}>{texto("RETORNO_HACIA", styles.referencia)}</td>
+              <td className={styles.cell}>
+                <EstablecimientoCombobox
+                  value={v("RETORNO_HACIA")}
+                  onChange={(nombre) => onChange({ RETORNO_HACIA: nombre })}
+                  className={styles.referencia + marcarFaltante("RETORNO_HACIA")}
+                />
+              </td>
             </tr>
 
             <tr>

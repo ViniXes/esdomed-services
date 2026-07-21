@@ -14,6 +14,7 @@ import {
 } from "@/lib/simmow/certificadoExtractor";
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import { generarScriptConsola } from "@/lib/simmow/generadorScript";
+import { cargarEstablecimientos, mejorCoincidenciaEstablecimiento } from "@/lib/simmow/establecimientos";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 import { FormularioRevision } from "@/components/simmow/FormularioRevision";
@@ -23,6 +24,34 @@ const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100";
 
 type Paso = "carga" | "revision" | "codigo";
+
+/**
+ * Reemplaza los tres campos de establecimiento con el nombre EXACTO del
+ * catálogo real de SIMMOW cuando hay una coincidencia confiable (el FIEH
+ * puede traer el nombre en otro orden o con leves diferencias). Si no hay
+ * suficiente certeza, deja el texto tal como se extrajo del FIEH para que
+ * el personal lo busque/corrija a mano en el formulario.
+ */
+async function sugerirEstablecimientosDelCatalogo(datos: DatosSimmow): Promise<DatosSimmow> {
+  const campos: Array<"REFERIDO_A_ESTABLECIMIENTO" | "REFERIDO_DEL_ESTABLECIMIENTO" | "RETORNO_HACIA"> = [
+    "REFERIDO_A_ESTABLECIMIENTO",
+    "REFERIDO_DEL_ESTABLECIMIENTO",
+    "RETORNO_HACIA",
+  ];
+  if (!campos.some((campo) => datos[campo])) return datos;
+
+  const catalogo = await cargarEstablecimientos();
+  const actualizado = { ...datos };
+
+  for (const campo of campos) {
+    const valor = actualizado[campo];
+    if (!valor) continue;
+    const coincidencia = mejorCoincidenciaEstablecimiento(catalogo, valor);
+    if (coincidencia) actualizado[campo] = coincidencia.nombre;
+  }
+
+  return actualizado;
+}
 
 export default function SimmowPage() {
   const router = useRouter();
@@ -101,6 +130,7 @@ export default function SimmowPage() {
       }
 
       datosFinal = aplicarReglasCondicionEgreso(datosFinal);
+      datosFinal = await sugerirEstablecimientosDelCatalogo(datosFinal);
 
       setDocumento(docFieh);
       setResultado({ datos: datosFinal, advertencias, camposNoEncontrados });
