@@ -32,7 +32,7 @@ import {
   tipoAfiliacionValor,
   tipoDocumentoValor,
 } from "./catalogoSimmow";
-import { buscarItem, checkboxesEnLinea } from "./layout";
+import { buscarItem, checkboxesEnLinea, leerCeldaMultilinea } from "./layout";
 
 // ─── Detección de tipo de documento ─────────────────────────────────────────
 
@@ -93,6 +93,49 @@ function cirugiaSuspendidaPorCheckbox(doc: DocumentoExtraido): string {
     if (op === "NO") return "";
   }
   return "";
+}
+
+/** Limpia el nombre del establecimiento de la sección E (comillas, comas, N/A). */
+function limpiarNombreEstablecimiento(txt: string): string {
+  const sinComillas = txt.replace(/["“”]/g, "").replace(/,/g, " ");
+  return limpiarNA(limpiarDato(sinComillas));
+}
+
+/**
+ * Sección E (Seguimiento de paciente a su egreso): un único nombre de
+ * establecimiento se reparte entre "Referido al Establecimiento" o "Retorno
+ * hacia" en SIMMOW según cuál casilla ("Referencia" / "Retorno") esté
+ * marcada junto a él. El nombre puede envolver a una segunda línea.
+ */
+function referidoRetornoSeguimientoPorCheckbox(
+  doc: DocumentoExtraido
+): { referidoA: string; retorno: string } {
+  const vacio = { referidoA: "", retorno: "" };
+
+  const etiquetaEstablecimiento = buscarItem(doc, /Nombre\s+establecimiento:/i);
+  if (!etiquetaEstablecimiento) return vacio;
+
+  const celda = leerCeldaMultilinea(
+    etiquetaEstablecimiento.pagina,
+    etiquetaEstablecimiento.item,
+    /^Recomendaciones:/i
+  );
+  const nombreEstablecimiento = limpiarNombreEstablecimiento(
+    celda.replace(/Nombre\s+establecimiento:\s*/i, "")
+  );
+  if (!nombreEstablecimiento) return vacio;
+
+  const marcadas = checkboxesEnLinea(
+    etiquetaEstablecimiento.pagina,
+    etiquetaEstablecimiento.item.y
+  )
+    .filter((cb) => cb.marcado)
+    .map((cb) => sinAcentos(cb.opcion).toLowerCase());
+
+  return {
+    referidoA: marcadas.some((op) => op.includes("referencia")) ? nombreEstablecimiento : "",
+    retorno: marcadas.some((op) => op.includes("retorno")) ? nombreEstablecimiento : "",
+  };
 }
 
 // ─── Edad ───────────────────────────────────────────────────────────────────
@@ -680,9 +723,10 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   );
   if (/urbano/i.test(datos.AREA)) datos.AREA = "Urbana";
 
-  datos.REFERIDO_A_ESTABLECIMIENTO = "";
+  const seguimiento = referidoRetornoSeguimientoPorCheckbox(doc);
+  datos.REFERIDO_A_ESTABLECIMIENTO = seguimiento.referidoA;
   datos.REFERIDO_DEL_ESTABLECIMIENTO = extraerReferidoDelEstablecimiento(plano);
-  datos.RETORNO_HACIA = "";
+  datos.RETORNO_HACIA = seguimiento.retorno;
 
   datos.FECHA_INGRESO = buscar(
     plano,

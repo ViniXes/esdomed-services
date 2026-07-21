@@ -63,6 +63,43 @@ export function opcionMarcadaJuntoA(
   return marcadas.length ? marcadas[0].opcion : "";
 }
 
+/**
+ * Lee el valor de una "celda" que puede extenderse en varias líneas (p. ej.
+ * un nombre de establecimiento largo que envuelve a la línea de abajo). Toma
+ * todos los items desde la línea de `item` (la etiqueta) hacia abajo, con X
+ * igual o mayor a la de la etiqueta —para no arrastrar columnas vecinas más a
+ * la izquierda—, hasta (sin incluir) la línea donde aparece `patronFin`.
+ */
+export function leerCeldaMultilinea(
+  pagina: PaginaExtraida,
+  item: ItemTexto,
+  patronFin: RegExp,
+  maxLineas: number = 3
+): string {
+  const finItem = pagina.items.find(
+    (it) => it !== item && it.y < item.y && patronFin.test(it.str)
+  );
+  const yLimite = finItem ? finItem.y : item.y - 40;
+
+  const candidatos = pagina.items.filter(
+    (it) => it.y <= item.y + 2 && it.y > yLimite + 2 && it.x >= item.x - 5
+  );
+
+  const lineas: ItemTexto[][] = [];
+  for (const it of [...candidatos].sort((a, b) => b.y - a.y || a.x - b.x)) {
+    const linea = lineas.find((l) => Math.abs(l[0].y - it.y) <= 5);
+    if (linea) linea.push(it);
+    else lineas.push([it]);
+  }
+
+  return lineas
+    .slice(0, maxLineas)
+    .map((l) => l.sort((a, b) => a.x - b.x).map((i) => i.str).join(" "))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Todas las casillas marcadas del documento con su opción asociada. */
 export function opcionesMarcadas(doc: DocumentoExtraido): CheckboxDetectado[] {
   return doc.paginas.flatMap((p) => p.checkboxes.filter((cb) => cb.marcado));

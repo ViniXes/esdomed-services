@@ -21,6 +21,7 @@ import type {
   ItemTexto,
   PaginaExtraida,
 } from "./types";
+import { decodificarEntidadesHtml } from "./texto";
 
 // Rango de tamaño (pt) que consideramos "casilla" al filtrar imágenes.
 const CASILLA_MIN = 5;
@@ -147,7 +148,11 @@ export async function extraerDocumento(file: File): Promise<DocumentoExtraido> {
           fontName?: string;
         };
         return {
-          str: it.str ?? "",
+          // Algunos FIEH traen entidades HTML sin decodificar (&quot; etc.),
+          // arrastre del sistema origen. Se limpia aquí, en la fuente, para
+          // que todo lo que viene después (texto plano, checkboxes, campos)
+          // ya reciba el texto correcto.
+          str: decodificarEntidadesHtml(it.str ?? ""),
           x: it.transform ? it.transform[4] : 0,
           y: it.transform ? it.transform[5] : 0,
           w: it.width ?? 0,

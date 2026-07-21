@@ -5,6 +5,24 @@ export function sinAcentos(txt: string): string {
   return String(txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+/**
+ * Algunos FIEH traen entidades HTML sin decodificar en el texto (p. ej.
+ * `&quot;San Rafael&quot;` en vez de `"San Rafael"`) \u2014 arrastre del sistema
+ * origen (probablemente generaba el PDF a partir de una plantilla HTML sin
+ * decodificar antes de imprimir). Se decodifica al vuelo para no ensuciar
+ * los valores que van a SIMMOW ni el establecimiento que se muestra al usuario.
+ */
+export function decodificarEntidadesHtml(txt: string): string {
+  return String(txt || "")
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_, codigo) => String.fromCharCode(Number(codigo)))
+    .replace(/&amp;/gi, "&");
+}
+
 export function limpiarDato(txt: string): string {
   return String(txt || "")
     .replace(/\s+/g, " ")
