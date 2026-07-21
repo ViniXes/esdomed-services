@@ -138,6 +138,41 @@ function referidoRetornoSeguimientoPorCheckbox(
   };
 }
 
+/**
+ * Sección A: "Nombre del establecimiento (referido de:)" a veces se parte en
+ * TRES líneas ("Nombre del" / "establecimiento" / "(referido de:)"), con el
+ * valor completo pegado a la derecha de la primera línea — el regex sobre
+ * texto plano nunca encuentra la etiqueta completa en ese caso. Se ancla por
+ * coordenadas: "Nombre del" seguido, justo debajo, de "establecimiento"
+ * (para no confundirlo con "Nombre del médico..." u otras etiquetas).
+ */
+function extraerReferidoDelEstablecimientoPorCoordenadas(doc: DocumentoExtraido): string {
+  for (const pagina of doc.paginas) {
+    for (const item of pagina.items) {
+      if (!/^Nombre\s+del$/i.test(item.str.trim())) continue;
+
+      const continuacion = pagina.items.find(
+        (it) =>
+          it !== item &&
+          Math.abs(it.x - item.x) <= 3 &&
+          it.y < item.y &&
+          item.y - it.y <= 15 &&
+          /^establecimiento\b/i.test(it.str.trim())
+      );
+      if (!continuacion) continue;
+
+      const valor = pagina.items
+        .filter((it) => Math.abs(it.y - item.y) <= 5 && it.x > item.x + 10)
+        .sort((a, b) => a.x - b.x)
+        .map((it) => it.str)
+        .join(" ");
+
+      return limpiarNombreEstablecimiento(valor);
+    }
+  }
+  return "";
+}
+
 // ─── Edad ───────────────────────────────────────────────────────────────────
 
 function extraerEdad(plano: string): { anios: string; meses: string; dias: string } {
@@ -725,7 +760,12 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
 
   const seguimiento = referidoRetornoSeguimientoPorCheckbox(doc);
   datos.REFERIDO_A_ESTABLECIMIENTO = seguimiento.referidoA;
-  datos.REFERIDO_DEL_ESTABLECIMIENTO = extraerReferidoDelEstablecimiento(plano);
+  // Regex sobre texto plano primero (caso etiqueta contigua); si la etiqueta
+  // "Nombre del establecimiento (referido de:)" viene partida en varias
+  // líneas, cae al respaldo por coordenadas.
+  datos.REFERIDO_DEL_ESTABLECIMIENTO =
+    extraerReferidoDelEstablecimiento(plano) ||
+    extraerReferidoDelEstablecimientoPorCoordenadas(doc);
   datos.RETORNO_HACIA = seguimiento.retorno;
 
   datos.FECHA_INGRESO = buscar(
