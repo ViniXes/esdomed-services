@@ -13,9 +13,11 @@ import {
   limpiarCamposCertificado,
 } from "@/lib/simmow/certificadoExtractor";
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
+import { generarScriptConsola } from "@/lib/simmow/generadorScript";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 import { FormularioRevision } from "@/components/simmow/FormularioRevision";
+import { PasoCodigo } from "@/components/simmow/PasoCodigo";
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100";
@@ -32,6 +34,9 @@ export default function SimmowPage() {
   const [documento, setDocumento] = useState<DocumentoExtraido | null>(null);
   const [resultado, setResultado] = useState<ResultadoExtraccion | null>(null);
   const [datos, setDatos] = useState<DatosSimmow | null>(null);
+  const [codigo, setCodigo] = useState<string | null>(null);
+  const [errorGeneracion, setErrorGeneracion] = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
 
   // Temporalmente solo admin mientras está en pruebas (ver dashboard/layout.tsx).
   useEffect(() => {
@@ -116,8 +121,25 @@ export default function SimmowPage() {
     setDocumento(null);
     setResultado(null);
     setDatos(null);
+    setCodigo(null);
+    setErrorGeneracion(null);
+    setGuardado(false);
     setError(null);
     setPaso("carga");
+  };
+
+  const generarCodigo = () => {
+    if (!datos) return;
+    if (!datos.EDAD_ANIOS.trim()) {
+      setErrorGeneracion(
+        "Falta la edad en años (EDAD_ANIOS). Complétela en el formulario antes de generar el código."
+      );
+      return;
+    }
+    setErrorGeneracion(null);
+    setCodigo(generarScriptConsola(datos, resultado?.advertencias ?? []));
+    setGuardado(false);
+    setPaso("codigo");
   };
 
   return (
@@ -162,6 +184,18 @@ export default function SimmowPage() {
               </div>
             )}
 
+            {errorGeneracion && (
+              <div className="mb-4 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+                {errorGeneracion}
+              </div>
+            )}
+
+            <button
+              onClick={generarCodigo}
+              className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Generar código actualizado
+            </button>
           </div>
 
           <FormularioRevision
@@ -194,6 +228,33 @@ export default function SimmowPage() {
               ))}
             </div>
           </details>
+        </div>
+      )}
+
+      {paso === "codigo" && codigo && datos && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setPaso("revision")}
+              className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            >
+              ← Volver a revisión
+            </button>
+            <button
+              onClick={reiniciar}
+              className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            >
+              Procesar otro
+            </button>
+          </div>
+
+          {/* Persistencia real en Firestore (auditoría) pendiente: tarea #6. */}
+          <PasoCodigo
+            codigo={codigo}
+            guardando={false}
+            guardado={guardado}
+            onGuardar={() => setGuardado(true)}
+          />
         </div>
       )}
     </div>

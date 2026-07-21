@@ -590,14 +590,26 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   datos.NEC = buscar(plano, /NEC\s*:\s*([A-Z0-9\-]+)/i);
 
   datos.TIPO_DOCUMENTO = buscar(plano, /Tipo\s+documento:\s*(.*?)\s*\d{7,10}-?\d?/i);
-  datos.NUM_DOCUMENTO = soloNumeros(
-    buscar(plano, /Tipo\s+documento:\s*.*?(\d{7,10}-?\d?)/i)
-  );
+
+  // Caso normal: "Tipo documento: 12345678-9" contiguo. Caso partido: la
+  // etiqueta ("Tipo" ... "documento:") Y el número quedan repartidos entre
+  // las dos líneas (p. ej. "Tipo 00260386- Tipo de ..." / "documento: 2
+  // afiliación:") — se reconstruye uniendo ambos fragmentos del número.
+  let numDocumento = buscar(plano, /Tipo\s+documento:\s*.*?(\d{7,10}-?\d?)/i);
+  if (!numDocumento) {
+    const parte1 = plano.match(/Tipo\s+(\d[\d-]{5,10})\s*Tipo\s+de/i);
+    const parte2 = plano.match(/documento:\s*(\d)\s*afiliaci[oó]n/i);
+    if (parte1) numDocumento = parte1[1] + (parte2 ? parte2[1] : "");
+  }
+  datos.NUM_DOCUMENTO = soloNumeros(numDocumento);
   datos.TIPO_DOCUMENTO_VALOR = tipoDocumentoValor(datos.TIPO_DOCUMENTO);
 
+  // "Tipo de afiliación:" a veces se parte en dos líneas visuales en el PDF
+  // ("Tipo de" ... "afiliación:"), quedando el valor entre ambas mitades. El
+  // segundo tramo de la etiqueta se hace opcional para cubrir ambos casos.
   datos.TIPO_AFILIACION = buscar(
     plano,
-    /Tipo\s+de\s+afiliaci[oó]n:\s*(.*?)\s*No\.?\s*Afiliaci[oó]n:/i
+    /Tipo\s+de\s+(?:afiliaci[oó]n:?\s*)?(.*?)\s*No\.?\s*Afiliaci[oó]n:/i
   );
   datos.NUM_AFILIACION = soloNumeros(
     buscar(plano, /No\.?\s*Afiliaci[oó]n:\s*([A-Z0-9\-/]+)/i)
@@ -605,9 +617,10 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   datos.TIPO_AFILIACION_VALOR = tipoAfiliacionValor(datos.TIPO_AFILIACION);
 
   datos.APELLIDOS = limpiarDato(buscar(plano, /Apellidos:\s*(.*?)\s*Nombres:/i));
-  datos.NOMBRES = limpiarDato(
-    buscar(plano, /Nombres:\s*(.*?)\s*Fecha\s+Nacimiento:/i)
-  );
+  // "Fecha Nacimiento:" también puede partirse en dos líneas ("Fecha" ...
+  // "Nacimiento:"); cortar solo en "Fecha" evita que el nombre se trague el
+  // resto de la fila cuando eso pasa.
+  datos.NOMBRES = limpiarDato(buscar(plano, /Nombres:\s*(.*?)\s*Fecha\b/i));
 
   const apellidos = dividirNombre(datos.APELLIDOS);
   datos.PRIMER_APELLIDO = apellidos[0] || "";
@@ -619,10 +632,20 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   datos.SEGUNDO_NOMBRE = nombres[1] || "";
   datos.TERCER_NOMBRE = nombres.slice(2).join(" ");
 
-  datos.FECHA_NACIMIENTO = buscar(
-    plano,
+  // Caso normal: "Fecha Nacimiento: DD/MM/YYYY" contiguo. Caso partido: la
+  // etiqueta se separa en dos líneas y la fecha queda partida junto con
+  // ella ("Fecha DD/MM/ ... Edad: ... Nacimiento: YYYY") — se reconstruye
+  // tomando día/mes de la primera mitad y el año de la segunda.
+  const fechaNacContigua = plano.match(
     /Fecha\s+Nacimiento:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
   );
+  if (fechaNacContigua) {
+    datos.FECHA_NACIMIENTO = fechaNacContigua[1];
+  } else {
+    const diaMes = plano.match(/Fecha\s+(\d{1,2}\/\d{1,2})\/?\s*Edad/i);
+    const anio = plano.match(/Nacimiento:\s*(\d{4})/i);
+    datos.FECHA_NACIMIENTO = diaMes && anio ? `${diaMes[1]}/${anio[1]}` : "";
+  }
 
   const edad = extraerEdad(plano);
   datos.EDAD_ANIOS = edad.anios;
@@ -631,20 +654,30 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
 
   datos.SEXO = buscar(plano, /Sexo:\s*(Masculino|Femenino|Intersexual)/i);
 
+  // "Dirección residencia:" también puede partirse ("Dirección" ...
+  // "residencia:"); el segundo tramo se hace opcional.
   const direccionCruda = buscar(
     plano,
-    /Direcci[oó]n\s+residencia:\s*(.*?)\s*Departamento:/i
+    /Direcci[oó]n\s+(?:residencia:?\s*)?(.*?)\s*Departamento:/i
   );
   datos.DIRECCION = limpiarDireccionParaSIMMOW(direccionCruda);
 
+  // Igual que arriba: "Área geográfica:" puede partirse en dos líneas
+  // ("Área" ... "geográfica:"), por eso el cierre del bloque corta solo en
+  // "Área" y el resto de la etiqueta queda opcional.
   const depMun = plano.match(
-    /Departamento:\s*(.*?)\s*Municipio:\s*(.*?)\s*Cant[oó]n:\s*(.*?)\s*[ÁA]rea\s+geogr[aá]fica:/i
+    /Departamento:\s*(.*?)\s*Municipio:\s*(.*?)\s*Cant[oó]n:\s*(.*?)\s*[ÁA]rea\b/i
   );
   datos.DEPARTAMENTO = depMun ? limpiarDato(depMun[1]) : "";
   datos.DISTRITO = depMun ? limpiarDato(depMun[2]) : "";
   datos.CANTON = depMun ? limpiarNA(depMun[3]) : "";
 
-  datos.AREA = buscar(plano, /[ÁA]rea\s+geogr[aá]fica:\s*(Urbana|Urbano|Rural)/i);
+  // "Área geográfica:" puede partirse igual que las demás etiquetas de dos
+  // palabras; "geográfica:" se vuelve opcional para cubrir ambos casos.
+  datos.AREA = buscar(
+    plano,
+    /[ÁA]rea\s+(?:geogr[aá]fica:?\s*)?(Urbana|Urbano|Rural)/i
+  );
   if (/urbano/i.test(datos.AREA)) datos.AREA = "Urbana";
 
   datos.REFERIDO_A_ESTABLECIMIENTO = "";
@@ -764,7 +797,16 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
 
   datos.FECHA_EGRESO = buscar(plano, /Fecha\s+de\s+egreso:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
 
-  const horaEgreso = plano.match(/Hora\s+de\s+egreso:\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  // "Hora de egreso:" puede partirse ("Hora de" ... "egreso:"), con el valor
+  // quedando ANTES del segundo tramo. Se busca primero la forma contigua y,
+  // si falla, la forma partida acotada a partir de "Fecha de egreso:" (para
+  // no confundirla con "Hora de ingreso:", que aparece antes en el documento).
+  let horaEgreso = plano.match(/Hora\s+de\s+egreso:\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!horaEgreso) {
+    const idxFechaEgreso = plano.search(/Fecha\s+de\s+egreso:/i);
+    const desdeEgreso = idxFechaEgreso >= 0 ? plano.slice(idxFechaEgreso) : "";
+    horaEgreso = desdeEgreso.match(/Hora\s+de\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  }
   if (horaEgreso) {
     datos.HORA_EGRESO = convertirHora24(horaEgreso[1], horaEgreso[3]);
     datos.MINUTO_EGRESO = pad2(horaEgreso[2]);
