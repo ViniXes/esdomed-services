@@ -368,7 +368,20 @@ function extraerUltimoServicioRuta(texto: string): {
   return null;
 }
 
-function extraerServicioIngresoParteB(texto: string): string {
+interface ServicioIngresoB {
+  origen: string;
+  /**
+   * Valor SIMMOW ya resuelto, cuando viene de `buscarServiciosConocidosEnTexto`
+   * (coincidencia exacta o por patrón). Si viene undefined, el llamador debe
+   * resolverlo con `mapearServicioSIMMOW(origen)` — pero OJO: cuando el
+   * "origen" es un extracto de texto crudo (no un nombre de servicio real),
+   * remapearlo después casi nunca funciona. Por eso esta función siempre
+   * intenta traer el valor ya resuelto en vez de dejarlo para después.
+   */
+  valor?: string;
+}
+
+function extraerServicioIngresoParteB(texto: string): ServicioIngresoB {
   const plano = texto.replace(/\s+/g, " ").trim();
 
   const etiqueta = plano.match(/Servicio\s+(?:en\s+la\s+que|al\s+que)\s+ingresa\s*:?\s*/i);
@@ -382,13 +395,15 @@ function extraerServicioIngresoParteB(texto: string): string {
     if (corte >= 0) ventana = ventana.slice(0, corte);
 
     const servicios = buscarServiciosConocidosEnTexto(ventana);
-    if (servicios.length) return servicios[0].origen;
+    if (servicios.length) return { origen: servicios[0].origen, valor: servicios[0].valor };
 
     const limpio = limpiarServicioFieh(ventana);
-    if (limpio) return limpio;
+    if (limpio) return { origen: limpio };
   }
 
-  // Respaldo: buscar dentro del bloque B completo.
+  // Respaldo: buscar dentro del bloque B completo. Esta es la ruta que se
+  // toma cuando "Servicio en la que ingresa:" viene partido en dos líneas
+  // (con el valor intercalado) y el patrón de arriba no matchea.
   const base = sinAcentos(texto);
   const bloqueBMatch = base.match(
     /B\.?\s*DATOS\s+DEL\s+INGRESO([\s\S]*?)(?:C\.?\s*RUTA\s+DE\s+MOVIMIENTOS?|D\.?\s*DATOS\s+DEL\s+EGRESO|$)/i
@@ -396,27 +411,42 @@ function extraerServicioIngresoParteB(texto: string): string {
   if (bloqueBMatch) {
     const bloqueB = bloqueBMatch[1] || "";
     const servicios = buscarServiciosConocidosEnTexto(bloqueB);
-    if (servicios.length) return servicios[servicios.length - 1].origen;
+    if (servicios.length) {
+      const ultimo = servicios[servicios.length - 1];
+      return { origen: ultimo.origen, valor: ultimo.valor };
+    }
 
+    // buscarServiciosConocidosEnTexto ya intenta este mismo respaldo por
+    // patrón internamente, pero cuando lo activa devuelve como "origen" un
+    // extracto arbitrario del texto (no necesariamente relacionado con el
+    // patrón que encontró) — por eso aquí se vuelve a inferir directamente
+    // sobre bloqueB y se arma un origen descriptivo real, conservando el
+    // valor SIMMOW correcto en vez de perderlo.
     const valorInferido = inferirServicioPorPatron(bloqueB);
     if (valorInferido) {
       const b = normServicioHospitalario(bloqueB);
-      if (b.includes("cuidados intermedios")) return "Unidad de Cuidados Intermedios detectada en FIEH";
+      if (b.includes("cuidados intermedios")) {
+        return { origen: "Unidad de Cuidados Intermedios detectada en FIEH", valor: valorInferido };
+      }
       if (
         b.includes("cuidados intensivos") ||
         b.includes("neurointensivos") ||
         b.includes("cuidados coronarios") ||
         b.includes("extracorporea")
       ) {
-        return "Unidad de Cuidados Intensivos detectada en FIEH";
+        return { origen: "Unidad de Cuidados Intensivos detectada en FIEH", valor: valorInferido };
       }
-      if (b.includes("convenio") || b.includes("isbm")) return "Servicio de Convenio detectado en FIEH";
-      if (b.includes("terapia intervencionista endovascular")) return "Unidad de Terapia Intervencionista Endovascular";
-      return "Servicio hospitalario detectado por patrón en FIEH";
+      if (b.includes("convenio") || b.includes("isbm")) {
+        return { origen: "Servicio de Convenio detectado en FIEH", valor: valorInferido };
+      }
+      if (b.includes("terapia intervencionista endovascular")) {
+        return { origen: "Unidad de Terapia Intervencionista Endovascular", valor: valorInferido };
+      }
+      return { origen: "Servicio hospitalario detectado por patrón en FIEH", valor: valorInferido };
     }
   }
 
-  return "";
+  return { origen: "" };
 }
 
 function extraerServicioHospitalario(texto: string): ServicioDetectado {
@@ -434,9 +464,9 @@ function extraerServicioHospitalario(texto: string): ServicioDetectado {
   // Prioridad 2: servicio en la que ingresa (parte B).
   const ingreso = extraerServicioIngresoParteB(texto);
   return {
-    origen: ingreso || "",
-    valor: ingreso ? mapearServicioSIMMOW(ingreso) : "",
-    fuente: ingreso ? "INGRESO" : "",
+    origen: ingreso.origen,
+    valor: ingreso.valor ?? (ingreso.origen ? mapearServicioSIMMOW(ingreso.origen) : ""),
+    fuente: ingreso.origen ? "INGRESO" : "",
     detalle: "",
   };
 }

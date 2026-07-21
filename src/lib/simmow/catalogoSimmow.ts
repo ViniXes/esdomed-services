@@ -1,7 +1,7 @@
 // Catálogos y mapeos hacia los valores que espera el formulario de SIMMOW.
 // Portado de la herramienta original de Apps Script (FIEH_SIMMOW_HNES).
 
-import { sinAcentos, limpiarDato } from "./texto";
+import { sinAcentos } from "./texto";
 
 // ─── Opciones para selects del formulario de revisión ───────────────────────
 
@@ -292,14 +292,24 @@ export function buscarServiciosConocidosEnTexto(texto: string): ServicioHallado[
 
   if (limpios.length) return limpios;
 
-  // Respaldo por patrón cuando ningún nombre del mapeo coincide.
+  // Respaldo por patrón cuando ningún nombre del mapeo coincide. El "origen"
+  // describe el patrón detectado (NUNCA un extracto arbitrario del texto de
+  // entrada — antes esto tomaba los primeros 80 caracteres del texto, que
+  // podían no tener nada que ver con el servicio realmente encontrado).
   const valorInferido = inferirServicioPorPatron(texto);
   if (valorInferido) {
+    const origenPorValor: Record<string, string> = {
+      "MEDICINA INTERNA D": "Unidad de Cuidados Intensivos detectada en FIEH",
+      "MEDICINA INTERNA E": "Unidad de Cuidados Intermedios detectada en FIEH",
+      "HOSPITALIZACION CONVENIO": "Servicio de Convenio detectado en FIEH",
+      "Terapia Intervencionista Endovascular": "Unidad de Terapia Intervencionista Endovascular",
+    };
+
     return [
       {
         idx: 0,
         fin: base.length,
-        origen: limpiarDato(texto).slice(0, 80),
+        origen: origenPorValor[valorInferido] ?? "Servicio hospitalario detectado por patrón en FIEH",
         valor: valorInferido,
         clave: "PATRON_" + valorInferido,
       },
