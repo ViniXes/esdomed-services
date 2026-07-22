@@ -71,7 +71,20 @@ function ratioOscuroDeRecorte(pix: Uint8ClampedArray): number {
   return total ? oscuro / total : 0;
 }
 
-/** Reconstruye texto en orden de lectura: líneas por Y desc, items por X asc. */
+/**
+ * Reconstruye texto en orden de lectura: líneas por Y desc, items por X asc.
+ *
+ * El navegador real (a diferencia del build de Node usado para depurar)
+ * suele partir un mismo token en varios ítems contiguos sin ningún hueco
+ * real entre ellos — p. ej. "6057-26" llega como los ítems "6057-" y "26"
+ * pegados, o "03/07/2026" como "03/", "07/" y "2026" pegados. Unir SIEMPRE
+ * con un espacio (como antes) metía un espacio falso ahí ("6057- 26",
+ * "03/ 07/ 2026"), rompiendo cualquier regex que no tolerara espacios entre
+ * dígitos/símbolos (fechas, NEC, horas). Ahora solo se agrega un espacio
+ * cuando hay un hueco horizontal real entre un ítem y el siguiente; si ya
+ * están pegados, se concatenan tal cual (los espacios genuinos entre
+ * palabras ya llegan como su propio ítem de texto " ").
+ */
 function construirTextoPlano(items: ItemTexto[]): string {
   const restantes = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
   const lineas: ItemTexto[][] = [];
@@ -85,12 +98,17 @@ function construirTextoPlano(items: ItemTexto[]): string {
   }
 
   return lineas
-    .map((l) =>
-      l
-        .sort((a, b) => a.x - b.x)
-        .map((it) => it.str)
-        .join(" ")
-    )
+    .map((l) => {
+      const ordenados = [...l].sort((a, b) => a.x - b.x);
+      let texto = "";
+      let finAnterior: number | null = null;
+      for (const it of ordenados) {
+        if (finAnterior !== null && it.x - finAnterior > 1) texto += " ";
+        texto += it.str;
+        finAnterior = it.x + it.w;
+      }
+      return texto;
+    })
     .join("\n");
 }
 

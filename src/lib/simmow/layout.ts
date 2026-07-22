@@ -12,21 +12,49 @@ import type {
 import { sinAcentos } from "./texto";
 
 const TOL_LINEA = 9;
+const TOL_LINEA_TEXTO = 5;
 
 export interface ItemUbicado {
   pagina: PaginaExtraida;
+  /** Último ítem consumido en el momento del match (fin de la etiqueta). */
   item: ItemTexto;
+  /** Primer ítem de esa misma línea (inicio de la etiqueta). */
+  inicio: ItemTexto;
 }
 
-/** Primer item de texto cuyo contenido (sin acentos) coincide con el patrón. */
+/**
+ * Primer item de texto cuyo contenido (sin acentos) coincide con el patrón.
+ *
+ * El navegador real reparte una misma etiqueta en varios ítems de texto, uno
+ * por palabra (p. ej. "Circunstancia de alta:" llega como los ítems
+ * "Circunstancia", "de", "alta:" por separado, no como uno solo) — probar el
+ * patrón contra CADA ítem por separado nunca encuentra una etiqueta de más
+ * de una palabra. Por eso se agrupan los ítems de cada línea (misma Y,
+ * ordenados por X) y se prueba el patrón contra el texto acumulado palabra a
+ * palabra, devolviendo el último ítem consumido en el momento del match (así
+ * `.y` sigue sirviendo para ubicar la línea y `.x`/`.w` quedan apuntando al
+ * final de la etiqueta, útil para leer el valor a la derecha).
+ */
 export function buscarItem(
   doc: DocumentoExtraido,
   patron: RegExp
 ): ItemUbicado | null {
   for (const pagina of doc.paginas) {
-    for (const item of pagina.items) {
-      if (patron.test(sinAcentos(item.str))) {
-        return { pagina, item };
+    const lineas: ItemTexto[][] = [];
+    for (const it of pagina.items) {
+      const linea = lineas.find((l) => Math.abs(l[0].y - it.y) <= TOL_LINEA_TEXTO);
+      if (linea) linea.push(it);
+      else lineas.push([it]);
+    }
+
+    for (const linea of lineas) {
+      const ordenada = [...linea].sort((a, b) => a.x - b.x);
+      let texto = "";
+      for (const it of ordenada) {
+        texto += (texto ? " " : "") + it.str;
+        if (patron.test(sinAcentos(texto))) {
+          return { pagina, item: it, inicio: ordenada[0] };
+        }
       }
     }
   }
