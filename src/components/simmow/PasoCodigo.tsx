@@ -5,15 +5,12 @@ import { Copy, Check, AlertTriangle } from "lucide-react";
 
 interface Props {
   codigo: string;
-  onGuardar: () => void;
-  guardando: boolean;
-  guardado: boolean;
 }
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100";
 
-export function PasoCodigo({ codigo, onGuardar, guardando, guardado }: Props) {
+export function PasoCodigo({ codigo }: Props) {
   const [copiado, setCopiado] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -71,21 +68,6 @@ export function PasoCodigo({ codigo, onGuardar, guardando, guardado }: Props) {
           className={inputCls + " font-mono h-64 resize-y"}
           onFocus={(e) => e.currentTarget.select()}
         />
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm flex items-center justify-between">
-        <div className="text-sm text-slate-600 dark:text-slate-300">
-          {guardado
-            ? "Guardado en el historial."
-            : "Guarda un registro de auditoría (sin datos clínicos) de este procesamiento."}
-        </div>
-        <button
-          onClick={onGuardar}
-          disabled={guardando || guardado}
-          className="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {guardando ? "Guardando..." : guardado ? "Guardado" : "Guardar y terminar"}
-        </button>
       </div>
     </div>
   );

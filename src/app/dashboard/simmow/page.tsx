@@ -65,7 +65,6 @@ export default function SimmowPage() {
   const [datos, setDatos] = useState<DatosSimmow | null>(null);
   const [codigo, setCodigo] = useState<string | null>(null);
   const [errorGeneracion, setErrorGeneracion] = useState<string | null>(null);
-  const [guardado, setGuardado] = useState(false);
 
   // Temporalmente solo admin mientras está en pruebas (ver dashboard/layout.tsx).
   useEffect(() => {
@@ -153,7 +152,6 @@ export default function SimmowPage() {
     setDatos(null);
     setCodigo(null);
     setErrorGeneracion(null);
-    setGuardado(false);
     setError(null);
     setPaso("carga");
   };
@@ -168,7 +166,6 @@ export default function SimmowPage() {
     }
     setErrorGeneracion(null);
     setCodigo(generarScriptConsola(datos, resultado?.advertencias ?? []));
-    setGuardado(false);
     setPaso("codigo");
   };
 
@@ -278,13 +275,7 @@ export default function SimmowPage() {
             </button>
           </div>
 
-          {/* Persistencia real en Firestore (auditoría) pendiente: tarea #6. */}
-          <PasoCodigo
-            codigo={codigo}
-            guardando={false}
-            guardado={guardado}
-            onGuardar={() => setGuardado(true)}
-          />
+          <PasoCodigo codigo={codigo} />
         </div>
       )}
     </div>
