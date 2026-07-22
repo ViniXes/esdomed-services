@@ -66,12 +66,15 @@ function condicionPorCheckbox(doc: DocumentoExtraido): "" | "VIVO" | "MUERTO" {
 /**
  * Cada opción de "Circunstancia de alta" envuelve su palabra clave a una
  * segunda línea ("Referido a otro" / "hospital", "Alta" / "voluntaria",
- * etc.), quedando la casilla pegada solo al conector suelto de la primera
- * línea ("a") — el texto ya asociado a la casilla (por "palabra más cercana
- * a la izquierda") no sirve para identificar la opción. Se resuelve por
- * posición: se reconstruye cada columna de opción juntando los fragmentos de
- * ambas líneas por su X, y cada casilla marcada se asigna a la columna cuyo
- * inicio (X) es el más cercano sin pasarse de la X de la casilla.
+ * etc.), y el navegador real entrega cada palabra como su propio ítem de
+ * texto (no se puede agrupar por X exacta: dos palabras de una misma opción
+ * casi nunca comparten X). Se resuelve por posición: en la línea SUPERIOR
+ * (la de las casillas) se detectan los INICIOS de columna por los saltos
+ * grandes de X entre palabras consecutivas — las opciones quedan bien
+ * separadas entre sí, pero las palabras de una misma opción quedan pegadas
+ * con el espaciado normal de una oración. Con esas columnas ya delimitadas,
+ * se junta el texto de ambas líneas que caiga dentro de cada una, y cada
+ * casilla marcada se clasifica según la columna donde caiga su X.
  */
 function circunstanciaAltaPorCheckbox(doc: DocumentoExtraido): string {
   const etiqueta = buscarItem(doc, /Circunstancia de alta/i);
@@ -82,26 +85,45 @@ function circunstanciaAltaPorCheckbox(doc: DocumentoExtraido): string {
   );
   if (!marcadas.length) return "";
 
+  const lineaSuperior = etiqueta.pagina.items
+    .filter(
+      (it) =>
+        Math.abs(it.y - etiqueta.item.y) <= 2 &&
+        it.x > etiqueta.item.x + etiqueta.item.w
+    )
+    .sort((a, b) => a.x - b.x);
+
+  const inicios: number[] = [];
+  let finAnterior: number | null = null;
+  for (const it of lineaSuperior) {
+    if (finAnterior === null || it.x - finAnterior > 15) inicios.push(it.x);
+    finAnterior = it.x + it.w;
+  }
+  if (!inicios.length) return "";
+
   const fragmentos = etiqueta.pagina.items.filter(
     (it) =>
       it.x > etiqueta.item.x &&
       it.y <= etiqueta.item.y + 2 &&
       it.y >= etiqueta.item.y - 12
   );
-  const columnas: { x: number; texto: string }[] = [];
-  for (const it of [...fragmentos].sort((a, b) => a.x - b.x || b.y - a.y)) {
-    const col = columnas.find((c) => Math.abs(c.x - it.x) <= 3);
-    if (col) col.texto += " " + it.str;
-    else columnas.push({ x: it.x, texto: it.str });
-  }
-  columnas.sort((a, b) => a.x - b.x);
-
-  for (const cb of marcadas) {
-    let texto = "";
+  const columnas = inicios.map((x) => ({ x, texto: "" }));
+  for (const it of fragmentos) {
+    let columna = columnas[0];
     for (const col of columnas) {
-      if (col.x <= cb.x + 2) texto = sinAcentos(col.texto).toLowerCase();
+      if (col.x <= it.x + 2) columna = col;
       else break;
     }
+    columna.texto += " " + it.str;
+  }
+
+  for (const cb of marcadas) {
+    let columna = columnas[0];
+    for (const col of columnas) {
+      if (col.x <= cb.x + 2) columna = col;
+      else break;
+    }
+    const texto = sinAcentos(columna.texto).toLowerCase();
     if (texto.includes("domicilio") || texto.includes("destino")) return "1";
     if (texto.includes("referido") || texto.includes("hospital")) return "2";
     if (texto.includes("residencia")) return "3";
@@ -191,62 +213,61 @@ function referidoRetornoSeguimientoPorCheckbox(
 /**
  * Sección A: "Nombre del establecimiento (referido de:)" a veces se parte en
  * TRES líneas ("Nombre del" / "establecimiento" / "(referido de:)"), con el
- * valor completo pegado a la derecha de la primera línea — el regex sobre
- * texto plano nunca encuentra la etiqueta completa en ese caso. Se ancla por
- * coordenadas: "Nombre del" seguido, justo debajo, de "establecimiento"
- * (para no confundirlo con "Nombre del médico..." u otras etiquetas).
+ * valor completo pegado a la derecha de la primera línea. Se ancla con
+ * buscarItem (que ya reconstruye la etiqueta aunque "Nombre" y "del" lleguen
+ * como ítems de texto separados) y se confirma que "establecimiento"
+ * aparece justo debajo, alineado con el inicio de la etiqueta — para no
+ * confundirlo con "Nombre del médico..." u otras etiquetas.
  */
 function extraerReferidoDelEstablecimientoPorCoordenadas(doc: DocumentoExtraido): string {
-  for (const pagina of doc.paginas) {
-    for (const item of pagina.items) {
-      if (!/^Nombre\s+del$/i.test(item.str.trim())) continue;
+  const etiqueta = buscarItem(doc, /^Nombre\s+del$/i);
+  if (!etiqueta) return "";
 
-      const continuacion = pagina.items.find(
-        (it) =>
-          it !== item &&
-          Math.abs(it.x - item.x) <= 3 &&
-          it.y < item.y &&
-          item.y - it.y <= 15 &&
-          /^establecimiento\b/i.test(it.str.trim())
-      );
-      if (!continuacion) continue;
+  const continuacion = etiqueta.pagina.items.find(
+    (it) =>
+      Math.abs(it.x - etiqueta.inicio.x) <= 3 &&
+      it.y < etiqueta.item.y &&
+      etiqueta.item.y - it.y <= 15 &&
+      /^establecimiento\b/i.test(it.str.trim())
+  );
+  if (!continuacion) return "";
 
-      const valor = pagina.items
-        .filter((it) => Math.abs(it.y - item.y) <= 5 && it.x > item.x + 10)
-        .sort((a, b) => a.x - b.x)
-        .map((it) => it.str)
-        .join(" ");
+  const valor = etiqueta.pagina.items
+    .filter(
+      (it) =>
+        Math.abs(it.y - etiqueta.item.y) <= 5 &&
+        it.x >= etiqueta.item.x + etiqueta.item.w - 2
+    )
+    .sort((a, b) => a.x - b.x)
+    .map((it) => it.str)
+    .join(" ");
 
-      return limpiarNombreEstablecimiento(valor);
-    }
-  }
-  return "";
+  return limpiarNombreEstablecimiento(valor);
 }
 
 /**
  * Variante actual de la plantilla del FIEH (confirmada en varios documentos
  * reales): la etiqueta ya NO se parte en "Nombre del" / "establecimiento" —
- * viene como un solo ítem "Nombre del establecimiento", con el valor a la
- * derecha en la MISMA línea, y "(referido de:)" como nota suelta en la línea
- * de abajo (no es parte del valor, se ignora).
+ * viene junta como "Nombre del establecimiento" (a veces en un solo ítem, a
+ * veces repartida palabra por palabra), con el valor a la derecha en la
+ * MISMA línea, y "(referido de:)" como nota suelta en la línea de abajo (no
+ * es parte del valor, se ignora).
  */
 function extraerReferidoDelEstablecimientoEtiquetaCompleta(doc: DocumentoExtraido): string {
-  for (const pagina of doc.paginas) {
-    for (const item of pagina.items) {
-      if (!/^Nombre\s+del\s+establecimiento$/i.test(sinAcentos(item.str).trim())) continue;
+  const etiqueta = buscarItem(doc, /^Nombre\s+del\s+establecimiento$/i);
+  if (!etiqueta) return "";
 
-      const valor = pagina.items
-        .filter(
-          (it) => it !== item && Math.abs(it.y - item.y) <= 5 && it.x >= item.x + item.w - 2
-        )
-        .sort((a, b) => a.x - b.x)
-        .map((it) => it.str)
-        .join(" ");
+  const valor = etiqueta.pagina.items
+    .filter(
+      (it) =>
+        Math.abs(it.y - etiqueta.item.y) <= 5 &&
+        it.x >= etiqueta.item.x + etiqueta.item.w - 2
+    )
+    .sort((a, b) => a.x - b.x)
+    .map((it) => it.str)
+    .join(" ");
 
-      return limpiarNombreEstablecimiento(valor);
-    }
-  }
-  return "";
+  return limpiarNombreEstablecimiento(valor);
 }
 
 // ─── Edad ───────────────────────────────────────────────────────────────────
