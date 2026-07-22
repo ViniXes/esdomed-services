@@ -1,0 +1,6974 @@
+[
+  {
+    "codigo": "2333",
+    "nombre": "Academia de Seguirdad Publica PNC"
+  },
+  {
+    "codigo": "2024",
+    "nombre": "Bartolina policial Acajutla SO frente Cooperativa la Salud"
+  },
+  {
+    "codigo": "2025",
+    "nombre": "Bartolina policial Ahuachapan AH Frente a Colonia IVU"
+  },
+  {
+    "codigo": "2051",
+    "nombre": "Bartolina policial Apopa SS Col. Madre Tierra 1"
+  },
+  {
+    "codigo": "2027",
+    "nombre": "Bartolina policial Atiquizaya AH Barrio el Angel"
+  },
+  {
+    "codigo": "2030",
+    "nombre": "Bartolina policial Chalatenango CH Barrio San Jose"
+  },
+  {
+    "codigo": "2040",
+    "nombre": "Bartolina policial Cojutepeque CU Barrio San Juan"
+  },
+  {
+    "codigo": "2029",
+    "nombre": "Bartolina policial Colon LL Col. Las Arboledas"
+  },
+  {
+    "codigo": "2062",
+    "nombre": "Bartolina policial Cuscatancingo SS Ciudad Futura"
+  },
+  {
+    "codigo": "2063",
+    "nombre": "Bartolina policial Cuscatancingo SS final calle central"
+  },
+  {
+    "codigo": "2061",
+    "nombre": "Bartolina policial Delgado SS Colonia Zacamil"
+  },
+  {
+    "codigo": "2031",
+    "nombre": "Bartolina policial Dulce nombre de María CH Barrio el Centro"
+  },
+  {
+    "codigo": "2038",
+    "nombre": "Bartolina policial El Rosario LP Barrio el Angel"
+  },
+  {
+    "codigo": "2026",
+    "nombre": "Bartolina policial Guaymango AH Barrio Santa Cruz"
+  },
+  {
+    "codigo": "2053",
+    "nombre": "Bartolina policial Ilopango SS Bulevard San Bartolo"
+  },
+  {
+    "codigo": "2058",
+    "nombre": "Bartolina policial Ilopango SS Col. Montecristo"
+  },
+  {
+    "codigo": "2028",
+    "nombre": "Bartolina policial La Libertad LL Boulevard Conchalio"
+  },
+  {
+    "codigo": "2047",
+    "nombre": "Bartolina policial La Unión LU Centro de Gobierno"
+  },
+  {
+    "codigo": "2023",
+    "nombre": "Bartolina policial Metapan SA Carretera Panamericana"
+  },
+  {
+    "codigo": "2032",
+    "nombre": "Bartolina policial Nueva Concepción CH Barrio el Carmen"
+  },
+  {
+    "codigo": "2039",
+    "nombre": "Bartolina policial Olocuilta LP barrio el centro"
+  },
+  {
+    "codigo": "2049",
+    "nombre": "Bartolina policial Osicala MO Barrio el Centro"
+  },
+  {
+    "codigo": "2048",
+    "nombre": "Bartolina policial San Francisco Gotera MO"
+  },
+  {
+    "codigo": "2037",
+    "nombre": "Bartolina policial San Juan Nonualco LP barrio el centro"
+  },
+  {
+    "codigo": "2033",
+    "nombre": "Bartolina policial San Juan Talpa LP Barrio el Centro"
+  },
+  {
+    "codigo": "2036",
+    "nombre": "Bartolina policial San Luis la Herradura LP barrio el centro"
+  },
+  {
+    "codigo": "2052",
+    "nombre": "Bartolina policial San Marcos SS Colonia El Cenizal"
+  },
+  {
+    "codigo": "2060",
+    "nombre": "Bartolina policial San Martin SS Col San Luis"
+  },
+  {
+    "codigo": "2045",
+    "nombre": "Bartolina policial San Miguel SM Centro de Gobierno"
+  },
+  {
+    "codigo": "2034",
+    "nombre": "Bartolina policial San Pedro Mazahuat LP Barrio el Centro"
+  },
+  {
+    "codigo": "2041",
+    "nombre": "Bartolina policial San Rafael Cedros CU Barrio el Centro"
+  },
+  {
+    "codigo": "2050",
+    "nombre": "Bartolina policial San Salvador SS frente a Fuerza Naval"
+  },
+  {
+    "codigo": "2044",
+    "nombre": "Bartolina policial San Vicente SV Barrio San Francisco"
+  },
+  {
+    "codigo": "2022",
+    "nombre": "Bartolina policial Santa Ana SA Aldea San Antonio"
+  },
+  {
+    "codigo": "2042",
+    "nombre": "Bartolina policial Santa Cruz Analquito CU Barrio el centro"
+  },
+  {
+    "codigo": "2043",
+    "nombre": "Bartolina policial Sensuntepeque CA Barrio el Calvario"
+  },
+  {
+    "codigo": "2055",
+    "nombre": "Bartolina policial Soyapango SS Canton el Limon"
+  },
+  {
+    "codigo": "2057",
+    "nombre": "Bartolina policial Soyapango SS Ciudad Credisa"
+  },
+  {
+    "codigo": "2056",
+    "nombre": "Bartolina policial Soyapango SS Los Conacastes"
+  },
+  {
+    "codigo": "2054",
+    "nombre": "Bartolina policial Soyapango SS Urb. Las Margaritas"
+  },
+  {
+    "codigo": "2059",
+    "nombre": "Bartolina policial Tonacatepeque SS Res. Altavista"
+  },
+  {
+    "codigo": "2046",
+    "nombre": "Bartolina policial Usulutan US Centro de Gobierno"
+  },
+  {
+    "codigo": "2035",
+    "nombre": "Bartolina policial Zacatecoluca LP frente terminal del Sur"
+  },
+  {
+    "codigo": "867",
+    "nombre": "Brigada Médica Cubana-Salvadoreña"
+  },
+  {
+    "codigo": "758",
+    "nombre": "CAE Apopa SS"
+  },
+  {
+    "codigo": "633",
+    "nombre": "CAE La Libertad LL"
+  },
+  {
+    "codigo": "2615",
+    "nombre": "CAE San Luis La Herradura LP Isla Tasajera"
+  },
+  {
+    "codigo": "802",
+    "nombre": "CAE San Martin SS"
+  },
+  {
+    "codigo": "2579",
+    "nombre": "Centro Ambulatorio de Cirugia Escalon CACES"
+  },
+  {
+    "codigo": "2620",
+    "nombre": "Centro de Confinamiento del Terrorismo (Cecot)"
+  },
+  {
+    "codigo": "2084",
+    "nombre": "Centro de Inserción de Carcel de Mujeres Ilopango SS"
+  },
+  {
+    "codigo": "2000",
+    "nombre": "Centro Detencion Menores La Esperanza"
+  },
+  {
+    "codigo": "2278",
+    "nombre": "Centro Medico Quirugico Chalatenango CH San Ignacio"
+  },
+  {
+    "codigo": "1968",
+    "nombre": "Centro Oftalmologico Nacional Hospital Nacional San Vicente SV"
+  },
+  {
+    "codigo": "796",
+    "nombre": "Centro para la Reinserción Social"
+  },
+  {
+    "codigo": "1991",
+    "nombre": "Centro Penal Apanteos"
+  },
+  {
+    "codigo": "1970",
+    "nombre": "Centro Penal Chalatenango CH"
+  },
+  {
+    "codigo": "1993",
+    "nombre": "Centro Penal Ciudad Barrios"
+  },
+  {
+    "codigo": "1994",
+    "nombre": "Centro Penal Ilopango Carcel de Mujeres"
+  },
+  {
+    "codigo": "1997",
+    "nombre": "Centro Penal Jucuapa SM"
+  },
+  {
+    "codigo": "1998",
+    "nombre": "Centro Penal La Unión"
+  },
+  {
+    "codigo": "2007",
+    "nombre": "Centro Penal Mariona"
+  },
+  {
+    "codigo": "1999",
+    "nombre": "Centro Penal Metapan SA"
+  },
+  {
+    "codigo": "2001",
+    "nombre": "Centro Penal Quezaltepeque LL"
+  },
+  {
+    "codigo": "1409",
+    "nombre": "Centro Penal San Francisco Gotera MO"
+  },
+  {
+    "codigo": "2004",
+    "nombre": "Centro Penal San Miguel SM"
+  },
+  {
+    "codigo": "2006",
+    "nombre": "Centro Penal San Vicente SV"
+  },
+  {
+    "codigo": "2003",
+    "nombre": "Centro Penal Santa Ana SA"
+  },
+  {
+    "codigo": "2005",
+    "nombre": "Centro Penal Sensuntepeque CA"
+  },
+  {
+    "codigo": "2002",
+    "nombre": "Centro Penal Sonsonate"
+  },
+  {
+    "codigo": "1932",
+    "nombre": "Centro Penal Usulutan US"
+  },
+  {
+    "codigo": "871",
+    "nombre": "Centro Penal Zacatecoluca LP Maxima Seguridad"
+  },
+  {
+    "codigo": "1977",
+    "nombre": "Centro Preventivo Ilobasco CA"
+  },
+  {
+    "codigo": "1996",
+    "nombre": "Centro Preventivo para Mujeres, Granja de Izalco"
+  },
+  {
+    "codigo": "1995",
+    "nombre": "Centro Preventivo y Cumplimiento de Penas de Izalco"
+  },
+  {
+    "codigo": "2088",
+    "nombre": "Clinica Comunal ISSS Ahuachapan AH El Calvario "
+  },
+  {
+    "codigo": "807",
+    "nombre": "Clínica Comunal ISSS Antiguo Cuscatlán LL"
+  },
+  {
+    "codigo": "810",
+    "nombre": "Clínica Comunal ISSS Antiguo Cuscatlan LL Merliot"
+  },
+  {
+    "codigo": "2089",
+    "nombre": "Clínica Comunal ISSS Apopa SS Guadalupe "
+  },
+  {
+    "codigo": "2074",
+    "nombre": "Clinica Comunal ISSS Ayutuxtepeque SS"
+  },
+  {
+    "codigo": "2086",
+    "nombre": "Clínica Comunal ISSS Ciudad Delgado SS"
+  },
+  {
+    "codigo": "811",
+    "nombre": "Clínica Comunal ISSS Colon LL Lourdes"
+  },
+  {
+    "codigo": "2015",
+    "nombre": "Clínica Comunal ISSS Cuscatancingo SS"
+  },
+  {
+    "codigo": "2096",
+    "nombre": "Clínica Comunal ISSS Ilopango SS San Cristóbal "
+  },
+  {
+    "codigo": "2098",
+    "nombre": "Clinica Comunal ISSS Ilopango SS San José "
+  },
+  {
+    "codigo": "2104",
+    "nombre": "Clínica Comunal ISSS Ilopango SS Santa Lucía "
+  },
+  {
+    "codigo": "2091",
+    "nombre": "Clínica Comunal ISSS Mejicanos SS"
+  },
+  {
+    "codigo": "2076",
+    "nombre": "Clinica Comunal ISSS Mejicanos SS Virgen de Transito"
+  },
+  {
+    "codigo": "2093",
+    "nombre": "Clínica Comunal ISSS Olocuilta  LP"
+  },
+  {
+    "codigo": "812",
+    "nombre": "Clínica Comunal ISSS San Juan Opico LL Sitio El Niño"
+  },
+  {
+    "codigo": "2099",
+    "nombre": "Clinica Comunal ISSS San Marcos SS"
+  },
+  {
+    "codigo": "2085",
+    "nombre": "Clinica Comunal ISSS San Martin SS"
+  },
+  {
+    "codigo": "2013",
+    "nombre": "Clínica Comunal ISSS San Miguel SM Panamericana"
+  },
+  {
+    "codigo": "2011",
+    "nombre": "Clinica Comunal ISSS San Miguel SM San Francisco"
+  },
+  {
+    "codigo": "2087",
+    "nombre": "Clinica Comunal ISSS San Salvador SS Colonia Costa Rica"
+  },
+  {
+    "codigo": "2014",
+    "nombre": "Clínica Comunal ISSS San Salvador SS La Rabida"
+  },
+  {
+    "codigo": "2090",
+    "nombre": "Clínica Comunal ISSS San Salvador SS Las Victorias "
+  },
+  {
+    "codigo": "2012",
+    "nombre": "Clinica Comunal ISSS San Salvador SS Miramonte"
+  },
+  {
+    "codigo": "2073",
+    "nombre": "Clinica Comunal ISSS San Salvador SS Monserrat"
+  },
+  {
+    "codigo": "2095",
+    "nombre": "Clinica Comunal ISSS San Salvador SS San Antonio Abad "
+  },
+  {
+    "codigo": "2097",
+    "nombre": "Clinica Comunal ISSS San Salvador SS San Esteban "
+  },
+  {
+    "codigo": "2100",
+    "nombre": "Clinica Comunal ISSS San Salvador SS San Miguelito "
+  },
+  {
+    "codigo": "2101",
+    "nombre": "Clinica Comunal ISSS Santa Ana SA San Rafael"
+  },
+  {
+    "codigo": "2102",
+    "nombre": "Clínica Comunal ISSS Santa Ana SA Santa Bárbara"
+  },
+  {
+    "codigo": "1952",
+    "nombre": "Clínica Comunal ISSS Santa Rosa de Lima LU"
+  },
+  {
+    "codigo": "808",
+    "nombre": "Clínica Comunal ISSS Santa Tecla LL San Antonio"
+  },
+  {
+    "codigo": "809",
+    "nombre": "Clínica Comunal ISSS Santa Tecla LL Santa Mónica"
+  },
+  {
+    "codigo": "2081",
+    "nombre": "Clinica Comunal ISSS Santo Domingo SO"
+  },
+  {
+    "codigo": "2105",
+    "nombre": "Clinica Comunal ISSS Santo Tomás  SS"
+  },
+  {
+    "codigo": "2092",
+    "nombre": "Clinica Comunal ISSS Soyapango SS Monte Maria "
+  },
+  {
+    "codigo": "2094",
+    "nombre": "Clínica Comunal ISSS Soyapango SS Reparto Morazán"
+  },
+  {
+    "codigo": "2103",
+    "nombre": "Clínica Comunal ISSS Usulutan US Santa Catarina "
+  },
+  {
+    "codigo": "817",
+    "nombre": "Clínica El Paisnal SS Municipal (Privada)"
+  },
+  {
+    "codigo": "2020",
+    "nombre": "Clinica Privada"
+  },
+  {
+    "codigo": "2350",
+    "nombre": "Clinica Privada Agua Caliente CH Dra. Gaynell Parada de Guevara"
+  },
+  {
+    "codigo": "2576",
+    "nombre": "Clinica Privada Aguilares SS Multiclinica de Especialidades y Centro de Cirugia Ambulatoria"
+  },
+  {
+    "codigo": "2564",
+    "nombre": "Clinica Privada Ahuachapan AH Dra. Violeta Maritza Martines Genoves"
+  },
+  {
+    "codigo": "2616",
+    "nombre": "Clinica Privada Candelaria de la Frontera SA centro medico MEDILIFE"
+  },
+  {
+    "codigo": "2625",
+    "nombre": "Clinica privada Candelaria de la frontera SA Santa Elena"
+  },
+  {
+    "codigo": "2328",
+    "nombre": "Clinica Privada Casa de la Salud Chalatenango CH"
+  },
+  {
+    "codigo": "2372",
+    "nombre": "Clinica Privada Chalatenango CH Clinica de Especialidades Medicas Monseñor Eduardo Alas"
+  },
+  {
+    "codigo": "2580",
+    "nombre": "Clínica Privada Chalatenango CH Clínica Diagnóstica Villa Clara"
+  },
+  {
+    "codigo": "2345",
+    "nombre": "Clinica Privada Cojutepeque CU Centro de Cirugia Ambulatoria San Jose"
+  },
+  {
+    "codigo": "2648",
+    "nombre": "Clinica Privada Cojutepeque CU Centro Medico CEMCU de Cirugia Ambulatoria"
+  },
+  {
+    "codigo": "2627",
+    "nombre": "Clinica privada Cojutepeque CU Clinica Medica Lizama"
+  },
+  {
+    "codigo": "2553",
+    "nombre": "Clinica Privada Cojutepeque CU Consultorio Medico Dra. Herrera"
+  },
+  {
+    "codigo": "2566",
+    "nombre": "Clinica Privada Cojutepeque CU Dra. Grisela Guadalupe Martinez de Guzma"
+  },
+  {
+    "codigo": "2665",
+    "nombre": "Clinica Privada Cojutepeque CU Dra.Gilda Lorena Leiva de Campos"
+  },
+  {
+    "codigo": "2326",
+    "nombre": "Clinica Privada El Transito SM Clinica Medica Familiar"
+  },
+  {
+    "codigo": "2325",
+    "nombre": "Clinica Privada El transito SM Clinica Medica Omega"
+  },
+  {
+    "codigo": "2324",
+    "nombre": "Clinica Privada El Transito SM Policlinica Medica San Jose"
+  },
+  {
+    "codigo": "2567",
+    "nombre": "Clinica Privada Ilobasco CA Dra. Martha Elena Amaya Serrano"
+  },
+  {
+    "codigo": "2581",
+    "nombre": "Clinica Privada Ilopango SS \"Clinica la Salud \" de San bartolo Ilopango"
+  },
+  {
+    "codigo": "2335",
+    "nombre": "Clinica Privada Ilopango SS Ultramed"
+  },
+  {
+    "codigo": "2010",
+    "nombre": "Clinica Privada Ingenio El Angel"
+  },
+  {
+    "codigo": "2322",
+    "nombre": "Clinica Privada Jiquilisco US Centro de Hemodialisis la Esperanza"
+  },
+  {
+    "codigo": "2572",
+    "nombre": "Clinica Privada Jiquilisco US Dr. Daniel Isai Montoya Osegueda"
+  },
+  {
+    "codigo": "2583",
+    "nombre": "Clinica Privada La Palma CH Clinica de Nefrologia y Centro de Hemodialisis \"Dr. Nestor Ayala\""
+  },
+  {
+    "codigo": "2320",
+    "nombre": "Clinica Privada La Palma CH Clinica Medica DR. Granados"
+  },
+  {
+    "codigo": "2334",
+    "nombre": "Clinica Privada La Palma CH Economedic La Palma"
+  },
+  {
+    "codigo": "2657",
+    "nombre": "Clinica privada Mejicanos SS Clinica medica familiar"
+  },
+  {
+    "codigo": "1926",
+    "nombre": "Clinica Privada Nejapa SS Provida"
+  },
+  {
+    "codigo": "2641",
+    "nombre": "Clinica privada Nueva Concepcion CH Clínica Medica Castaneda."
+  },
+  {
+    "codigo": "2341",
+    "nombre": "Clinica Privada Policlinica Integral Santa Ana"
+  },
+  {
+    "codigo": "2573",
+    "nombre": "Clinica Privada San Francisco Gotera MO Dr. Walter Martir Ventura"
+  },
+  {
+    "codigo": "2649",
+    "nombre": "Clinica privada San Ignacio CH Clinica Medica Familiar"
+  },
+  {
+    "codigo": "2586",
+    "nombre": "Clinica Privada San Martin SS Bautista"
+  },
+  {
+    "codigo": "2321",
+    "nombre": "Clinica Privada San Martín SS Clínica Médica Flores Alvarez"
+  },
+  {
+    "codigo": "2338",
+    "nombre": "Clinica Privada San Miguel SM Centro Medico de Oriente"
+  },
+  {
+    "codigo": "2571",
+    "nombre": "Clinica Privada San Miguel SM Dr. Oscar Rene Platero Benitez"
+  },
+  {
+    "codigo": "2339",
+    "nombre": "Clinica Privada San Rafael Cedros CU Neomedic"
+  },
+  {
+    "codigo": "2666",
+    "nombre": "Clinica Privada San Salavador SS Dra.Gilda Lorena Leiva de Campos"
+  },
+  {
+    "codigo": "2348",
+    "nombre": "Clinica Privada San Salvador Dr. Jose Ernesto Cordova Chinchilla"
+  },
+  {
+    "codigo": "2624",
+    "nombre": "Clinica privada San Salvador SS Centro de Cirugía de Especialidades CECIE"
+  },
+  {
+    "codigo": "2340",
+    "nombre": "Clinica Privada San Salvador SS Centro de Ortopedia y Traumatologia (COT)"
+  },
+  {
+    "codigo": "2674",
+    "nombre": "Clinica Privada San Salvador SS Centro Integral de Nefrologia La Divina Misericordia"
+  },
+  {
+    "codigo": "2621",
+    "nombre": "Clinica privada San Salvador SS Centro Médico Especialidades Beethoven"
+  },
+  {
+    "codigo": "2650",
+    "nombre": "Clinica Privada San Salvador SS Centro medico especilizado Avante"
+  },
+  {
+    "codigo": "2346",
+    "nombre": "Clinica Privada San Salvador SS Circulación Laboratorio Vascular"
+  },
+  {
+    "codigo": "2651",
+    "nombre": "Clinica Privada San Salvador SS clinica de especialidades renales"
+  },
+  {
+    "codigo": "2342",
+    "nombre": "Clinica Privada San Salvador SS Clínica Hemato-Oncológico"
+  },
+  {
+    "codigo": "2318",
+    "nombre": "Clinica Privada San Salvador SS Clinica Médica El Buen Samaritano"
+  },
+  {
+    "codigo": "2373",
+    "nombre": "Clinica Privada San Salvador SS Clinica Medica Emanuel"
+  },
+  {
+    "codigo": "2562",
+    "nombre": "Clinica Privada San Salvador SS Clínica Médica Santa Fe"
+  },
+  {
+    "codigo": "2574",
+    "nombre": "Clinica Privada San Salvador SS Dra. Ursula Asuncion Barrera Hernandez"
+  },
+  {
+    "codigo": "2331",
+    "nombre": "Clinica Privada San Vicente SV Clinica Medica Integral y Centro de Hemodialisi MORDARGISS"
+  },
+  {
+    "codigo": "2330",
+    "nombre": "Clinica Privada San Vicente SV Clinicas Unidas"
+  },
+  {
+    "codigo": "2568",
+    "nombre": "Clinica Privada San Vicente SV Dr. Enrique Armando Jimenez Romero"
+  },
+  {
+    "codigo": "2640",
+    "nombre": "Clinica privada SanSalvador SS Centro de Cirugia Ambulatoria y clinicas Medicas CCA UNIMED"
+  },
+  {
+    "codigo": "2617",
+    "nombre": "Clinica Privada Santa Ana SA Centro del Corazon"
+  },
+  {
+    "codigo": "2352",
+    "nombre": "Clinica Privada Santa Ana SA Clínica Médica Bolivar"
+  },
+  {
+    "codigo": "2565",
+    "nombre": "Clinica Privada Santa Ana SA Dra. Roxana Jannette Mancia de Palma"
+  },
+  {
+    "codigo": "2336",
+    "nombre": "Clinica Privada Santa Ana SA San Antonio"
+  },
+  {
+    "codigo": "2349",
+    "nombre": "Clinica Privada Santa Tecla LL Dr. Osman Antonio Cordova Chinchilla"
+  },
+  {
+    "codigo": "2570",
+    "nombre": "Clinica Privada Santa Tecla LL Dra. Xenia Carolina Serpas Zelaya"
+  },
+  {
+    "codigo": "2319",
+    "nombre": "Clinica Privada Sensuntepeque CA Centro de cirugia ambulatoria Policlinica Barahona Gil"
+  },
+  {
+    "codigo": "2563",
+    "nombre": "Clinica Privada Sonsonate SO Dra. Yanira del Carmen Delgado de Linares"
+  },
+  {
+    "codigo": "2619",
+    "nombre": "Clinica privada Tejutla CH Centro Medico Divina Providencia"
+  },
+  {
+    "codigo": "2323",
+    "nombre": "Clinica Privada Usulutan US Clínica la Familia"
+  },
+  {
+    "codigo": "2569",
+    "nombre": "Clinica Privada Zacatecoluca LP Dra. Sandra Yanira Coto Caballero"
+  },
+  {
+    "codigo": "2639",
+    "nombre": "Clinica privadaCentro de Rehabilitacion y Estetica Odontologica¨ CREO"
+  },
+  {
+    "codigo": "1973",
+    "nombre": "Clínica PROFAMILIA Chalatenango CH"
+  },
+  {
+    "codigo": "824",
+    "nombre": "Clinica San Miguel SM Centro de Salud Villaseca Col.Cdad.Pacífico (Privada)"
+  },
+  {
+    "codigo": "1886",
+    "nombre": "Clínica San Miguel SM ISDEMU"
+  },
+  {
+    "codigo": "825",
+    "nombre": "Clínica San Pedro Masahuat LP San Judas Tadeo (Privada)"
+  },
+  {
+    "codigo": "745",
+    "nombre": "Clínica San Pedro Nonualco LP Inmaculada Concepción (Privada)"
+  },
+  {
+    "codigo": "844",
+    "nombre": "Clínica San Salvador SS Instituto del Cancer (Privada)"
+  },
+  {
+    "codigo": "1978",
+    "nombre": "Granja de Rehabilitación para jovenes Ilobasco CA"
+  },
+  {
+    "codigo": "1992",
+    "nombre": "Granja Penitenciaria de Santa Ana"
+  },
+  {
+    "codigo": "2165",
+    "nombre": "Granja Penitenciaria Zacatecoluca LP"
+  },
+  {
+    "codigo": "1922",
+    "nombre": "HEM Anamoros LU \"Dra. Maria Isabel Rodriguez\""
+  },
+  {
+    "codigo": "1909",
+    "nombre": "HEM Atiquizaya AH"
+  },
+  {
+    "codigo": "2375",
+    "nombre": "HEM Berlin US"
+  },
+  {
+    "codigo": "1949",
+    "nombre": "HEM Chalatenango CH Guargila"
+  },
+  {
+    "codigo": "2019",
+    "nombre": "HEM Chirilagua SM"
+  },
+  {
+    "codigo": "2112",
+    "nombre": "HEM Ciudad Arce LL"
+  },
+  {
+    "codigo": "1910",
+    "nombre": "HEM Coatepeque SA"
+  },
+  {
+    "codigo": "1906",
+    "nombre": "HEM Colón LL El Botoncillal"
+  },
+  {
+    "codigo": "1940",
+    "nombre": "HEM Corinto MO"
+  },
+  {
+    "codigo": "1966",
+    "nombre": "HEM Izalco SO"
+  },
+  {
+    "codigo": "1907",
+    "nombre": "HEM La Libertad LL Puerto"
+  },
+  {
+    "codigo": "1913",
+    "nombre": "HEM La Palma CH"
+  },
+  {
+    "codigo": "1923",
+    "nombre": "HEM La Unión LU"
+  },
+  {
+    "codigo": "1914",
+    "nombre": "HEM Panchimalco SS Planes de Renderos"
+  },
+  {
+    "codigo": "1963",
+    "nombre": "HEM Perquín MO"
+  },
+  {
+    "codigo": "2018",
+    "nombre": "HEM Puerto el Triunfo US"
+  },
+  {
+    "codigo": "1912",
+    "nombre": "HEM San Francisco Menendez AH Cara Sucia"
+  },
+  {
+    "codigo": "1936",
+    "nombre": "HEM San Gerardo SM"
+  },
+  {
+    "codigo": "1917",
+    "nombre": "HEM San Juan Nonualco LP"
+  },
+  {
+    "codigo": "1916",
+    "nombre": "HEM San Luis La Herradura LP"
+  },
+  {
+    "codigo": "2652",
+    "nombre": "HEM San Vicente SV"
+  },
+  {
+    "codigo": "1941",
+    "nombre": "HEM Sensuntepeque CA"
+  },
+  {
+    "codigo": "1911",
+    "nombre": "HEM Sonsonate SO"
+  },
+  {
+    "codigo": "1915",
+    "nombre": "HEM Suchitoto CU"
+  },
+  {
+    "codigo": "2584",
+    "nombre": "HEM Tacuba AH"
+  },
+  {
+    "codigo": "2329",
+    "nombre": "Hospice La Cima centro de cuidado paliativo"
+  },
+  {
+    "codigo": "1965",
+    "nombre": "Hospital ISSS Policlinico Mejicanos SS Zacamil"
+  },
+  {
+    "codigo": "1972",
+    "nombre": "Hospital ISSS Policlinico San Salvador SS Arce"
+  },
+  {
+    "codigo": "750",
+    "nombre": "Hospital ISSS Policlinico San Salvador SS Planes de Renderos"
+  },
+  {
+    "codigo": "753",
+    "nombre": "Hospital ISSS Policlinico San Salvador SS Roma"
+  },
+  {
+    "codigo": "748",
+    "nombre": "Hospital ISSS Regional San Miguel SM"
+  },
+  {
+    "codigo": "746",
+    "nombre": "Hospital ISSS Regional Santa Ana SA"
+  },
+  {
+    "codigo": "747",
+    "nombre": "Hospital ISSS Regional Sonsonate SO"
+  },
+  {
+    "codigo": "2327",
+    "nombre": "Hospital ISSS San Salvador Hospital La Ceiba"
+  },
+  {
+    "codigo": "749",
+    "nombre": "Hospital ISSS San Salvador SS 1º de Mayo"
+  },
+  {
+    "codigo": "754",
+    "nombre": "Hospital ISSS San Salvador SS General"
+  },
+  {
+    "codigo": "751",
+    "nombre": "Hospital ISSS San Salvador SS Médico Quirúrgico y Oncología"
+  },
+  {
+    "codigo": "752",
+    "nombre": "Hospital ISSS Soyapango SS Amatepec"
+  },
+  {
+    "codigo": "1372",
+    "nombre": "Hospital Militar San Miguel SM"
+  },
+  {
+    "codigo": "797",
+    "nombre": "Hospital Militar San Salvador SS"
+  },
+  {
+    "codigo": "5",
+    "nombre": "Hospital Nacional Ahuachapán AH \"Francisco Menéndez\""
+  },
+  {
+    "codigo": "106",
+    "nombre": "Hospital Nacional Chalatenango CH \"Dr. Luis Edmundo Vásquez\""
+  },
+  {
+    "codigo": "72",
+    "nombre": "Hospital Nacional Chalchuapa SA"
+  },
+  {
+    "codigo": "423",
+    "nombre": "Hospital Nacional Ciudad Barrios SM \"Mons. Oscar Arnulfo Romero\""
+  },
+  {
+    "codigo": "207",
+    "nombre": "Hospital Nacional Cojutepeque CU \"Nuestra Sra. de Fátima\""
+  },
+  {
+    "codigo": "299",
+    "nombre": "Hospital Nacional Ilobasco CA \"Dr. José L. Saca\""
+  },
+  {
+    "codigo": "575",
+    "nombre": "Hospital Nacional Ilopango SS \"Enf. Angélica Vidal de Najarro\""
+  },
+  {
+    "codigo": "372",
+    "nombre": "Hospital Nacional Jiquilisco US"
+  },
+  {
+    "codigo": "481",
+    "nombre": "Hospital Nacional La Unión LU"
+  },
+  {
+    "codigo": "589",
+    "nombre": "Hospital Nacional Mejicanos SS (Zacamil) \"Dr. Juan José Fernández\""
+  },
+  {
+    "codigo": "63",
+    "nombre": "Hospital Nacional Metapán SA"
+  },
+  {
+    "codigo": "144",
+    "nombre": "Hospital Nacional Nueva Concepción CH"
+  },
+  {
+    "codigo": "435",
+    "nombre": "Hospital Nacional Nueva Guadalupe SM"
+  },
+  {
+    "codigo": "552",
+    "nombre": "Hospital Nacional Panchimalco SS Neumológico \"Dr. José A. Saldaña\""
+  },
+  {
+    "codigo": "443",
+    "nombre": "Hospital Nacional San Francisco Gotera MO"
+  },
+  {
+    "codigo": "385",
+    "nombre": "Hospital Nacional San Miguel SM \"San Juan de Dios\""
+  },
+  {
+    "codigo": "2",
+    "nombre": "Hospital Nacional San Salvador SS \"Benjamin Bloom\""
+  },
+  {
+    "codigo": "1",
+    "nombre": "Hospital Nacional San Salvador SS \"Rosales\""
+  },
+  {
+    "codigo": "3",
+    "nombre": "Hospital Nacional San Salvador SS de la Mujer"
+  },
+  {
+    "codigo": "2317",
+    "nombre": "Hospital Nacional San Salvador SS El Salvador"
+  },
+  {
+    "codigo": "314",
+    "nombre": "Hospital Nacional San Vicente SV \"Santa Gertrudis\""
+  },
+  {
+    "codigo": "32",
+    "nombre": "Hospital Nacional Santa Ana SA \"San Juan de Dios\""
+  },
+  {
+    "codigo": "509",
+    "nombre": "Hospital Nacional Santa Rosa de Lima LU"
+  },
+  {
+    "codigo": "163",
+    "nombre": "Hospital Nacional Santa Tecla LL \"San Rafael\""
+  },
+  {
+    "codigo": "356",
+    "nombre": "Hospital Nacional Santiago de María US"
+  },
+  {
+    "codigo": "276",
+    "nombre": "Hospital Nacional Sensuntepeque CA"
+  },
+  {
+    "codigo": "78",
+    "nombre": "Hospital Nacional Sonsonate SO \"Dr. Jorge Mazzini Villacorta\""
+  },
+  {
+    "codigo": "569",
+    "nombre": "Hospital Nacional Soyapango SS \"Dr. José Molina Martínez\""
+  },
+  {
+    "codigo": "603",
+    "nombre": "Hospital Nacional Suchitoto CU"
+  },
+  {
+    "codigo": "334",
+    "nombre": "Hospital Nacional Usulután US \"San Pedro\""
+  },
+  {
+    "codigo": "228",
+    "nombre": "Hospital Nacional Zacatecoluca LP \"Santa Teresa\""
+  },
+  {
+    "codigo": "2021",
+    "nombre": "Hospital Privado"
+  },
+  {
+    "codigo": "2122",
+    "nombre": "Hospital Privado Ahuachapan AH Centro Clinico Hospitalario"
+  },
+  {
+    "codigo": "2123",
+    "nombre": "Hospital Privado Ahuachapan AH Centro Medico"
+  },
+  {
+    "codigo": "2124",
+    "nombre": "Hospital Privado Ahuachapan AH Monte Sinai"
+  },
+  {
+    "codigo": "2127",
+    "nombre": "Hospital Privado Chalchuapa SA La Rabida"
+  },
+  {
+    "codigo": "2119",
+    "nombre": "Hospital Privado Cojutepeque CU Guadalupano"
+  },
+  {
+    "codigo": "2137",
+    "nombre": "Hospital Privado Colon LL Centro Medico San Mateo"
+  },
+  {
+    "codigo": "2136",
+    "nombre": "Hospital Privado Colon LL Lourdes"
+  },
+  {
+    "codigo": "2129",
+    "nombre": "Hospital Privado San Ana SA Medico Quirurgico Santa Barbara"
+  },
+  {
+    "codigo": "2151",
+    "nombre": "Hospital Privado San Martin SS Medico Familiar"
+  },
+  {
+    "codigo": "2158",
+    "nombre": "Hospital Privado San Miguel SM Centro de Salud Josefino Vilaseca"
+  },
+  {
+    "codigo": "2156",
+    "nombre": "Hospital Privado San Miguel SM Clinica San Francisco"
+  },
+  {
+    "codigo": "2157",
+    "nombre": "Hospital Privado San Miguel SM Nuestra Señora de la Paz"
+  },
+  {
+    "codigo": "2577",
+    "nombre": "Hospital Privado San Salvador Circulación"
+  },
+  {
+    "codigo": "2635",
+    "nombre": "Hospital privado San Salvador SS Avante Centro Médico Especializado."
+  },
+  {
+    "codigo": "2142",
+    "nombre": "Hospital Privado San Salvador SS Bautista"
+  },
+  {
+    "codigo": "2145",
+    "nombre": "Hospital Privado San Salvador SS Central"
+  },
+  {
+    "codigo": "2332",
+    "nombre": "Hospital Privado San Salvador SS Central Promedica SA de CV"
+  },
+  {
+    "codigo": "2337",
+    "nombre": "Hospital Privado San Salvador SS Centro de Cirugia Ambulatoria MULTIMEDICA INTERNACIONAL"
+  },
+  {
+    "codigo": "2149",
+    "nombre": "Hospital Privado San Salvador SS Centro de Cirugia Farela"
+  },
+  {
+    "codigo": "2139",
+    "nombre": "Hospital Privado San Salvador SS Centro de Emergencias"
+  },
+  {
+    "codigo": "2638",
+    "nombre": "Hospital privado San Salvador SS centro de Emergencias Pastrana"
+  },
+  {
+    "codigo": "2150",
+    "nombre": "Hospital Privado San Salvador SS Centro de Hemodialisis"
+  },
+  {
+    "codigo": "2118",
+    "nombre": "Hospital Privado San Salvador SS Centro Ginecologico"
+  },
+  {
+    "codigo": "2140",
+    "nombre": "Hospital Privado San Salvador SS Centro Pediatrico"
+  },
+  {
+    "codigo": "2141",
+    "nombre": "Hospital Privado San Salvador SS de Diagnostico"
+  },
+  {
+    "codigo": "2144",
+    "nombre": "Hospital Privado San Salvador SS de la Mujer"
+  },
+  {
+    "codigo": "2148",
+    "nombre": "Hospital Privado San Salvador SS Diagnostico Suc Escalon"
+  },
+  {
+    "codigo": "2117",
+    "nombre": "Hospital Privado San Salvador SS Divina Providencia"
+  },
+  {
+    "codigo": "2344",
+    "nombre": "Hospital Privado San Salvador SS Hospital de Ojos y Especialidades"
+  },
+  {
+    "codigo": "2147",
+    "nombre": "Hospital Privado San Salvador SS PARAVIDA"
+  },
+  {
+    "codigo": "2064",
+    "nombre": "Hospital Privado San Salvador SS Profamilia"
+  },
+  {
+    "codigo": "2561",
+    "nombre": "Hospital Privado San Salvador SS Promedica Hospitalaria SA de CV"
+  },
+  {
+    "codigo": "2121",
+    "nombre": "Hospital Privado San Vicente SV Divino Niño"
+  },
+  {
+    "codigo": "2126",
+    "nombre": "Hospital Privado Santa Ana SA Cader"
+  },
+  {
+    "codigo": "2125",
+    "nombre": "Hospital Privado Santa Ana SA Centro Medico"
+  },
+  {
+    "codigo": "2131",
+    "nombre": "Hospital Privado Santa Ana SA Centro Medico Jabes"
+  },
+  {
+    "codigo": "2130",
+    "nombre": "Hospital Privado Santa Ana SA Centro Medico Metapaneco"
+  },
+  {
+    "codigo": "2637",
+    "nombre": "Hospital privado Santa Ana SA CLIMESA"
+  },
+  {
+    "codigo": "2128",
+    "nombre": "Hospital Privado Santa Ana SA Materno Infantil San Antonio"
+  },
+  {
+    "codigo": "2160",
+    "nombre": "Hospital Privado Santa Rosa de Lima LU de Especialidades"
+  },
+  {
+    "codigo": "2623",
+    "nombre": "Hospital privado Santa Rosa de Lima LU El Angel"
+  },
+  {
+    "codigo": "2159",
+    "nombre": "Hospital Privado Santa Rosa de Lima LU Policlinica Limeña"
+  },
+  {
+    "codigo": "2135",
+    "nombre": "Hospital Privado Santa Tecla LL Centro Medico Quirurgico CLIMOSAL"
+  },
+  {
+    "codigo": "2138",
+    "nombre": "Hospital Privado Santa Tecla LL Merliot"
+  },
+  {
+    "codigo": "2143",
+    "nombre": "Hospital Privado Santiago Texacuango SS Divina Providencia"
+  },
+  {
+    "codigo": "2133",
+    "nombre": "Hospital Privado Sonsonate SO Ave Maria de Especialidades"
+  },
+  {
+    "codigo": "2132",
+    "nombre": "Hospital Privado Sonsonate SO Centro Medico"
+  },
+  {
+    "codigo": "2134",
+    "nombre": "Hospital Privado Sonsonate SO San Miguel"
+  },
+  {
+    "codigo": "826",
+    "nombre": "Hospital Privado Sonzacate SO Medico Quirugico"
+  },
+  {
+    "codigo": "2146",
+    "nombre": "Hospital Privado Soyapango SS Las Flores"
+  },
+  {
+    "codigo": "2153",
+    "nombre": "Hospital Privado Usulutan US Centro Medico Usuluteco"
+  },
+  {
+    "codigo": "2152",
+    "nombre": "Hospital Privado Usulutan US Clinica Orellana"
+  },
+  {
+    "codigo": "2155",
+    "nombre": "Hospital Privado Usulutan US Metropol"
+  },
+  {
+    "codigo": "2154",
+    "nombre": "Hospital Privado Usulutan US Santa Catalina"
+  },
+  {
+    "codigo": "2120",
+    "nombre": "Hospital Privado Zacatecoluca LP de Especialidades"
+  },
+  {
+    "codigo": "2284",
+    "nombre": "Hospital Temporal Jiquilisco US"
+  },
+  {
+    "codigo": "2283",
+    "nombre": "Hospital Temporal Tecoluca SV"
+  },
+  {
+    "codigo": "1832",
+    "nombre": "Instituto del Cancer"
+  },
+  {
+    "codigo": "1971",
+    "nombre": "ISBM Chalatenango CH"
+  },
+  {
+    "codigo": "1887",
+    "nombre": "ISBM Chapeltique SM"
+  },
+  {
+    "codigo": "1888",
+    "nombre": "ISBM Chinameca SM"
+  },
+  {
+    "codigo": "1889",
+    "nombre": "ISBM Ciudad Barrios SM"
+  },
+  {
+    "codigo": "1890",
+    "nombre": "ISBM Jucuapa US"
+  },
+  {
+    "codigo": "1891",
+    "nombre": "ISBM Nueva Guadalupe SM"
+  },
+  {
+    "codigo": "1892",
+    "nombre": "ISBM San Miguel SM"
+  },
+  {
+    "codigo": "1893",
+    "nombre": "ISBM San Miguel SM San Juan de Dios"
+  },
+  {
+    "codigo": "2343",
+    "nombre": "ISBM Zacatecoluca LP"
+  },
+  {
+    "codigo": "2578",
+    "nombre": "Laboratorio Clinico Especializado Cojutepeque CU Santa Lucia"
+  },
+  {
+    "codigo": "2077",
+    "nombre": "Resguardo Metropolitano de Adolescentes Ilopango SS"
+  },
+  {
+    "codigo": "2658",
+    "nombre": "Telemedicina Doctorsv"
+  },
+  {
+    "codigo": "1389",
+    "nombre": "UCSFB Acajutla SO Costa Azul"
+  },
+  {
+    "codigo": "1388",
+    "nombre": "UCSFB Acajutla SO Villa Centenario"
+  },
+  {
+    "codigo": "929",
+    "nombre": "UCSFB Agua Caliente CH Cerro Grande"
+  },
+  {
+    "codigo": "928",
+    "nombre": "UCSFB Agua Caliente CH El Carmen"
+  },
+  {
+    "codigo": "930",
+    "nombre": "UCSFB Agua Caliente CH Obrajuelo"
+  },
+  {
+    "codigo": "1086",
+    "nombre": "UCSFB Aguilares SS La Florida"
+  },
+  {
+    "codigo": "1267",
+    "nombre": "UCSFB Ahuachapan AH Ashapuco"
+  },
+  {
+    "codigo": "1268",
+    "nombre": "UCSFB Ahuachapan AH El Barro"
+  },
+  {
+    "codigo": "1269",
+    "nombre": "UCSFB Ahuachapan AH Llano la Laguna"
+  },
+  {
+    "codigo": "1931",
+    "nombre": "UCSFB Ahuachapan AH Santa Cruz"
+  },
+  {
+    "codigo": "1067",
+    "nombre": "UCSFB Ahuachapan AH Un Rancho y un lucero"
+  },
+  {
+    "codigo": "1207",
+    "nombre": "UCSFB Alegria US El Quebracho"
+  },
+  {
+    "codigo": "1208",
+    "nombre": "UCSFB Alegría US El Zapotillo"
+  },
+  {
+    "codigo": "1206",
+    "nombre": "UCSFB Alegría US Las Casitas"
+  },
+  {
+    "codigo": "1270",
+    "nombre": "UCSFB Apaneca AH Quezalapa"
+  },
+  {
+    "codigo": "1149",
+    "nombre": "UCSFB Apastepeque SV Calderas"
+  },
+  {
+    "codigo": "1150",
+    "nombre": "UCSFB Apastepeque SV Las Minas"
+  },
+  {
+    "codigo": "1151",
+    "nombre": "UCSFB Apastepeque SV San Felipe"
+  },
+  {
+    "codigo": "1152",
+    "nombre": "UCSFB Apastepeque SV San Jacinto"
+  },
+  {
+    "codigo": "1153",
+    "nombre": "UCSFB Apastepeque SV San Nicolas"
+  },
+  {
+    "codigo": "1154",
+    "nombre": "UCSFB Apastepeque SV San Pedro"
+  },
+  {
+    "codigo": "979",
+    "nombre": "UCSFB Arambala MO"
+  },
+  {
+    "codigo": "1736",
+    "nombre": "UCSFB Arambala MO *"
+  },
+  {
+    "codigo": "1056",
+    "nombre": "UCSFB Atiquizaya AH Lomas de Alarcon"
+  },
+  {
+    "codigo": "1416",
+    "nombre": "UCSFB Ayutuxtepeque SS Cristo Redentor"
+  },
+  {
+    "codigo": "1199",
+    "nombre": "UCSFB Berlin US 1"
+  },
+  {
+    "codigo": "1200",
+    "nombre": "UCSFB Berlin US 2"
+  },
+  {
+    "codigo": "1204",
+    "nombre": "UCSFB Berlin US San Isidro"
+  },
+  {
+    "codigo": "1201",
+    "nombre": "UCSFB Berlin US San José"
+  },
+  {
+    "codigo": "1202",
+    "nombre": "UCSFB Berlin US Talpetate"
+  },
+  {
+    "codigo": "1203",
+    "nombre": "UCSFB Berlin US Virginia"
+  },
+  {
+    "codigo": "1765",
+    "nombre": "UCSFB Bolivar LU *"
+  },
+  {
+    "codigo": "1003",
+    "nombre": "UCSFB Cacaopera MO Agua Blanca"
+  },
+  {
+    "codigo": "1002",
+    "nombre": "UCSFB Cacaopera MO La Estancia"
+  },
+  {
+    "codigo": "1004",
+    "nombre": "UCSFB Cacaopera MO Sunsulaca"
+  },
+  {
+    "codigo": "1661",
+    "nombre": "UCSFB California US *"
+  },
+  {
+    "codigo": "1272",
+    "nombre": "UCSFB Caluco SO El Zapote"
+  },
+  {
+    "codigo": "1271",
+    "nombre": "UCSFB Caluco SO Plan de Amayo"
+  },
+  {
+    "codigo": "1307",
+    "nombre": "UCSFB Candelaria CU Concepción"
+  },
+  {
+    "codigo": "1306",
+    "nombre": "UCSFB Candelaria CU El Rosario"
+  },
+  {
+    "codigo": "1308",
+    "nombre": "UCSFB Candelaria CU Miraflores Arriba"
+  },
+  {
+    "codigo": "1475",
+    "nombre": "UCSFB Candelaria de la Frontera SA La Parada Aldea Bolaños *"
+  },
+  {
+    "codigo": "1079",
+    "nombre": "UCSFB Carolina SM"
+  },
+  {
+    "codigo": "963",
+    "nombre": "UCSFB Carolina SM La Ceibita"
+  },
+  {
+    "codigo": "964",
+    "nombre": "UCSFB Carolina SM Rosa Nacaspilo"
+  },
+  {
+    "codigo": "1090",
+    "nombre": "UCSFB Chalatenango CH Guarjila"
+  },
+  {
+    "codigo": "1821",
+    "nombre": "UCSFB Chalatenango CH Guarjila *"
+  },
+  {
+    "codigo": "1033",
+    "nombre": "UCSFB Chalchuapa SA"
+  },
+  {
+    "codigo": "1491",
+    "nombre": "UCSFB Chalchuapa SA *"
+  },
+  {
+    "codigo": "1040",
+    "nombre": "UCSFB Chalchuapa SA El Paste"
+  },
+  {
+    "codigo": "1037",
+    "nombre": "UCSFB Chalchuapa SA Galeano"
+  },
+  {
+    "codigo": "1045",
+    "nombre": "UCSFB Chalchuapa SA Las Cruces"
+  },
+  {
+    "codigo": "1039",
+    "nombre": "UCSFB Chalchuapa SA Las Flores"
+  },
+  {
+    "codigo": "1044",
+    "nombre": "UCSFB Chalchuapa SA Las Lajas"
+  },
+  {
+    "codigo": "1043",
+    "nombre": "UCSFB Chalchuapa SA Las Lomas"
+  },
+  {
+    "codigo": "1034",
+    "nombre": "UCSFB Chalchuapa SA Magdalena 1"
+  },
+  {
+    "codigo": "1035",
+    "nombre": "UCSFB Chalchuapa SA Magdalena 2"
+  },
+  {
+    "codigo": "1481",
+    "nombre": "UCSFB Chalchuapa SA Sabanetas El Paste *"
+  },
+  {
+    "codigo": "1042",
+    "nombre": "UCSFB Chalchuapa SA San José"
+  },
+  {
+    "codigo": "1036",
+    "nombre": "UCSFB Chalchuapa SA San Sebastian"
+  },
+  {
+    "codigo": "1038",
+    "nombre": "UCSFB Chalchuapa SA Zacamil"
+  },
+  {
+    "codigo": "1189",
+    "nombre": "UCSFB Chapeltique SM La Trinidad (El Rodeo)"
+  },
+  {
+    "codigo": "992",
+    "nombre": "UCSFB Chilanga MO Las Crucitas"
+  },
+  {
+    "codigo": "993",
+    "nombre": "UCSFB Chilanga MO Piedra Parada"
+  },
+  {
+    "codigo": "1109",
+    "nombre": "UCSFB Chiltiupán LL Las Termopilas"
+  },
+  {
+    "codigo": "1694",
+    "nombre": "UCSFB Chinameca SM El Jocote Dulce *"
+  },
+  {
+    "codigo": "1688",
+    "nombre": "UCSFB Chirilagua SM El Cuco *"
+  },
+  {
+    "codigo": "1689",
+    "nombre": "UCSFB Chirilagua SM San Pedro *"
+  },
+  {
+    "codigo": "1693",
+    "nombre": "UCSFB Chirilagua SM Tierra Blanca *"
+  },
+  {
+    "codigo": "885",
+    "nombre": "UCSFB Cítala CH San Ramon"
+  },
+  {
+    "codigo": "1179",
+    "nombre": "UCSFB Ciudad Barrios SM"
+  },
+  {
+    "codigo": "1816",
+    "nombre": "UCSFB Ciudad Barrios SM *"
+  },
+  {
+    "codigo": "1181",
+    "nombre": "UCSFB Ciudad Barrios SM El Porvenir"
+  },
+  {
+    "codigo": "1180",
+    "nombre": "UCSFB Ciudad Barrios SM Guanaste"
+  },
+  {
+    "codigo": "1184",
+    "nombre": "UCSFB Ciudad Barrios SM Llano el Angel"
+  },
+  {
+    "codigo": "1183",
+    "nombre": "UCSFB Ciudad Barrios SM San Cristobal"
+  },
+  {
+    "codigo": "1182",
+    "nombre": "UCSFB Ciudad Barrios SM San Matias"
+  },
+  {
+    "codigo": "1287",
+    "nombre": "UCSFB Coatepeque SA Conacaste"
+  },
+  {
+    "codigo": "1286",
+    "nombre": "UCSFB Coatepeque SA Las Piletas"
+  },
+  {
+    "codigo": "1476",
+    "nombre": "UCSFB Coatepeque SA San Jacinto *"
+  },
+  {
+    "codigo": "1405",
+    "nombre": "UCSFB Colón LL \"Dr. Manuel Gallardo\""
+  },
+  {
+    "codigo": "1573",
+    "nombre": "UCSFB Colón LL \"Dr. Manuel Gallardo\" *"
+  },
+  {
+    "codigo": "1818",
+    "nombre": "UCSFB Colón LL El Botoncillal *"
+  },
+  {
+    "codigo": "1406",
+    "nombre": "UCSFB Colón LL El Pital"
+  },
+  {
+    "codigo": "915",
+    "nombre": "UCSFB Comalapa CH Guachipilín"
+  },
+  {
+    "codigo": "1114",
+    "nombre": "UCSFB Comasagua LL El Conacaste"
+  },
+  {
+    "codigo": "1115",
+    "nombre": "UCSFB Comasagua LL El Matazano"
+  },
+  {
+    "codigo": "1113",
+    "nombre": "UCSFB Comasagua LL La Shila"
+  },
+  {
+    "codigo": "1234",
+    "nombre": "UCSFB Concepción Batres US"
+  },
+  {
+    "codigo": "1645",
+    "nombre": "UCSFB Concepción Batres US *"
+  },
+  {
+    "codigo": "1237",
+    "nombre": "UCSFB Concepción Batres US El Cañal"
+  },
+  {
+    "codigo": "1236",
+    "nombre": "UCSFB Concepción Batres US Hacienda Nueva"
+  },
+  {
+    "codigo": "1235",
+    "nombre": "UCSFB Concepción Batres US San Felipe"
+  },
+  {
+    "codigo": "1866",
+    "nombre": "UCSFB Concepción de Ataco AH El Triunfo"
+  },
+  {
+    "codigo": "924",
+    "nombre": "UCSFB Concepción Quezaltepeque CH"
+  },
+  {
+    "codigo": "1530",
+    "nombre": "UCSFB Concepción Quezaltepeque CH *"
+  },
+  {
+    "codigo": "925",
+    "nombre": "UCSFB Concepción Quezaltepeque CH Llano Grande"
+  },
+  {
+    "codigo": "926",
+    "nombre": "UCSFB Concepción Quezaltepeque CH Monte Redondo"
+  },
+  {
+    "codigo": "1753",
+    "nombre": "UCSFB Conchagua LU El Faro *"
+  },
+  {
+    "codigo": "1096",
+    "nombre": "UCSFB Conchagua LU Las Tunas"
+  },
+  {
+    "codigo": "1715",
+    "nombre": "UCSFB Corinto MO *"
+  },
+  {
+    "codigo": "994",
+    "nombre": "UCSFB Corinto MO 1"
+  },
+  {
+    "codigo": "995",
+    "nombre": "UCSFB Corinto MO 2"
+  },
+  {
+    "codigo": "1093",
+    "nombre": "UCSFB Corinto MO Corralito Atillo"
+  },
+  {
+    "codigo": "996",
+    "nombre": "UCSFB Corinto MO Corralito San Francisco"
+  },
+  {
+    "codigo": "998",
+    "nombre": "UCSFB Corinto MO La Hermita"
+  },
+  {
+    "codigo": "997",
+    "nombre": "UCSFB Corinto MO San Felipe Los Villatoro"
+  },
+  {
+    "codigo": "1274",
+    "nombre": "UCSFB Cuisnahuat SO Agua Shuca"
+  },
+  {
+    "codigo": "1275",
+    "nombre": "UCSFB Cuisnahuat SO Coquiama"
+  },
+  {
+    "codigo": "1276",
+    "nombre": "UCSFB Cuisnahuat SO San Lucas"
+  },
+  {
+    "codigo": "1333",
+    "nombre": "UCSFB Cuyultitan LP San Antonio"
+  },
+  {
+    "codigo": "990",
+    "nombre": "UCSFB Delicias de Concepción MO El Volcan"
+  },
+  {
+    "codigo": "960",
+    "nombre": "UCSFB Dolores CA San Carlos"
+  },
+  {
+    "codigo": "916",
+    "nombre": "UCSFB Dulce Nombre de Maria CH"
+  },
+  {
+    "codigo": "1513",
+    "nombre": "UCSFB Dulce Nombre de Maria CH *"
+  },
+  {
+    "codigo": "917",
+    "nombre": "UCSFB Dulce Nombre de Maria CH El Ocotal"
+  },
+  {
+    "codigo": "918",
+    "nombre": "UCSFB Dulce Nombre de Maria CH Gutierrez"
+  },
+  {
+    "codigo": "1321",
+    "nombre": "UCSFB El Carmen CU Candelaria"
+  },
+  {
+    "codigo": "1144",
+    "nombre": "UCSFB El Carmen CU San Antonio"
+  },
+  {
+    "codigo": "1319",
+    "nombre": "UCSFB El Carmen CU San Sebastian"
+  },
+  {
+    "codigo": "1320",
+    "nombre": "UCSFB El Carmen CU Santa Lucía"
+  },
+  {
+    "codigo": "1427",
+    "nombre": "UCSFB El Paisnal SS Comunidad Rutilio Grande"
+  },
+  {
+    "codigo": "1085",
+    "nombre": "UCSFB El Paisnal SS San Francisco dos Cerros"
+  },
+  {
+    "codigo": "1022",
+    "nombre": "UCSFB El Porvenir SA"
+  },
+  {
+    "codigo": "1488",
+    "nombre": "UCSFB El Porvenir SA *"
+  },
+  {
+    "codigo": "1024",
+    "nombre": "UCSFB El Porvenir SA Amate Blanco"
+  },
+  {
+    "codigo": "1023",
+    "nombre": "UCSFB El Porvenir SA El Cerrón"
+  },
+  {
+    "codigo": "1025",
+    "nombre": "UCSFB El Porvenir SA San Juan Chiquito"
+  },
+  {
+    "codigo": "1051",
+    "nombre": "UCSFB El Refugio AH El Rosario"
+  },
+  {
+    "codigo": "982",
+    "nombre": "UCSFB El Rosario MO"
+  },
+  {
+    "codigo": "1732",
+    "nombre": "UCSFB El Rosario MO *"
+  },
+  {
+    "codigo": "1840",
+    "nombre": "UCSFB El Sauce LU Santa Rosita"
+  },
+  {
+    "codigo": "1841",
+    "nombre": "UCSFB El Sauce LU Talpetate"
+  },
+  {
+    "codigo": "1656",
+    "nombre": "UCSFB El Tránsito SM Primavera *"
+  },
+  {
+    "codigo": "1648",
+    "nombre": "UCSFB Ereguayquin US *"
+  },
+  {
+    "codigo": "1239",
+    "nombre": "UCSFB Ereguayquin US Analco"
+  },
+  {
+    "codigo": "1193",
+    "nombre": "UCSFB Estanzuelas US Escarbadero"
+  },
+  {
+    "codigo": "1194",
+    "nombre": "UCSFB Estanzuelas US la Cruz"
+  },
+  {
+    "codigo": "1354",
+    "nombre": "UCSFB Guacotecti CA Agua Zarca"
+  },
+  {
+    "codigo": "1980",
+    "nombre": "UCSFB Guadalupe SV San Emigdio"
+  },
+  {
+    "codigo": "968",
+    "nombre": "UCSFB Guatajiagua MO 2"
+  },
+  {
+    "codigo": "971",
+    "nombre": "UCSFB Guatajiagua MO Los Abelines"
+  },
+  {
+    "codigo": "969",
+    "nombre": "UCSFB Guatajiagua MO Maiguera"
+  },
+  {
+    "codigo": "1091",
+    "nombre": "UCSFB Guatajiagua MO Pajigua"
+  },
+  {
+    "codigo": "970",
+    "nombre": "UCSFB Guatajiagua MO San Bartolo"
+  },
+  {
+    "codigo": "1240",
+    "nombre": "UCSFB Guaymango AH"
+  },
+  {
+    "codigo": "1245",
+    "nombre": "UCSFB Guaymango AH Cauta Arriba"
+  },
+  {
+    "codigo": "1242",
+    "nombre": "UCSFB Guaymango AH El Escalón"
+  },
+  {
+    "codigo": "1243",
+    "nombre": "UCSFB Guaymango AH Morro Grande"
+  },
+  {
+    "codigo": "1241",
+    "nombre": "UCSFB Guaymango AH Platanares"
+  },
+  {
+    "codigo": "1244",
+    "nombre": "UCSFB Guaymango AH San Martín"
+  },
+  {
+    "codigo": "2587",
+    "nombre": "UCSFB Guazapa SS San Lucas"
+  },
+  {
+    "codigo": "2575",
+    "nombre": "UCSFB Guazapa SS Zacamil"
+  },
+  {
+    "codigo": "1375",
+    "nombre": "UCSFB Ilobasco CA"
+  },
+  {
+    "codigo": "1626",
+    "nombre": "UCSFB Ilobasco CA *"
+  },
+  {
+    "codigo": "938",
+    "nombre": "UCSFB Ilobasco CA Agua Zarca"
+  },
+  {
+    "codigo": "939",
+    "nombre": "UCSFB Ilobasco CA Cerro Colorado"
+  },
+  {
+    "codigo": "1087",
+    "nombre": "UCSFB Ilobasco CA Hoyos"
+  },
+  {
+    "codigo": "943",
+    "nombre": "UCSFB Ilobasco CA Huertas"
+  },
+  {
+    "codigo": "942",
+    "nombre": "UCSFB Ilobasco CA Los Llanitos"
+  },
+  {
+    "codigo": "946",
+    "nombre": "UCSFB Ilobasco CA Maquilishuat El Limón"
+  },
+  {
+    "codigo": "941",
+    "nombre": "UCSFB Ilobasco CA Potreros"
+  },
+  {
+    "codigo": "940",
+    "nombre": "UCSFB Ilobasco CA San Francisco Iraheta"
+  },
+  {
+    "codigo": "937",
+    "nombre": "UCSFB Ilobasco CA San Jose"
+  },
+  {
+    "codigo": "944",
+    "nombre": "UCSFB Ilobasco CA Sitio Viejo"
+  },
+  {
+    "codigo": "1393",
+    "nombre": "UCSFB Izalco SO Chorro Arriba"
+  },
+  {
+    "codigo": "1396",
+    "nombre": "UCSFB Izalco SO Cuyagualo"
+  },
+  {
+    "codigo": "1394",
+    "nombre": "UCSFB Izalco SO Las Lajas"
+  },
+  {
+    "codigo": "1395",
+    "nombre": "UCSFB Izalco SO Las Marías"
+  },
+  {
+    "codigo": "1392",
+    "nombre": "UCSFB Izalco SO Tunalmiles Centro"
+  },
+  {
+    "codigo": "869",
+    "nombre": "UCSFB Jiquilisco US Bajo Lempa \"Salud Renal\""
+  },
+  {
+    "codigo": "1873",
+    "nombre": "UCSFB Jiquilisco US California"
+  },
+  {
+    "codigo": "1870",
+    "nombre": "UCSFB Jiquilisco US Cantón El Paraiso"
+  },
+  {
+    "codigo": "1867",
+    "nombre": "UCSFB Jiquilisco US Cantón Las Flores"
+  },
+  {
+    "codigo": "1868",
+    "nombre": "UCSFB Jiquilisco US Cantón Roquinte"
+  },
+  {
+    "codigo": "1899",
+    "nombre": "UCSFB Jiquilisco US Colonia Romero"
+  },
+  {
+    "codigo": "1874",
+    "nombre": "UCSFB Jiquilisco US Comunidad San Hilario"
+  },
+  {
+    "codigo": "1871",
+    "nombre": "UCSFB Jiquilisco US Cruzadilla San Juan"
+  },
+  {
+    "codigo": "1896",
+    "nombre": "UCSFB Jiquilisco US El Quebrado"
+  },
+  {
+    "codigo": "1671",
+    "nombre": "UCSFB Jiquilisco US El Quebrado *"
+  },
+  {
+    "codigo": "1903",
+    "nombre": "UCSFB Jiquilisco US Isla de Mendez"
+  },
+  {
+    "codigo": "1670",
+    "nombre": "UCSFB Jiquilisco US Isla de Mendez *"
+  },
+  {
+    "codigo": "1869",
+    "nombre": "UCSFB Jiquilisco US La Concordia"
+  },
+  {
+    "codigo": "1897",
+    "nombre": "UCSFB Jiquilisco US Nuevo Amanecer"
+  },
+  {
+    "codigo": "1675",
+    "nombre": "UCSFB Jiquilisco US Nuevo Amanecer *"
+  },
+  {
+    "codigo": "1872",
+    "nombre": "UCSFB Jiquilisco US San Marcos Lempa"
+  },
+  {
+    "codigo": "981",
+    "nombre": "UCSFB Joateca MO La Laguna"
+  },
+  {
+    "codigo": "1721",
+    "nombre": "UCSFB Jocoaitique MO *"
+  },
+  {
+    "codigo": "978",
+    "nombre": "UCSFB Jocoaitique MO Quebrachos"
+  },
+  {
+    "codigo": "2075",
+    "nombre": "UCSFB Jocoro MO Lagunetas"
+  },
+  {
+    "codigo": "1844",
+    "nombre": "UCSFB Juayua SO Los Naranjos"
+  },
+  {
+    "codigo": "1232",
+    "nombre": "UCSFB Jucuaran US El Espino"
+  },
+  {
+    "codigo": "1650",
+    "nombre": "UCSFB Jucuaran US El Espino *"
+  },
+  {
+    "codigo": "1231",
+    "nombre": "UCSFB Jucuaran US El Jutal"
+  },
+  {
+    "codigo": "1233",
+    "nombre": "UCSFB Jucuaran US El Zapote"
+  },
+  {
+    "codigo": "1246",
+    "nombre": "UCSFB Jujutla AH"
+  },
+  {
+    "codigo": "1248",
+    "nombre": "UCSFB Jujutla AH Barra de Santiago"
+  },
+  {
+    "codigo": "1249",
+    "nombre": "UCSFB Jujutla AH Falla"
+  },
+  {
+    "codigo": "1250",
+    "nombre": "UCSFB Jujutla AH Guayapa Abajo"
+  },
+  {
+    "codigo": "1253",
+    "nombre": "UCSFB Jujutla AH San Antonio"
+  },
+  {
+    "codigo": "1252",
+    "nombre": "UCSFB Jujutla AH San José El Naranjo"
+  },
+  {
+    "codigo": "1251",
+    "nombre": "UCSFB Jujutla AH Santa Rosa Guayapa"
+  },
+  {
+    "codigo": "1247",
+    "nombre": "UCSFB Jujutla AH Tihuicha"
+  },
+  {
+    "codigo": "913",
+    "nombre": "UCSFB La Laguna CH San Jose"
+  },
+  {
+    "codigo": "1089",
+    "nombre": "UCSFB La Palma CH"
+  },
+  {
+    "codigo": "1538",
+    "nombre": "UCSFB La Palma CH *"
+  },
+  {
+    "codigo": "889",
+    "nombre": "UCSFB La Palma CH Las Granadillas"
+  },
+  {
+    "codigo": "887",
+    "nombre": "UCSFB La Palma CH Los Horcones"
+  },
+  {
+    "codigo": "888",
+    "nombre": "UCSFB La Palma CH San José Sacare"
+  },
+  {
+    "codigo": "894",
+    "nombre": "UCSFB La Reina CH El Pepeto"
+  },
+  {
+    "codigo": "895",
+    "nombre": "UCSFB La Reina CH El Tigre"
+  },
+  {
+    "codigo": "1747",
+    "nombre": "UCSFB La Unión LU Agua Caliente *"
+  },
+  {
+    "codigo": "1750",
+    "nombre": "UCSFB La Unión LU Agua Escondida *"
+  },
+  {
+    "codigo": "1744",
+    "nombre": "UCSFB La Unión LU Isla Zacatillo *"
+  },
+  {
+    "codigo": "1755",
+    "nombre": "UCSFB La Unión LU San Carlos Borromeo *"
+  },
+  {
+    "codigo": "1007",
+    "nombre": "UCSFB Lislique LU El Derrumbado"
+  },
+  {
+    "codigo": "1009",
+    "nombre": "UCSFB Lislique LU Guajiniquil"
+  },
+  {
+    "codigo": "1008",
+    "nombre": "UCSFB Lislique LU Higueras"
+  },
+  {
+    "codigo": "1006",
+    "nombre": "UCSFB Lislique LU Pilas"
+  },
+  {
+    "codigo": "999",
+    "nombre": "UCSFB Lolotiquillo MO"
+  },
+  {
+    "codigo": "1735",
+    "nombre": "UCSFB Lolotiquillo MO *"
+  },
+  {
+    "codigo": "1000",
+    "nombre": "UCSFB Lolotiquillo MO Gualindo"
+  },
+  {
+    "codigo": "1026",
+    "nombre": "UCSFB Masahuat SA"
+  },
+  {
+    "codigo": "1027",
+    "nombre": "UCSFB Masahuat SA La Joya"
+  },
+  {
+    "codigo": "1745",
+    "nombre": "UCSFB Meanguera del Golfo LU Isla Conchaguita *"
+  },
+  {
+    "codigo": "1859",
+    "nombre": "UCSFB Meanguera MO"
+  },
+  {
+    "codigo": "1723",
+    "nombre": "UCSFB Meanguera MO *"
+  },
+  {
+    "codigo": "1827",
+    "nombre": "UCSFB Meanguera MO El Mozote"
+  },
+  {
+    "codigo": "1412",
+    "nombre": "UCSFB Mejicanos SS Las nubes"
+  },
+  {
+    "codigo": "1413",
+    "nombre": "UCSFB Mejicanos SS San Roque"
+  },
+  {
+    "codigo": "1362",
+    "nombre": "UCSFB Mercedes La Ceiba LP"
+  },
+  {
+    "codigo": "1612",
+    "nombre": "UCSFB Mercedes la Ceiba LP *"
+  },
+  {
+    "codigo": "1196",
+    "nombre": "UCSFB Mercedes Umaña US La Puerta"
+  },
+  {
+    "codigo": "1198",
+    "nombre": "UCSFB Mercedes Umaña US Los Horcones"
+  },
+  {
+    "codigo": "1197",
+    "nombre": "UCSFB Mercedes Umaña US Santa Anita"
+  },
+  {
+    "codigo": "1485",
+    "nombre": "UCSFB Metapán SA San Jerónimo *"
+  },
+  {
+    "codigo": "1487",
+    "nombre": "UCSFB Metapán SA San José Ingenio *"
+  },
+  {
+    "codigo": "1483",
+    "nombre": "UCSFB Metapán SA San Juan Las Minas *"
+  },
+  {
+    "codigo": "2065",
+    "nombre": "UCSFB Metapan SA Tecomapa"
+  },
+  {
+    "codigo": "1696",
+    "nombre": "UCSFB Moncagua SM Tongolona *"
+  },
+  {
+    "codigo": "1135",
+    "nombre": "UCSFB Monte San Juan CU San Nicolas"
+  },
+  {
+    "codigo": "1136",
+    "nombre": "UCSFB Monte San Juan CU Soledad"
+  },
+  {
+    "codigo": "1845",
+    "nombre": "UCSFB Nahuizalco SO El Canelo"
+  },
+  {
+    "codigo": "1397",
+    "nombre": "UCSFB Nahuizalco SO El Carrizal"
+  },
+  {
+    "codigo": "1398",
+    "nombre": "UCSFB Nahuizalco SO Tajcuilujlan"
+  },
+  {
+    "codigo": "1426",
+    "nombre": "UCSFB Nejapa SS La Portada"
+  },
+  {
+    "codigo": "900",
+    "nombre": "UCSFB Nombre de Jesus CH Junquillo"
+  },
+  {
+    "codigo": "1017",
+    "nombre": "UCSFB Nueva Esparta LU Honduritas"
+  },
+  {
+    "codigo": "1016",
+    "nombre": "UCSFB Nueva Esparta LU Las Marias"
+  },
+  {
+    "codigo": "1191",
+    "nombre": "UCSFB Nueva Granada US Nuevo Gualcho"
+  },
+  {
+    "codigo": "936",
+    "nombre": "UCSFB Nuevo Eden de San Juan SM San Sebastian"
+  },
+  {
+    "codigo": "909",
+    "nombre": "UCSFB Ojos de Agua CH El Zapotal"
+  },
+  {
+    "codigo": "1334",
+    "nombre": "UCSFB Olocuilta LP San Sebastían"
+  },
+  {
+    "codigo": "1215",
+    "nombre": "UCSFB Ozatlan US La Breña"
+  },
+  {
+    "codigo": "1214",
+    "nombre": "UCSFB Ozatlan US La Poza"
+  },
+  {
+    "codigo": "1213",
+    "nombre": "UCSFB Ozatlan US Las Trancas"
+  },
+  {
+    "codigo": "1084",
+    "nombre": "UCSFB Panchimalco SS Amayon"
+  },
+  {
+    "codigo": "1421",
+    "nombre": "UCSFB Panchimalco SS Cantón El Cedro"
+  },
+  {
+    "codigo": "1083",
+    "nombre": "UCSFB Panchimalco SS Quezalapa"
+  },
+  {
+    "codigo": "1420",
+    "nombre": "UCSFB Panchimalco SS San Isidro"
+  },
+  {
+    "codigo": "1815",
+    "nombre": "UCSFB Perquin MO Rancho Quemado *"
+  },
+  {
+    "codigo": "1019",
+    "nombre": "UCSFB Poloros LU Boquin"
+  },
+  {
+    "codigo": "1020",
+    "nombre": "UCSFB Poloros LU Carpintero"
+  },
+  {
+    "codigo": "1021",
+    "nombre": "UCSFB Poloros LU Ocote"
+  },
+  {
+    "codigo": "1894",
+    "nombre": "UCSFB Puerto El Triunfo US Colonia Mancia"
+  },
+  {
+    "codigo": "1905",
+    "nombre": "UCSFB Puerto El Triunfo US Corral de Mulas"
+  },
+  {
+    "codigo": "1672",
+    "nombre": "UCSFB Puerto El Triunfo US Corral de Mulas *"
+  },
+  {
+    "codigo": "1900",
+    "nombre": "UCSFB Puerto El Triunfo US El Sitio"
+  },
+  {
+    "codigo": "1810",
+    "nombre": "UCSFB Puerto El Triunfo US Espiritu Santo *"
+  },
+  {
+    "codigo": "1238",
+    "nombre": "UCSFB Puerto el Triunfo US La Palmera"
+  },
+  {
+    "codigo": "1407",
+    "nombre": "UCSFB Quezaltepeque LL San Jacinto"
+  },
+  {
+    "codigo": "1408",
+    "nombre": "UCSFB Quezaltepeque LL Santa Emilia"
+  },
+  {
+    "codigo": "1082",
+    "nombre": "UCSFB Rosario de Mora SS Palo Grande"
+  },
+  {
+    "codigo": "1331",
+    "nombre": "UCSFB Rosario LP El Nao Amatepec"
+  },
+  {
+    "codigo": "1218",
+    "nombre": "UCSFB San Agustín US El Caulotal"
+  },
+  {
+    "codigo": "1217",
+    "nombre": "UCSFB San Agustín US El Eucalipto"
+  },
+  {
+    "codigo": "1751",
+    "nombre": "UCSFB San Alejo LU Bobadilla *"
+  },
+  {
+    "codigo": "1177",
+    "nombre": "UCSFB San Antonio Masahuat LP La Loma"
+  },
+  {
+    "codigo": "1858",
+    "nombre": "UCSFB San Antonio Pajonal SA"
+  },
+  {
+    "codigo": "1478",
+    "nombre": "UCSFB San Antonio Pajonal SA *"
+  },
+  {
+    "codigo": "1092",
+    "nombre": "UCSFB San Antonio SM San Diego"
+  },
+  {
+    "codigo": "1095",
+    "nombre": "UCSFB San Antonio SM San Marcos"
+  },
+  {
+    "codigo": "1706",
+    "nombre": "UCSFB San Buenaventura US Las Charcas *"
+  },
+  {
+    "codigo": "1359",
+    "nombre": "UCSFB San Cayetano Istepeque SV Candelaria"
+  },
+  {
+    "codigo": "1133",
+    "nombre": "UCSFB San Cristobal CU La Virgen"
+  },
+  {
+    "codigo": "1430",
+    "nombre": "UCSFB San Cristobal CU San Antonio"
+  },
+  {
+    "codigo": "1132",
+    "nombre": "UCSFB San Cristobal CU Santa Anita"
+  },
+  {
+    "codigo": "1875",
+    "nombre": "UCSFB San Dionisio US"
+  },
+  {
+    "codigo": "1651",
+    "nombre": "UCSFB San Dionisio US *"
+  },
+  {
+    "codigo": "1879",
+    "nombre": "UCSFB San Dionisio US Isla La Pirraya"
+  },
+  {
+    "codigo": "1876",
+    "nombre": "UCSFB San Dionisio US San Francisco"
+  },
+  {
+    "codigo": "1164",
+    "nombre": "UCSFB San Esteban Catarina SV San Jacinto la Burrera"
+  },
+  {
+    "codigo": "976",
+    "nombre": "UCSFB San Fernando MO"
+  },
+  {
+    "codigo": "1724",
+    "nombre": "UCSFB San Fernando MO *"
+  },
+  {
+    "codigo": "1336",
+    "nombre": "UCSFB San Francisco Chinameca LP Candelaria"
+  },
+  {
+    "codigo": "1335",
+    "nombre": "UCSFB San Francisco Chinameca LP San José La Montaña"
+  },
+  {
+    "codigo": "1221",
+    "nombre": "UCSFB San Francisco Javier US La Cruz"
+  },
+  {
+    "codigo": "1220",
+    "nombre": "UCSFB San Francisco Javier US Los Hornos"
+  },
+  {
+    "codigo": "1458",
+    "nombre": "UCSFB San Francisco Menendez AH El Zapote*"
+  },
+  {
+    "codigo": "1459",
+    "nombre": "UCSFB San Francisco Menendez AH Garita Palmera *"
+  },
+  {
+    "codigo": "1460",
+    "nombre": "UCSFB San Francisco Menendez AH Ing. Javier Estrada *"
+  },
+  {
+    "codigo": "1456",
+    "nombre": "UCSFB San Francisco Menendez AH*"
+  },
+  {
+    "codigo": "1094",
+    "nombre": "UCSFB San Gerardo SM La Laguna"
+  },
+  {
+    "codigo": "965",
+    "nombre": "UCSFB San Gerardo SM San Jeronimo"
+  },
+  {
+    "codigo": "1161",
+    "nombre": "UCSFB San Ildefonso SV Guachipilín"
+  },
+  {
+    "codigo": "1162",
+    "nombre": "UCSFB San Ildefonso SV San Lorenzo"
+  },
+  {
+    "codigo": "1356",
+    "nombre": "UCSFB San Isidro CA Potrero de Batres"
+  },
+  {
+    "codigo": "1357",
+    "nombre": "UCSFB San Isidro CA San Francisco"
+  },
+  {
+    "codigo": "1229",
+    "nombre": "UCSFB San Jorge SM Joya de Ventura"
+  },
+  {
+    "codigo": "1228",
+    "nombre": "UCSFB San Jorge SM San Julian"
+  },
+  {
+    "codigo": "1313",
+    "nombre": "UCSFB San José Guayabal CU Animas"
+  },
+  {
+    "codigo": "1312",
+    "nombre": "UCSFB San José Guayabal CU La Cruz"
+  },
+  {
+    "codigo": "1140",
+    "nombre": "UCSFB San Jose Guayabal CU Llano Grande"
+  },
+  {
+    "codigo": "1073",
+    "nombre": "UCSFB San Jose LU El Sombrerito"
+  },
+  {
+    "codigo": "1374",
+    "nombre": "UCSFB San Juan Talpa LP Comalapa"
+  },
+  {
+    "codigo": "1330",
+    "nombre": "UCSFB San Juan Talpa LP Veracruz"
+  },
+  {
+    "codigo": "1050",
+    "nombre": "UCSFB San Lorenzo AH Guascota"
+  },
+  {
+    "codigo": "1166",
+    "nombre": "UCSFB San Lorenzo SV Santa Lucia"
+  },
+  {
+    "codigo": "1437",
+    "nombre": "UCSFB San Luis de la Reina SM El Ostucal"
+  },
+  {
+    "codigo": "1436",
+    "nombre": "UCSFB San Luis de la Reina SM San Antonio"
+  },
+  {
+    "codigo": "1373",
+    "nombre": "UCSFB San Luis la Herradura LP Los Blancos"
+  },
+  {
+    "codigo": "1379",
+    "nombre": "UCSFB San Luis Talpa LP Hacienda Amatecampo"
+  },
+  {
+    "codigo": "1340",
+    "nombre": "UCSFB San Luis Talpa LP San Francisco Amatepe"
+  },
+  {
+    "codigo": "1425",
+    "nombre": "UCSFB San Marcos SS Comunidad El Transito"
+  },
+  {
+    "codigo": "1424",
+    "nombre": "UCSFB San Marcos SS Comunidad Linda Vista"
+  },
+  {
+    "codigo": "1429",
+    "nombre": "UCSFB San Martin SS Cantón El Rosario"
+  },
+  {
+    "codigo": "1428",
+    "nombre": "UCSFB San Martin SS Comunidad Santa Fe"
+  },
+  {
+    "codigo": "1081",
+    "nombre": "UCSFB San Martin SS La Flor"
+  },
+  {
+    "codigo": "1080",
+    "nombre": "UCSFB San Martin SS Los Letona"
+  },
+  {
+    "codigo": "1288",
+    "nombre": "UCSFB San Martin SS Santa Gertrudis"
+  },
+  {
+    "codigo": "1691",
+    "nombre": "UCSFB San Miguel SM El Tecomatal *"
+  },
+  {
+    "codigo": "1435",
+    "nombre": "UCSFB San Miguel SM Espiritu Santo"
+  },
+  {
+    "codigo": "1434",
+    "nombre": "UCSFB San Miguel SM Las Brisas"
+  },
+  {
+    "codigo": "1175",
+    "nombre": "UCSFB San Miguel Tepezontes LP Soledad Las Flores"
+  },
+  {
+    "codigo": "1122",
+    "nombre": "UCSFB San Pablo Tacachico LL Atiocoyo"
+  },
+  {
+    "codigo": "1123",
+    "nombre": "UCSFB San Pablo Tacachico LL Obraje Nuevo"
+  },
+  {
+    "codigo": "1121",
+    "nombre": "UCSFB San Pablo Tacachico LL San Isidro"
+  },
+  {
+    "codigo": "1124",
+    "nombre": "UCSFB San Pablo Tacachico LL Valle Mesas"
+  },
+  {
+    "codigo": "1377",
+    "nombre": "UCSFB San Pedro Masahuat LP Astoria"
+  },
+  {
+    "codigo": "1327",
+    "nombre": "UCSFB San Pedro Masahuat LP Las Marías"
+  },
+  {
+    "codigo": "1171",
+    "nombre": "UCSFB San Pedro Nonualco LP San Juan Nahuistepeque"
+  },
+  {
+    "codigo": "1172",
+    "nombre": "UCSFB San Pedro Nonualco LP San Ramón"
+  },
+  {
+    "codigo": "1142",
+    "nombre": "UCSFB San Pedro Perulapan CU La Esperanza"
+  },
+  {
+    "codigo": "1143",
+    "nombre": "UCSFB San Pedro Perulapan CU San Francisco"
+  },
+  {
+    "codigo": "1256",
+    "nombre": "UCSFB San Pedro Puxtla AH"
+  },
+  {
+    "codigo": "1254",
+    "nombre": "UCSFB San Pedro Puxtla AH Los Aguirre"
+  },
+  {
+    "codigo": "1255",
+    "nombre": "UCSFB San Pedro Puxtla AH Los Chacón"
+  },
+  {
+    "codigo": "1315",
+    "nombre": "UCSFB San Rafael Cedros CU Cerro Colorado"
+  },
+  {
+    "codigo": "1316",
+    "nombre": "UCSFB San Rafael Cedros CU Jiboa"
+  },
+  {
+    "codigo": "1317",
+    "nombre": "UCSFB San Rafael Cedros CU Palacios"
+  },
+  {
+    "codigo": "1141",
+    "nombre": "UCSFB San Rafael Cedros CU Soledad"
+  },
+  {
+    "codigo": "921",
+    "nombre": "UCSFB San Rafael CH San Jose Los Sitios"
+  },
+  {
+    "codigo": "1344",
+    "nombre": "UCSFB San Rafael Obrajuelo LP La Palma"
+  },
+  {
+    "codigo": "1345",
+    "nombre": "UCSFB San Rafael Obrajuelo LP San Pedro Martir"
+  },
+  {
+    "codigo": "1310",
+    "nombre": "UCSFB San Ramón CU Santa Isabel"
+  },
+  {
+    "codigo": "1423",
+    "nombre": "UCSFB San Salvador SS Comunidad Las Esmeraldas"
+  },
+  {
+    "codigo": "1422",
+    "nombre": "UCSFB San Salvador SS Comunidad Miraflores"
+  },
+  {
+    "codigo": "1289",
+    "nombre": "UCSFB San Salvador SS Comunidad Modelo 3"
+  },
+  {
+    "codigo": "1415",
+    "nombre": "UCSFB San Salvador SS Coro Quiñones"
+  },
+  {
+    "codigo": "1385",
+    "nombre": "UCSFB San Salvador SS La Fosa"
+  },
+  {
+    "codigo": "1417",
+    "nombre": "UCSFB San Salvador SS La Naval"
+  },
+  {
+    "codigo": "1419",
+    "nombre": "UCSFB San Salvador SS Las Brisas"
+  },
+  {
+    "codigo": "1982",
+    "nombre": "UCSFB San Salvador SS Las Conchas"
+  },
+  {
+    "codigo": "1387",
+    "nombre": "UCSFB San Salvador SS Los Rosales"
+  },
+  {
+    "codigo": "1418",
+    "nombre": "UCSFB San Salvador SS Mano de León"
+  },
+  {
+    "codigo": "1386",
+    "nombre": "UCSFB San Salvador SS Saavedra"
+  },
+  {
+    "codigo": "1290",
+    "nombre": "UCSFB San Salvador SS San Cristobal"
+  },
+  {
+    "codigo": "1414",
+    "nombre": "UCSFB San Salvador SS Valle de Oro"
+  },
+  {
+    "codigo": "1383",
+    "nombre": "UCSFB San Sebastián Salitrillo SA Santa Rosa"
+  },
+  {
+    "codigo": "1370",
+    "nombre": "UCSFB San Sebastián SV La Esperanza"
+  },
+  {
+    "codigo": "986",
+    "nombre": "UCSFB San Simón MO El Carrizal 1"
+  },
+  {
+    "codigo": "987",
+    "nombre": "UCSFB San Simón MO Las Quebradas"
+  },
+  {
+    "codigo": "985",
+    "nombre": "UCSFB San Simón MO Potrero Adentro"
+  },
+  {
+    "codigo": "1369",
+    "nombre": "UCSFB San Vicente SV El Rebelde"
+  },
+  {
+    "codigo": "1368",
+    "nombre": "UCSFB San Vicente SV Guajoyo"
+  },
+  {
+    "codigo": "1473",
+    "nombre": "UCSFB Santa Ana SA Planes de la Laguna *"
+  },
+  {
+    "codigo": "1278",
+    "nombre": "UCSFB Santa Catarina Masahuat SO El Guayabo"
+  },
+  {
+    "codigo": "1279",
+    "nombre": "UCSFB Santa Catarina Masahuat SO Tres Caminos"
+  },
+  {
+    "codigo": "1159",
+    "nombre": "UCSFB Santa Clara SV Santa Rosa"
+  },
+  {
+    "codigo": "1145",
+    "nombre": "UCSFB Santa Cruz Michapa CU Buena Vista"
+  },
+  {
+    "codigo": "1226",
+    "nombre": "UCSFB Santa Elena US Amate Norte"
+  },
+  {
+    "codigo": "1223",
+    "nombre": "UCSFB Santa Elena US El Nanzal 1"
+  },
+  {
+    "codigo": "1224",
+    "nombre": "UCSFB Santa Elena US El Volcan"
+  },
+  {
+    "codigo": "1225",
+    "nombre": "UCSFB Santa Elena US Joya Ancha Arriba"
+  },
+  {
+    "codigo": "1283",
+    "nombre": "UCSFB Santa Isabel Ishuatan SO Acachapa"
+  },
+  {
+    "codigo": "1282",
+    "nombre": "UCSFB Santa Isabel Ishuatan SO Las Piedras"
+  },
+  {
+    "codigo": "1168",
+    "nombre": "UCSFB Santa María Ostuma LP El Carrizal"
+  },
+  {
+    "codigo": "1169",
+    "nombre": "UCSFB Santa María Ostuma LP El Chaperno"
+  },
+  {
+    "codigo": "1646",
+    "nombre": "UCSFB Santa Maria US *"
+  },
+  {
+    "codigo": "922",
+    "nombre": "UCSFB Santa Rita CH El Sol"
+  },
+  {
+    "codigo": "1828",
+    "nombre": "UCSFB Santa Rosa de Lima LU El Portillo"
+  },
+  {
+    "codigo": "1028",
+    "nombre": "UCSFB Santa Rosa Guachipilín SA"
+  },
+  {
+    "codigo": "1029",
+    "nombre": "UCSFB Santa Rosa Guachipilín SA El Despoblado"
+  },
+  {
+    "codigo": "1031",
+    "nombre": "UCSFB Santiago de La Frontera SA Las Piletas"
+  },
+  {
+    "codigo": "1032",
+    "nombre": "UCSFB Santiago de La Frontera SA Santa Cruz"
+  },
+  {
+    "codigo": "1324",
+    "nombre": "UCSFB Santiago Nonualco LP San José Abajo"
+  },
+  {
+    "codigo": "1337",
+    "nombre": "UCSFB Santiago Nonualco LP San José La Paz"
+  },
+  {
+    "codigo": "1339",
+    "nombre": "UCSFB Santiago Nonualco LP San Sebastían Arriba"
+  },
+  {
+    "codigo": "1985",
+    "nombre": "UCSFB Santiago Texacuangos SS Joya Grande"
+  },
+  {
+    "codigo": "1284",
+    "nombre": "UCSFB Santo Domingo de Guzman SO El Carrizal"
+  },
+  {
+    "codigo": "972",
+    "nombre": "UCSFB Sensembra MO"
+  },
+  {
+    "codigo": "1729",
+    "nombre": "UCSFB Sensembra MO *"
+  },
+  {
+    "codigo": "1617",
+    "nombre": "UCSFB Sensuntepeque CA *"
+  },
+  {
+    "codigo": "1846",
+    "nombre": "UCSFB Sensuntepeque CA 1"
+  },
+  {
+    "codigo": "1847",
+    "nombre": "UCSFB Sensuntepeque CA 2"
+  },
+  {
+    "codigo": "1348",
+    "nombre": "UCSFB Sensuntepeque CA Chunte"
+  },
+  {
+    "codigo": "1351",
+    "nombre": "UCSFB Sensuntepeque CA Copinolapa"
+  },
+  {
+    "codigo": "1350",
+    "nombre": "UCSFB Sensuntepeque CA Cuyantepeque"
+  },
+  {
+    "codigo": "1349",
+    "nombre": "UCSFB Sensuntepeque CA Rio Grande"
+  },
+  {
+    "codigo": "1346",
+    "nombre": "UCSFB Sensuntepeque CA San Gregorio"
+  },
+  {
+    "codigo": "1347",
+    "nombre": "UCSFB Sensuntepeque CA San Lorenzo"
+  },
+  {
+    "codigo": "1352",
+    "nombre": "UCSFB Sensuntepeque CA San Nicolas"
+  },
+  {
+    "codigo": "1188",
+    "nombre": "UCSFB Sesori SM"
+  },
+  {
+    "codigo": "1676",
+    "nombre": "UCSFB Sesori SM *"
+  },
+  {
+    "codigo": "1185",
+    "nombre": "UCSFB Sesori SM El Tablon"
+  },
+  {
+    "codigo": "1187",
+    "nombre": "UCSFB Sesori SM Managuera"
+  },
+  {
+    "codigo": "1186",
+    "nombre": "UCSFB Sesori SM San Sebastían"
+  },
+  {
+    "codigo": "1849",
+    "nombre": "UCSFB Sociedad MO Animas"
+  },
+  {
+    "codigo": "1850",
+    "nombre": "UCSFB Sociedad MO El Peñon"
+  },
+  {
+    "codigo": "1851",
+    "nombre": "UCSFB Sociedad MO La Labranza"
+  },
+  {
+    "codigo": "1861",
+    "nombre": "UCSFB Sociedad MO Trompina El Bejucal"
+  },
+  {
+    "codigo": "1760",
+    "nombre": "UCSFB Sociedad MO Trompina El Bejucal *"
+  },
+  {
+    "codigo": "1390",
+    "nombre": "UCSFB Sonsonate SO El Cacao"
+  },
+  {
+    "codigo": "1439",
+    "nombre": "UCSFB Sonsonate SO Sensunapán"
+  },
+  {
+    "codigo": "1391",
+    "nombre": "UCSFB Sonsote SO El Presidio"
+  },
+  {
+    "codigo": "1979",
+    "nombre": "UCSFB Suchitoto CU Hilda Alas"
+  },
+  {
+    "codigo": "1376",
+    "nombre": "UCSFB Suchitoto CU Laura Lopez"
+  },
+  {
+    "codigo": "1147",
+    "nombre": "UCSFB Suchitoto CU Palo Grande"
+  },
+  {
+    "codigo": "1257",
+    "nombre": "UCSFB Tacuba AH"
+  },
+  {
+    "codigo": "1445",
+    "nombre": "UCSFB Tacuba AH *"
+  },
+  {
+    "codigo": "1260",
+    "nombre": "UCSFB Tacuba AH Chaguite"
+  },
+  {
+    "codigo": "1261",
+    "nombre": "UCSFB Tacuba AH El Jicaro"
+  },
+  {
+    "codigo": "1262",
+    "nombre": "UCSFB Tacuba AH El Sincuyo"
+  },
+  {
+    "codigo": "1266",
+    "nombre": "UCSFB Tacuba AH La Escuela de El Rodeo"
+  },
+  {
+    "codigo": "1263",
+    "nombre": "UCSFB Tacuba AH La Magdalena"
+  },
+  {
+    "codigo": "1259",
+    "nombre": "UCSFB Tacuba AH Las Palmeras"
+  },
+  {
+    "codigo": "1264",
+    "nombre": "UCSFB Tacuba AH Pandiadura"
+  },
+  {
+    "codigo": "1258",
+    "nombre": "UCSFB Tacuba AH San Rafael"
+  },
+  {
+    "codigo": "1265",
+    "nombre": "UCSFB Tacuba AH Valle la Puerta"
+  },
+  {
+    "codigo": "1568",
+    "nombre": "UCSFB Talnique LL *"
+  },
+  {
+    "codigo": "1572",
+    "nombre": "UCSFB Talnique LL San José Los Sitios *"
+  },
+  {
+    "codigo": "1117",
+    "nombre": "UCSFB Tamanique LL Buenos Aires"
+  },
+  {
+    "codigo": "1119",
+    "nombre": "UCSFB Tamanique LL El Palmar"
+  },
+  {
+    "codigo": "1118",
+    "nombre": "UCSFB Tamanique LL San Alfonso"
+  },
+  {
+    "codigo": "1211",
+    "nombre": "UCSFB Tecapan US Chapetones"
+  },
+  {
+    "codigo": "1210",
+    "nombre": "UCSFB Tecapan US Gualache"
+  },
+  {
+    "codigo": "1366",
+    "nombre": "UCSFB Tecoluca SV El Carao"
+  },
+  {
+    "codigo": "1855",
+    "nombre": "UCSFB Tecoluca SV La Esperanza"
+  },
+  {
+    "codigo": "1854",
+    "nombre": "UCSFB Tecoluca SV Llano Grande"
+  },
+  {
+    "codigo": "1367",
+    "nombre": "UCSFB Tecoluca SV Santa Cruz Paraiso"
+  },
+  {
+    "codigo": "1856",
+    "nombre": "UCSFB Tecoluca SV Santa Cruz Portillo"
+  },
+  {
+    "codigo": "1364",
+    "nombre": "UCSFB Tecoluca SV Santa Marta"
+  },
+  {
+    "codigo": "1853",
+    "nombre": "UCSFB Tecoluca SV Tehuacan"
+  },
+  {
+    "codigo": "952",
+    "nombre": "UCSFB Tejutepeque CA Concepción"
+  },
+  {
+    "codigo": "953",
+    "nombre": "UCSFB Tejutepeque CA El Zapote"
+  },
+  {
+    "codigo": "1402",
+    "nombre": "UCSFB Tejutla CH Aguaje Escondido"
+  },
+  {
+    "codigo": "1404",
+    "nombre": "UCSFB Tejutla CH El Coyolito"
+  },
+  {
+    "codigo": "1403",
+    "nombre": "UCSFB Tejutla CH El Salitre"
+  },
+  {
+    "codigo": "1401",
+    "nombre": "UCSFB Tejutla CH Los Hernandez"
+  },
+  {
+    "codigo": "1138",
+    "nombre": "UCSFB Tenancingo CU Corral Viejo"
+  },
+  {
+    "codigo": "1139",
+    "nombre": "UCSFB Tenancingo CU Rosario Tablon"
+  },
+  {
+    "codigo": "1107",
+    "nombre": "UCSFB Teotepeque LL Aguacayo"
+  },
+  {
+    "codigo": "1105",
+    "nombre": "UCSFB Teotepeque LL El Angel"
+  },
+  {
+    "codigo": "1052",
+    "nombre": "UCSFB Turín AH El Paraiso"
+  },
+  {
+    "codigo": "1877",
+    "nombre": "UCSFB Usulutan US El Flor"
+  },
+  {
+    "codigo": "1878",
+    "nombre": "UCSFB Usulutan US Los Desmontes"
+  },
+  {
+    "codigo": "1156",
+    "nombre": "UCSFB Verapaz SV El Carmen"
+  },
+  {
+    "codigo": "1157",
+    "nombre": "UCSFB Verapaz SV San Isidro"
+  },
+  {
+    "codigo": "955",
+    "nombre": "UCSFB Victoria CA Azacualpa"
+  },
+  {
+    "codigo": "956",
+    "nombre": "UCSFB Victoria CA San Antonio"
+  },
+  {
+    "codigo": "959",
+    "nombre": "UCSFB Victoria CA San Pedro"
+  },
+  {
+    "codigo": "974",
+    "nombre": "UCSFB Yamabal MO Isletas"
+  },
+  {
+    "codigo": "973",
+    "nombre": "UCSFB Yamabal MO San Juan de La Cruz"
+  },
+  {
+    "codigo": "1814",
+    "nombre": "UCSFB Yamabal MO San Juan de la Cruz *"
+  },
+  {
+    "codigo": "1011",
+    "nombre": "UCSFB Yayantique LU"
+  },
+  {
+    "codigo": "1699",
+    "nombre": "UCSFB Yayantique LU *"
+  },
+  {
+    "codigo": "1012",
+    "nombre": "UCSFB Yayantique LU El Pastor"
+  },
+  {
+    "codigo": "1013",
+    "nombre": "UCSFB Yayantique LU Los Amates"
+  },
+  {
+    "codigo": "2633",
+    "nombre": "UCSFB Yoloaiquin MO Pueblo Viejo"
+  },
+  {
+    "codigo": "1342",
+    "nombre": "UCSFB Zacatecoluca LP Azacualpa"
+  },
+  {
+    "codigo": "1384",
+    "nombre": "UCSFB Zacatecoluca LP Escuintla"
+  },
+  {
+    "codigo": "1438",
+    "nombre": "UCSFB Zacatecoluca LP Hatos de los Reyes"
+  },
+  {
+    "codigo": "1341",
+    "nombre": "UCSFB Zacatecoluca LP San Faustino"
+  },
+  {
+    "codigo": "1323",
+    "nombre": "UCSFB Zacatecoluca LP Santa Lucía"
+  },
+  {
+    "codigo": "1078",
+    "nombre": "UCSFE Anamoros LU"
+  },
+  {
+    "codigo": "1297",
+    "nombre": "UCSFE Berlin US"
+  },
+  {
+    "codigo": "883",
+    "nombre": "UCSFE Chalatenango CH Guarjila"
+  },
+  {
+    "codigo": "1049",
+    "nombre": "UCSFE Chalchuapa SA"
+  },
+  {
+    "codigo": "1918",
+    "nombre": "UCSFE Ciudad Barrios SM"
+  },
+  {
+    "codigo": "1292",
+    "nombre": "UCSFE Colón LL Ciudad Mujer"
+  },
+  {
+    "codigo": "1298",
+    "nombre": "UCSFE Concepción Batres US"
+  },
+  {
+    "codigo": "1071",
+    "nombre": "UCSFE Concepción Quezaltepeque CH"
+  },
+  {
+    "codigo": "1075",
+    "nombre": "UCSFE Corinto MO"
+  },
+  {
+    "codigo": "1070",
+    "nombre": "UCSFE Dulce Nombre de Maria CH"
+  },
+  {
+    "codigo": "1953",
+    "nombre": "UCSFE El Divisadero MO Ciudad Mujer"
+  },
+  {
+    "codigo": "1299",
+    "nombre": "UCSFE Guaymango AH"
+  },
+  {
+    "codigo": "933",
+    "nombre": "UCSFE Ilobasco CA"
+  },
+  {
+    "codigo": "1301",
+    "nombre": "UCSFE Izalco SO"
+  },
+  {
+    "codigo": "1933",
+    "nombre": "UCSFE Jiquilisco US \"Monseñor Oscar Arnulfo Romero\""
+  },
+  {
+    "codigo": "1291",
+    "nombre": "UCSFE La Libertad LL Puerto"
+  },
+  {
+    "codigo": "1547",
+    "nombre": "UCSFE La Libertad LL Puerto *"
+  },
+  {
+    "codigo": "886",
+    "nombre": "UCSFE La Palma CH"
+  },
+  {
+    "codigo": "1295",
+    "nombre": "UCSFE Olocuilta LP"
+  },
+  {
+    "codigo": "1077",
+    "nombre": "UCSFE Osicala MO"
+  },
+  {
+    "codigo": "1074",
+    "nombre": "UCSFE Perquin MO"
+  },
+  {
+    "codigo": "1958",
+    "nombre": "UCSFE San Marcos SS \"Dr. Roberto Cáceres Bustamante\""
+  },
+  {
+    "codigo": "1303",
+    "nombre": "UCSFE San Martin SS"
+  },
+  {
+    "codigo": "1865",
+    "nombre": "UCSFE San Martin SS Ciudad Mujer"
+  },
+  {
+    "codigo": "1945",
+    "nombre": "UCSFE San Miguel SM"
+  },
+  {
+    "codigo": "1942",
+    "nombre": "UCSFE San Miguel SM Ciudad Mujer"
+  },
+  {
+    "codigo": "1944",
+    "nombre": "UCSFE San Miguel SM El Zamoran"
+  },
+  {
+    "codigo": "1293",
+    "nombre": "UCSFE San Pedro Perulapan CU"
+  },
+  {
+    "codigo": "1956",
+    "nombre": "UCSFE San Salvador SS Barrios"
+  },
+  {
+    "codigo": "1304",
+    "nombre": "UCSFE San Salvador SS San Jacinto"
+  },
+  {
+    "codigo": "1957",
+    "nombre": "UCSFE San Salvador SS San Miguelito \"Dr.Juan Ramón Alvarenga\""
+  },
+  {
+    "codigo": "1857",
+    "nombre": "UCSFE Santa Ana SA Ciudad Mujer"
+  },
+  {
+    "codigo": "1564",
+    "nombre": "UCSFE Santa Tecla LL \" Dr. Carlos Díaz del Pinal\" *"
+  },
+  {
+    "codigo": "1076",
+    "nombre": "UCSFE Sensembra MO"
+  },
+  {
+    "codigo": "934",
+    "nombre": "UCSFE Sensuntepeque CA"
+  },
+  {
+    "codigo": "1296",
+    "nombre": "UCSFE Sesori SM"
+  },
+  {
+    "codigo": "1302",
+    "nombre": "UCSFE Sonzacate SO \"Dr. Leonardo Alberto López Vigil\""
+  },
+  {
+    "codigo": "2113",
+    "nombre": "UCSFE Soyapango SS San Antonio"
+  },
+  {
+    "codigo": "1959",
+    "nombre": "UCSFE Soyapango SS Unicentro"
+  },
+  {
+    "codigo": "1300",
+    "nombre": "UCSFE Tacuba AH"
+  },
+  {
+    "codigo": "1834",
+    "nombre": "UCSFE Usulután US Ciudad Mujer"
+  },
+  {
+    "codigo": "1294",
+    "nombre": "UCSFE Verapaz SV"
+  },
+  {
+    "codigo": "1496",
+    "nombre": "UCSFI Acajutla SO *"
+  },
+  {
+    "codigo": "1499",
+    "nombre": "UCSFI Acajutla SO Metalio *"
+  },
+  {
+    "codigo": "927",
+    "nombre": "UCSFI Agua Caliente CH"
+  },
+  {
+    "codigo": "1539",
+    "nombre": "UCSFI Agua Caliente CH *"
+  },
+  {
+    "codigo": "1772",
+    "nombre": "UCSFI Aguilares SS *"
+  },
+  {
+    "codigo": "1440",
+    "nombre": "UCSFI Ahuachapán AH *"
+  },
+  {
+    "codigo": "1450",
+    "nombre": "UCSFI Ahuachapán AH Las Chinamas *"
+  },
+  {
+    "codigo": "1205",
+    "nombre": "UCSFI Alegria US"
+  },
+  {
+    "codigo": "1659",
+    "nombre": "UCSFI Alegria US *"
+  },
+  {
+    "codigo": "1759",
+    "nombre": "UCSFI Anamoros LU *"
+  },
+  {
+    "codigo": "1569",
+    "nombre": "UCSFI Antiguo Cuscatlán LL *"
+  },
+  {
+    "codigo": "1441",
+    "nombre": "UCSFI Apaneca AH *"
+  },
+  {
+    "codigo": "1148",
+    "nombre": "UCSFI Apastepeque SV"
+  },
+  {
+    "codigo": "1630",
+    "nombre": "UCSFI Apastepeque SV *"
+  },
+  {
+    "codigo": "1769",
+    "nombre": "UCSFI Apopa SS *"
+  },
+  {
+    "codigo": "1777",
+    "nombre": "UCSFI Apopa SS Chintuc *"
+  },
+  {
+    "codigo": "1776",
+    "nombre": "UCSFI Apopa SS Popotlán *"
+  },
+  {
+    "codigo": "896",
+    "nombre": "UCSFI Arcatao CH"
+  },
+  {
+    "codigo": "1516",
+    "nombre": "UCSFI Arcatao CH *"
+  },
+  {
+    "codigo": "1494",
+    "nombre": "UCSFI Armenia SO *"
+  },
+  {
+    "codigo": "1442",
+    "nombre": "UCSFI Atiquizaya AH*"
+  },
+  {
+    "codigo": "1939",
+    "nombre": "UCSFI Ayutuxtepeque SS"
+  },
+  {
+    "codigo": "1125",
+    "nombre": "UCSFI Azacualpa CH"
+  },
+  {
+    "codigo": "1525",
+    "nombre": "UCSFI Azacualpa CH *"
+  },
+  {
+    "codigo": "1657",
+    "nombre": "UCSFI Berlin US *"
+  },
+  {
+    "codigo": "1001",
+    "nombre": "UCSFI Cacaopera MO"
+  },
+  {
+    "codigo": "1717",
+    "nombre": "UCSFI Cacaopera MO *"
+  },
+  {
+    "codigo": "1273",
+    "nombre": "UCSFI Caluco SO"
+  },
+  {
+    "codigo": "1506",
+    "nombre": "UCSFI Caluco SO *"
+  },
+  {
+    "codigo": "1305",
+    "nombre": "UCSFI Candelaria CU"
+  },
+  {
+    "codigo": "1579",
+    "nombre": "UCSFI Candelaria CU *"
+  },
+  {
+    "codigo": "1471",
+    "nombre": "UCSFI Candelaria de la Frontera SA *"
+  },
+  {
+    "codigo": "962",
+    "nombre": "UCSFI Carolina SM"
+  },
+  {
+    "codigo": "1703",
+    "nombre": "UCSFI Carolina SM *"
+  },
+  {
+    "codigo": "1812",
+    "nombre": "UCSFI Chalatenango CH *"
+  },
+  {
+    "codigo": "1512",
+    "nombre": "UCSFI Chalatenango CH El Dorado *"
+  },
+  {
+    "codigo": "1041",
+    "nombre": "UCSFI Chalchuapa SA El Coco"
+  },
+  {
+    "codigo": "1490",
+    "nombre": "UCSFI Chalchuapa SA El Coco*"
+  },
+  {
+    "codigo": "1681",
+    "nombre": "UCSFI Chapeltique SM *"
+  },
+  {
+    "codigo": "1728",
+    "nombre": "UCSFI Chilanga MO *"
+  },
+  {
+    "codigo": "991",
+    "nombre": "UCSFI Chilanga MO 1"
+  },
+  {
+    "codigo": "1108",
+    "nombre": "UCSFI Chiltiupán LL"
+  },
+  {
+    "codigo": "1563",
+    "nombre": "UCSFI Chiltiupán LL *"
+  },
+  {
+    "codigo": "1571",
+    "nombre": "UCSFI Chiltiupán LL Taquillo \"Ing. Orlando Recinos\""
+  },
+  {
+    "codigo": "1708",
+    "nombre": "UCSFI Chinameca SM *"
+  },
+  {
+    "codigo": "1711",
+    "nombre": "UCSFI Chinameca SM Las Marías *"
+  },
+  {
+    "codigo": "1680",
+    "nombre": "UCSFI Chinameca SM Las Placitas *"
+  },
+  {
+    "codigo": "1678",
+    "nombre": "UCSFI Chirilagua SM *"
+  },
+  {
+    "codigo": "949",
+    "nombre": "UCSFI Cinquera CA"
+  },
+  {
+    "codigo": "1620",
+    "nombre": "UCSFI Cinquera CA *"
+  },
+  {
+    "codigo": "884",
+    "nombre": "UCSFI Citala CH"
+  },
+  {
+    "codigo": "1542",
+    "nombre": "UCSFI Citala CH *"
+  },
+  {
+    "codigo": "1549",
+    "nombre": "UCSFI Ciudad Arce LL *"
+  },
+  {
+    "codigo": "1799",
+    "nombre": "UCSFI Ciudad Delgado SS *"
+  },
+  {
+    "codigo": "1801",
+    "nombre": "UCSFI Ciudad Delgado SS Hábitat Confien *"
+  },
+  {
+    "codigo": "1468",
+    "nombre": "UCSFI Coatepeque SA *"
+  },
+  {
+    "codigo": "1479",
+    "nombre": "UCSFI Coatepeque SA El Tinteral *"
+  },
+  {
+    "codigo": "1817",
+    "nombre": "UCSFI Cojutepeque CU Periferica *"
+  },
+  {
+    "codigo": "1553",
+    "nombre": "UCSFI Colón LL Lourdes *"
+  },
+  {
+    "codigo": "1687",
+    "nombre": "UCSFI Comacarán SM *"
+  },
+  {
+    "codigo": "914",
+    "nombre": "UCSFI Comalapa CH"
+  },
+  {
+    "codigo": "1520",
+    "nombre": "UCSFI Comalapa CH *"
+  },
+  {
+    "codigo": "1112",
+    "nombre": "UCSFI Comasagua LL"
+  },
+  {
+    "codigo": "1556",
+    "nombre": "UCSFI Comasagua LL *"
+  },
+  {
+    "codigo": "1444",
+    "nombre": "UCSFI Concepción de Ataco AH *"
+  },
+  {
+    "codigo": "1762",
+    "nombre": "UCSFI Concepción de Oriente LU *"
+  },
+  {
+    "codigo": "1740",
+    "nombre": "UCSFI Conchagua LU *"
+  },
+  {
+    "codigo": "1752",
+    "nombre": "UCSFI Conchagua LU El Huisquil *"
+  },
+  {
+    "codigo": "1097",
+    "nombre": "UCSFI Conchagua LU El Pilón"
+  },
+  {
+    "codigo": "1742",
+    "nombre": "UCSFI Conchagua LU El Tamarindo *"
+  },
+  {
+    "codigo": "1749",
+    "nombre": "UCSFI Conchagua LU Llano Los Patos *"
+  },
+  {
+    "codigo": "1277",
+    "nombre": "UCSFI Cuisnahuat SO"
+  },
+  {
+    "codigo": "1507",
+    "nombre": "UCSFI Cuisnahuat SO *"
+  },
+  {
+    "codigo": "1798",
+    "nombre": "UCSFI Cuscatancingo SS *"
+  },
+  {
+    "codigo": "1802",
+    "nombre": "UCSFI Cuscatancingo SS Villa Mariona *"
+  },
+  {
+    "codigo": "1332",
+    "nombre": "UCSFI Cuyultitan LP"
+  },
+  {
+    "codigo": "1603",
+    "nombre": "UCSFI Cuyultitan LP *"
+  },
+  {
+    "codigo": "1727",
+    "nombre": "UCSFI Delicias de Concepción MO *"
+  },
+  {
+    "codigo": "989",
+    "nombre": "UCSFI Delicias de Concepción MO 1"
+  },
+  {
+    "codigo": "958",
+    "nombre": "UCSFI Dolores CA"
+  },
+  {
+    "codigo": "1615",
+    "nombre": "UCSFI Dolores CA *"
+  },
+  {
+    "codigo": "1318",
+    "nombre": "UCSFI El Carmen CU"
+  },
+  {
+    "codigo": "1584",
+    "nombre": "UCSFI El Carmen CU *"
+  },
+  {
+    "codigo": "1746",
+    "nombre": "UCSFI El Carmen LU *"
+  },
+  {
+    "codigo": "1754",
+    "nombre": "UCSFI El Carmen LU El Piche *"
+  },
+  {
+    "codigo": "1743",
+    "nombre": "UCSFI El Carmen LU Olomega *"
+  },
+  {
+    "codigo": "910",
+    "nombre": "UCSFI El Carrizal CH"
+  },
+  {
+    "codigo": "1531",
+    "nombre": "UCSFI El Carrizal CH *"
+  },
+  {
+    "codigo": "911",
+    "nombre": "UCSFI El Carrizal CH Vainillas"
+  },
+  {
+    "codigo": "1537",
+    "nombre": "UCSFI El Carrizal CH Vanillas *"
+  },
+  {
+    "codigo": "1470",
+    "nombre": "UCSFI El Congo SA *"
+  },
+  {
+    "codigo": "1714",
+    "nombre": "UCSFI El Divisadero MO *"
+  },
+  {
+    "codigo": "1774",
+    "nombre": "UCSFI El Paisnal SS *"
+  },
+  {
+    "codigo": "1515",
+    "nombre": "UCSFI El Paraiso CH *"
+  },
+  {
+    "codigo": "1455",
+    "nombre": "UCSFI El Refugio AH *"
+  },
+  {
+    "codigo": "1127",
+    "nombre": "UCSFI El Rosario CU"
+  },
+  {
+    "codigo": "1580",
+    "nombre": "UCSFI El Rosario CU *"
+  },
+  {
+    "codigo": "1839",
+    "nombre": "UCSFI El Sauce LU"
+  },
+  {
+    "codigo": "1761",
+    "nombre": "UCSFI El Sauce LU *"
+  },
+  {
+    "codigo": "1654",
+    "nombre": "UCSFI El Tránsito SM *"
+  },
+  {
+    "codigo": "1664",
+    "nombre": "UCSFI El Triunfo US *"
+  },
+  {
+    "codigo": "1192",
+    "nombre": "UCSFI Estanzuelas US"
+  },
+  {
+    "codigo": "1658",
+    "nombre": "UCSFI Estanzuelas US *"
+  },
+  {
+    "codigo": "1353",
+    "nombre": "UCSFI Guacotecti CA"
+  },
+  {
+    "codigo": "1616",
+    "nombre": "UCSFI Guacotecti CA *"
+  },
+  {
+    "codigo": "1628",
+    "nombre": "UCSFI Guadalupe SV *"
+  },
+  {
+    "codigo": "988",
+    "nombre": "UCSFI Gualococti MO"
+  },
+  {
+    "codigo": "1733",
+    "nombre": "UCSFI Gualococti MO *"
+  },
+  {
+    "codigo": "1720",
+    "nombre": "UCSFI Guatajiagua MO *"
+  },
+  {
+    "codigo": "967",
+    "nombre": "UCSFI Guatajiagua MO 1"
+  },
+  {
+    "codigo": "1447",
+    "nombre": "UCSFI Guaymango AH *"
+  },
+  {
+    "codigo": "1771",
+    "nombre": "UCSFI Guazapa SS *"
+  },
+  {
+    "codigo": "1559",
+    "nombre": "UCSFI Huizucar LL *"
+  },
+  {
+    "codigo": "945",
+    "nombre": "UCSFI Ilobasco CA Maquilishuat Santa Lucia"
+  },
+  {
+    "codigo": "947",
+    "nombre": "UCSFI Ilobasco CA San Francisco del Monte"
+  },
+  {
+    "codigo": "1625",
+    "nombre": "UCSFI Ilobasco CA San Francisco del Monte *"
+  },
+  {
+    "codigo": "1822",
+    "nombre": "UCSFI Ilopango SS *"
+  },
+  {
+    "codigo": "1788",
+    "nombre": "UCSFI Ilopango SS Santa Lucía *"
+  },
+  {
+    "codigo": "1739",
+    "nombre": "UCSFI Intipuca LU *"
+  },
+  {
+    "codigo": "1492",
+    "nombre": "UCSFI Izalco SO *"
+  },
+  {
+    "codigo": "1548",
+    "nombre": "UCSFI Jayaque LL \"Dr Francisco Lima\" *"
+  },
+  {
+    "codigo": "1361",
+    "nombre": "UCSFI Jerusalen LP"
+  },
+  {
+    "codigo": "1601",
+    "nombre": "UCSFI Jerusalen LP *"
+  },
+  {
+    "codigo": "1111",
+    "nombre": "UCSFI Jicalapa LL"
+  },
+  {
+    "codigo": "1567",
+    "nombre": "UCSFI Jicalapa LL *"
+  },
+  {
+    "codigo": "1895",
+    "nombre": "UCSFI Jiquilisco US"
+  },
+  {
+    "codigo": "1934",
+    "nombre": "UCSFI Jiquilisco US \"Monseñor Oscar Arnulfo Romero\" *"
+  },
+  {
+    "codigo": "1823",
+    "nombre": "UCSFI Jiquilisco US *"
+  },
+  {
+    "codigo": "1898",
+    "nombre": "UCSFI Jiquilisco US La Canoa"
+  },
+  {
+    "codigo": "1673",
+    "nombre": "UCSFI Jiquilisco US La Canoa *"
+  },
+  {
+    "codigo": "1901",
+    "nombre": "UCSFI Jiquilisco US Salinas de Sisiguayo"
+  },
+  {
+    "codigo": "1674",
+    "nombre": "UCSFI Jiquilisco US Salinas de Sisiguayo *"
+  },
+  {
+    "codigo": "1908",
+    "nombre": "UCSFI Jiquilisco US Tierra Blanca"
+  },
+  {
+    "codigo": "1666",
+    "nombre": "UCSFI Jiquilisco US Tierra Blanca *"
+  },
+  {
+    "codigo": "980",
+    "nombre": "UCSFI Joateca MO"
+  },
+  {
+    "codigo": "1725",
+    "nombre": "UCSFI Joateca MO *"
+  },
+  {
+    "codigo": "977",
+    "nombre": "UCSFI Jocoaitique MO"
+  },
+  {
+    "codigo": "1712",
+    "nombre": "UCSFI Jocoro MO *"
+  },
+  {
+    "codigo": "1497",
+    "nombre": "UCSFI Juayua SO Dr. Francisco Magaña Herrera *"
+  },
+  {
+    "codigo": "1500",
+    "nombre": "UCSFI Juayua SO La Majada *"
+  },
+  {
+    "codigo": "1705",
+    "nombre": "UCSFI Jucuapa US *"
+  },
+  {
+    "codigo": "1230",
+    "nombre": "UCSFI Jucuaran US"
+  },
+  {
+    "codigo": "1643",
+    "nombre": "UCSFI Jucuaran US *"
+  },
+  {
+    "codigo": "1448",
+    "nombre": "UCSFI Jujutla AH *"
+  },
+  {
+    "codigo": "1457",
+    "nombre": "UCSFI Jujutla AH Barra de Santiago *"
+  },
+  {
+    "codigo": "1451",
+    "nombre": "UCSFI Jujutla AH Guayapa Abajo *"
+  },
+  {
+    "codigo": "1449",
+    "nombre": "UCSFI Jujutla AH San José El Naranjo *"
+  },
+  {
+    "codigo": "948",
+    "nombre": "UCSFI Jutiapa CA"
+  },
+  {
+    "codigo": "950",
+    "nombre": "UCSFI Jutiapa CA Carolina"
+  },
+  {
+    "codigo": "1624",
+    "nombre": "UCSFI Jutiapa CA Carolina *"
+  },
+  {
+    "codigo": "1622",
+    "nombre": "UCSFI Jutiapa CA*"
+  },
+  {
+    "codigo": "912",
+    "nombre": "UCSFI La Laguna CH"
+  },
+  {
+    "codigo": "1518",
+    "nombre": "UCSFI La Laguna CH *"
+  },
+  {
+    "codigo": "893",
+    "nombre": "UCSFI La Reina CH"
+  },
+  {
+    "codigo": "1541",
+    "nombre": "UCSFI La Reina CH *"
+  },
+  {
+    "codigo": "1737",
+    "nombre": "UCSFI La Unión LU \"Enf. Zoila E. Turcios de Jimenez\" *"
+  },
+  {
+    "codigo": "907",
+    "nombre": "UCSFI Las Vueltas CH"
+  },
+  {
+    "codigo": "1517",
+    "nombre": "UCSFI Las Vueltas CH *"
+  },
+  {
+    "codigo": "1005",
+    "nombre": "UCSFI Lislique LU"
+  },
+  {
+    "codigo": "1763",
+    "nombre": "UCSFI Lislique LU *"
+  },
+  {
+    "codigo": "1758",
+    "nombre": "UCSFI Lislique LU Guajiniquil *"
+  },
+  {
+    "codigo": "1710",
+    "nombre": "UCSFI Lolotique SM *"
+  },
+  {
+    "codigo": "1484",
+    "nombre": "UCSFI Masahuat SA *"
+  },
+  {
+    "codigo": "1741",
+    "nombre": "UCSFI Meanguera del Golfo LU *"
+  },
+  {
+    "codigo": "1860",
+    "nombre": "UCSFI Meanguera MO San Luis"
+  },
+  {
+    "codigo": "1718",
+    "nombre": "UCSFI Meanguera MO San Luis *"
+  },
+  {
+    "codigo": "1797",
+    "nombre": "UCSFI Mejicanos SS \"Dr. Hugo Morán Quijada\" *"
+  },
+  {
+    "codigo": "1796",
+    "nombre": "UCSFI Mejicanos SS Zacamil *"
+  },
+  {
+    "codigo": "1195",
+    "nombre": "UCSFI Mercedes Umaña US"
+  },
+  {
+    "codigo": "1660",
+    "nombre": "UCSFI Mercedes Umaña US *"
+  },
+  {
+    "codigo": "1806",
+    "nombre": "UCSFI Metapán SA *"
+  },
+  {
+    "codigo": "1486",
+    "nombre": "UCSFI Metapán SA Belen Guijat *"
+  },
+  {
+    "codigo": "1709",
+    "nombre": "UCSFI Moncagua SM *"
+  },
+  {
+    "codigo": "1685",
+    "nombre": "UCSFI Moncagua SM El Platanar *"
+  },
+  {
+    "codigo": "1134",
+    "nombre": "UCSFI Monte San Juan CU"
+  },
+  {
+    "codigo": "1581",
+    "nombre": "UCSFI Monte San Juan CU *"
+  },
+  {
+    "codigo": "1493",
+    "nombre": "UCSFI Nahuizalco SO *"
+  },
+  {
+    "codigo": "1843",
+    "nombre": "UCSFI Nahuizalco SO Los Arenales"
+  },
+  {
+    "codigo": "1510",
+    "nombre": "UCSFI Nahuizalco SO Los Arenales *"
+  },
+  {
+    "codigo": "1501",
+    "nombre": "UCSFI Nahulingo SO *"
+  },
+  {
+    "codigo": "1770",
+    "nombre": "UCSFI Nejapa SS *"
+  },
+  {
+    "codigo": "899",
+    "nombre": "UCSFI Nombre de Jesus CH"
+  },
+  {
+    "codigo": "1514",
+    "nombre": "UCSFI Nombre de Jesus CH *"
+  },
+  {
+    "codigo": "1811",
+    "nombre": "UCSFI Nueva Concepción CH *"
+  },
+  {
+    "codigo": "1545",
+    "nombre": "UCSFI Nueva Concepción CH Arracaos *"
+  },
+  {
+    "codigo": "1544",
+    "nombre": "UCSFI Nueva Concepción CH Potrero Sula *"
+  },
+  {
+    "codigo": "1014",
+    "nombre": "UCSFI Nueva Esparta LU"
+  },
+  {
+    "codigo": "1756",
+    "nombre": "UCSFI Nueva Esparta LU \"Ana María Alfaro Sánchez\" *"
+  },
+  {
+    "codigo": "1015",
+    "nombre": "UCSFI Nueva Esparta LU Monteca"
+  },
+  {
+    "codigo": "1764",
+    "nombre": "UCSFI Nueva Esparta LU Monteca *"
+  },
+  {
+    "codigo": "1190",
+    "nombre": "UCSFI Nueva Granada US"
+  },
+  {
+    "codigo": "1662",
+    "nombre": "UCSFI Nueva Granada US*"
+  },
+  {
+    "codigo": "1990",
+    "nombre": "UCSFI Nueva Guadalupe SM"
+  },
+  {
+    "codigo": "897",
+    "nombre": "UCSFI Nueva Trinidad CH"
+  },
+  {
+    "codigo": "1528",
+    "nombre": "UCSFI Nueva Trinidad CH *"
+  },
+  {
+    "codigo": "1570",
+    "nombre": "UCSFI Nuevo Cuscatlán LL *"
+  },
+  {
+    "codigo": "935",
+    "nombre": "UCSFI Nuevo Eden de San Juan SM"
+  },
+  {
+    "codigo": "1619",
+    "nombre": "UCSFI Nuevo Eden de San Juan SM *"
+  },
+  {
+    "codigo": "908",
+    "nombre": "UCSFI Ojos de Agua CH"
+  },
+  {
+    "codigo": "1521",
+    "nombre": "UCSFI Ojos de Agua CH *"
+  },
+  {
+    "codigo": "1592",
+    "nombre": "UCSFI Olocuilta LP *"
+  },
+  {
+    "codigo": "1343",
+    "nombre": "UCSFI Olocuilta LP Santa Lucía Orcoyo"
+  },
+  {
+    "codigo": "1602",
+    "nombre": "UCSFI Olocuilta LP Santa Lucía Orcoyo *"
+  },
+  {
+    "codigo": "1322",
+    "nombre": "UCSFI Oratorio Concepción CU"
+  },
+  {
+    "codigo": "1804",
+    "nombre": "UCSFI Oratorio de Concepción CU *"
+  },
+  {
+    "codigo": "1713",
+    "nombre": "UCSFI Osicala MO *"
+  },
+  {
+    "codigo": "1212",
+    "nombre": "UCSFI Ozatlan US"
+  },
+  {
+    "codigo": "1644",
+    "nombre": "UCSFI Ozatlán US *"
+  },
+  {
+    "codigo": "1784",
+    "nombre": "UCSFI Panchimaco SS Planes de Renderos *"
+  },
+  {
+    "codigo": "1782",
+    "nombre": "UCSFI Panchimalco SS *"
+  },
+  {
+    "codigo": "1128",
+    "nombre": "UCSFI Paraiso de Osorio LP"
+  },
+  {
+    "codigo": "1586",
+    "nombre": "UCSFI Paraiso de Osorio LP *"
+  },
+  {
+    "codigo": "1757",
+    "nombre": "UCSFI Pasaquina LU *"
+  },
+  {
+    "codigo": "1768",
+    "nombre": "UCSFI Pasaquina LU San Felipe *"
+  },
+  {
+    "codigo": "1716",
+    "nombre": "UCSFI Perquin MO *"
+  },
+  {
+    "codigo": "1018",
+    "nombre": "UCSFI Poloros LU"
+  },
+  {
+    "codigo": "1766",
+    "nombre": "UCSFI Poloros LU *"
+  },
+  {
+    "codigo": "904",
+    "nombre": "UCSFI Potonico CH"
+  },
+  {
+    "codigo": "1524",
+    "nombre": "UCSFI Potonico CH *"
+  },
+  {
+    "codigo": "1904",
+    "nombre": "UCSFI Puerto El Triunfo US"
+  },
+  {
+    "codigo": "1667",
+    "nombre": "UCSFI Puerto El Triunfo US *"
+  },
+  {
+    "codigo": "1690",
+    "nombre": "UCSFI Quelepa SM *"
+  },
+  {
+    "codigo": "1550",
+    "nombre": "UCSFI Quezaltepeque LL *"
+  },
+  {
+    "codigo": "1783",
+    "nombre": "UCSFI Rosario de Mora SS *"
+  },
+  {
+    "codigo": "1593",
+    "nombre": "UCSFI Rosario LP *"
+  },
+  {
+    "codigo": "1566",
+    "nombre": "UCSFI Sacacoyo LL *"
+  },
+  {
+    "codigo": "1509",
+    "nombre": "UCSFI Salcoatitan SO *"
+  },
+  {
+    "codigo": "1216",
+    "nombre": "UCSFI San Agustín US"
+  },
+  {
+    "codigo": "1668",
+    "nombre": "UCSFI San Agustín US *"
+  },
+  {
+    "codigo": "1738",
+    "nombre": "UCSFI San Alejo LU *"
+  },
+  {
+    "codigo": "1748",
+    "nombre": "UCSFI San Alejo LU Hato Nuevo *"
+  },
+  {
+    "codigo": "901",
+    "nombre": "UCSFI San Antonio de la Cruz CH"
+  },
+  {
+    "codigo": "1533",
+    "nombre": "UCSFI San Antonio de la Cruz CH *"
+  },
+  {
+    "codigo": "1508",
+    "nombre": "UCSFI San Antonio del Monte SO *"
+  },
+  {
+    "codigo": "905",
+    "nombre": "UCSFI San Antonio los Ranchos CH"
+  },
+  {
+    "codigo": "1523",
+    "nombre": "UCSFI San Antonio los Ranchos CH *"
+  },
+  {
+    "codigo": "1176",
+    "nombre": "UCSFI San Antonio Masahuat LP"
+  },
+  {
+    "codigo": "1608",
+    "nombre": "UCSFI San Antonio Masahuat LP *"
+  },
+  {
+    "codigo": "961",
+    "nombre": "UCSFI San Antonio SM"
+  },
+  {
+    "codigo": "1704",
+    "nombre": "UCSFI San Antonio SM *"
+  },
+  {
+    "codigo": "1790",
+    "nombre": "UCSFI San Bartolome Perulapía CU *"
+  },
+  {
+    "codigo": "1707",
+    "nombre": "UCSFI San Buenaventura US *"
+  },
+  {
+    "codigo": "1731",
+    "nombre": "UCSFI San Carlos MO *"
+  },
+  {
+    "codigo": "1358",
+    "nombre": "UCSFI San Cayetano Istepeque SV"
+  },
+  {
+    "codigo": "1640",
+    "nombre": "UCSFI San Cayetano Istepeque SV *"
+  },
+  {
+    "codigo": "1131",
+    "nombre": "UCSFI San Cristobal CU"
+  },
+  {
+    "codigo": "1582",
+    "nombre": "UCSFI San Cristobal CU *"
+  },
+  {
+    "codigo": "1130",
+    "nombre": "UCSFI San Emigdio LP"
+  },
+  {
+    "codigo": "1585",
+    "nombre": "UCSFI San Emigdio LP *"
+  },
+  {
+    "codigo": "1163",
+    "nombre": "UCSFI San Esteban Catarina SV"
+  },
+  {
+    "codigo": "1636",
+    "nombre": "UCSFI San Esteban Catarina SV *"
+  },
+  {
+    "codigo": "923",
+    "nombre": "UCSFI San Fernando CH"
+  },
+  {
+    "codigo": "1526",
+    "nombre": "UCSFI San Fernando CH *"
+  },
+  {
+    "codigo": "1338",
+    "nombre": "UCSFI San Francisco Chinameca LP"
+  },
+  {
+    "codigo": "1600",
+    "nombre": "UCSFI San Francisco Chinameca LP *"
+  },
+  {
+    "codigo": "1824",
+    "nombre": "UCSFI San Francisco Gotera MO *"
+  },
+  {
+    "codigo": "1219",
+    "nombre": "UCSFI San Francisco Javier US"
+  },
+  {
+    "codigo": "1669",
+    "nombre": "UCSFI San Francisco Javier US *"
+  },
+  {
+    "codigo": "1126",
+    "nombre": "UCSFI San Francisco Lempa CH"
+  },
+  {
+    "codigo": "1527",
+    "nombre": "UCSFI San Francisco Lempa CH *"
+  },
+  {
+    "codigo": "1443",
+    "nombre": "UCSFI San Francisco Menendez AH Cara Sucia *"
+  },
+  {
+    "codigo": "1446",
+    "nombre": "UCSFI San Francisco Menendez AH La Hachadura *"
+  },
+  {
+    "codigo": "932",
+    "nombre": "UCSFI San Francisco Morazan CH"
+  },
+  {
+    "codigo": "1519",
+    "nombre": "UCSFI San Francisco Morazán CH *"
+  },
+  {
+    "codigo": "1701",
+    "nombre": "UCSFI San Gerardo SM *"
+  },
+  {
+    "codigo": "966",
+    "nombre": "UCSFI San Gerardo SM 1"
+  },
+  {
+    "codigo": "890",
+    "nombre": "UCSFI San Ignacio CH"
+  },
+  {
+    "codigo": "1543",
+    "nombre": "UCSFI San Ignacio CH *"
+  },
+  {
+    "codigo": "891",
+    "nombre": "UCSFI San Ignacio CH El Carmen"
+  },
+  {
+    "codigo": "892",
+    "nombre": "UCSFI San Ignacio CH Las Pilas"
+  },
+  {
+    "codigo": "1546",
+    "nombre": "UCSFI San Ignacio CH Las Pilas *"
+  },
+  {
+    "codigo": "1160",
+    "nombre": "UCSFI San Ildefonso SV"
+  },
+  {
+    "codigo": "1635",
+    "nombre": "UCSFI San Ildefonso SV *"
+  },
+  {
+    "codigo": "1355",
+    "nombre": "UCSFI San Isidro CA"
+  },
+  {
+    "codigo": "1613",
+    "nombre": "UCSFI San Isidro CA *"
+  },
+  {
+    "codigo": "902",
+    "nombre": "UCSFI San Isidro Labrador CH"
+  },
+  {
+    "codigo": "1536",
+    "nombre": "UCSFI San Isidro Labrador CH *"
+  },
+  {
+    "codigo": "983",
+    "nombre": "UCSFI San Isidro MO"
+  },
+  {
+    "codigo": "1730",
+    "nombre": "UCSFI San Isidro MO *"
+  },
+  {
+    "codigo": "1227",
+    "nombre": "UCSFI San Jorge SM"
+  },
+  {
+    "codigo": "1655",
+    "nombre": "UCSFI San Jorge SM *"
+  },
+  {
+    "codigo": "903",
+    "nombre": "UCSFI San Jose Cancasque CH"
+  },
+  {
+    "codigo": "1535",
+    "nombre": "UCSFI San Jose Cancasque CH *"
+  },
+  {
+    "codigo": "1311",
+    "nombre": "UCSFI San José Guayabal CU"
+  },
+  {
+    "codigo": "1803",
+    "nombre": "UCSFI San José Guayabal CU*"
+  },
+  {
+    "codigo": "898",
+    "nombre": "UCSFI San José Las Flores CH"
+  },
+  {
+    "codigo": "1511",
+    "nombre": "UCSFI San José Las Flores CH *"
+  },
+  {
+    "codigo": "1010",
+    "nombre": "UCSFI San Jose LU San Jose de la Fuente"
+  },
+  {
+    "codigo": "1767",
+    "nombre": "UCSFI San Jose LU San Jose de la Fuente *"
+  },
+  {
+    "codigo": "1560",
+    "nombre": "UCSFI San José Villanueva LL *"
+  },
+  {
+    "codigo": "1594",
+    "nombre": "UCSFI San Juan Nonualco LP *"
+  },
+  {
+    "codigo": "1551",
+    "nombre": "UCSFI San Juan Opico LL *"
+  },
+  {
+    "codigo": "1554",
+    "nombre": "UCSFI San Juan Opico LL Sitio El Niño *"
+  },
+  {
+    "codigo": "1329",
+    "nombre": "UCSFI San Juan Talpa LP"
+  },
+  {
+    "codigo": "1598",
+    "nombre": "UCSFI San Juan Talpa LP *"
+  },
+  {
+    "codigo": "1173",
+    "nombre": "UCSFI San Juan Tepezontes LP"
+  },
+  {
+    "codigo": "1599",
+    "nombre": "UCSFI San Juan Tepezontes LP *"
+  },
+  {
+    "codigo": "1495",
+    "nombre": "UCSFI San Julian SO *"
+  },
+  {
+    "codigo": "1453",
+    "nombre": "UCSFI San Lorenzo AH *"
+  },
+  {
+    "codigo": "1165",
+    "nombre": "UCSFI San Lorenzo SV"
+  },
+  {
+    "codigo": "1639",
+    "nombre": "UCSFI San Lorenzo SV *"
+  },
+  {
+    "codigo": "1830",
+    "nombre": "UCSFI San Luis de la Reina SM"
+  },
+  {
+    "codigo": "1702",
+    "nombre": "UCSFI San Luis de la Reina SM *"
+  },
+  {
+    "codigo": "931",
+    "nombre": "UCSFI San Luis del Carmen CH"
+  },
+  {
+    "codigo": "1522",
+    "nombre": "UCSFI San Luis del Carmen CH *"
+  },
+  {
+    "codigo": "1590",
+    "nombre": "UCSFI San Luis La Herradura LP *"
+  },
+  {
+    "codigo": "1325",
+    "nombre": "UCSFI San Luis la Herradura LP El Zapote"
+  },
+  {
+    "codigo": "1607",
+    "nombre": "UCSFI San Luis La Herradura LP El Zapote *"
+  },
+  {
+    "codigo": "1591",
+    "nombre": "UCSFI San Luis Talpa LP *"
+  },
+  {
+    "codigo": "1328",
+    "nombre": "UCSFI San Luis Talpa LP El Pimental"
+  },
+  {
+    "codigo": "1609",
+    "nombre": "UCSFI San Luis Talpa LP El Pimental *"
+  },
+  {
+    "codigo": "1779",
+    "nombre": "UCSFI San Marcos SS \"Dr. Roberto Cáceres Bustamante\" *"
+  },
+  {
+    "codigo": "1789",
+    "nombre": "UCSFI San Martin SS *"
+  },
+  {
+    "codigo": "1557",
+    "nombre": "UCSFI San Matías LL *"
+  },
+  {
+    "codigo": "906",
+    "nombre": "UCSFI San Miguel de Mercedes CH"
+  },
+  {
+    "codigo": "1534",
+    "nombre": "UCSFI San Miguel de Mercedes CH *"
+  },
+  {
+    "codigo": "1700",
+    "nombre": "UCSFI San Miguel SM *"
+  },
+  {
+    "codigo": "1692",
+    "nombre": "UCSFI San Miguel SM El Niño *"
+  },
+  {
+    "codigo": "1682",
+    "nombre": "UCSFI San Miguel SM El Zamoran *"
+  },
+  {
+    "codigo": "1677",
+    "nombre": "UCSFI San Miguel SM La Presita \"Dr. Roberto A. Carías\" *"
+  },
+  {
+    "codigo": "1695",
+    "nombre": "UCSFI San Miguel SM Martin Zaldivar Colonia Carrillo *"
+  },
+  {
+    "codigo": "1679",
+    "nombre": "UCSFI San Miguel SM Milagro de la Paz *"
+  },
+  {
+    "codigo": "1697",
+    "nombre": "UCSFI San Miguel SM Miraflores *"
+  },
+  {
+    "codigo": "1684",
+    "nombre": "UCSFI San Miguel SM San Antonio Silva *"
+  },
+  {
+    "codigo": "1683",
+    "nombre": "UCSFI San Miguel SM San Carlos *"
+  },
+  {
+    "codigo": "1174",
+    "nombre": "UCSFI San Miguel Tepezontes LP"
+  },
+  {
+    "codigo": "1596",
+    "nombre": "UCSFI San Miguel Tepezontes LP *"
+  },
+  {
+    "codigo": "1120",
+    "nombre": "UCSFI San Pablo Tacachico LL"
+  },
+  {
+    "codigo": "1552",
+    "nombre": "UCSFI San Pablo Tacachico LL *"
+  },
+  {
+    "codigo": "1588",
+    "nombre": "UCSFI San Pedro Masahuat LP *"
+  },
+  {
+    "codigo": "1326",
+    "nombre": "UCSFI San Pedro Masahuat LP El Achiotal"
+  },
+  {
+    "codigo": "1605",
+    "nombre": "UCSFI San Pedro Masahuat LP El Achiotal *"
+  },
+  {
+    "codigo": "1604",
+    "nombre": "UCSFI San Pedro Masahuat LP Las Isletas *"
+  },
+  {
+    "codigo": "1170",
+    "nombre": "UCSFI San Pedro Nonualco LP"
+  },
+  {
+    "codigo": "1587",
+    "nombre": "UCSFI San Pedro Nonualco LP *"
+  },
+  {
+    "codigo": "1574",
+    "nombre": "UCSFI San Pedro Perulapán CU *"
+  },
+  {
+    "codigo": "1452",
+    "nombre": "UCSFI San Pedro Puxtla AH *"
+  },
+  {
+    "codigo": "1314",
+    "nombre": "UCSFI San Rafael Cedros CU"
+  },
+  {
+    "codigo": "1575",
+    "nombre": "UCSFI San Rafael Cedros CU *"
+  },
+  {
+    "codigo": "919",
+    "nombre": "UCSFI San Rafael CH"
+  },
+  {
+    "codigo": "1529",
+    "nombre": "UCSFI San Rafael CH *"
+  },
+  {
+    "codigo": "1597",
+    "nombre": "UCSFI San Rafael Obrajuelo LP *"
+  },
+  {
+    "codigo": "1653",
+    "nombre": "UCSFI San Rafael Oriente SM *"
+  },
+  {
+    "codigo": "1309",
+    "nombre": "UCSFI San Ramón CU"
+  },
+  {
+    "codigo": "1583",
+    "nombre": "UCSFI San Ramón CU *"
+  },
+  {
+    "codigo": "1793",
+    "nombre": "UCSFI San Salvador SS Barrios *"
+  },
+  {
+    "codigo": "1792",
+    "nombre": "UCSFI San Salvador SS Concepción *"
+  },
+  {
+    "codigo": "1795",
+    "nombre": "UCSFI San Salvador SS Lourdes *"
+  },
+  {
+    "codigo": "1794",
+    "nombre": "UCSFI San Salvador SS Monserrat *"
+  },
+  {
+    "codigo": "1800",
+    "nombre": "UCSFI San Salvador SS San Antonio Abad *"
+  },
+  {
+    "codigo": "1778",
+    "nombre": "UCSFI San Salvador SS San Jacinto \"Dr. Mauricio Sol Nerio\" *"
+  },
+  {
+    "codigo": "1791",
+    "nombre": "UCSFI San Salvador SS San Miguelito \" Dr.Juan Ramón Alvarenga\" *"
+  },
+  {
+    "codigo": "1489",
+    "nombre": "UCSFI San Sebastian Salitrillo SA *"
+  },
+  {
+    "codigo": "1627",
+    "nombre": "UCSFI San Sebastián SV *"
+  },
+  {
+    "codigo": "1726",
+    "nombre": "UCSFI San Simón MO *"
+  },
+  {
+    "codigo": "984",
+    "nombre": "UCSFI San Simón MO 3"
+  },
+  {
+    "codigo": "1634",
+    "nombre": "UCSFI San Vicente SV Periférica *"
+  },
+  {
+    "codigo": "1461",
+    "nombre": "UCSFI Santa Ana SA \"Dr. Tomás Pineda Martínez\" *"
+  },
+  {
+    "codigo": "1462",
+    "nombre": "UCSFI Santa Ana SA Casa del Niño *"
+  },
+  {
+    "codigo": "1463",
+    "nombre": "UCSFI Santa Ana SA El Palmar *"
+  },
+  {
+    "codigo": "1474",
+    "nombre": "UCSFI Santa Ana SA Natividad *"
+  },
+  {
+    "codigo": "1465",
+    "nombre": "UCSFI Santa Ana SA San Miguelito *"
+  },
+  {
+    "codigo": "1466",
+    "nombre": "UCSFI Santa Ana SA San Rafael *"
+  },
+  {
+    "codigo": "1467",
+    "nombre": "UCSFI Santa Ana SA Santa Bárbara *"
+  },
+  {
+    "codigo": "1464",
+    "nombre": "UCSFI Santa Ana SA Santa Lucia *"
+  },
+  {
+    "codigo": "1502",
+    "nombre": "UCSFI Santa Catarina Masahuat SO *"
+  },
+  {
+    "codigo": "1280",
+    "nombre": "UCSFI Santa Catarina Mashuat SO"
+  },
+  {
+    "codigo": "1158",
+    "nombre": "UCSFI Santa Clara SV"
+  },
+  {
+    "codigo": "1638",
+    "nombre": "UCSFI Santa Clara SV *"
+  },
+  {
+    "codigo": "1129",
+    "nombre": "UCSFI Santa Cruz Analquito CU"
+  },
+  {
+    "codigo": "1578",
+    "nombre": "UCSFI Santa Cruz Analquito CU *"
+  },
+  {
+    "codigo": "1576",
+    "nombre": "UCSFI Santa Cruz Michapa CU *"
+  },
+  {
+    "codigo": "1222",
+    "nombre": "UCSFI Santa Elena US"
+  },
+  {
+    "codigo": "1642",
+    "nombre": "UCSFI Santa Elena US *"
+  },
+  {
+    "codigo": "1281",
+    "nombre": "UCSFI Santa Isabel Ishuatan SO"
+  },
+  {
+    "codigo": "1504",
+    "nombre": "UCSFI Santa Isabel Ishuatan SO *"
+  },
+  {
+    "codigo": "1167",
+    "nombre": "UCSFI Santa Maria Ostuma LP"
+  },
+  {
+    "codigo": "1595",
+    "nombre": "UCSFI Santa Maria Ostuma LP *"
+  },
+  {
+    "codigo": "920",
+    "nombre": "UCSFI Santa Rita CH"
+  },
+  {
+    "codigo": "1532",
+    "nombre": "UCSFI Santa Rita CH *"
+  },
+  {
+    "codigo": "1813",
+    "nombre": "UCSFI Santa Rosa de Lima LU Periferica *"
+  },
+  {
+    "codigo": "1482",
+    "nombre": "UCSFI Santa Rosa Guachipilin SA *"
+  },
+  {
+    "codigo": "1555",
+    "nombre": "UCSFI Santa Tecla LL \" Dr. Alberto Aguilar Rivas\" *"
+  },
+  {
+    "codigo": "1030",
+    "nombre": "UCSFI Santiago de La Frontera SA"
+  },
+  {
+    "codigo": "1477",
+    "nombre": "UCSFI Santiago de La Frontera SA *"
+  },
+  {
+    "codigo": "1986",
+    "nombre": "UCSFI Santiago de Maria US"
+  },
+  {
+    "codigo": "1665",
+    "nombre": "UCSFI Santiago de María US El Cerrito *"
+  },
+  {
+    "codigo": "1589",
+    "nombre": "UCSFI Santiago Nonualco LP *"
+  },
+  {
+    "codigo": "1606",
+    "nombre": "UCSFI Santiago Nonualco LP San José La Paz Arriba *"
+  },
+  {
+    "codigo": "1781",
+    "nombre": "UCSFI Santiago Texacuangos SS *"
+  },
+  {
+    "codigo": "1285",
+    "nombre": "UCSFI Santo Domingo de Guzman SO"
+  },
+  {
+    "codigo": "1503",
+    "nombre": "UCSFI Santo Domingo de Guzman SO *"
+  },
+  {
+    "codigo": "1632",
+    "nombre": "UCSFI Santo Domingo SV *"
+  },
+  {
+    "codigo": "1780",
+    "nombre": "UCSFI Santo Tomas SS \"Dr.José Edmundo Avalos la Guardia\" *"
+  },
+  {
+    "codigo": "1623",
+    "nombre": "UCSFI Sensuntepeque CA Santa Lucia *"
+  },
+  {
+    "codigo": "1848",
+    "nombre": "UCSFI Sociedad MO"
+  },
+  {
+    "codigo": "1719",
+    "nombre": "UCSFI Sociedad MO *"
+  },
+  {
+    "codigo": "1808",
+    "nombre": "UCSFI Sonsonate SO *"
+  },
+  {
+    "codigo": "1842",
+    "nombre": "UCSFI Sonsonate SO Salinas de Ayacachapa"
+  },
+  {
+    "codigo": "1505",
+    "nombre": "UCSFI Sonsonate SO Salinas de Ayacachapa *"
+  },
+  {
+    "codigo": "1498",
+    "nombre": "UCSFI Sonzacate SO \"Dr. Leonardo Alberto López Vigil\" *"
+  },
+  {
+    "codigo": "1785",
+    "nombre": "UCSFI Soyapango SS \"Enf. Zoila Marina Torres de Guadrón\" *"
+  },
+  {
+    "codigo": "1786",
+    "nombre": "UCSFI Soyapango SS Amatepec *"
+  },
+  {
+    "codigo": "1787",
+    "nombre": "UCSFI Soyapango SS Unicentro *"
+  },
+  {
+    "codigo": "1411",
+    "nombre": "UCSFI Suchitoto CU"
+  },
+  {
+    "codigo": "1948",
+    "nombre": "UCSFI Suchitoto CU *"
+  },
+  {
+    "codigo": "1863",
+    "nombre": "UCSFI Talnique LL"
+  },
+  {
+    "codigo": "1864",
+    "nombre": "UCSFI Talnique LL San José Los Sitios"
+  },
+  {
+    "codigo": "1116",
+    "nombre": "UCSFI Tamanique LL"
+  },
+  {
+    "codigo": "1565",
+    "nombre": "UCSFI Tamanique LL *"
+  },
+  {
+    "codigo": "1178",
+    "nombre": "UCSFI Tapalhuaca LP"
+  },
+  {
+    "codigo": "1610",
+    "nombre": "UCSFI Tapalhuaca LP *"
+  },
+  {
+    "codigo": "1209",
+    "nombre": "UCSFI Tecapan US"
+  },
+  {
+    "codigo": "1663",
+    "nombre": "UCSFI Tecapan US *"
+  },
+  {
+    "codigo": "1852",
+    "nombre": "UCSFI Tecoluca SV"
+  },
+  {
+    "codigo": "1629",
+    "nombre": "UCSFI Tecoluca SV *"
+  },
+  {
+    "codigo": "1363",
+    "nombre": "UCSFI Tecoluca SV San Carlos Lempa"
+  },
+  {
+    "codigo": "1637",
+    "nombre": "UCSFI Tecoluca SV San Carlos Lempa *"
+  },
+  {
+    "codigo": "1365",
+    "nombre": "UCSFI Tecoluca SV San Nicolas Lempa"
+  },
+  {
+    "codigo": "1641",
+    "nombre": "UCSFI Tecoluca SV San Nicolas Lempa *"
+  },
+  {
+    "codigo": "951",
+    "nombre": "UCSFI Tejutepeque CA"
+  },
+  {
+    "codigo": "1621",
+    "nombre": "UCSFI Tejutepeque CA *"
+  },
+  {
+    "codigo": "1400",
+    "nombre": "UCSFI Tejutla CH"
+  },
+  {
+    "codigo": "1540",
+    "nombre": "UCSFI Tejutla CH *"
+  },
+  {
+    "codigo": "1137",
+    "nombre": "UCSFI Tenancingo CU"
+  },
+  {
+    "codigo": "1577",
+    "nombre": "UCSFI Tenancingo CU *"
+  },
+  {
+    "codigo": "1104",
+    "nombre": "UCSFI Teotepeque LL"
+  },
+  {
+    "codigo": "1809",
+    "nombre": "UCSFI Teotepeque LL *"
+  },
+  {
+    "codigo": "1106",
+    "nombre": "UCSFI Teotepeque LL Mizata"
+  },
+  {
+    "codigo": "1562",
+    "nombre": "UCSFI Teotepeque LL Mizata *"
+  },
+  {
+    "codigo": "1558",
+    "nombre": "UCSFI Tepecoyo LL *"
+  },
+  {
+    "codigo": "1360",
+    "nombre": "UCSFI Tepetitan SV"
+  },
+  {
+    "codigo": "1633",
+    "nombre": "UCSFI Tepetitan SV *"
+  },
+  {
+    "codigo": "1469",
+    "nombre": "UCSFI Texistepeque SA *"
+  },
+  {
+    "codigo": "1472",
+    "nombre": "UCSFI Texistepeque SA Guarnecia *"
+  },
+  {
+    "codigo": "1480",
+    "nombre": "UCSFI Texistepeque SA San Miguel *"
+  },
+  {
+    "codigo": "1773",
+    "nombre": "UCSFI Tonacatepeque SS *"
+  },
+  {
+    "codigo": "1805",
+    "nombre": "UCSFI Tonacatepeque SS Alta Vista *"
+  },
+  {
+    "codigo": "1775",
+    "nombre": "UCSFI Tonacatepeque SS Distrito Italia *"
+  },
+  {
+    "codigo": "975",
+    "nombre": "UCSFI Torola MO"
+  },
+  {
+    "codigo": "1722",
+    "nombre": "UCSFI Torola MO *"
+  },
+  {
+    "codigo": "1454",
+    "nombre": "UCSFI Turin AH *"
+  },
+  {
+    "codigo": "1686",
+    "nombre": "UCSFI Uluazapa SM *"
+  },
+  {
+    "codigo": "1820",
+    "nombre": "UCSFI Usulután US *"
+  },
+  {
+    "codigo": "1647",
+    "nombre": "UCSFI Usulután US El Molino *"
+  },
+  {
+    "codigo": "1652",
+    "nombre": "UCSFI Usulután US La Cruz *"
+  },
+  {
+    "codigo": "1902",
+    "nombre": "UCSFI Usulután US Puerto Parada"
+  },
+  {
+    "codigo": "1649",
+    "nombre": "UCSFI Usulután US Puerto Parada *"
+  },
+  {
+    "codigo": "1155",
+    "nombre": "UCSFI Verapaz SV"
+  },
+  {
+    "codigo": "1631",
+    "nombre": "UCSFI Verapaz SV *"
+  },
+  {
+    "codigo": "954",
+    "nombre": "UCSFI Victoria CA"
+  },
+  {
+    "codigo": "1614",
+    "nombre": "UCSFI Victoria CA *"
+  },
+  {
+    "codigo": "957",
+    "nombre": "UCSFI Victoria CA Santa Marta"
+  },
+  {
+    "codigo": "1618",
+    "nombre": "UCSFI Victoria CA Santa Marta *"
+  },
+  {
+    "codigo": "1734",
+    "nombre": "UCSFI Yoloaiquin MO *"
+  },
+  {
+    "codigo": "1698",
+    "nombre": "UCSFI Yucuaiquín LU *"
+  },
+  {
+    "codigo": "1611",
+    "nombre": "UCSFI Zacatecoluca LP \"Dr. Carlos Alberto Galeano\" *"
+  },
+  {
+    "codigo": "1561",
+    "nombre": "UCSFI Zaragoza LL *"
+  },
+  {
+    "codigo": "90",
+    "nombre": "UDS Acajutla SO"
+  },
+  {
+    "codigo": "93",
+    "nombre": "UDS Acajutla SO Metalío"
+  },
+  {
+    "codigo": "149",
+    "nombre": "UDS Agua Caliente CH"
+  },
+  {
+    "codigo": "543",
+    "nombre": "UDS Aguilares SS"
+  },
+  {
+    "codigo": "7",
+    "nombre": "UDS Ahuachapán AH"
+  },
+  {
+    "codigo": "21",
+    "nombre": "UDS Ahuachapán AH Las Chinamas"
+  },
+  {
+    "codigo": "364",
+    "nombre": "UDS Alegria US"
+  },
+  {
+    "codigo": "514",
+    "nombre": "UDS Anamoros LU"
+  },
+  {
+    "codigo": "196",
+    "nombre": "UDS Antiguo Cuscatlán LL"
+  },
+  {
+    "codigo": "9",
+    "nombre": "UDS Apaneca AH"
+  },
+  {
+    "codigo": "321",
+    "nombre": "UDS Apastepeque SV"
+  },
+  {
+    "codigo": "539",
+    "nombre": "UDS Apopa SS"
+  },
+  {
+    "codigo": "549",
+    "nombre": "UDS Apopa SS Chintuc"
+  },
+  {
+    "codigo": "548",
+    "nombre": "UDS Apopa SS Popotlán"
+  },
+  {
+    "codigo": "473",
+    "nombre": "UDS Arambala MO"
+  },
+  {
+    "codigo": "120",
+    "nombre": "UDS Arcatao CH"
+  },
+  {
+    "codigo": "85",
+    "nombre": "UDS Armenia SO"
+  },
+  {
+    "codigo": "11",
+    "nombre": "UDS Atiquizaya AH"
+  },
+  {
+    "codigo": "129",
+    "nombre": "UDS Azacualpa CH"
+  },
+  {
+    "codigo": "355",
+    "nombre": "UDS Berlin US"
+  },
+  {
+    "codigo": "522",
+    "nombre": "UDS Bolivar LU"
+  },
+  {
+    "codigo": "454",
+    "nombre": "UDS Cacaopera MO"
+  },
+  {
+    "codigo": "366",
+    "nombre": "UDS California US"
+  },
+  {
+    "codigo": "100",
+    "nombre": "UDS Caluco SO"
+  },
+  {
+    "codigo": "216",
+    "nombre": "UDS Candelaria CU"
+  },
+  {
+    "codigo": "46",
+    "nombre": "UDS Candelaria de la Frontera SA"
+  },
+  {
+    "codigo": "53",
+    "nombre": "UDS Candelaria de la Frontera SA La Parada Aldea Bolaños"
+  },
+  {
+    "codigo": "428",
+    "nombre": "UDS Carolina SM"
+  },
+  {
+    "codigo": "664",
+    "nombre": "UDS Chalatenango CH"
+  },
+  {
+    "codigo": "161",
+    "nombre": "UDS Chalatenango CH Arracaos"
+  },
+  {
+    "codigo": "112",
+    "nombre": "UDS Chalatenango CH El Dorado"
+  },
+  {
+    "codigo": "1102",
+    "nombre": "UDS Chalatenango CH Guarjila"
+  },
+  {
+    "codigo": "76",
+    "nombre": "UDS Chalchuapa SA"
+  },
+  {
+    "codigo": "75",
+    "nombre": "UDS Chalchuapa SA El Coco"
+  },
+  {
+    "codigo": "59",
+    "nombre": "UDS Chalchuapa SA Sabanetas El Paste"
+  },
+  {
+    "codigo": "398",
+    "nombre": "UDS Chapeltique SM"
+  },
+  {
+    "codigo": "465",
+    "nombre": "UDS Chilanga MO"
+  },
+  {
+    "codigo": "190",
+    "nombre": "UDS Chiltiupan LL"
+  },
+  {
+    "codigo": "198",
+    "nombre": "UDS Chiltiupán LL Taquillo \"Ing. Orlando Recinos\""
+  },
+  {
+    "codigo": "434",
+    "nombre": "UDS Chinameca SM"
+  },
+  {
+    "codigo": "413",
+    "nombre": "UDS Chinameca SM El Jocote Dulce"
+  },
+  {
+    "codigo": "441",
+    "nombre": "UDS Chinameca SM Las Marías"
+  },
+  {
+    "codigo": "397",
+    "nombre": "UDS Chinameca SM Las Placitas"
+  },
+  {
+    "codigo": "395",
+    "nombre": "UDS Chirilagua SM"
+  },
+  {
+    "codigo": "407",
+    "nombre": "UDS Chirilagua SM El Cuco"
+  },
+  {
+    "codigo": "408",
+    "nombre": "UDS Chirilagua SM San Pedro"
+  },
+  {
+    "codigo": "412",
+    "nombre": "UDS Chirilagua SM Tierra Blanca"
+  },
+  {
+    "codigo": "302",
+    "nombre": "UDS Cinquera CA"
+  },
+  {
+    "codigo": "158",
+    "nombre": "UDS Citala CH"
+  },
+  {
+    "codigo": "170",
+    "nombre": "UDS Ciudad Arce LL"
+  },
+  {
+    "codigo": "819",
+    "nombre": "UDS Ciudad Barrios SM Perférica"
+  },
+  {
+    "codigo": "597",
+    "nombre": "UDS Ciudad Delgado SS"
+  },
+  {
+    "codigo": "601",
+    "nombre": "UDS Ciudad Delgado SS Hábitat Confien"
+  },
+  {
+    "codigo": "42",
+    "nombre": "UDS Coatepeque SA"
+  },
+  {
+    "codigo": "57",
+    "nombre": "UDS Coatepeque SA El Tinteral"
+  },
+  {
+    "codigo": "54",
+    "nombre": "UDS Coatepeque SA San Jacinto"
+  },
+  {
+    "codigo": "820",
+    "nombre": "UDS Cojutepeque CU Periferica"
+  },
+  {
+    "codigo": "200",
+    "nombre": "UDS Colón LL \"Dr. Manuel Gallardo\""
+  },
+  {
+    "codigo": "870",
+    "nombre": "UDS Colón LL El Botoncillal"
+  },
+  {
+    "codigo": "177",
+    "nombre": "UDS Colón LL Lourdes"
+  },
+  {
+    "codigo": "406",
+    "nombre": "UDS Comacarán SM"
+  },
+  {
+    "codigo": "124",
+    "nombre": "UDS Comalapa CH"
+  },
+  {
+    "codigo": "180",
+    "nombre": "UDS Comasagua LL"
+  },
+  {
+    "codigo": "343",
+    "nombre": "UDS Concepción Batres US"
+  },
+  {
+    "codigo": "519",
+    "nombre": "UDS Concepción de Oriente US"
+  },
+  {
+    "codigo": "134",
+    "nombre": "UDS Concepción Quezaltepeque CH"
+  },
+  {
+    "codigo": "15",
+    "nombre": "UDS Concepcón de Ataco AH"
+  },
+  {
+    "codigo": "489",
+    "nombre": "UDS Conchagua LU"
+  },
+  {
+    "codigo": "503",
+    "nombre": "UDS Conchagua LU El Faro"
+  },
+  {
+    "codigo": "502",
+    "nombre": "UDS Conchagua LU El Huisquil"
+  },
+  {
+    "codigo": "492",
+    "nombre": "UDS Conchagua LU El Tamarindo"
+  },
+  {
+    "codigo": "499",
+    "nombre": "UDS Conchagua LU Llano Los Patos"
+  },
+  {
+    "codigo": "450",
+    "nombre": "UDS Corinto MO"
+  },
+  {
+    "codigo": "101",
+    "nombre": "UDS Cuisnahuat SO"
+  },
+  {
+    "codigo": "596",
+    "nombre": "UDS Cuscatancingo SS"
+  },
+  {
+    "codigo": "602",
+    "nombre": "UDS Cuscatancingo SS Villa Mariona"
+  },
+  {
+    "codigo": "262",
+    "nombre": "UDS Cuyultitan LP"
+  },
+  {
+    "codigo": "464",
+    "nombre": "UDS Delicias de Concepción MO"
+  },
+  {
+    "codigo": "285",
+    "nombre": "UDS Dolores CA"
+  },
+  {
+    "codigo": "114",
+    "nombre": "UDS Dulce Nombre de María CH"
+  },
+  {
+    "codigo": "222",
+    "nombre": "UDS El Carmen CU"
+  },
+  {
+    "codigo": "496",
+    "nombre": "UDS El Carmen LU"
+  },
+  {
+    "codigo": "504",
+    "nombre": "UDS El Carmen LU El Piche"
+  },
+  {
+    "codigo": "493",
+    "nombre": "UDS El Carmen LU Olomeca"
+  },
+  {
+    "codigo": "135",
+    "nombre": "UDS El Carrizal CH"
+  },
+  {
+    "codigo": "141",
+    "nombre": "UDS El Carrizal CH Vainillas"
+  },
+  {
+    "codigo": "45",
+    "nombre": "UDS El Congo SA"
+  },
+  {
+    "codigo": "448",
+    "nombre": "UDS El Divisadero MO"
+  },
+  {
+    "codigo": "515",
+    "nombre": "UDS El Divisadero MO Trompina El Bejucal"
+  },
+  {
+    "codigo": "546",
+    "nombre": "UDS El Paisnal SS"
+  },
+  {
+    "codigo": "118",
+    "nombre": "UDS El Paraiso CH"
+  },
+  {
+    "codigo": "73",
+    "nombre": "UDS El Porvenir SA"
+  },
+  {
+    "codigo": "26",
+    "nombre": "UDS El Refugio AH"
+  },
+  {
+    "codigo": "218",
+    "nombre": "UDS El Rosario CU"
+  },
+  {
+    "codigo": "248",
+    "nombre": "UDS El Rosario LP"
+  },
+  {
+    "codigo": "516",
+    "nombre": "UDS El Sauce LU"
+  },
+  {
+    "codigo": "352",
+    "nombre": "UDS El Tránsito SM"
+  },
+  {
+    "codigo": "354",
+    "nombre": "UDS El Tránsito SM Primavera"
+  },
+  {
+    "codigo": "369",
+    "nombre": "UDS El Triunfo US"
+  },
+  {
+    "codigo": "346",
+    "nombre": "UDS Ereguayquin US"
+  },
+  {
+    "codigo": "358",
+    "nombre": "UDS Estanzuelas US"
+  },
+  {
+    "codigo": "290",
+    "nombre": "UDS Guacotecti CA"
+  },
+  {
+    "codigo": "318",
+    "nombre": "UDS Guadalupe SV"
+  },
+  {
+    "codigo": "470",
+    "nombre": "UDS Gualococti MO"
+  },
+  {
+    "codigo": "457",
+    "nombre": "UDS Guatajiagua MO"
+  },
+  {
+    "codigo": "18",
+    "nombre": "UDS Guaymango AH"
+  },
+  {
+    "codigo": "542",
+    "nombre": "UDS Guazapa SS"
+  },
+  {
+    "codigo": "185",
+    "nombre": "UDS Huizucar LL"
+  },
+  {
+    "codigo": "311",
+    "nombre": "UDS Ilobasco CA"
+  },
+  {
+    "codigo": "310",
+    "nombre": "UDS Ilobasco CA San Francisco del Monte"
+  },
+  {
+    "codigo": "1378",
+    "nombre": "UDS Ilopango SS"
+  },
+  {
+    "codigo": "576",
+    "nombre": "UDS Ilopango SS Santa Lucía"
+  },
+  {
+    "codigo": "487",
+    "nombre": "UDS Intipuca LU"
+  },
+  {
+    "codigo": "79",
+    "nombre": "UDS Izalco SO"
+  },
+  {
+    "codigo": "167",
+    "nombre": "UDS Jayaque LL \"Dr Francisco Lima\""
+  },
+  {
+    "codigo": "260",
+    "nombre": "UDS Jerusalem LP"
+  },
+  {
+    "codigo": "194",
+    "nombre": "UDS Jicalapa LL"
+  },
+  {
+    "codigo": "1432",
+    "nombre": "UDS Jiquilisco US"
+  },
+  {
+    "codigo": "379",
+    "nombre": "UDS Jiquilisco US El Quebrado"
+  },
+  {
+    "codigo": "378",
+    "nombre": "UDS Jiquilisco US Isla de Mendez"
+  },
+  {
+    "codigo": "381",
+    "nombre": "UDS Jiquilisco US La Canoa"
+  },
+  {
+    "codigo": "383",
+    "nombre": "UDS Jiquilisco US Nuevo Amanecer"
+  },
+  {
+    "codigo": "382",
+    "nombre": "UDS Jiquilisco US Salinas de Sisiguayo"
+  },
+  {
+    "codigo": "374",
+    "nombre": "UDS Jiquilisco US Tierra Blanca"
+  },
+  {
+    "codigo": "462",
+    "nombre": "UDS Joateca MO"
+  },
+  {
+    "codigo": "458",
+    "nombre": "UDS Jocoaitique MO"
+  },
+  {
+    "codigo": "444",
+    "nombre": "UDS Jocoro MO"
+  },
+  {
+    "codigo": "91",
+    "nombre": "UDS Juayua SO \" San Francisco Magaña H.\""
+  },
+  {
+    "codigo": "94",
+    "nombre": "UDS Juayua SO La Majada"
+  },
+  {
+    "codigo": "431",
+    "nombre": "UDS Jucuapa US"
+  },
+  {
+    "codigo": "340",
+    "nombre": "UDS Jucuarán US"
+  },
+  {
+    "codigo": "348",
+    "nombre": "UDS Jucuarán US El Espino"
+  },
+  {
+    "codigo": "19",
+    "nombre": "UDS Jujutla AH"
+  },
+  {
+    "codigo": "28",
+    "nombre": "UDS Jujutla AH Barra de Santiago"
+  },
+  {
+    "codigo": "22",
+    "nombre": "UDS Jujutla AH Guayapa Abajo"
+  },
+  {
+    "codigo": "20",
+    "nombre": "UDS Jujutla AH San José El Naranjo"
+  },
+  {
+    "codigo": "305",
+    "nombre": "UDS Jutiapa CA"
+  },
+  {
+    "codigo": "309",
+    "nombre": "UDS Jutiapa CA Carolina"
+  },
+  {
+    "codigo": "122",
+    "nombre": "UDS La Laguna CH"
+  },
+  {
+    "codigo": "143",
+    "nombre": "UDS La Palma CH"
+  },
+  {
+    "codigo": "155",
+    "nombre": "UDS La Reina CH"
+  },
+  {
+    "codigo": "482",
+    "nombre": "UDS La Unión LU \"Enf. Zoila E. Turcios de Jimenez\""
+  },
+  {
+    "codigo": "497",
+    "nombre": "UDS La Unión LU Agua Caliente"
+  },
+  {
+    "codigo": "500",
+    "nombre": "UDS La Unión LU Agua Escondida"
+  },
+  {
+    "codigo": "494",
+    "nombre": "UDS La Unión LU Isla Zacatillo"
+  },
+  {
+    "codigo": "505",
+    "nombre": "UDS La Unión LU San Carlos Borromeo Los Leones"
+  },
+  {
+    "codigo": "121",
+    "nombre": "UDS Las Vueltas CH"
+  },
+  {
+    "codigo": "520",
+    "nombre": "UDS Lislique LU"
+  },
+  {
+    "codigo": "513",
+    "nombre": "UDS Lislique LU Guajiniquil"
+  },
+  {
+    "codigo": "439",
+    "nombre": "UDS Lolotique SM"
+  },
+  {
+    "codigo": "472",
+    "nombre": "UDS Lolotiquillo MO"
+  },
+  {
+    "codigo": "67",
+    "nombre": "UDS Masahuat SA"
+  },
+  {
+    "codigo": "491",
+    "nombre": "UDS Meanguera del Golfo LU"
+  },
+  {
+    "codigo": "495",
+    "nombre": "UDS Meanguera del Golfo LU Isla Conchaguita"
+  },
+  {
+    "codigo": "460",
+    "nombre": "UDS Meanguera MO"
+  },
+  {
+    "codigo": "455",
+    "nombre": "UDS Meanguera MO San Luis"
+  },
+  {
+    "codigo": "594",
+    "nombre": "UDS Mejicanos SS \"Dr. Hugo Morán Quijada\""
+  },
+  {
+    "codigo": "592",
+    "nombre": "UDS Mejicanos SS Zacamil"
+  },
+  {
+    "codigo": "273",
+    "nombre": "UDS Mercedes de la Ceiba LP"
+  },
+  {
+    "codigo": "365",
+    "nombre": "UDS Mercedes Umaña US"
+  },
+  {
+    "codigo": "627",
+    "nombre": "UDS Metapán SA"
+  },
+  {
+    "codigo": "69",
+    "nombre": "UDS Metapán SA Belen Guijath"
+  },
+  {
+    "codigo": "68",
+    "nombre": "UDS Metapán SA San Jerónimo"
+  },
+  {
+    "codigo": "70",
+    "nombre": "UDS Metapán SA San José Ingenio"
+  },
+  {
+    "codigo": "66",
+    "nombre": "UDS Metapán SA San Juan Las Minas"
+  },
+  {
+    "codigo": "436",
+    "nombre": "UDS Moncagua SM"
+  },
+  {
+    "codigo": "404",
+    "nombre": "UDS Moncagua SM El Platanar"
+  },
+  {
+    "codigo": "415",
+    "nombre": "UDS Moncagua SM Tongolona"
+  },
+  {
+    "codigo": "219",
+    "nombre": "UDS Monte San Juan CU"
+  },
+  {
+    "codigo": "95",
+    "nombre": "UDS Nahuilingo SO"
+  },
+  {
+    "codigo": "82",
+    "nombre": "UDS Nahuizalco SO"
+  },
+  {
+    "codigo": "104",
+    "nombre": "UDS Nahuizalco SO Arenales"
+  },
+  {
+    "codigo": "541",
+    "nombre": "UDS Nejapa SS"
+  },
+  {
+    "codigo": "115",
+    "nombre": "UDS Nombre de Jesús CH"
+  },
+  {
+    "codigo": "663",
+    "nombre": "UDS Nueva Concepción CH"
+  },
+  {
+    "codigo": "160",
+    "nombre": "UDS Nueva Concepción CH Potrero Sula"
+  },
+  {
+    "codigo": "510",
+    "nombre": "UDS Nueva Esparta LU \"Ana María Alfaro Sánchez\""
+  },
+  {
+    "codigo": "521",
+    "nombre": "UDS Nueva esparta LU Monteca"
+  },
+  {
+    "codigo": "367",
+    "nombre": "UDS Nueva Granada US"
+  },
+  {
+    "codigo": "132",
+    "nombre": "UDS Nueva Trinidad CH"
+  },
+  {
+    "codigo": "197",
+    "nombre": "UDS Nuevo Cuscatlán LL"
+  },
+  {
+    "codigo": "295",
+    "nombre": "UDS Nuevo Eden de San Juan SM"
+  },
+  {
+    "codigo": "245",
+    "nombre": "UDS Olocuilta LP"
+  },
+  {
+    "codigo": "261",
+    "nombre": "UDS Olocuilta LP Santa Lucía Orcoyo"
+  },
+  {
+    "codigo": "606",
+    "nombre": "UDS Oratorio de Concepción CU"
+  },
+  {
+    "codigo": "446",
+    "nombre": "UDS Osicala MO"
+  },
+  {
+    "codigo": "341",
+    "nombre": "UDS Ozatlan US"
+  },
+  {
+    "codigo": "563",
+    "nombre": "UDS Panchimalco SS"
+  },
+  {
+    "codigo": "566",
+    "nombre": "UDS Panchimalco SS Planes de Renderos"
+  },
+  {
+    "codigo": "224",
+    "nombre": "UDS Paraiso de Osorio LP"
+  },
+  {
+    "codigo": "511",
+    "nombre": "UDS Pasaquina LU"
+  },
+  {
+    "codigo": "525",
+    "nombre": "UDS Pasaquina LU San Felipe"
+  },
+  {
+    "codigo": "452",
+    "nombre": "UDS Perquin MO"
+  },
+  {
+    "codigo": "816",
+    "nombre": "UDS Perquin MO Rancho Quemado"
+  },
+  {
+    "codigo": "523",
+    "nombre": "UDS Poloros LU"
+  },
+  {
+    "codigo": "128",
+    "nombre": "UDS Potonico CH"
+  },
+  {
+    "codigo": "375",
+    "nombre": "UDS Puerto El Triunfo US"
+  },
+  {
+    "codigo": "380",
+    "nombre": "UDS Puerto El Triunfo US Corral de Mulas"
+  },
+  {
+    "codigo": "743",
+    "nombre": "UDS Puerto El Triunfo US Espiritu Santo"
+  },
+  {
+    "codigo": "165",
+    "nombre": "UDS Puerto La Libertad LL"
+  },
+  {
+    "codigo": "409",
+    "nombre": "UDS Quelepa SM"
+  },
+  {
+    "codigo": "173",
+    "nombre": "UDS Quezaltepeque LL"
+  },
+  {
+    "codigo": "565",
+    "nombre": "UDS Rosario de Mora SS"
+  },
+  {
+    "codigo": "193",
+    "nombre": "UDS Sacacoyo LL"
+  },
+  {
+    "codigo": "103",
+    "nombre": "UDS Salcoatitan SO"
+  },
+  {
+    "codigo": "376",
+    "nombre": "UDS San Agustín US"
+  },
+  {
+    "codigo": "485",
+    "nombre": "UDS San Alejo LU"
+  },
+  {
+    "codigo": "501",
+    "nombre": "UDS San Alejo LU Bobadilla"
+  },
+  {
+    "codigo": "498",
+    "nombre": "UDS San Alejo LU Hato Nuevo"
+  },
+  {
+    "codigo": "137",
+    "nombre": "UDS San Antonio de la Cruz CH"
+  },
+  {
+    "codigo": "127",
+    "nombre": "UDS San Antonio de los Ranchos CH"
+  },
+  {
+    "codigo": "102",
+    "nombre": "UDS San Antonio del Monte SO"
+  },
+  {
+    "codigo": "429",
+    "nombre": "UDS San Antonio del Norte SM"
+  },
+  {
+    "codigo": "267",
+    "nombre": "UDS San Antonio Masahuat LP"
+  },
+  {
+    "codigo": "56",
+    "nombre": "UDS San Antonio Pajonal SA"
+  },
+  {
+    "codigo": "579",
+    "nombre": "UDS San Bartolome Perulapía CU"
+  },
+  {
+    "codigo": "433",
+    "nombre": "UDS San Buenaventura US"
+  },
+  {
+    "codigo": "432",
+    "nombre": "UDS San Buenaventura US Las Charcas"
+  },
+  {
+    "codigo": "468",
+    "nombre": "UDS San Carlos MO"
+  },
+  {
+    "codigo": "332",
+    "nombre": "UDS San Cayetano Istepeque SV"
+  },
+  {
+    "codigo": "220",
+    "nombre": "UDS San Cristobal CU"
+  },
+  {
+    "codigo": "349",
+    "nombre": "UDS San Dionicio US"
+  },
+  {
+    "codigo": "223",
+    "nombre": "UDS San Emigdio CH"
+  },
+  {
+    "codigo": "328",
+    "nombre": "UDS San Esteban Catarina SV"
+  },
+  {
+    "codigo": "130",
+    "nombre": "UDS San Fernanado CH"
+  },
+  {
+    "codigo": "461",
+    "nombre": "UDS San Fernando MO"
+  },
+  {
+    "codigo": "17",
+    "nombre": "UDS San Fracisco Menendez AH La Hachadura"
+  },
+  {
+    "codigo": "259",
+    "nombre": "UDS San Francisco Chinameca LP"
+  },
+  {
+    "codigo": "1433",
+    "nombre": "UDS San Francisco Gotera MO"
+  },
+  {
+    "codigo": "377",
+    "nombre": "UDS San Francisco Javier US"
+  },
+  {
+    "codigo": "131",
+    "nombre": "UDS San Francisco Lempa CH"
+  },
+  {
+    "codigo": "27",
+    "nombre": "UDS San Francisco Menendez AH"
+  },
+  {
+    "codigo": "13",
+    "nombre": "UDS San Francisco Menendez AH Cara Sucia"
+  },
+  {
+    "codigo": "29",
+    "nombre": "UDS San Francisco Menendez AH El Zapote"
+  },
+  {
+    "codigo": "30",
+    "nombre": "UDS San Francisco Menendez AH Garita Palmera"
+  },
+  {
+    "codigo": "31",
+    "nombre": "UDS San Francisco Menendez AH Ing. Javier Estrada"
+  },
+  {
+    "codigo": "123",
+    "nombre": "UDS San Francisco Morazán CH"
+  },
+  {
+    "codigo": "424",
+    "nombre": "UDS San Gerardo SM"
+  },
+  {
+    "codigo": "159",
+    "nombre": "UDS San Ignacio CH"
+  },
+  {
+    "codigo": "162",
+    "nombre": "UDS San Ignacio CH Las Pilas"
+  },
+  {
+    "codigo": "327",
+    "nombre": "UDS San Ildelfonso SV"
+  },
+  {
+    "codigo": "277",
+    "nombre": "UDS San Isidro CA"
+  },
+  {
+    "codigo": "140",
+    "nombre": "UDS San Isidro Labrador CH"
+  },
+  {
+    "codigo": "467",
+    "nombre": "UDS San Isidro MO"
+  },
+  {
+    "codigo": "353",
+    "nombre": "UDS San Jorge SM"
+  },
+  {
+    "codigo": "139",
+    "nombre": "UDS San José Cancasque CH"
+  },
+  {
+    "codigo": "604",
+    "nombre": "UDS San José Guayabal CU"
+  },
+  {
+    "codigo": "110",
+    "nombre": "UDS San josé Las Flores CH"
+  },
+  {
+    "codigo": "524",
+    "nombre": "UDS San Jose LU San Jose de la Fuente"
+  },
+  {
+    "codigo": "125",
+    "nombre": "UDS San José Ojos de Agua CH"
+  },
+  {
+    "codigo": "187",
+    "nombre": "UDS San José Villanueva LL"
+  },
+  {
+    "codigo": "251",
+    "nombre": "UDS San Juan Nonualco"
+  },
+  {
+    "codigo": "175",
+    "nombre": "UDS San Juan Opico LL"
+  },
+  {
+    "codigo": "178",
+    "nombre": "UDS San Juan Opico LL Sitio El Niño"
+  },
+  {
+    "codigo": "257",
+    "nombre": "UDS San Juan Talpa LP"
+  },
+  {
+    "codigo": "258",
+    "nombre": "UDS San Juan Tepezontes LP"
+  },
+  {
+    "codigo": "88",
+    "nombre": "UDS San Julian SO"
+  },
+  {
+    "codigo": "24",
+    "nombre": "UDS San Lorenzo AH"
+  },
+  {
+    "codigo": "331",
+    "nombre": "UDS San Lorenzo SV"
+  },
+  {
+    "codigo": "427",
+    "nombre": "UDS San Luis de la Reina SM"
+  },
+  {
+    "codigo": "126",
+    "nombre": "UDS SAN LUIS DEL CARMEN"
+  },
+  {
+    "codigo": "239",
+    "nombre": "UDS San Luis La Herradura LP"
+  },
+  {
+    "codigo": "266",
+    "nombre": "UDS San Luis La Herradura LP El Zapote"
+  },
+  {
+    "codigo": "242",
+    "nombre": "UDS San Luis Talpa LP"
+  },
+  {
+    "codigo": "268",
+    "nombre": "UDS San Luis Talpa LP El Pimental"
+  },
+  {
+    "codigo": "553",
+    "nombre": "UDS San Marcos SS \"Dr. Roberto Cáceres B.\""
+  },
+  {
+    "codigo": "577",
+    "nombre": "UDS San Martín SS"
+  },
+  {
+    "codigo": "182",
+    "nombre": "UDS San Matías LL"
+  },
+  {
+    "codigo": "138",
+    "nombre": "UDS San Miguel de Mercedes CH"
+  },
+  {
+    "codigo": "422",
+    "nombre": "UDS San Miguel SM"
+  },
+  {
+    "codigo": "414",
+    "nombre": "UDS San Miguel SM Col Carrillo \" Martín Zaldivar\""
+  },
+  {
+    "codigo": "411",
+    "nombre": "UDS San Miguel SM El Niño"
+  },
+  {
+    "codigo": "410",
+    "nombre": "UDS San Miguel SM El Tecomatal"
+  },
+  {
+    "codigo": "399",
+    "nombre": "UDS San Miguel SM El Zamoran"
+  },
+  {
+    "codigo": "393",
+    "nombre": "UDS San Miguel SM La Presita \" Dr. Roberto A. Carias\""
+  },
+  {
+    "codigo": "396",
+    "nombre": "UDS San Miguel SM Milagro de la Paz"
+  },
+  {
+    "codigo": "416",
+    "nombre": "UDS San Miguel SM Miraflores"
+  },
+  {
+    "codigo": "403",
+    "nombre": "UDS San Miguel SM San Antonio Silva"
+  },
+  {
+    "codigo": "401",
+    "nombre": "UDS San Miguel SM San Carlos"
+  },
+  {
+    "codigo": "255",
+    "nombre": "UDS San Miguel Tepezontes LP"
+  },
+  {
+    "codigo": "176",
+    "nombre": "UDS San Pablo Tacachico LL"
+  },
+  {
+    "codigo": "233",
+    "nombre": "UDS San Pedro Masahuat LP"
+  },
+  {
+    "codigo": "264",
+    "nombre": "UDS San Pedro Masahuat LP El Achiotal"
+  },
+  {
+    "codigo": "263",
+    "nombre": "UDS San Pedro Masahuat LP Las Isletas"
+  },
+  {
+    "codigo": "230",
+    "nombre": "UDS San Pedro Nonualco LP"
+  },
+  {
+    "codigo": "205",
+    "nombre": "UDS San Pedro Perulapan CU"
+  },
+  {
+    "codigo": "23",
+    "nombre": "UDS San Pedro Puxtla AH"
+  },
+  {
+    "codigo": "209",
+    "nombre": "UDS San Rafael Cedros CU"
+  },
+  {
+    "codigo": "133",
+    "nombre": "UDS San Rafael CH"
+  },
+  {
+    "codigo": "256",
+    "nombre": "UDS San Rafael Obrajuelo LP"
+  },
+  {
+    "codigo": "351",
+    "nombre": "UDS San Rafael Oriente SM"
+  },
+  {
+    "codigo": "221",
+    "nombre": "UDS San Ramón CU"
+  },
+  {
+    "codigo": "586",
+    "nombre": "UDS San Salvador SS Barrios"
+  },
+  {
+    "codigo": "584",
+    "nombre": "UDS San Salvador SS Concepción"
+  },
+  {
+    "codigo": "590",
+    "nombre": "UDS San Salvador SS Lourdes"
+  },
+  {
+    "codigo": "588",
+    "nombre": "UDS San Salvador SS Monserrat"
+  },
+  {
+    "codigo": "599",
+    "nombre": "UDS San Salvador SS San Antonio Abad"
+  },
+  {
+    "codigo": "550",
+    "nombre": "UDS San Salvador SS San Jacinto \"Dr. Mauricio Sol Nerio\""
+  },
+  {
+    "codigo": "582",
+    "nombre": "UDS San Salvador SS San Miguelito \" Dr. Juan R. Alvarenga\""
+  },
+  {
+    "codigo": "74",
+    "nombre": "UDS San Sebastián Salitrillo SA"
+  },
+  {
+    "codigo": "316",
+    "nombre": "UDS San Sebastian SV"
+  },
+  {
+    "codigo": "463",
+    "nombre": "UDS San Simón MO"
+  },
+  {
+    "codigo": "326",
+    "nombre": "UDS San Vicente SV Periférica"
+  },
+  {
+    "codigo": "34",
+    "nombre": "UDS Santa Ana SA \" Dr. Tomás Pineda Martínez\""
+  },
+  {
+    "codigo": "35",
+    "nombre": "UDS Santa Ana SA Casa del Niño"
+  },
+  {
+    "codigo": "36",
+    "nombre": "UDS Santa Ana SA El Palmar"
+  },
+  {
+    "codigo": "49",
+    "nombre": "UDS Santa Ana SA Natividad"
+  },
+  {
+    "codigo": "48",
+    "nombre": "UDS Santa Ana SA Planes de la Laguna"
+  },
+  {
+    "codigo": "38",
+    "nombre": "UDS Santa Ana SA San Miguelito"
+  },
+  {
+    "codigo": "39",
+    "nombre": "UDS Santa Ana SA San Rafael"
+  },
+  {
+    "codigo": "40",
+    "nombre": "UDS Santa Ana SA Santa Bárbara"
+  },
+  {
+    "codigo": "37",
+    "nombre": "UDS Santa Ana SA Santa Lucia"
+  },
+  {
+    "codigo": "96",
+    "nombre": "UDS Santa Catarina Masahuat SO"
+  },
+  {
+    "codigo": "330",
+    "nombre": "UDS Santa Clara SV"
+  },
+  {
+    "codigo": "214",
+    "nombre": "UDS Santa Cruz Analquito CU"
+  },
+  {
+    "codigo": "210",
+    "nombre": "UDS Santa Cruz Michapa CU"
+  },
+  {
+    "codigo": "339",
+    "nombre": "UDS Santa Elena US"
+  },
+  {
+    "codigo": "98",
+    "nombre": "UDS Santa Isabel Ishuatan SO"
+  },
+  {
+    "codigo": "253",
+    "nombre": "UDS Santa María Ostuma LP"
+  },
+  {
+    "codigo": "344",
+    "nombre": "UDS Santa María US"
+  },
+  {
+    "codigo": "136",
+    "nombre": "UDS Santa Rita CH"
+  },
+  {
+    "codigo": "756",
+    "nombre": "UDS Santa Rosa de Lima LU Periferica"
+  },
+  {
+    "codigo": "65",
+    "nombre": "UDS Santa Rosa Guachipilín SA"
+  },
+  {
+    "codigo": "179",
+    "nombre": "UDS Santa Tecla LL \" Dr. Alberto Aguilar Rivas\""
+  },
+  {
+    "codigo": "191",
+    "nombre": "UDS Santa Tecla LL \" Dr. Carlos Díaz del Pinal\""
+  },
+  {
+    "codigo": "370",
+    "nombre": "UDS Santiago de María US El Cerrito"
+  },
+  {
+    "codigo": "55",
+    "nombre": "UDS Santiago La Frontera SA"
+  },
+  {
+    "codigo": "236",
+    "nombre": "UDS Santiago Nonualco LP"
+  },
+  {
+    "codigo": "265",
+    "nombre": "UDS Santiago Nonualco LP San José la Paz Arriba"
+  },
+  {
+    "codigo": "560",
+    "nombre": "UDS Santiago Texacuangos SS"
+  },
+  {
+    "codigo": "97",
+    "nombre": "UDS Santo Domingo de Guzmán SO"
+  },
+  {
+    "codigo": "324",
+    "nombre": "UDS Santo Domingo SV"
+  },
+  {
+    "codigo": "554",
+    "nombre": "UDS SantoTomas SS \"Dr. José E. Avalos la Guardia\""
+  },
+  {
+    "codigo": "466",
+    "nombre": "UDS Sensembra MO Yamabal"
+  },
+  {
+    "codigo": "293",
+    "nombre": "UDS Sensuntepeque CA"
+  },
+  {
+    "codigo": "308",
+    "nombre": "UDS Sensuntepeque CA Santa Lucia"
+  },
+  {
+    "codigo": "388",
+    "nombre": "UDS Sesori SM"
+  },
+  {
+    "codigo": "456",
+    "nombre": "UDS Sociedad MO"
+  },
+  {
+    "codigo": "634",
+    "nombre": "UDS Sonsonate SO"
+  },
+  {
+    "codigo": "99",
+    "nombre": "UDS Sonsonate SO Salinas de Ayacachapa"
+  },
+  {
+    "codigo": "92",
+    "nombre": "UDS Sonzacate SO \"Dr. Leonardo A. López\""
+  },
+  {
+    "codigo": "570",
+    "nombre": "UDS Soyapango SS \" Enf. Zoila M. de Guadrón\""
+  },
+  {
+    "codigo": "571",
+    "nombre": "UDS Soyapango SS Amatepec"
+  },
+  {
+    "codigo": "572",
+    "nombre": "UDS Soyapango SS Unicentro"
+  },
+  {
+    "codigo": "16",
+    "nombre": "UDS Tacuba AH"
+  },
+  {
+    "codigo": "195",
+    "nombre": "UDS Talnique LL"
+  },
+  {
+    "codigo": "199",
+    "nombre": "UDS Talnique LL San José Los Sitios"
+  },
+  {
+    "codigo": "192",
+    "nombre": "UDS Tamanique LL"
+  },
+  {
+    "codigo": "269",
+    "nombre": "UDS Tapalhuaca LP"
+  },
+  {
+    "codigo": "368",
+    "nombre": "UDS Tecapán US"
+  },
+  {
+    "codigo": "319",
+    "nombre": "UDS Tecoluca SV"
+  },
+  {
+    "codigo": "329",
+    "nombre": "UDS Tecoluca SV San Carlos Lempa"
+  },
+  {
+    "codigo": "333",
+    "nombre": "UDS Tecoluca SV San Nicolas Lempa"
+  },
+  {
+    "codigo": "304",
+    "nombre": "UDS Tejutepeque CA"
+  },
+  {
+    "codigo": "152",
+    "nombre": "UDS Tejutla CH"
+  },
+  {
+    "codigo": "212",
+    "nombre": "UDS Tenancingo CU"
+  },
+  {
+    "codigo": "730",
+    "nombre": "UDS Teotepeque LL"
+  },
+  {
+    "codigo": "189",
+    "nombre": "UDS Teotepeque LL Mizata"
+  },
+  {
+    "codigo": "183",
+    "nombre": "UDS Tepecoyo LL"
+  },
+  {
+    "codigo": "325",
+    "nombre": "UDS Tepetitan SV"
+  },
+  {
+    "codigo": "44",
+    "nombre": "UDS Texistepeque SA"
+  },
+  {
+    "codigo": "47",
+    "nombre": "UDS Texistepeque SA Guarnecia"
+  },
+  {
+    "codigo": "58",
+    "nombre": "UDS Texistepeque SA San Miguel"
+  },
+  {
+    "codigo": "544",
+    "nombre": "UDS Tonacatepeque SS"
+  },
+  {
+    "codigo": "610",
+    "nombre": "UDS Tonacatepeque SS Alta Vista"
+  },
+  {
+    "codigo": "547",
+    "nombre": "UDS Tonacatepeque SS Distrito Italia"
+  },
+  {
+    "codigo": "459",
+    "nombre": "UDS Torola MO"
+  },
+  {
+    "codigo": "25",
+    "nombre": "UDS Turin AH"
+  },
+  {
+    "codigo": "405",
+    "nombre": "UDS Uluazapa SM"
+  },
+  {
+    "codigo": "1088",
+    "nombre": "UDS Usulután US"
+  },
+  {
+    "codigo": "345",
+    "nombre": "UDS Usulután US El Molino"
+  },
+  {
+    "codigo": "350",
+    "nombre": "UDS Usulután US La Cruz"
+  },
+  {
+    "codigo": "347",
+    "nombre": "UDS Usulután US Puerto Parada"
+  },
+  {
+    "codigo": "323",
+    "nombre": "UDS Verapaz SV"
+  },
+  {
+    "codigo": "279",
+    "nombre": "UDS Victoria CA"
+  },
+  {
+    "codigo": "294",
+    "nombre": "UDS Victoria CA Santa Marta"
+  },
+  {
+    "codigo": "469",
+    "nombre": "UDS Villa El Rosario MO"
+  },
+  {
+    "codigo": "815",
+    "nombre": "UDS Yamabal MO San Juan de la Cruz"
+  },
+  {
+    "codigo": "418",
+    "nombre": "UDS Yayantique LU"
+  },
+  {
+    "codigo": "471",
+    "nombre": "UDS Yoloaiquin MO"
+  },
+  {
+    "codigo": "417",
+    "nombre": "UDS Yucuiaiquín LU"
+  },
+  {
+    "codigo": "270",
+    "nombre": "UDS Zacatecoluca LP \"Dr. Carlos Alberto Galeano\""
+  },
+  {
+    "codigo": "188",
+    "nombre": "UDS Zaragoza LL"
+  },
+  {
+    "codigo": "2653",
+    "nombre": "UDSI Izalco SO San Isidro"
+  },
+  {
+    "codigo": "2079",
+    "nombre": "Unidad Medica ISSS Acajutla SO"
+  },
+  {
+    "codigo": "1981",
+    "nombre": "Unidad Medica ISSS Aguilares SS"
+  },
+  {
+    "codigo": "1961",
+    "nombre": "Unidad Medica ISSS Ahuachapan"
+  },
+  {
+    "codigo": "1976",
+    "nombre": "Unidad Medica ISSS Apopa SS"
+  },
+  {
+    "codigo": "2107",
+    "nombre": "Unidad Médica ISSS Berlín  US"
+  },
+  {
+    "codigo": "803",
+    "nombre": "Unidad Medica ISSS Chalatenango CH"
+  },
+  {
+    "codigo": "1862",
+    "nombre": "Unidad Médica ISSS Chalchuapa SA"
+  },
+  {
+    "codigo": "2078",
+    "nombre": "Unidad Medica ISSS Chinameca SM"
+  },
+  {
+    "codigo": "2106",
+    "nombre": "Unidad Médica ISSS Cojutepeque  CU"
+  },
+  {
+    "codigo": "2108",
+    "nombre": "Unidad Médica ISSS Ilobasco  CA"
+  },
+  {
+    "codigo": "1101",
+    "nombre": "Unidad Medica ISSS Ilopango SS"
+  },
+  {
+    "codigo": "2080",
+    "nombre": "Unidad Medica ISSS Juayua SO"
+  },
+  {
+    "codigo": "804",
+    "nombre": "Unidad Medica ISSS La Libertad LL"
+  },
+  {
+    "codigo": "1399",
+    "nombre": "Unidad Medica ISSS La Unión LU"
+  },
+  {
+    "codigo": "868",
+    "nombre": "Unidad Medica ISSS Mejicanos SS Zacamil"
+  },
+  {
+    "codigo": "1831",
+    "nombre": "Unidad Médica ISSS Metapán SA"
+  },
+  {
+    "codigo": "2109",
+    "nombre": "Unidad Médica ISSS Moncagua  SM"
+  },
+  {
+    "codigo": "2110",
+    "nombre": "Unidad Médica ISSS Nejapa  SS"
+  },
+  {
+    "codigo": "1826",
+    "nombre": "Unidad Medica ISSS Puerto El Triunfo US"
+  },
+  {
+    "codigo": "805",
+    "nombre": "Unidad Medica ISSS Quezaltepeque LL"
+  },
+  {
+    "codigo": "813",
+    "nombre": "Unidad Medica ISSS Sacacoyo LL Ateos"
+  },
+  {
+    "codigo": "2016",
+    "nombre": "Unidad Médica ISSS San Francisco Gotera MO"
+  },
+  {
+    "codigo": "1431",
+    "nombre": "Unidad Medica ISSS San Miguel SM"
+  },
+  {
+    "codigo": "1943",
+    "nombre": "Unidad Medica ISSS San Salvador SS Atlacatl"
+  },
+  {
+    "codigo": "2290",
+    "nombre": "Unidad Medica ISSS San Salvador SS Medicina Fisica y Rehabilitacion"
+  },
+  {
+    "codigo": "1946",
+    "nombre": "Unidad Medica ISSS San Salvador SS San Jacinto"
+  },
+  {
+    "codigo": "1947",
+    "nombre": "Unidad Medica ISSS San Salvador SS Santa Anita (15 de sept.)"
+  },
+  {
+    "codigo": "626",
+    "nombre": "Unidad Medica ISSS San Vicente SV"
+  },
+  {
+    "codigo": "2111",
+    "nombre": "Unidad Médica ISSS Santa Ana SA"
+  },
+  {
+    "codigo": "806",
+    "nombre": "Unidad Medica ISSS Santa Tecla LL"
+  },
+  {
+    "codigo": "1960",
+    "nombre": "Unidad Medica ISSS Santiago de Maria US"
+  },
+  {
+    "codigo": "2017",
+    "nombre": "Unidad Médica ISSS Sensuntepeque CA"
+  },
+  {
+    "codigo": "1974",
+    "nombre": "Unidad Medica ISSS Soyapango SS"
+  },
+  {
+    "codigo": "1825",
+    "nombre": "Unidad Medica ISSS Usulutan US"
+  },
+  {
+    "codigo": "798",
+    "nombre": "Unidad Medica ISSS Zacatecoluca LP"
+  },
+  {
+    "codigo": "1962",
+    "nombre": "Universidad Alberto Masferrer (USAM) SS"
+  },
+  {
+    "codigo": "2347",
+    "nombre": "Universidad Automa de Santa Ana (UNASA)"
+  },
+  {
+    "codigo": "1880",
+    "nombre": "Universidad de El Salvador (UES) SS"
+  },
+  {
+    "codigo": "1881",
+    "nombre": "Universidad Evangélica (UE) SS"
+  },
+  {
+    "codigo": "2632",
+    "nombre": "USB Nejapa SS Tutultepeque"
+  },
+  {
+    "codigo": "2631",
+    "nombre": "USB Panchimalco SS El Cedro Planes de Renderos"
+  },
+  {
+    "codigo": "2629",
+    "nombre": "USB Panchimalco SS Panchimalquito"
+  },
+  {
+    "codigo": "2630",
+    "nombre": "USB Rosario de Mora SS El Jutillo"
+  }
+]

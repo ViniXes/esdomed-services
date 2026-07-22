@@ -34,6 +34,7 @@ import {
   CalendarClock,
   NotebookPen,
   UserSearch,
+  FileCode2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -84,6 +85,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verBusquedaTelefono = esAdmin;
   const verCuidadosCriticos = puedeVerModuloCuidadosCriticos(profile);
   const verReportes = esEsdomed || esAdmin;
+  // Temporalmente solo admin mientras está en pruebas, para no confundir al
+  // personal de ESDOMED con una herramienta todavía no lista para uso real.
+  const verSimmow = esAdmin;
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
   const verAprobacionTramites = esAdmin || esAsistente;
@@ -220,6 +224,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS },
           { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, badge: pendientes.anexo5, group: G_DOCUMENTOS },
         ]
+      : []),
+    ...(verSimmow
+      ? [{ href: "/dashboard/simmow", label: "SIMMOW", icon: FileCode2, group: G_DOCUMENTOS }]
       : []),
 
     // ── Reportes ──
