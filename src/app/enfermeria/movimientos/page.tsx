@@ -69,7 +69,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   observada: "bg-rose-50/70 dark:bg-rose-950/40 text-slate-800 dark:text-rose-100 border-rose-200/80 dark:border-rose-900/70",
   deposito: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   suspendida: "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
-  procesada: "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900",
+  procesada: "bg-blue-50 dark:bg-[var(--color-institutional-navy)] text-[#1c1e4d] dark:text-[#dce6ff] border-[#c9a892]/60 dark:border-[#c9a892]/40",
   recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   revertida: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
@@ -84,7 +84,13 @@ const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
 };
 
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition";
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1c1e4d]/50 dark:focus:ring-[#c9a892]/60 transition";
+
+/* Acción primaria institucional: marino con hairline dorado arena. */
+const primaryBtnCls = "bg-[#1c1e4d] hover:bg-[#2f48aa] text-white ring-1 ring-inset ring-[#c9a892]/40 dark:ring-[#c9a892]/50";
+
+/* Anillo de foco institucional para controles de filtro. */
+const focusRingCls = "focus:outline-none focus:ring-2 focus:ring-[#1c1e4d]/50 dark:focus:ring-[#c9a892]/60";
 
 const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
 const esEstadoOcultoParaEnfermeria = (n: NotificacionAltaVivo) =>
@@ -279,10 +285,11 @@ export default function EnfermeriaMovimientosPage() {
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950 rounded-xl flex items-center justify-center border border-teal-200 dark:border-teal-900">
-          <History size={17} className="text-teal-600 dark:text-teal-400" />
+        <div className="w-9 h-9 bg-[#1c1e4d] dark:bg-[#c9a892] rounded-xl flex items-center justify-center ring-1 ring-[#c9a892]/45 dark:ring-0 shadow-sm">
+          <History size={17} className="text-white dark:text-[#1c2834]" />
         </div>
         <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a67c65] dark:text-[#c9a892]/80">Enfermería · Egresos vivos</p>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
             Movimientos de altas
           </h1>
@@ -295,8 +302,8 @@ export default function EnfermeriaMovimientosPage() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
         <SummaryCard label="Pendientes" value={registrosVisibles.filter((n) => n.estado === "pendiente").length} />
         <SummaryCard label="Con observacion" value={registrosVisibles.filter((n) => n.estado === "observada").length} tone="rose" />
-        <SummaryCard label="Altas efectivas" value={registrosVisibles.filter((n) => n.estado === "procesada").length} tone="green" />
-        <SummaryCard label="Rectificadas" value={registrosVisibles.filter((n) => n.rectificacionUsada).length} tone="blue" />
+        <SummaryCard label="Altas efectivas" value={registrosVisibles.filter((n) => n.estado === "procesada").length} tone="navy" />
+        <SummaryCard label="Rectificadas" value={registrosVisibles.filter((n) => n.rectificacionUsada).length} tone="royal" />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -306,13 +313,13 @@ export default function EnfermeriaMovimientosPage() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar paciente, expediente o servicio..."
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+            className={`w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg ${focusRingCls} text-slate-900 dark:text-slate-100 placeholder-slate-400`}
           />
         </div>
         <select
           value={filtroEstado}
           onChange={(e) => setFiltroEstado(e.target.value as EstadoNotificacionAlta | "todos")}
-          className="px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
+          className={`px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg ${focusRingCls} text-slate-900 dark:text-slate-100`}
         >
           <option value="todos">Todos los estados</option>
           <option value="pendiente">Pendiente ESDOMED</option>
@@ -388,7 +395,7 @@ export default function EnfermeriaMovimientosPage() {
           return (
             <div
               key={n.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 transition-colors hover:border-teal-200 dark:hover:border-teal-900"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 transition-colors hover:border-[#c9a892]/60 dark:hover:border-[#c9a892]/35"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -421,7 +428,7 @@ export default function EnfermeriaMovimientosPage() {
                   </p>
                 )}
                 {n.estado === "procesada" && n.procesadoPorNombre && (
-                  <p className="text-xs text-green-600 dark:text-green-500 font-medium">
+                  <p className="text-xs text-[#1c1e4d] dark:text-[#c9a892] font-medium">
                     Alta efectiva por ESDOMED - {formatFecha(n.procesadoEn)}
                   </p>
                 )}
@@ -472,7 +479,7 @@ export default function EnfermeriaMovimientosPage() {
                   <button
                     type="button"
                     onClick={() => abrirRectificacion(n)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold ${primaryBtnCls} rounded-lg transition-colors`}
                   >
                     <Pencil size={12} />
                     {n.estado === "observada" ? "Corregir observacion" : "Rectificar una vez"}
@@ -525,7 +532,7 @@ export default function EnfermeriaMovimientosPage() {
               <label className="block text-xs font-medium text-slate-500 mb-1.5">
                 Cambiar paciente <span className="font-normal text-slate-400">(opcional)</span>
               </label>
-              <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="teal" />
+              <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="navy" />
             </div>
 
             <div>
@@ -538,8 +545,8 @@ export default function EnfermeriaMovimientosPage() {
                     onClick={() => setTipoAlta(t.value)}
                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                       tipoAlta === t.value
-                        ? "border-teal-500 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 ring-1 ring-teal-500/30"
-                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-teal-300"
+                        ? "border-[#1c1e4d] bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 dark:border-[#c9a892]/50 dark:bg-[var(--color-institutional-navy)] dark:text-white"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-[#c9a892]/70"
                     }`}
                   >
                     {t.label}
@@ -574,7 +581,7 @@ export default function EnfermeriaMovimientosPage() {
               <button
                 type="submit"
                 disabled={saving || !tipoAlta}
-                className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors"
+                className={`flex-1 py-2.5 ${primaryBtnCls} text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors`}
               >
                 {saving ? "Guardando..." : "Guardar rectificacion"}
               </button>
@@ -593,13 +600,13 @@ function SummaryCard({
 }: {
   label: string;
   value: number;
-  tone?: "amber" | "rose" | "green" | "blue";
+  tone?: "amber" | "rose" | "navy" | "royal";
 }) {
   const toneCls = {
     amber: "border-l-4 border-l-[#c99a2e] text-[#1c1e4d] dark:text-amber-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
     rose: "border-l-4 border-l-[#b76e79] text-[#1c1e4d] dark:text-rose-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-    green: "border-l-4 border-l-[#009b8f] text-[#1c1e4d] dark:text-emerald-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-    blue: "border-l-4 border-l-[#1c1e4d] text-[#1c1e4d] dark:text-blue-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
+    navy: "border-l-4 border-l-[#1c1e4d] text-[#1c1e4d] dark:text-[#dce6ff] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
+    royal: "border-l-4 border-l-[#2f48aa] text-[#1c1e4d] dark:text-blue-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
   }[tone];
 
   return (
