@@ -690,7 +690,9 @@ function extraerCausaExternaYCirugias(texto: string): {
     .trim();
 
   const cie = "([A-Z]\\s*\\d\\s*\\d(?:\\s*[\\.,]\\s*\\d{1,2})?)";
-  const patronCodigoCIE10 = "Codigo\\s*CIE\\s*[-\\s]*10\\s*:?";
+  // "10" opcional: a veces queda desplazado DESPUÉS del código en vez de
+  // antes (ver comentario en extraerFieh, Diagnóstico principal).
+  const patronCodigoCIE10 = "Codigo\\s*CIE\\s*[-\\s]*(?:10)?\\s*:?";
 
   const limpiarTextoLocal = (txt: string) =>
     limpiarDato(
@@ -938,9 +940,15 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   }
 
   // Diagnóstico principal
+  //
+  // "Código CIE-10:" a veces llega con el "10:" desplazado DESPUÉS del
+  // código en vez de antes (p. ej. "Código CIE- J15.8 10:") — un elemento de
+  // posición fija en la plantilla que no se mueve con el ancho del código
+  // cuando este es corto. Se hace "10" opcional para no depender de su
+  // posición exacta.
   const dxPrincipal = plano.match(
     new RegExp(
-      "Diagn[oó]stico\\s+principal\\s*(?:\\(d\\))?\\s*:\\s*([\\s\\S]*?)\\s*C[oó]digo\\s*CIE\\s*[-\\s]*10\\s*:?\\s*([A-Z]\\s*\\d\\s*\\d(?:\\s*[\\.,]\\s*\\d{1,2})?)",
+      "Diagn[oó]stico\\s+principal\\s*(?:\\(d\\))?\\s*:\\s*([\\s\\S]*?)\\s*C[oó]digo\\s*CIE\\s*[-\\s]*(?:10)?\\s*:?\\s*([A-Z]\\s*\\d\\s*\\d(?:\\s*[\\.,]\\s*\\d{1,2})?)",
       "i"
     )
   );
