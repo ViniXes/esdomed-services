@@ -103,13 +103,20 @@ function limpiarNombreEstablecimiento(txt: string): string {
 
 /**
  * Sección E (Seguimiento de paciente a su egreso): un único nombre de
- * establecimiento se reparte entre "Referido al Establecimiento" o "Retorno
- * hacia" en SIMMOW según cuál casilla ("Referencia" / "Retorno") esté
- * marcada junto a él. El nombre puede envolver a una segunda línea.
+ * establecimiento, marcado con cualquiera de las dos casillas ("Referencia" /
+ * "Retorno" — cuál de las dos esté marcada NO decide el destino), se reparte
+ * entre "Referido al Establecimiento" o "Retorno hacia" en SIMMOW según la
+ * Circunstancia de Alta (numeral 8, sección D) elegida:
+ *   - Circunstancia = "A otro Hospital" (valor "2") → Referido al Establecimiento.
+ *   - Cualquier otra circunstancia (Domicilio, Residencia, Voluntaria,
+ *     In Extremis, Fuga) → Retorno hacia.
+ * Regla confirmada por el personal de ESDOMED (no es una inferencia propia).
+ * El nombre puede envolver a una segunda línea.
  */
 function referidoRetornoSeguimientoPorCheckbox(
-  doc: DocumentoExtraido
-): { referidoA: string; retorno: string } {
+  doc: DocumentoExtraido,
+  circunstanciaAltaValor: string
+): { referidoA: string; retorno: string; advertencia?: string } {
   const vacio = { referidoA: "", retorno: "" };
 
   const etiquetaEstablecimiento = buscarItem(doc, /Nombre\s+establecimiento:/i);
@@ -131,10 +138,21 @@ function referidoRetornoSeguimientoPorCheckbox(
   )
     .filter((cb) => cb.marcado)
     .map((cb) => sinAcentos(cb.opcion).toLowerCase());
+  const hayMarca = marcadas.some((op) => op.includes("referencia") || op.includes("retorno"));
+  if (!hayMarca) return vacio;
 
+  if (circunstanciaAltaValor === "2") {
+    return { referidoA: nombreEstablecimiento, retorno: "" };
+  }
+  if (circunstanciaAltaValor) {
+    return { referidoA: "", retorno: nombreEstablecimiento };
+  }
   return {
-    referidoA: marcadas.some((op) => op.includes("referencia")) ? nombreEstablecimiento : "",
-    retorno: marcadas.some((op) => op.includes("retorno")) ? nombreEstablecimiento : "",
+    ...vacio,
+    advertencia:
+      `Se detectó establecimiento de seguimiento ("${nombreEstablecimiento}") pero no se ` +
+      "pudo determinar la Circunstancia de Alta para saber si va en Referido al " +
+      "Establecimiento o Retorno hacia. Complételo manualmente.",
   };
 }
 
@@ -788,7 +806,8 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   );
   if (/urbano/i.test(datos.AREA)) datos.AREA = "Urbana";
 
-  const seguimiento = referidoRetornoSeguimientoPorCheckbox(doc);
+  const circunstanciaAlta = circunstanciaAltaPorCheckbox(doc);
+  const seguimiento = referidoRetornoSeguimientoPorCheckbox(doc, circunstanciaAlta);
   datos.REFERIDO_A_ESTABLECIMIENTO = seguimiento.referidoA;
   // Regex sobre texto plano primero (caso etiqueta contigua); si la etiqueta
   // "Nombre del establecimiento (referido de:)" viene partida en varias
@@ -797,6 +816,7 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
     extraerReferidoDelEstablecimiento(plano) ||
     extraerReferidoDelEstablecimientoPorCoordenadas(doc);
   datos.RETORNO_HACIA = seguimiento.retorno;
+  if (seguimiento.advertencia) advertencias.push(seguimiento.advertencia);
 
   datos.FECHA_INGRESO = buscar(
     plano,
@@ -904,7 +924,7 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
     camposNoEncontrados.push("CONDICION_EGRESO");
   }
 
-  datos.MOTIVO_ALTA_VALOR = circunstanciaAltaPorCheckbox(doc);
+  datos.MOTIVO_ALTA_VALOR = circunstanciaAlta;
   if (!datos.MOTIVO_ALTA_VALOR && datos.CONDICION_EGRESO !== "MUERTO") {
     camposNoEncontrados.push("MOTIVO_ALTA_VALOR");
   }
