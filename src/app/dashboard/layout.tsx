@@ -232,9 +232,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     // ── Reportes ──
     ...(verReportes
       ? [
-          { href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES },
+          { href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES, exact: true },
           { href: "/dashboard/reportes/tabuladores", label: "Tabuladores", icon: Table2, group: G_REPORTES },
           { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid, group: G_REPORTES },
+          { href: "/dashboard/reportes/traslados", label: "Traslados de cama", icon: ArrowRightLeft, group: G_REPORTES },
         ]
       : []),
 
