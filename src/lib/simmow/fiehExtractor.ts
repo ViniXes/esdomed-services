@@ -32,7 +32,7 @@ import {
   tipoAfiliacionValor,
   tipoDocumentoValor,
 } from "./catalogoSimmow";
-import { buscarItem, checkboxesEnLinea, leerCeldaMultilinea } from "./layout";
+import { buscarItem, checkboxesEnLinea, leerCeldaMultilinea, opcionesMarcadas } from "./layout";
 
 // ─── Detección de tipo de documento ─────────────────────────────────────────
 
@@ -46,14 +46,16 @@ export function esFieh(textoCompleto: string): boolean {
 
 // ─── Campos por casillas ────────────────────────────────────────────────────
 
+/**
+ * "Vivo" / "Muerto" son las únicas casillas de todo el documento con ese
+ * texto exacto, así que se busca la marcada en TODO el documento en vez de
+ * anclarla a la línea de la etiqueta "Condición de": en algunos FIEH reales
+ * la casilla de esta fila queda justo en el borde de la tolerancia vertical
+ * usada para asociar checkbox↔línea y la búsqueda por línea no la encuentra,
+ * aunque la casilla sí se detectó y asoció correctamente a su opción.
+ */
 function condicionPorCheckbox(doc: DocumentoExtraido): "" | "VIVO" | "MUERTO" {
-  const etiqueta = buscarItem(doc, /^Condicion de\b/i);
-  if (!etiqueta) return "";
-
-  const marcadas = checkboxesEnLinea(etiqueta.pagina, etiqueta.item.y).filter(
-    (cb) => cb.marcado
-  );
-  for (const cb of marcadas) {
+  for (const cb of opcionesMarcadas(doc)) {
     const op = sinAcentos(cb.opcion).toLowerCase();
     if (op === "vivo") return "VIVO";
     if (op === "muerto") return "MUERTO";
@@ -61,6 +63,16 @@ function condicionPorCheckbox(doc: DocumentoExtraido): "" | "VIVO" | "MUERTO" {
   return "";
 }
 
+/**
+ * Cada opción de "Circunstancia de alta" envuelve su palabra clave a una
+ * segunda línea ("Referido a otro" / "hospital", "Alta" / "voluntaria",
+ * etc.), quedando la casilla pegada solo al conector suelto de la primera
+ * línea ("a") — el texto ya asociado a la casilla (por "palabra más cercana
+ * a la izquierda") no sirve para identificar la opción. Se resuelve por
+ * posición: se reconstruye cada columna de opción juntando los fragmentos de
+ * ambas líneas por su X, y cada casilla marcada se asigna a la columna cuyo
+ * inicio (X) es el más cercano sin pasarse de la X de la casilla.
+ */
 function circunstanciaAltaPorCheckbox(doc: DocumentoExtraido): string {
   const etiqueta = buscarItem(doc, /Circunstancia de alta/i);
   if (!etiqueta) return "";
@@ -68,14 +80,34 @@ function circunstanciaAltaPorCheckbox(doc: DocumentoExtraido): string {
   const marcadas = checkboxesEnLinea(etiqueta.pagina, etiqueta.item.y).filter(
     (cb) => cb.marcado
   );
+  if (!marcadas.length) return "";
+
+  const fragmentos = etiqueta.pagina.items.filter(
+    (it) =>
+      it.x > etiqueta.item.x &&
+      it.y <= etiqueta.item.y + 2 &&
+      it.y >= etiqueta.item.y - 12
+  );
+  const columnas: { x: number; texto: string }[] = [];
+  for (const it of [...fragmentos].sort((a, b) => a.x - b.x || b.y - a.y)) {
+    const col = columnas.find((c) => Math.abs(c.x - it.x) <= 3);
+    if (col) col.texto += " " + it.str;
+    else columnas.push({ x: it.x, texto: it.str });
+  }
+  columnas.sort((a, b) => a.x - b.x);
+
   for (const cb of marcadas) {
-    const op = sinAcentos(cb.opcion).toLowerCase();
-    if (op.includes("domicilio") || op.includes("destino")) return "1";
-    if (op.includes("referido") || op.includes("hospital")) return "2";
-    if (op.includes("residencia")) return "3";
-    if (op.includes("voluntaria") || op === "alta") return "4";
-    if (op.includes("extremis") || op.includes("morir en casa")) return "5";
-    if (op.includes("fuga")) return "6";
+    let texto = "";
+    for (const col of columnas) {
+      if (col.x <= cb.x + 2) texto = sinAcentos(col.texto).toLowerCase();
+      else break;
+    }
+    if (texto.includes("domicilio") || texto.includes("destino")) return "1";
+    if (texto.includes("referido") || texto.includes("hospital")) return "2";
+    if (texto.includes("residencia")) return "3";
+    if (texto.includes("voluntaria") || /\balta\b/.test(texto)) return "4";
+    if (texto.includes("extremis") || texto.includes("morir en casa")) return "5";
+    if (texto.includes("fuga")) return "6";
   }
   return "";
 }
@@ -181,6 +213,32 @@ function extraerReferidoDelEstablecimientoPorCoordenadas(doc: DocumentoExtraido)
 
       const valor = pagina.items
         .filter((it) => Math.abs(it.y - item.y) <= 5 && it.x > item.x + 10)
+        .sort((a, b) => a.x - b.x)
+        .map((it) => it.str)
+        .join(" ");
+
+      return limpiarNombreEstablecimiento(valor);
+    }
+  }
+  return "";
+}
+
+/**
+ * Variante actual de la plantilla del FIEH (confirmada en varios documentos
+ * reales): la etiqueta ya NO se parte en "Nombre del" / "establecimiento" —
+ * viene como un solo ítem "Nombre del establecimiento", con el valor a la
+ * derecha en la MISMA línea, y "(referido de:)" como nota suelta en la línea
+ * de abajo (no es parte del valor, se ignora).
+ */
+function extraerReferidoDelEstablecimientoEtiquetaCompleta(doc: DocumentoExtraido): string {
+  for (const pagina of doc.paginas) {
+    for (const item of pagina.items) {
+      if (!/^Nombre\s+del\s+establecimiento$/i.test(sinAcentos(item.str).trim())) continue;
+
+      const valor = pagina.items
+        .filter(
+          (it) => it !== item && Math.abs(it.y - item.y) <= 5 && it.x >= item.x + item.w - 2
+        )
         .sort((a, b) => a.x - b.x)
         .map((it) => it.str)
         .join(" ");
@@ -814,7 +872,8 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   // líneas, cae al respaldo por coordenadas.
   datos.REFERIDO_DEL_ESTABLECIMIENTO =
     extraerReferidoDelEstablecimiento(plano) ||
-    extraerReferidoDelEstablecimientoPorCoordenadas(doc);
+    extraerReferidoDelEstablecimientoPorCoordenadas(doc) ||
+    extraerReferidoDelEstablecimientoEtiquetaCompleta(doc);
   datos.RETORNO_HACIA = seguimiento.retorno;
   if (seguimiento.advertencia) advertencias.push(seguimiento.advertencia);
 
