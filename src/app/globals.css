@@ -74,6 +74,20 @@ html, body {
   overscroll-behavior-y: contain;
 }
 
+/* ── Escalado en pantallas cortas (laptops 768p, escala 125% de Windows) ──
+   Tailwind dimensiona casi todo en rem, así que reducir la base en viewports
+   de poca altura encoge la UI completa (sidebar incluido) proporcionalmente
+   para que quepa sin desbordarse. Solo aplica en desktop (md+), no en móvil. */
+@media (min-width: 768px) and (max-height: 820px) {
+  html { font-size: 15px; }
+}
+@media (min-width: 768px) and (max-height: 720px) {
+  html { font-size: 14px; }
+}
+@media (min-width: 768px) and (max-height: 620px) {
+  html { font-size: 13px; }
+}
+
 /* Áreas seguras (notch / home indicator) para elementos fijos en pantalla completa. */
 .pt-safe { padding-top: env(safe-area-inset-top); }
 /* Alto de la barra móvil fija (h-14 = 3.5rem) + su propio espacio seguro superior;

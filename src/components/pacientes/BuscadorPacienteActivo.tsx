@@ -10,6 +10,13 @@ import type { Paciente } from "@/types";
 type Modo = "servicio" | "expediente" | "cama";
 
 const ACENTOS = {
+  /** Institucional: azul marino + dorado arena (mismo lenguaje del sidebar). */
+  navy: {
+    sel: "border-[#1c1e4d] bg-blue-50 dark:bg-[var(--color-institutional-navy)] ring-1 ring-[#c9a892]/45",
+    hover: "hover:border-[#c9a892]/70 dark:hover:border-[#c9a892]/40",
+    on: "bg-[#1c1e4d] text-white border-[#1c1e4d] dark:bg-[#c9a892] dark:text-[#1c2834] dark:border-[#c9a892]",
+    spin: "border-[#1c1e4d] dark:border-[#c9a892]",
+  },
   teal: {
     sel: "border-teal-500 bg-teal-50 dark:bg-teal-950 ring-1 ring-teal-500/30",
     hover: "hover:border-teal-300 dark:hover:border-teal-800",

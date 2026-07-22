@@ -184,7 +184,7 @@ function SidebarBody({
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 min-h-0 px-2 py-3 space-y-0.5 overflow-y-auto">
         {sinGrupo.map(renderItem)}
 
         {grupos.map((group) => {
@@ -256,7 +256,10 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Acordeón exclusivo: solo un grupo abierto a la vez. La preferencia manual
+  // guarda con qué grupo activo se hizo; al navegar a otro grupo se descarta
+  // y vuelve a mandar la ruta (derivado en render, sin efectos).
+  const [manualOpen, setManualOpen] = useState<{ activeGroup?: string; open: string | null } | null>(null);
   const { profile, changePassword, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
@@ -269,42 +272,22 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
     };
   }, [open]);
 
-  // Estado de secciones colapsadas — persistido entre sesiones.
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      try {
-        const saved = localStorage.getItem("sidebarCollapsedGroups");
-        if (saved) setCollapsed(JSON.parse(saved));
-      } catch {
-        /* localStorage no disponible */
-      }
-    }, 0);
-    return () => window.clearTimeout(timeout);
-  }, []);
-
   const isActive = (item: NavItem) =>
     item.exact
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(item.href + "/");
 
-  // Por defecto las secciones están colapsadas; la sección de la ruta activa arranca
-  // abierta. La preferencia explícita del usuario (localStorage) tiene prioridad.
+  // Solo un grupo abierto a la vez: por defecto el de la ruta activa; el toggle
+  // manual tiene prioridad hasta que se navega a una ruta de otro grupo.
   const activeGroup = navItems.find((i) => i.group && isActive(i))?.group;
-  const isGroupCollapsed = (group: string) =>
-    collapsed[group] ?? group !== activeGroup;
+  const openGroup =
+    manualOpen && manualOpen.activeGroup === activeGroup
+      ? manualOpen.open
+      : activeGroup ?? null;
+  const isGroupCollapsed = (group: string) => group !== openGroup;
 
-  const toggleGroup = (group: string) => {
-    setCollapsed((prev) => {
-      const current = prev[group] ?? group !== activeGroup;
-      const next = { ...prev, [group]: !current };
-      try {
-        localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(next));
-      } catch {
-        /* localStorage no disponible */
-      }
-      return next;
-    });
-  };
+  const toggleGroup = (group: string) =>
+    setManualOpen({ activeGroup, open: openGroup === group ? null : group });
 
   const handleLogout = async () => {
     await logout();
