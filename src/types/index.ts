@@ -407,6 +407,17 @@ export interface SolicitudIncapacidad {
   emitidaPorNombre?: string;
   emitidaEn?: Date;
   fechaExpedicion?: Date;     // = emitidaEn pero como fecha solo (para el PDF)
+
+  // ── Corrección ESDOMED: fecha de ingreso ──
+  // Prevalece sobre la fecha de ingreso del paciente en el detalle y en la
+  // constancia impresa. Vive solo en la incapacidad: NO toca /pacientes (censos,
+  // estancias) ni los días de incapacidad que otorgó el médico.
+  fechaIngresoCorregida?: Date;
+  fechaIngresoCorregidaPor?: string;   // nombre del ESDOMED que corrigió
+  fechaIngresoCorregidaEn?: Date;
+  // Aclaración obligatoria al corregir: por qué se cambió la fecha. Solo se
+  // muestra en la vista ESDOMED; no se imprime en la constancia.
+  fechaIngresoAclaracion?: string;
 }
 
 // ============================================================================

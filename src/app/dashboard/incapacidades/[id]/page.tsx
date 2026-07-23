@@ -8,8 +8,9 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, CheckCircle2, Clock, FileText, Printer, AlertTriangle,
-  User2, Stethoscope, Trash2,
+  User2, Stethoscope, Trash2, Pencil,
 } from "lucide-react";
+import { DateField } from "@/components/ui/DateField";
 import type {
   BancoDeposito, InstitucionProvisional, Paciente, SolicitudIncapacidad,
 } from "@/types";
@@ -37,7 +38,14 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  const puedeEliminar = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+  // Corrección ESDOMED de la fecha de ingreso (solo afecta esta incapacidad).
+  const [editandoIngreso, setEditandoIngreso] = useState(false);
+  const [fechaIngresoEdit, setFechaIngresoEdit] = useState("");
+  const [aclaracionIngreso, setAclaracionIngreso] = useState("");
+  const [guardandoIngreso, setGuardandoIngreso] = useState(false);
+
+  const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+  const puedeEliminar = esEsdomed;
 
   // Suscripción a la incapacidad
   useEffect(() => {
@@ -57,6 +65,8 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
         creadoEn: toDate(data.creadoEn) ?? new Date(),
         emitidaEn: toDate(data.emitidaEn),
         fechaExpedicion: toDate(data.fechaExpedicion),
+        fechaIngresoCorregida: toDate(data.fechaIngresoCorregida),
+        fechaIngresoCorregidaEn: toDate(data.fechaIngresoCorregidaEn),
       } as SolicitudIncapacidad;
       setIncapacidad(inc);
       setInstitucion(inc.institucionProvisional ?? "");
@@ -148,6 +158,55 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
 
   const abrirImprimir = () => {
     window.open(`/dashboard/incapacidades/${incapacidad.id}/imprimir`, "_blank");
+  };
+
+  // ── Corrección de fecha de ingreso (ESDOMED) ──
+  const aYMD = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const abrirEditarIngreso = () => {
+    const base = incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso;
+    setFechaIngresoEdit(base ? aYMD(base) : "");
+    setAclaracionIngreso(incapacidad.fechaIngresoAclaracion ?? "");
+    setEditandoIngreso(true);
+  };
+
+  const guardarFechaIngreso = async () => {
+    if (!incapacidad.id || !profile || !fechaIngresoEdit || !aclaracionIngreso.trim()) return;
+    setError(null);
+    setGuardandoIngreso(true);
+    try {
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+        fechaIngresoCorregida: Timestamp.fromDate(new Date(fechaIngresoEdit + "T00:00:00")),
+        fechaIngresoCorregidaPor: profile.nombre,
+        fechaIngresoCorregidaEn: Timestamp.now(),
+        fechaIngresoAclaracion: aclaracionIngreso.trim(),
+      });
+      setEditandoIngreso(false);
+    } catch (e) {
+      setError(`Error al corregir la fecha: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoIngreso(false);
+    }
+  };
+
+  const quitarCorreccionIngreso = async () => {
+    if (!incapacidad.id) return;
+    setError(null);
+    setGuardandoIngreso(true);
+    try {
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+        fechaIngresoCorregida: null,
+        fechaIngresoCorregidaPor: null,
+        fechaIngresoCorregidaEn: null,
+        fechaIngresoAclaracion: null,
+      });
+      setEditandoIngreso(false);
+    } catch (e) {
+      setError(`Error al quitar la corrección: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoIngreso(false);
+    }
   };
 
   const eliminar = async () => {
@@ -255,7 +314,86 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
             <Row label="Departamento" value={paciente.departamento} />
             <Row label="Municipio" value={paciente.municipio} />
             <Row label="Dirección" value={paciente.direccion} />
-            <Row label="Fecha ingreso" value={formatFecha(paciente.fechaIngreso)} />
+            {/* Fecha de ingreso: ESDOMED puede corregirla (solo para esta
+                incapacidad y su constancia; no modifica el expediente). */}
+            <div className="flex gap-3 text-sm">
+              <span className="text-slate-500 text-xs pt-0.5 font-medium w-32 flex-shrink-0">Fecha ingreso</span>
+              <div className="flex-1 min-w-0">
+                {!editandoIngreso ? (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-slate-800 dark:text-slate-200">
+                        {formatFecha(incapacidad.fechaIngresoCorregida ?? paciente.fechaIngreso)}
+                      </span>
+                      {esEsdomed && (
+                        <button
+                          onClick={abrirEditarIngreso}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          <Pencil size={10} /> Corregir
+                        </button>
+                      )}
+                    </div>
+                    {incapacidad.fechaIngresoCorregida && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">
+                        Corregida por {incapacidad.fechaIngresoCorregidaPor ?? "ESDOMED"}
+                        {" · "}original: {formatFecha(paciente.fechaIngreso)}
+                      </p>
+                    )}
+                    {incapacidad.fechaIngresoCorregida && incapacidad.fechaIngresoAclaracion && (
+                      <p className="mt-1.5 text-[11px] text-slate-700 dark:text-slate-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-lg px-2.5 py-1.5">
+                        <span className="font-semibold">Aclaración:</span> {incapacidad.fechaIngresoAclaracion}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <DateField
+                      value={fechaIngresoEdit}
+                      onChange={setFechaIngresoEdit}
+                      ariaLabel="Fecha de ingreso corregida"
+                    />
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                        Aclaración de la corrección <span className="text-rose-500">*</span>
+                      </label>
+                      <textarea
+                        value={aclaracionIngreso}
+                        onChange={e => setAclaracionIngreso(e.target.value)}
+                        rows={2}
+                        placeholder="Ej. La fecha enviada por el médico no coincide con el ingreso registrado en SIS..."
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={guardarFechaIngreso}
+                        disabled={guardandoIngreso || !fechaIngresoEdit || !aclaracionIngreso.trim()}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {guardandoIngreso ? "Guardando..." : "Guardar"}
+                      </button>
+                      <button
+                        onClick={() => setEditandoIngreso(false)}
+                        disabled={guardandoIngreso}
+                        className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                      {incapacidad.fechaIngresoCorregida && (
+                        <button
+                          onClick={quitarCorreccionIngreso}
+                          disabled={guardandoIngreso}
+                          className="px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          Quitar corrección
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <p className="text-xs text-amber-600 dark:text-amber-400 italic">
