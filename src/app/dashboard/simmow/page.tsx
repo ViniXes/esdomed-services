@@ -15,6 +15,7 @@ import {
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import { generarScriptConsola } from "@/lib/simmow/generadorScript";
 import { cargarEstablecimientos, mejorCoincidenciaEstablecimiento } from "@/lib/simmow/establecimientos";
+import { cargarMedicos, mejorCoincidenciaMedico } from "@/lib/simmow/medicos";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 import { FormularioRevision } from "@/components/simmow/FormularioRevision";
@@ -47,6 +48,24 @@ async function sugerirEstablecimientosDelCatalogo(datos: DatosSimmow): Promise<D
   }
 
   return actualizado;
+}
+
+/**
+ * Resuelve el código interno de SIMMOW para el médico responsable del alta,
+ * buscando por NOMBRE (el mismo en SIS y SIMMOW) contra el catálogo real de
+ * médicos — el JVPM del SIS no coincide con el código que SIMMOW espera en
+ * ese campo, por eso el nombre nunca precargaba automáticamente antes. Si no
+ * hay una coincidencia única y confiable, deja el código vacío para que el
+ * personal lo busque/confirme a mano.
+ */
+async function sugerirMedicoDelCatalogo(datos: DatosSimmow): Promise<DatosSimmow> {
+  if (!datos.MEDICO_RESPONSABLE_ALTA) return datos;
+
+  const catalogo = await cargarMedicos();
+  const coincidencia = mejorCoincidenciaMedico(catalogo, datos.MEDICO_RESPONSABLE_ALTA);
+  if (!coincidencia) return datos;
+
+  return { ...datos, MEDICO_RESPONSABLE_CODIGO_SIMMOW: coincidencia.codigo };
 }
 
 export default function SimmowPage() {
@@ -126,6 +145,7 @@ export default function SimmowPage() {
 
       datosFinal = aplicarReglasCondicionEgreso(datosFinal);
       datosFinal = await sugerirEstablecimientosDelCatalogo(datosFinal);
+      datosFinal = await sugerirMedicoDelCatalogo(datosFinal);
 
       setDocumento(docFieh);
       setResultado({ datos: datosFinal, advertencias, camposNoEncontrados });

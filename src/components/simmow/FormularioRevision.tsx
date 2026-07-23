@@ -11,6 +11,7 @@ import {
   SERVICIOS_SIMMOW,
 } from "@/lib/simmow/catalogoSimmow";
 import { EstablecimientoCombobox } from "./EstablecimientoCombobox";
+import { MedicoCombobox } from "./MedicoCombobox";
 import styles from "./FormularioRevision.module.css";
 
 interface Props {
@@ -551,8 +552,18 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
             <tr>
               <td className={styles.label}>&nbsp;&nbsp;Médico responsable / JVPM</td>
               <td className={styles.cell}>
-                {texto("MEDICO_RESPONSABLE_ALTA", styles.nombre)}
-                {texto("JVPM_MEDICO_NUMERO", styles.codigo)}
+                <MedicoCombobox
+                  nombre={v("MEDICO_RESPONSABLE_ALTA")}
+                  codigo={v("MEDICO_RESPONSABLE_CODIGO_SIMMOW")}
+                  className={styles.nombre + marcarFaltante("MEDICO_RESPONSABLE_ALTA")}
+                  onChange={(nombreNuevo, codigoNuevo) =>
+                    onChange({
+                      MEDICO_RESPONSABLE_ALTA: nombreNuevo,
+                      MEDICO_RESPONSABLE_CODIGO_SIMMOW: codigoNuevo,
+                    })
+                  }
+                />
+                {texto("JVPM_MEDICO_NUMERO", styles.codigo, { readOnly: true })}
               </td>
             </tr>
 

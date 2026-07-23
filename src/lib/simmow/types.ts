@@ -147,6 +147,13 @@ export interface DatosSimmow {
   MEDICO_RESPONSABLE_ALTA: string;
   JVPM_MEDICO: string;
   JVPM_MEDICO_NUMERO: string;
+  /**
+   * Código interno que SIMMOW le asigna al médico al crear su usuario — es lo
+   * que el campo "Médico Responsable" de SIMMOW realmente espera (NO el JVPM
+   * del SIS, que no coincide entre ambos sistemas). Se resuelve por nombre
+   * contra el catálogo real de médicos de SIMMOW.
+   */
+  MEDICO_RESPONSABLE_CODIGO_SIMMOW: string;
   ESDOMED_DIGITA: string;
   FECHA_DIGITACION: string;
 
@@ -273,6 +280,7 @@ export function datosVacios(): DatosSimmow {
     MEDICO_RESPONSABLE_ALTA: "",
     JVPM_MEDICO: "",
     JVPM_MEDICO_NUMERO: "",
+    MEDICO_RESPONSABLE_CODIGO_SIMMOW: "",
     ESDOMED_DIGITA: "",
     FECHA_DIGITACION: "",
     CERT_CAUSA_A_TEXTO: "",
