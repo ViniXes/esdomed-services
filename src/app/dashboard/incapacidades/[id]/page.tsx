@@ -17,7 +17,10 @@ import type {
 import {
   calcularEdad, formatFecha, formatFechaHora, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { formatFechaConstanciaCorta, numeroALetras, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
+import {
+  altaAntesDelIngreso, calcularDiasHospitalizacion, formatFechaConstanciaCorta,
+  numeroALetras, pacienteDesdeIncapacidad,
+} from "@/lib/incapacidades/helpers";
 
 const INSTITUCIONES: InstitucionProvisional[] = ["CRECER", "CONFIA", "INPEP", "IPSFA", "ISSS"];
 const BANCOS: BancoDeposito[] = ["Promerica", "Atlantida"];
@@ -124,6 +127,20 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
     );
   }
 
+  // Desglose de días: los "adicionales" son los que el médico otorga post-alta
+  // (fechaAlta → fechaHasta). No se guardan aparte; se derivan comparando solo
+  // el día calendario. El resto del total corresponde a la hospitalización.
+  const DIA_MS = 1000 * 60 * 60 * 24;
+  const aMedianoche = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diasAdicionales = Math.max(0, Math.round(
+    (aMedianoche(incapacidad.fechaHasta).getTime() - aMedianoche(incapacidad.fechaAlta).getTime()) / DIA_MS,
+  ));
+  const diasHospitalizacion = Math.max(0, incapacidad.diasIncapacidad - diasAdicionales);
+
+  // En emergencia no hay estancia: los días son solo los prescritos y no
+  // dependen de la fecha de ingreso, así que la corrección no recalcula nada.
+  const esEmergenciaInc = incapacidad.origen === "emergencia";
+
   const emitir = async () => {
     if (!profile || !incapacidad.id) return;
     setError(null);
@@ -173,15 +190,28 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
 
   const guardarFechaIngreso = async () => {
     if (!incapacidad.id || !profile || !fechaIngresoEdit || !aclaracionIngreso.trim()) return;
+    const nuevaFecha = new Date(fechaIngresoEdit + "T00:00:00");
+    if (!esEmergenciaInc && altaAntesDelIngreso(incapacidad.fechaAlta, nuevaFecha)) {
+      setError("La fecha de ingreso corregida no puede ser posterior a la fecha de alta.");
+      return;
+    }
     setError(null);
     setGuardandoIngreso(true);
     try {
-      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
-        fechaIngresoCorregida: Timestamp.fromDate(new Date(fechaIngresoEdit + "T00:00:00")),
+      const update: Record<string, unknown> = {
+        fechaIngresoCorregida: Timestamp.fromDate(nuevaFecha),
         fechaIngresoCorregidaPor: profile.nombre,
         fechaIngresoCorregidaEn: Timestamp.now(),
         fechaIngresoAclaracion: aclaracionIngreso.trim(),
-      });
+      };
+      // Hospitalización: la estancia depende del ingreso → se recalculan el total
+      // de días y fechaDesde (= ingreso), igual que al crearla el médico. Los días
+      // adicionales post-alta y fechaHasta no cambian.
+      if (!esEmergenciaInc) {
+        update.diasIncapacidad = calcularDiasHospitalizacion(nuevaFecha, incapacidad.fechaAlta) + diasAdicionales;
+        update.fechaDesde = Timestamp.fromDate(nuevaFecha);
+      }
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), update);
       setEditandoIngreso(false);
     } catch (e) {
       setError(`Error al corregir la fecha: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -195,12 +225,18 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
     setError(null);
     setGuardandoIngreso(true);
     try {
-      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+      const update: Record<string, unknown> = {
         fechaIngresoCorregida: null,
         fechaIngresoCorregidaPor: null,
         fechaIngresoCorregidaEn: null,
         fechaIngresoAclaracion: null,
-      });
+      };
+      // Restaurar el cálculo original con la fecha de ingreso del paciente.
+      if (!esEmergenciaInc && paciente && !altaAntesDelIngreso(incapacidad.fechaAlta, paciente.fechaIngreso)) {
+        update.diasIncapacidad = calcularDiasHospitalizacion(paciente.fechaIngreso, incapacidad.fechaAlta) + diasAdicionales;
+        update.fechaDesde = Timestamp.fromDate(paciente.fechaIngreso);
+      }
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), update);
       setEditandoIngreso(false);
     } catch (e) {
       setError(`Error al quitar la corrección: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -224,15 +260,9 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
 
   const yaEmitida = incapacidad.estado === "emitida";
 
-  // Desglose de días: los "adicionales" son los que el médico otorga post-alta
-  // (fechaAlta → fechaHasta). No se guardan aparte; se derivan comparando solo
-  // el día calendario. El resto del total corresponde a la hospitalización.
-  const DIA_MS = 1000 * 60 * 60 * 24;
-  const aMedianoche = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diasAdicionales = Math.max(0, Math.round(
-    (aMedianoche(incapacidad.fechaHasta).getTime() - aMedianoche(incapacidad.fechaAlta).getTime()) / DIA_MS,
-  ));
-  const diasHospitalizacion = Math.max(0, incapacidad.diasIncapacidad - diasAdicionales);
+  // Validación en vivo de la fecha corregida: la estancia no puede ser negativa.
+  const fechaIngresoEditInvalida = !esEmergenciaInc && editandoIngreso && !!fechaIngresoEdit &&
+    altaAntesDelIngreso(incapacidad.fechaAlta, new Date(fechaIngresoEdit + "T00:00:00"));
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
@@ -353,6 +383,16 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
                       onChange={setFechaIngresoEdit}
                       ariaLabel="Fecha de ingreso corregida"
                     />
+                    {fechaIngresoEditInvalida && (
+                      <p className="text-[11px] text-red-600 dark:text-red-400">
+                        No puede ser posterior a la fecha de alta ({formatFecha(incapacidad.fechaAlta)}).
+                      </p>
+                    )}
+                    <p className="text-[11px] text-slate-400">
+                      {esEmergenciaInc
+                        ? "Solo cambia la fecha impresa en la constancia; los días prescritos no varían."
+                        : "Al guardar se recalculan los días de hospitalización y el total de días; los días adicionales que otorgó el médico se conservan."}
+                    </p>
                     <div>
                       <label className="block text-[11px] font-medium text-slate-500 mb-1">
                         Aclaración de la corrección <span className="text-rose-500">*</span>
@@ -368,7 +408,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={guardarFechaIngreso}
-                        disabled={guardandoIngreso || !fechaIngresoEdit || !aclaracionIngreso.trim()}
+                        disabled={guardandoIngreso || !fechaIngresoEdit || !aclaracionIngreso.trim() || fechaIngresoEditInvalida}
                         className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
                       >
                         {guardandoIngreso ? "Guardando..." : "Guardar"}
