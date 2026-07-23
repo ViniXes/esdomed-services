@@ -135,7 +135,7 @@ export function ConstanciaPrintLayout({ incapacidad, paciente }: Props) {
           {/* Fecha de Ingreso + Fecha de Alta */}
           <tr>
             <td className="label"><strong>Fecha de Ingreso:</strong></td>
-            <td colSpan={2} className="value text-center">{formatFechaConstanciaCorta(paciente.fechaIngreso)}</td>
+            <td colSpan={2} className="value text-center">{formatFechaConstanciaCorta(incapacidad.fechaIngresoCorregida ?? paciente.fechaIngreso)}</td>
             <td className="sublabel"><strong>Fecha de Alta:</strong></td>
             <td colSpan={2} className="value text-center">{formatFechaConstanciaCorta(incapacidad.fechaAlta)}</td>
           </tr>

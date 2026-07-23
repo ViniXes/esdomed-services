@@ -68,6 +68,7 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
           creadoEn: toDate(incData.creadoEn) ?? new Date(),
           emitidaEn: toDate(incData.emitidaEn),
           fechaExpedicion: toDate(incData.fechaExpedicion),
+          fechaIngresoCorregida: toDate(incData.fechaIngresoCorregida),
         } as SolicitudIncapacidad;
         setIncapacidad(inc);
 
