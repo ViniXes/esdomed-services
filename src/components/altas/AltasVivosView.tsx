@@ -86,6 +86,10 @@ const COUNTER_ESTADOS: EstadoNotificacionAlta[] = [
   "pendiente", "observada", "procesada", "recibida", "deposito", "suspendida", "duplicada", "revertida", "rechazada",
 ];
 
+// Chips siempre visibles (trabajo real de ESDOMED). El resto son estados
+// excepcionales o informativos: su chip solo aparece cuando hay casos.
+const COUNTER_ESTADOS_FIJOS: EstadoNotificacionAlta[] = ["pendiente", "observada", "procesada"];
+
 // Estados accionables: se mantienen en la bandeja en vivo aunque sean de días
 // anteriores, para no perder trabajo sin procesar.
 const ESTADOS_ACCIONABLES: EstadoNotificacionAlta[] = ["pendiente", "observada"];
@@ -1246,10 +1250,11 @@ export function AltasVivosView() {
         </div>
       )}
 
-      {/* Contadores por estado (clic para filtrar) */}
+      {/* Contadores por estado (clic para filtrar). Los estados excepcionales
+          solo muestran chip cuando tienen casos (o si son el filtro activo). */}
       <div className="flex flex-wrap gap-2 mb-4">
         <ChipContador label="Todas" count={conteos.todas} active={filtroEstado === "todas"} onClick={() => setFiltroEstado("todas")} />
-        {COUNTER_ESTADOS.map((e) => (
+        {COUNTER_ESTADOS.filter((e) => COUNTER_ESTADOS_FIJOS.includes(e) || (conteos[e] ?? 0) > 0 || filtroEstado === e).map((e) => (
           <ChipContador
             key={e}
             label={ESTADO_LABEL[e]}

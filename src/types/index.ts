@@ -246,7 +246,10 @@ export interface NotificacionFallecido {
   recibeDePsConfirmadoEn?: Date;
   tramitaDefuncion?: string;
   tramitaDefuncionEn?: Date;
-  estadoEntregaCertificado?: "pendiente" | "entregado";
+  // "resguardado" = resguardado en archivo interno: nadie reclamó el cuerpo
+  // (desconocidos / fosa común). El certificado se archiva en ESDOMED, la
+  // entrega física no aplica y el trámite puede cerrarse.
+  estadoEntregaCertificado?: "pendiente" | "entregado" | "resguardado";
   // Fallecido privado de libertad: el certificado queda en custodia interna de
   // ESDOMED (no se entrega a nadie salvo requerimiento de la Fiscalía). Suprime
   // la alerta de certificado vencido y el conteo de pendientes.
