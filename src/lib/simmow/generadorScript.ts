@@ -247,6 +247,12 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
 // Este código NO presiona Grabar. Revise antes de guardar.
 
 ;(async () => {
+  if (window.__simmowLlenadoEnCurso) {
+    console.error('Ya hay un llenado en curso en esta pestaña. Espere a que termine (o recargue la página) antes de pegar el código de nuevo — ejecutarlo dos veces a la vez duplica los caracteres escritos en los campos.');
+    return;
+  }
+  window.__simmowLlenadoEnCurso = true;
+
   const DATA = ${dataJson};
   const errores = [];
 
@@ -1046,6 +1052,7 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
     return '';
   };
 
+  try {
   console.clear();
   console.log('Iniciando llenado desde el módulo SIMMOW de esdomed-services...');
   console.log(DATA);
@@ -1223,6 +1230,9 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
     console.error('Observaciones del llenado:', errores);
   } else {
     console.log('Sin errores de selector detectados.');
+  }
+  } finally {
+    window.__simmowLlenadoEnCurso = false;
   }
 })();
 `;
