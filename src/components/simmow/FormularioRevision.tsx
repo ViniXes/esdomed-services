@@ -550,12 +550,13 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
             </tr>
 
             <tr>
-              <td className={styles.label}>&nbsp;&nbsp;Médico responsable / JVPM</td>
+              <td className={styles.label}>&nbsp;&nbsp;Médico Responsable</td>
               <td className={styles.cell}>
                 <MedicoCombobox
                   nombre={v("MEDICO_RESPONSABLE_ALTA")}
                   codigo={v("MEDICO_RESPONSABLE_CODIGO_SIMMOW")}
-                  className={styles.nombre + marcarFaltante("MEDICO_RESPONSABLE_ALTA")}
+                  codigoClassName={styles.codigo + marcarFaltante("MEDICO_RESPONSABLE_CODIGO_SIMMOW")}
+                  nombreClassName={styles.nombre}
                   onChange={(nombreNuevo, codigoNuevo) =>
                     onChange({
                       MEDICO_RESPONSABLE_ALTA: nombreNuevo,
@@ -563,7 +564,6 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
                     })
                   }
                 />
-                {texto("JVPM_MEDICO_NUMERO", styles.codigo, { readOnly: true })}
               </td>
             </tr>
 

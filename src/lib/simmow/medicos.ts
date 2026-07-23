@@ -54,6 +54,16 @@ export function buscarMedicos(
  * coincidencia sea única; si hay ambigüedad o no hay certeza total, no
  * sugiere nada (mejor vacío, que el personal lo busque/confirme a mano).
  */
+/** Busca un médico por su código interno exacto (para cuando se escribe directo el código). */
+export function buscarMedicoPorCodigo(
+  entradas: MedicoSimmow[],
+  codigo: string
+): MedicoSimmow | null {
+  const c = codigo.trim();
+  if (!c) return null;
+  return entradas.find((e) => e.codigo === c) ?? null;
+}
+
 export function mejorCoincidenciaMedico(
   entradas: MedicoSimmow[],
   nombreFieh: string
