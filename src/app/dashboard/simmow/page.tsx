@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileCode2, CheckCircle2 } from "lucide-react";
+import { FileCode2, CheckCircle2, Copy, Check, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { extraerDocumento } from "@/lib/simmow/pdfEngine";
 import { esFieh, extraerFieh } from "@/lib/simmow/fiehExtractor";
@@ -15,15 +15,12 @@ import {
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import { generarScriptConsola } from "@/lib/simmow/generadorScript";
 import { cargarEstablecimientos, mejorCoincidenciaEstablecimiento } from "@/lib/simmow/establecimientos";
+import { cargarMedicos, mejorCoincidenciaMedico } from "@/lib/simmow/medicos";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 import { FormularioRevision } from "@/components/simmow/FormularioRevision";
-import { PasoCodigo } from "@/components/simmow/PasoCodigo";
 
-const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100";
-
-type Paso = "carga" | "revision" | "codigo";
+type Paso = "carga" | "revision";
 
 /**
  * Reemplaza los tres campos de establecimiento con el nombre EXACTO del
@@ -53,6 +50,24 @@ async function sugerirEstablecimientosDelCatalogo(datos: DatosSimmow): Promise<D
   return actualizado;
 }
 
+/**
+ * Resuelve el código interno de SIMMOW para el médico responsable del alta,
+ * buscando por NOMBRE (el mismo en SIS y SIMMOW) contra el catálogo real de
+ * médicos — el JVPM del SIS no coincide con el código que SIMMOW espera en
+ * ese campo, por eso el nombre nunca precargaba automáticamente antes. Si no
+ * hay una coincidencia única y confiable, deja el código vacío para que el
+ * personal lo busque/confirme a mano.
+ */
+async function sugerirMedicoDelCatalogo(datos: DatosSimmow): Promise<DatosSimmow> {
+  if (!datos.MEDICO_RESPONSABLE_ALTA) return datos;
+
+  const catalogo = await cargarMedicos();
+  const coincidencia = mejorCoincidenciaMedico(catalogo, datos.MEDICO_RESPONSABLE_ALTA);
+  if (!coincidencia) return datos;
+
+  return { ...datos, MEDICO_RESPONSABLE_CODIGO_SIMMOW: coincidencia.codigo };
+}
+
 export default function SimmowPage() {
   const router = useRouter();
   const { profile, loading } = useAuth();
@@ -63,8 +78,8 @@ export default function SimmowPage() {
   const [documento, setDocumento] = useState<DocumentoExtraido | null>(null);
   const [resultado, setResultado] = useState<ResultadoExtraccion | null>(null);
   const [datos, setDatos] = useState<DatosSimmow | null>(null);
-  const [codigo, setCodigo] = useState<string | null>(null);
   const [errorGeneracion, setErrorGeneracion] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   // Temporalmente solo admin mientras está en pruebas (ver dashboard/layout.tsx).
   useEffect(() => {
@@ -130,6 +145,7 @@ export default function SimmowPage() {
 
       datosFinal = aplicarReglasCondicionEgreso(datosFinal);
       datosFinal = await sugerirEstablecimientosDelCatalogo(datosFinal);
+      datosFinal = await sugerirMedicoDelCatalogo(datosFinal);
 
       setDocumento(docFieh);
       setResultado({ datos: datosFinal, advertencias, camposNoEncontrados });
@@ -150,13 +166,13 @@ export default function SimmowPage() {
     setDocumento(null);
     setResultado(null);
     setDatos(null);
-    setCodigo(null);
     setErrorGeneracion(null);
+    setCopiado(false);
     setError(null);
     setPaso("carga");
   };
 
-  const generarCodigo = () => {
+  const copiarCodigo = async () => {
     if (!datos) return;
     if (!datos.EDAD_ANIOS.trim()) {
       setErrorGeneracion(
@@ -165,8 +181,26 @@ export default function SimmowPage() {
       return;
     }
     setErrorGeneracion(null);
-    setCodigo(generarScriptConsola(datos, resultado?.advertencias ?? []));
-    setPaso("codigo");
+    const codigo = generarScriptConsola(datos, resultado?.advertencias ?? []);
+
+    try {
+      await navigator.clipboard.writeText(codigo);
+    } catch {
+      // Navegadores sin permiso/soporte para el Clipboard API: respaldo con
+      // un textarea invisible + execCommand, sin mostrar el código en pantalla.
+      const textarea = document.createElement("textarea");
+      textarea.value = codigo;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2500);
   };
 
   return (
@@ -217,11 +251,21 @@ export default function SimmowPage() {
               </div>
             )}
 
+            <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 mb-3">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Este código no presiona &quot;Grabar&quot; en SIMMOW. Abra SIMMOW, entre a la pantalla de
+                Ingreso/Egreso del paciente, presione F12 para abrir la consola, pegue el código, presione
+                Enter, y revise cada campo antes de grabar manualmente.
+              </span>
+            </div>
+
             <button
-              onClick={generarCodigo}
-              className="px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+              onClick={copiarCodigo}
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
             >
-              Generar código actualizado
+              {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copiado ? "Copiado correctamente" : "Copiar código para SIMMOW"}
             </button>
           </div>
 
@@ -230,52 +274,6 @@ export default function SimmowPage() {
             camposNoEncontrados={resultado.camposNoEncontrados}
             onChange={actualizar}
           />
-
-          <details className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-            <summary className="text-sm font-semibold text-slate-700 dark:text-slate-200 cursor-pointer">
-              Casillas detectadas por página (debug)
-            </summary>
-            <div className="mt-3 space-y-3">
-              {documento.paginas.map((p) => (
-                <div key={p.numero} className="text-xs">
-                  <div className="font-medium text-slate-600 dark:text-slate-300 mb-1">
-                    Página {p.numero} — {p.checkboxes.length} casillas detectadas
-                  </div>
-                  <div className={inputCls + " font-mono whitespace-pre-wrap"}>
-                    {p.checkboxes.length === 0
-                      ? "(sin casillas en esta página)"
-                      : p.checkboxes
-                          .map(
-                            (cb) =>
-                              `${cb.marcado ? "[X]" : "[ ]"} "${cb.opcion}" (ratio ${(cb.ratioOscuro * 100).toFixed(1)}%)`
-                          )
-                          .join("\n")}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </details>
-        </div>
-      )}
-
-      {paso === "codigo" && codigo && datos && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setPaso("revision")}
-              className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            >
-              ← Volver a revisión
-            </button>
-            <button
-              onClick={reiniciar}
-              className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-            >
-              Procesar otro
-            </button>
-          </div>
-
-          <PasoCodigo codigo={codigo} />
         </div>
       )}
     </div>

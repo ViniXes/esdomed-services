@@ -379,13 +379,154 @@ function limpiarServicioFieh(txt: string): string {
   );
 }
 
-function extraerUltimoServicioRuta(texto: string): {
+interface Movimiento {
+  fecha: string;
+  hora: string;
   origen: string;
   valor: string;
   fuente: string;
-  fecha: string;
-  hora: string;
-} | null {
+}
+
+/** Concatena ítems (ya filtrados a una columna) respetando huecos reales entre ellos. */
+function juntarPalabras(items: { str: string; x: number; w: number }[]): string {
+  const ordenados = [...items].sort((a, b) => a.x - b.x);
+  let texto = "";
+  let finAnterior: number | null = null;
+  for (const it of ordenados) {
+    if (finAnterior !== null && it.x - finAnterior > 1) texto += " ";
+    texto += it.str;
+    finAnterior = it.x + it.w;
+  }
+  return texto;
+}
+
+/**
+ * Sección C (Ruta de movimiento): tabla "Fecha | Hora | Traslado de: |
+ * Traslado a: | Nombre del médico...". Cuando el nombre del servicio es
+ * largo (típico en UCI/UCIN: "Unidad de Cuidados Intensivos Aislados
+ * Adultos"), la celda envuelve a una segunda línea — y como el navegador
+ * real entrega cada palabra como su propio ítem, aplanar todo a texto
+ * mezcla las columnas ("Traslado de:" y "Traslado a:" quedan intercaladas
+ * antes de que las líneas envueltas de cada una aparezcan, lejos de su
+ * columna). Eso hacía que solo sobreviviera una palabra suelta del destino
+ * real (p. ej. "aislados" en vez de "Unidad de Cuidados Intensivos Aislados
+ * Adultos"), mapeando al servicio equivocado (AISLAMIENTO en vez de
+ * MEDICINA INTERNA D). Se resuelve leyendo la tabla por coordenadas: se
+ * ubican las columnas por el encabezado y se junta el texto de "Traslado
+ * a:" en ambas líneas de cada fila.
+ */
+function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimiento | null {
+  for (const pagina of doc.paginas) {
+    // Puede haber un tercer "traslado" suelto en la nota final de la sección
+    // ("...encargada del traslado de paciente"): se descarta agrupando por Y
+    // y quedándose con la línea que tiene DOS "Traslado" (el encabezado real
+    // "Traslado de:" / "Traslado a:"), no cualquier par por cercanía en X.
+    const traslados = pagina.items.filter((it) => /^Traslado$/i.test(sinAcentos(it.str).trim()));
+    if (traslados.length < 2) continue;
+
+    const gruposPorY: typeof traslados[] = [];
+    for (const it of traslados) {
+      const grupo = gruposPorY.find((g) => Math.abs(g[0].y - it.y) <= 3);
+      if (grupo) grupo.push(it);
+      else gruposPorY.push([it]);
+    }
+    const filaEncabezadoTraslados = gruposPorY.find((g) => g.length >= 2);
+    if (!filaEncabezadoTraslados) continue;
+
+    const [colDe, colA] = [...filaEncabezadoTraslados].sort((a, b) => a.x - b.x);
+    const yEncabezado = colA.y;
+
+    const filaEncabezado = pagina.items.filter((it) => Math.abs(it.y - yEncabezado) <= 3);
+    const colFecha = filaEncabezado.find((it) => /^Fecha$/i.test(sinAcentos(it.str).trim()));
+    const colHora = filaEncabezado.find((it) => /^Hora$/i.test(sinAcentos(it.str).trim()));
+    const colMedico = filaEncabezado.find((it) => /^Nombre$/i.test(sinAcentos(it.str).trim()));
+    if (!colFecha || !colHora) continue;
+
+    // Límites de columna = punto medio entre encabezados consecutivos, NO la
+    // X cruda de cada encabezado: el contenido de una columna (p. ej. la
+    // fecha "17-01-2026") suele empezar más a la izquierda que su propia
+    // etiqueta ("Fecha"), así que anclar el límite en la etiqueta recortaba
+    // contenido real de la columna.
+    const medio = (a: number, b: number) => (a + b) / 2;
+    const limFechaHora = medio(colFecha.x, colHora.x);
+    const limHoraDe = medio(colHora.x, colDe.x);
+    const limDeA = medio(colDe.x, colA.x);
+    const limANombre = colMedico ? medio(colA.x, colMedico.x) : colA.x + 200;
+
+    const notaFinal = pagina.items.find(
+      (it) => /^El$/i.test(it.str.trim()) && it.y < yEncabezado
+    );
+    const yFinTabla = notaFinal ? notaFinal.y : -Infinity;
+
+    const itemsTabla = pagina.items.filter(
+      (it) => it.y < yEncabezado - 3 && it.y > yFinTabla + 3
+    );
+    if (!itemsTabla.length) continue;
+
+    const lineas: typeof itemsTabla[] = [];
+    for (const it of itemsTabla) {
+      const linea = lineas.find((l) => Math.abs(l[0].y - it.y) <= 4);
+      if (linea) linea.push(it);
+      else lineas.push([it]);
+    }
+    lineas.sort((a, b) => b[0].y - a[0].y);
+
+    interface Fila {
+      fecha: string;
+      hora: string;
+      colA: string;
+      serial: number;
+      indice: number;
+    }
+    const filas: Fila[] = [];
+
+    for (const linea of lineas) {
+      const enFecha = linea.filter((it) => it.x < limFechaHora);
+      const enColA = linea.filter((it) => it.x >= limDeA && it.x < limANombre);
+
+      if (enFecha.length) {
+        const enHora = linea.filter((it) => it.x >= limFechaHora && it.x < limHoraDe);
+        const fecha = juntarPalabras(enFecha);
+        const hora = juntarPalabras(enHora);
+        filas.push({
+          fecha,
+          hora,
+          colA: juntarPalabras(enColA),
+          serial: serialFechaHora(fecha, hora),
+          indice: filas.length,
+        });
+      } else if (filas.length && enColA.length) {
+        filas[filas.length - 1].colA += " " + juntarPalabras(enColA);
+      }
+    }
+
+    if (!filas.length) return null;
+
+    const orden = [...filas].sort((a, b) =>
+      b.serial !== a.serial ? b.serial - a.serial : b.indice - a.indice
+    );
+
+    for (const fila of orden) {
+      const destino = limpiarServicioFieh(fila.colA);
+      const servicios = buscarServiciosConocidosEnTexto(destino);
+      if (servicios.length) {
+        const s = servicios[servicios.length - 1];
+        return {
+          origen: s.origen,
+          valor: s.valor,
+          fuente: "RUTA_MOVIMIENTO",
+          fecha: fila.fecha,
+          hora: fila.hora,
+        };
+      }
+    }
+    return null;
+  }
+  return null;
+}
+
+/** Respaldo por texto plano, para plantillas donde no se ubique el encabezado por coordenadas. */
+function extraerUltimoServicioRutaPorTexto(texto: string): Movimiento | null {
   const base = sinAcentos(texto);
 
   const bloqueMatch = base.match(
@@ -399,17 +540,12 @@ function extraerUltimoServicioRuta(texto: string): {
     .replace(/\s+/g, " ")
     .trim();
 
-  interface Movimiento {
-    fecha: string;
-    hora: string;
-    origen: string;
-    valor: string;
-    fuente: string;
+  interface MovimientoTexto extends Movimiento {
     indice: number;
     serial: number;
   }
 
-  const movimientos: Movimiento[] = [];
+  const movimientos: MovimientoTexto[] = [];
   const patronFila =
     /(\d{1,2}[/-]\d{1,2}[/-](?:\d{2}|\d{4}))\s+(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)\s+([\s\S]*?)(?=\s+\d{1,2}[/-]\d{1,2}[/-](?:\d{2}|\d{4})\s+\d{1,2}:\d{2}|$)/gi;
 
@@ -463,6 +599,10 @@ function extraerUltimoServicioRuta(texto: string): {
   }
 
   return null;
+}
+
+function extraerUltimoServicioRuta(doc: DocumentoExtraido, texto: string): Movimiento | null {
+  return extraerUltimoServicioRutaPorCoordenadas(doc) ?? extraerUltimoServicioRutaPorTexto(texto);
 }
 
 interface ServicioIngresoB {
@@ -546,9 +686,9 @@ function extraerServicioIngresoParteB(texto: string): ServicioIngresoB {
   return { origen: "" };
 }
 
-function extraerServicioHospitalario(texto: string): ServicioDetectado {
+function extraerServicioHospitalario(doc: DocumentoExtraido, texto: string): ServicioDetectado {
   // Prioridad 1: último traslado del literal C.
-  const ruta = extraerUltimoServicioRuta(texto);
+  const ruta = extraerUltimoServicioRuta(doc, texto);
   if (ruta && ruta.origen) {
     return {
       origen: ruta.origen,
@@ -923,7 +1063,7 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   );
 
   // Servicio hospitalario (último traslado del literal C, o ingreso).
-  const servicio = extraerServicioHospitalario(texto);
+  const servicio = extraerServicioHospitalario(doc, texto);
   datos.SERVICIO_HOSPITALARIO_ORIGEN = servicio.origen;
   datos.SERVICIO_HOSPITALARIO_VALOR = servicio.valor;
   datos.SERVICIO_HOSPITALARIO_FUENTE = servicio.fuente;

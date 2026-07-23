@@ -217,7 +217,10 @@ function prepararPayloadSIMMOW(datos: DatosSimmow, advertencias: string[]): Payl
 
     motivo_alta: datos.MOTIVO_ALTA_VALOR || "",
     observaciones: cortar(datos.RECOMENDACIONES || "", 300),
-    medico_responsable: datos.JVPM_MEDICO_NUMERO || "",
+    // El campo "Médico Responsable" de SIMMOW espera el código interno que
+    // SIMMOW le asigna al médico (no el JVPM del SIS, que no coincide entre
+    // ambos sistemas) — se resuelve por nombre contra el catálogo real.
+    medico_responsable: datos.MEDICO_RESPONSABLE_CODIGO_SIMMOW || "",
 
     advertencias,
   };
