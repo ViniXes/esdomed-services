@@ -8,7 +8,7 @@ import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -57,10 +57,11 @@ function tsToDate(ts: unknown): Date | null {
 }
 
 // Pasos de seguimiento exigidos para cerrar el trámite. En privados de libertad el
-// certificado queda en custodia interna: la entrega y la recepción por Psic./T.S.
-// no aplican, así que no se exigen para cerrar ni se cuentan en el progreso.
+// certificado queda en custodia interna, y en cuerpos no reclamados (fosa común)
+// queda resguardado en archivo interno: en ambos casos la entrega y la recepción
+// por Psic./T.S. no aplican, así que no se exigen para cerrar ni cuentan en el progreso.
 function pasosRequeridos(n: NotificacionFallecido) {
-  return n.privadoDeLibertad
+  return n.privadoDeLibertad || n.estadoEntregaCertificado === "resguardado"
     ? COLUMNAS_SEGUIMIENTO.filter(c => c.key !== "entregaCertificado" && c.key !== "recibeDePs")
     : COLUMNAS_SEGUIMIENTO;
 }
@@ -316,7 +317,15 @@ export default function DashboardFallecidosPage() {
   const isLocked    = !!(selectedLive?.tramiteCerrado && !selectedLive.tramiteDesbloqueado);
   const isUnlocked  = !!(selectedLive?.tramiteCerrado && selectedLive.tramiteDesbloqueado);
   const todos4      = selectedLive ? pasosRequeridos(selectedLive).every(col => !!selectedLive[col.key]) : false;
-  const puedeCerrar = todos4 && selectedLive?.estado === "confirmado" && (!selectedLive.tramiteCerrado || isUnlocked);
+  // La entrega debe estar resuelta para cerrar: entregado al familiar, resguardado
+  // en archivo interno (cuerpo no reclamado) o en custodia interna (privado de
+  // libertad). "Pendiente" o sin definir bloquean el cierre.
+  const entregaResuelta = !!selectedLive && (
+    !!selectedLive.privadoDeLibertad ||
+    selectedLive.estadoEntregaCertificado === "entregado" ||
+    selectedLive.estadoEntregaCertificado === "resguardado"
+  );
+  const puedeCerrar = todos4 && entregaResuelta && selectedLive?.estado === "confirmado" && (!selectedLive.tramiteCerrado || isUnlocked);
   const isAdmin     = profile?.role === "admin";
 
   const fiehNombreGuardado = typeof selectedLive?.actualizoFieh === "string" && selectedLive.actualizoFieh
@@ -490,6 +499,12 @@ export default function DashboardFallecidosPage() {
                           {!n.privadoDeLibertad && n.estadoEntregaCertificado === "entregado" && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 px-1.5 py-0.5 rounded-md">
                               <CheckCircle2 size={10} /> Cert. entregado
+                            </span>
+                          )}
+                          {!n.privadoDeLibertad && n.estadoEntregaCertificado === "resguardado" && (
+                            <span title="Cuerpo no reclamado (desconocido / fosa común): el certificado queda resguardado en el archivo interno de ESDOMED"
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-900 px-1.5 py-0.5 rounded-md">
+                              <Archive size={10} /> Resguardado en archivo
                             </span>
                           )}
                         </div>
@@ -721,6 +736,16 @@ export default function DashboardFallecidosPage() {
                       <span>
                         Privado de libertad — certificado en custodia interna. La recepción por
                         Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
+                      </span>
+                    </div>
+                  )}
+
+                  {!selectedLive.privadoDeLibertad && selectedLive.estadoEntregaCertificado === "resguardado" && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 text-[11px] text-teal-700 dark:text-teal-300">
+                      <Archive size={14} className="mt-0.5 shrink-0" />
+                      <span>
+                        Resguardado en archivo interno — cuerpo no reclamado (desconocido / fosa común).
+                        La recepción por Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
                       </span>
                     </div>
                   )}
@@ -963,12 +988,19 @@ export default function DashboardFallecidosPage() {
                         <option value="">— Sin definir</option>
                         <option value="pendiente">Pendiente</option>
                         <option value="entregado">Entregado</option>
+                        <option value="resguardado">Resguardado en archivo interno</option>
                       </select>
                       <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
                     {selectedLive.privadoDeLibertad && (
                       <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1.5">
                         En custodia interna — la entrega no aplica mientras sea privado de libertad.
+                      </p>
+                    )}
+                    {!selectedLive.privadoDeLibertad && selectedLive.estadoEntregaCertificado === "resguardado" && (
+                      <p className="text-[11px] text-teal-600 dark:text-teal-400 mt-1.5">
+                        Para cuerpos no reclamados (desconocidos / fosa común): el certificado queda
+                        archivado en ESDOMED y el trámite puede cerrarse sin entrega.
                       </p>
                     )}
                   </div>
@@ -1019,6 +1051,18 @@ export default function DashboardFallecidosPage() {
                   className="w-full py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors">
                   {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
                 </button>
+              )}
+              {/* Bloqueo de cierre por entrega pendiente: todo lo demás está listo,
+                  pero el certificado no se ha entregado ni resguardado. */}
+              {activeTab === "entrega" && !isLocked && selectedLive.estado === "confirmado" && todos4 && !entregaResuelta && (
+                <div className="flex items-start gap-2.5 px-3 py-2.5 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
+                  <FileWarning size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    No se puede cerrar el trámite: la entrega del certificado sigue pendiente.
+                    En la pestaña <strong>Certificado</strong>, márcala como <strong>Entregado</strong> o,
+                    si nadie reclamó el cuerpo, como <strong>Resguardado en archivo interno</strong>.
+                  </span>
+                </div>
               )}
               {puedeCerrar && activeTab === "entrega" && (
                 <button onClick={cerrarTramite} disabled={cerrando}
