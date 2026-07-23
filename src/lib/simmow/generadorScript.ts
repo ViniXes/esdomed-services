@@ -863,6 +863,12 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
     const opciones = [...sel.options].map(o => ({
       value: o.value || '',
       text: o.text || '',
+      // SIMMOW valida el combobox comparando el input visible contra el
+      // textContent SIN normalizar de la opción (algunas tienen espacios
+      // dobles en su texto real) — si no coincide exacto, su propio widget
+      // borra el input y el select al perder el foco. Por eso guardamos el
+      // texto crudo aparte del texto normalizado usado para buscar/loguear.
+      rawText: o.textContent || o.text || '',
       normText: norm(o.text || ''),
       normValue: norm(o.value || '')
     })).filter(o => o.value || o.text);
@@ -954,11 +960,11 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
       }
 
       if (visibleInput) {
-        visibleInput.value = op.text;
+        visibleInput.value = op.rawText;
         fire(visibleInput);
 
         if (window.jQuery) {
-          window.jQuery(visibleInput).val(op.text).trigger('change').trigger('blur');
+          window.jQuery(visibleInput).val(op.rawText).trigger('change').trigger('blur');
         }
       }
     } catch (e) {}
