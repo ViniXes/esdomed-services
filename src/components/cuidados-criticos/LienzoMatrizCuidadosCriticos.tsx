@@ -405,10 +405,10 @@ function AccionesAdmin({
         type="button"
         onClick={() => setModal(pendiente ? "revisar" : "confirmar")}
         title={pendiente ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}` : "Eliminar ficha"}
-        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-colors ${
           pendiente
-            ? "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-            : "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
+            ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+            : "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
         }`}
       >
         <Trash2 size={7} />
@@ -589,10 +589,10 @@ function AccionesMedico({
               ? `Solicitud anterior rechazada${solicitud?.notaRechazo ? `: ${solicitud.notaRechazo}` : ""}. Click para volver a solicitar.`
               : "Solicitar eliminación"
         }
-        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-colors ${
           pendiente
-            ? "border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-            : "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
+            ? "text-amber-600 dark:text-amber-400"
+            : "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
         }`}
       >
         <Trash2 size={7} />
