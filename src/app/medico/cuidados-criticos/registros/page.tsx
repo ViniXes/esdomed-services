@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Users } from "lucide-react";
+import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Trash2, Users } from "lucide-react";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import {
+  actualizarFichaEnCache,
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
   queryFichasServicios,
@@ -130,6 +131,12 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const pacientesUnicos = new Set(fichasFiltradas.map(ficha => ficha.pacienteExpediente)).size;
   const activas = fichasFiltradas.filter(ficha => !fichaEgresada(ficha)).length;
   const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
+  const solicitudesPendientes = fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+
+  const manejarFichaActualizada = (ficha: FichaCuidadosCriticos) => {
+    setFichas(prev => prev.map(item => item.id === ficha.id ? ficha : item));
+    actualizarFichaEnCache(claveConsulta, ficha);
+  };
 
   if (!profile?.tipoMedico) {
     return (
@@ -160,6 +167,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
         <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} variant={pendientesCierre > 0 ? "warning" : "default"} />
+        <Stat icon={<Trash2 size={18} />} label="Solicitudes de eliminación" value={solicitudesPendientes} variant={solicitudesPendientes > 0 ? "warning" : "default"} />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -244,6 +252,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
           tipo={profile.tipoMedico}
           fichas={fichasFiltradas}
           expedienteHref={ficha => ficha.id ? `/medico/cuidados-criticos?ficha=${ficha.id}` : undefined}
+          onFichaActualizada={manejarFichaActualizada}
         />
       </section>
     </div>

@@ -159,7 +159,8 @@ service cloud.firestore {
                     && request.resource.data.actualizadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
                     && request.resource.data.creadoEn == request.time
                     && request.resource.data.actualizadoEn == request.time;
-      allow update: if isMedicoCuidadosCriticos()
+      allow update: if isAdmin()
+                    || (isMedicoCuidadosCriticos()
                     && resource.data.servicio in serviciosAsignados()
                     && request.resource.data.servicio in serviciosAsignados()
                     && request.resource.data.pacienteId == resource.data.pacienteId
@@ -170,7 +171,9 @@ service cloud.firestore {
                     && request.resource.data.creadoEn == resource.data.creadoEn
                     && request.resource.data.actualizadoPorId == uid()
                     && request.resource.data.actualizadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
-                    && request.resource.data.actualizadoEn == request.time;
+                    && request.resource.data.actualizadoEn == request.time);
+      // Admin puede eliminar cualquier ficha directamente, o al aprobar una
+      // solicitudEliminacion enviada por el médico autor (ver update arriba).
       allow delete: if isAdmin();
     }
 

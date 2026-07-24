@@ -96,6 +96,24 @@ export interface AtencionCuidadosCriticos {
   creadoEn: Date;
 }
 
+// Solicitud del médico autor para que un admin borre una ficha cargada por error.
+// Vive embebida en la ficha (no es una colección aparte) porque es 1 a 1 con ella
+// y se resuelve borrando el documento completo (aprobada) o limpiando el estado
+// (rechazada) — no hace falta historial fuera de la ficha misma.
+export type EstadoSolicitudEliminacionFicha = "pendiente" | "rechazada";
+
+export interface SolicitudEliminacionFicha {
+  motivo: string;              // obligatorio — por qué se pide borrar
+  solicitadoPorId: string;
+  solicitadoPorNombre: string;
+  solicitadoEn: Date;
+  estado: EstadoSolicitudEliminacionFicha;
+  resueltoPorId?: string;       // admin que rechazó (si aplica)
+  resueltoPorNombre?: string;
+  resueltoEn?: Date;
+  notaRechazo?: string;
+}
+
 export interface FichaCuidadosCriticos {
   id?: string;
   tipoUnidad: TipoMedicoCuidadosCriticos;
@@ -112,6 +130,7 @@ export interface FichaCuidadosCriticos {
   actualizadoPorId: string;
   actualizadoPorNombre: string;
   actualizadoEn: Date;
+  solicitudEliminacion?: SolicitudEliminacionFicha;
 }
 
 export interface ConfigIndicadoresCuidadosCriticos {

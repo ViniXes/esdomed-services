@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, AlertCircle, FileSpreadsheet, Users } from "lucide-react";
+import { Activity, AlertCircle, FileSpreadsheet, Trash2, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import {
+  actualizarFichaEnCache,
   consultarFichasCuidadosCriticos,
+  eliminarFichaDeCache,
   getFichasCuidadosCriticosCache,
   queryFichasTodas,
 } from "@/lib/fichasCuidadosCriticosQueries";
@@ -115,6 +117,17 @@ export default function CuidadosCriticosDashboardPage() {
     return fechaA - fechaB;
   });
   const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
+  const solicitudesEliminacionPendientes = fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+
+  const manejarFichaEliminada = (id: string) => {
+    setFichas(prev => prev.filter(item => item.id !== id));
+    eliminarFichaDeCache(claveConsulta, id);
+  };
+  const manejarFichaActualizada = (ficha: FichaCuidadosCriticos) => {
+    setFichas(prev => prev.map(item => item.id === ficha.id ? ficha : item));
+    actualizarFichaEnCache(claveConsulta, ficha);
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center p-6">
@@ -150,6 +163,7 @@ export default function CuidadosCriticosDashboardPage() {
         <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "uci").length} />
         <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "ucin").length} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
+        <Stat icon={<Trash2 size={18} />} label="Solicitudes de eliminación" value={solicitudesEliminacionPendientes} alerta={solicitudesEliminacionPendientes > 0} />
       </div>
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:p-5">
@@ -204,17 +218,19 @@ export default function CuidadosCriticosDashboardPage() {
           onRefresh={consultarFichas}
           refreshing={consultando}
           refreshLabel={consultadoEn ? "Actualizar matriz" : "Consultar matriz"}
+          onFichaEliminada={manejarFichaEliminada}
+          onFichaActualizada={manejarFichaActualizada}
         />
       </section>
     </div>
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+function Stat({ icon, label, value, alerta = false }: { icon: React.ReactNode; label: string; value: number | string; alerta?: boolean }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">{icon}<span className="text-xs font-medium text-slate-500">{label}</span></div>
-      <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{value}</p>
+    <div className={`rounded-xl border p-4 ${alerta ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
+      <div className={`flex items-center gap-2 ${alerta ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>{icon}<span className={`text-xs font-medium ${alerta ? "text-amber-700 dark:text-amber-400" : "text-slate-500"}`}>{label}</span></div>
+      <p className={`mt-2 text-2xl font-bold ${alerta ? "text-amber-700 dark:text-amber-300" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
     </div>
   );
 }
