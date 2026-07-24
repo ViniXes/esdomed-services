@@ -87,7 +87,86 @@ export default function ImprimirAnexo5Page() {
 
       {/* CSS global: oculta sidebar y barras del dashboard al imprimir */}
       <style jsx global>{`
+        @page {
+          size: letter portrait;
+          margin: 10mm 6mm;
+        }
         @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #anexo5-print-document,
+          #anexo5-print-document * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          #anexo5-print-document {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #000 !important;
+          }
+          #anexo5-print-document .generation-date {
+            top: 9mm !important;
+          }
+          #anexo5-print-document .anexo5-header {
+            padding-top: 9mm !important;
+          }
+          #anexo5-print-document .anexo5-frame {
+            border: 1pt solid #000 !important;
+          }
+          #anexo5-print-document .anexo5-rule {
+            border: 0 !important;
+            border-top: 1.25pt solid #000 !important;
+            opacity: 1 !important;
+          }
+          #anexo5-print-document .form-line-row {
+            display: grid !important;
+            grid-template-columns: max-content minmax(0, 1fr) !important;
+            align-items: end !important;
+            column-gap: 6pt !important;
+            padding-top: 11pt !important;
+            padding-bottom: 11pt !important;
+            break-inside: avoid !important;
+          }
+          #anexo5-print-document .patient-line-row {
+            grid-template-columns: max-content minmax(0, 1fr) max-content minmax(68pt, 0.3fr) !important;
+          }
+          #anexo5-print-document .form-line-label,
+          #anexo5-print-document .form-line-value {
+            font-size: 10.25pt !important;
+            line-height: 1.35 !important;
+          }
+          #anexo5-print-document .form-line-value {
+            display: block !important;
+            min-width: 0 !important;
+            width: 100% !important;
+            min-height: 18pt !important;
+            border-bottom: 1pt solid #000 !important;
+            padding: 0 2pt 3pt !important;
+          }
+          #anexo5-print-document .appointment-heading {
+            border-top: 1pt solid #000 !important;
+            border-bottom: 1pt solid #000 !important;
+            margin-top: 8pt !important;
+            padding-top: 10pt !important;
+            padding-bottom: 9pt !important;
+            font-size: 9.5pt !important;
+          }
+          #anexo5-print-document .doctor-stamp-space {
+            height: 68pt !important;
+            margin-top: 8pt !important;
+            margin-bottom: 10pt !important;
+            border: 0.5pt dashed #dfdfdf !important;
+          }
+          #anexo5-print-document .doctor-stamp-space span {
+            color: #e1e1e1 !important;
+          }
           aside,
           .md\\:hidden,
           [class*="border-r border-slate-200"][class*="dark:border-slate-800"],
@@ -100,6 +179,8 @@ export default function ImprimirAnexo5Page() {
           }
           html, body {
             background: white !important;
+            width: 100% !important;
+            height: auto !important;
           }
         }
       `}</style>

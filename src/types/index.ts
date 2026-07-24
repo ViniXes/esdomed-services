@@ -305,15 +305,20 @@ export interface SolicitudAnexo5 {
   medicoId: string;
   medicoNombre: string;
   
-  expediente?: string; // Solo referencia interna, no aparece en el impreso
+  expediente?: string; // NEC del paciente; también aparece en el punto 1 del impreso
 
-  fecha?: string; // formato YYYY-MM-DD — opcional, a veces se llena a mano en el impreso
+  fecha?: string; // Legado: reemplazado visualmente por la fecha automática de creadoEn
   nombrePaciente: string;
-  referidoDe: string;
+  referidoDe?: string; // Legado: los Anexos 5 nuevos ya no capturan este campo
   establecimientoReferencia: string;
-  fechaHoraCita?: string; // Opcional
+  // Datos de la cita por RRI. Los completa posteriormente
+  // Referencia, Retorno e Interconsulta; el médico solicitante no los captura.
+  fechaHoraCita?: string;
+  medicoAtendera?: string;
+  especialidadAtencion?: string;
   especialidad: string;
-  medicoRefiere?: string; // Opcional — libre, no se ata al usuario logueado
+  medicoRefiere: string; // Obligatorio; proviene del perfil o de un cambio manual explícito
+  medicoRefiereFuente?: "perfil" | "manual";
   establecimientoQueRefiere: string;
   telefonoEstablecimiento: string;
 

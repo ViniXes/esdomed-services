@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { collection, onSnapshot, orderBy, query, limit, doc, updateDoc, Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClipboardList, Clock, CheckCircle2, Search, Printer, ExternalLink } from "lucide-react";
+import { ClipboardList, Clock, CheckCircle2, Search, Printer } from "lucide-react";
 import type { SolicitudAnexo5 } from "@/types";
+import { formatearFechaGeneracionAnexo5 } from "@/lib/anexo5";
 
 type Tab = "cola" | "historial";
 
@@ -37,7 +39,7 @@ export default function BandejaAnexo5Page() {
     const term = busqueda.toLowerCase();
     return (
       s.nombrePaciente.toLowerCase().includes(term) ||
-      (s.fecha ?? "").includes(term) ||
+      formatearFechaGeneracionAnexo5(s.creadoEn).toLowerCase().includes(term) ||
       (s.expediente ?? "").toLowerCase().includes(term)
     );
   });
@@ -152,7 +154,7 @@ export default function BandejaAnexo5Page() {
                       }`}
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400 text-xs">
-                        {s.fecha}
+                        {formatearFechaGeneracionAnexo5(s.creadoEn)}
                       </td>
                       <td className="px-4 py-3">
                         <span className="block text-slate-900 dark:text-slate-200 font-medium">{s.nombrePaciente}</span>
@@ -195,16 +197,24 @@ export default function BandejaAnexo5Page() {
               {/* Vista previa simulada de hoja */}
               <div className="flex-1 overflow-y-auto p-8">
                 <div className="bg-white mx-auto shadow-sm border border-slate-200 max-w-[650px] p-10 min-h-[800px] text-black" style={{ fontFamily: "Arial, sans-serif" }}>
-                  <div className="text-center space-y-4 mb-8">
-                    <h1 className="text-xl font-bold">Anexo 5</h1>
-                    <div className="flex flex-col items-center gap-2">
-                      <img src="/logo_minsal.png" alt="Logo MINSAL" className="w-20 object-contain" />
-                      <p className="text-sm font-semibold text-gray-700 tracking-wide uppercase mt-1">MINISTERIO DE SALUD</p>
-                    </div>
-                    <div className="text-sm space-y-1 mt-4">
+                  <div className="relative flex flex-col items-center text-center mb-8">
+                    <p className="absolute left-0 top-0 max-w-[150px] text-left text-[10px] leading-4">
+                      <span className="block font-bold">Fecha y hora de emisión</span>
+                      {formatearFechaGeneracionAnexo5(selectedItem.creadoEn)}
+                    </p>
+                    <div className="text-sm space-y-1">
+                      <p className="font-bold">Ministerio de Salud</p>
                       <p>Dirección Nacional de Hospitales</p>
                       <p>Dirección Nacional de Primer Nivel de Atención</p>
                     </div>
+                    <Image
+                      src="/logo_minsal.png"
+                      alt="Ministerio de Salud"
+                      width={200}
+                      height={68}
+                      className="mt-2 object-contain"
+                    />
+                    <h1 className="mt-3 text-xl font-bold">Anexo 5</h1>
                   </div>
 
                   <hr className="border-black mb-6" />
@@ -212,50 +222,51 @@ export default function BandejaAnexo5Page() {
                   <h2 className="text-center font-bold text-lg mb-8">Comprobante para el paciente referido en el SIS</h2>
 
                   <div className="space-y-6 text-sm">
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">Fecha</span>
-                      <span className="w-2/3">{selectedItem.fecha || "— (a llenar a mano)"}</span>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">1. Nombre:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.nombrePaciente}</span>
+                      <span className="ml-2 shrink-0 font-bold">NEC:</span>
+                      <span className="min-h-5 w-24 border-b border-black px-0.5">{selectedItem.expediente || ""}</span>
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">1. Nombre</span>
-                      <span className="w-2/3">{selectedItem.nombrePaciente}</span>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">2. Establecimiento que refiere:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.establecimientoQueRefiere}</span>
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">2. Referido de</span>
-                      <span className="w-2/3">{selectedItem.referidoDe}</span>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">3. Teléfono del establecimiento que refiere:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.telefonoEstablecimiento}</span>
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">3. Establecimiento de referencia</span>
-                      <span className="w-2/3">{selectedItem.establecimientoReferencia}</span>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">4. Médico que refiere:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.medicoRefiere}</span>
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">4. Fecha y hora de la cita</span>
-                      <span className="w-2/3">{selectedItem.fechaHoraCita || ""}</span>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">5. Especialidad del médico que refiere:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.especialidad}</span>
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">5. Especialidad</span>
-                      <span className="w-2/3">{selectedItem.especialidad}</span>
+                    <div className="flex h-16 w-[96%] items-center justify-center rounded-sm border border-dashed border-black/10 text-xs font-semibold text-black/10">
+                      Firma y sello del médico
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">6. Médico</span>
-                      <span className="w-2/3">{selectedItem.medicoRefiere}</span>
+                    <div className="border-b border-black py-2 text-center">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                        Datos de la cita por RRI
+                      </p>
                     </div>
-                    <div className="flex justify-between border-b border-black pb-1">
-                      <span className="font-bold w-1/3">7. Establecimiento que refiere :</span>
-                      <span className="w-2/3">{selectedItem.establecimientoQueRefiere}</span>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">6. Establecimiento al que se refiere:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.establecimientoReferencia}</span>
                     </div>
-                    
-                    <div className="flex justify-between pt-6">
-                      <div className="flex-1">
-                        <span className="font-bold block mb-1">Teléfono del establecimiento que refiere:</span>
-                        <div className="border-b border-black w-3/4 pb-1">
-                          {selectedItem.telefonoEstablecimiento}
-                        </div>
-                      </div>
-                      <div className="w-32 flex flex-col items-center justify-end">
-                        <div className="w-full border-b border-black h-12 mb-1"></div>
-                        <span className="font-bold">Sello</span>
-                      </div>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">7. Fecha y hora de la cita:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.fechaHoraCita || ""}</span>
+                    </div>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">8. Médico que atenderá al paciente:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.medicoAtendera || ""}</span>
+                    </div>
+                    <div className="flex items-end gap-1.5">
+                      <span className="shrink-0 font-bold">9. Especialidad donde será atendido:</span>
+                      <span className="min-h-5 flex-1 border-b border-black px-0.5">{selectedItem.especialidadAtencion || ""}</span>
                     </div>
                   </div>
                 </div>
