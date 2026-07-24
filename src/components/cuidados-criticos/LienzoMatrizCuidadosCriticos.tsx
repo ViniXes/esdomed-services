@@ -405,13 +405,13 @@ function AccionesAdmin({
         type="button"
         onClick={() => setModal(pendiente ? "revisar" : "confirmar")}
         title={pendiente ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}` : "Eliminar ficha"}
-        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
           pendiente
             ? "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
             : "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
         }`}
       >
-        <Trash2 size={13} />
+        <Trash2 size={7} />
       </button>
 
       {modal !== "cerrado" && (
@@ -529,7 +529,7 @@ function AccionesMedico({
   const [error, setError] = useState<string | null>(null);
 
   if (ficha.creadoPorId !== uid) {
-    return <span className="inline-block h-7 w-7 shrink-0" aria-hidden="true" />;
+    return <span className="inline-block h-3.5 w-3.5 shrink-0" aria-hidden="true" />;
   }
 
   const solicitud = ficha.solicitudEliminacion;
@@ -589,13 +589,13 @@ function AccionesMedico({
               ? `Solicitud anterior rechazada${solicitud?.notaRechazo ? `: ${solicitud.notaRechazo}` : ""}. Click para volver a solicitar.`
               : "Solicitar eliminación"
         }
-        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-lg border transition-colors ${
           pendiente
             ? "border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
             : "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
         }`}
       >
-        <Trash2 size={13} />
+        <Trash2 size={7} />
       </button>
 
       {abierto && (
