@@ -42,7 +42,6 @@ export function LienzoMatrizCuidadosCriticos({
   const { user, profile } = useAuth();
   const puedeGestionarAcciones = Boolean((onFichaEliminada || onFichaActualizada) && (profile?.role === "admin" || profile?.role === "medico"));
   const [modoAcciones, setModoAcciones] = useState(false);
-  const mostrarAcciones = puedeGestionarAcciones && modoAcciones;
   const [exportando, setExportando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [pagina, setPagina] = useState(1);
@@ -161,21 +160,34 @@ export function LienzoMatrizCuidadosCriticos({
         <table className="min-w-max border-collapse text-xs">
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
+              {puedeGestionarAcciones && (
+                <th className="sticky left-0 z-20 w-36 bg-slate-100 px-2 py-2 dark:bg-slate-800" aria-hidden="true" />
+              )}
               {campos.map(campo => (
                 <th key={campo.key} className="max-w-56 border-r border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-200">
                   {campo.label}
                 </th>
               ))}
-              {mostrarAcciones && (
-                <th className="border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
-                  Acciones
-                </th>
-              )}
             </tr>
           </thead>
           <tbody>
             {filasPagina.map((fila, index) => (
               <tr key={fila.id ?? `fila-${inicio + index}`} className="bg-white dark:bg-slate-900">
+                {puedeGestionarAcciones && (
+                  <td className="sticky left-0 z-10 w-36 bg-white px-2 py-2 align-top dark:bg-slate-900">
+                    <div className="flex items-start gap-2 rounded-lg bg-slate-50/80 p-1.5 dark:bg-slate-800/60">
+                      {profile?.role === "admin" ? (
+                        <AccionesAdmin ficha={fila} activo={modoAcciones} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
+                      ) : profile?.role === "medico" ? (
+                        <AccionesMedico ficha={fila} uid={user?.uid} nombre={profile?.nombre} activo={modoAcciones} onActualizada={onFichaActualizada} />
+                      ) : null}
+                      <div className="min-w-0 leading-tight">
+                        <p className="truncate font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">{fila.pacienteExpediente}</p>
+                        <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">{fila.pacienteNombre}</p>
+                      </div>
+                    </div>
+                  </td>
+                )}
                 {campos.map(campo => {
                   const valor = valorCampo(fila, campo.key);
                   const href = campo.key === "registro" ? expedienteHref?.(fila) : undefined;
@@ -199,20 +211,11 @@ export function LienzoMatrizCuidadosCriticos({
                     </td>
                   );
                 })}
-                {mostrarAcciones && (
-                  <td className="border-t border-slate-200 px-3 py-2 align-top dark:border-slate-700">
-                    {profile?.role === "admin" ? (
-                      <AccionesAdmin ficha={fila} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
-                    ) : profile?.role === "medico" ? (
-                      <AccionesMedico ficha={fila} uid={user?.uid} nombre={profile?.nombre} onActualizada={onFichaActualizada} />
-                    ) : null}
-                  </td>
-                )}
               </tr>
             ))}
             {filasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={campos.length + (mostrarAcciones ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={campos.length + (puedeGestionarAcciones ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">
                   {filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
                 </td>
               </tr>
@@ -303,10 +306,12 @@ function Paginacion({
 
 function AccionesAdmin({
   ficha,
+  activo,
   onEliminada,
   onActualizada,
 }: {
   ficha: FichaCuidadosCriticos;
+  activo: boolean;
   onEliminada?: (id: string) => void;
   onActualizada?: (ficha: FichaCuidadosCriticos) => void;
 }) {
@@ -382,16 +387,29 @@ function AccionesAdmin({
     }
   };
 
+  // Revisar una solicitud pendiente siempre es posible (es informativo, no un
+  // borrado directo); el borrado directo solo se habilita con el toggle "Eliminar".
+  const interactivo = activo || pendiente;
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setModal(pendiente ? "revisar" : "confirmar")}
-        title={pendiente ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}` : "Eliminar ficha"}
-        className={`inline-flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${
+        onClick={() => interactivo && setModal(pendiente ? "revisar" : "confirmar")}
+        disabled={!interactivo}
+        title={
+          pendiente
+            ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}`
+            : activo
+              ? "Eliminar ficha"
+              : "Activa \"Eliminar\" en la barra de herramientas para habilitar"
+        }
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
           pendiente
             ? "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-            : "border-slate-200 text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+            : activo
+              ? "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
+              : "border-transparent text-slate-300 dark:text-slate-600"
         }`}
       >
         <Trash2 size={13} />
@@ -499,11 +517,13 @@ function AccionesMedico({
   ficha,
   uid,
   nombre,
+  activo,
   onActualizada,
 }: {
   ficha: FichaCuidadosCriticos;
   uid?: string;
   nombre?: string;
+  activo: boolean;
   onActualizada?: (ficha: FichaCuidadosCriticos) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -512,21 +532,15 @@ function AccionesMedico({
   const [error, setError] = useState<string | null>(null);
 
   if (ficha.creadoPorId !== uid) {
-    return <span className="text-xs text-slate-300 dark:text-slate-700">—</span>;
+    return <span className="inline-block h-7 w-7 shrink-0" aria-hidden="true" />;
   }
 
   const solicitud = ficha.solicitudEliminacion;
-
-  if (solicitud?.estado === "pendiente") {
-    return (
-      <span
-        title={`Motivo: ${solicitud.motivo}`}
-        className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-      >
-        Solicitud enviada
-      </span>
-    );
-  }
+  const pendiente = solicitud?.estado === "pendiente";
+  const rechazada = solicitud?.estado === "rechazada";
+  // Ver el estado de una solicitud propia (pendiente/rechazada) siempre esta
+  // visible; solo enviar una solicitud nueva requiere el toggle "Eliminar" activo.
+  const interactivo = activo && !pendiente;
 
   const enviar = async () => {
     if (!ficha.id || !uid || !nombre || !motivo.trim()) return;
@@ -571,17 +585,29 @@ function AccionesMedico({
     <>
       <button
         type="button"
-        onClick={() => setAbierto(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-rose-950 dark:hover:text-rose-400"
+        onClick={() => interactivo && setAbierto(true)}
+        disabled={!interactivo}
+        title={
+          pendiente
+            ? `Solicitud enviada, pendiente de revision: ${solicitud?.motivo}`
+            : rechazada
+              ? `Solicitud anterior rechazada${solicitud?.notaRechazo ? `: ${solicitud.notaRechazo}` : ""}.${activo ? " Click para volver a solicitar." : ""}`
+              : activo
+                ? "Solicitar eliminación"
+                : "Activa \"Eliminar\" en la barra de herramientas para habilitar"
+        }
+        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+          pendiente
+            ? "border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
+            : rechazada
+              ? "border-rose-300 bg-rose-50 text-rose-500 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-500"
+              : activo
+                ? "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
+                : "border-transparent text-slate-300 dark:text-slate-600"
+        }`}
       >
-        <Trash2 size={12} />
-        Solicitar eliminación
+        <Trash2 size={13} />
       </button>
-      {solicitud?.estado === "rechazada" && (
-        <p className="mt-1 max-w-40 text-[10px] text-rose-500 dark:text-rose-400" title={solicitud.notaRechazo ?? undefined}>
-          Solicitud anterior rechazada
-        </p>
-      )}
 
       {abierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
