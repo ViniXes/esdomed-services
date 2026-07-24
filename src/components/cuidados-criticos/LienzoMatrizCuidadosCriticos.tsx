@@ -162,7 +162,7 @@ export function LienzoMatrizCuidadosCriticos({
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
               {mostrarAcciones && (
-                <th className="sticky left-0 z-20 w-32 bg-slate-100 px-1.5 py-2 dark:bg-slate-800" aria-hidden="true" />
+                <th className="sticky left-0 z-20 w-10 bg-slate-100 px-1 py-2 dark:bg-slate-800" aria-hidden="true" />
               )}
               {campos.map(campo => (
                 <th key={campo.key} className="max-w-56 border-r border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-200">
@@ -175,18 +175,12 @@ export function LienzoMatrizCuidadosCriticos({
             {filasPagina.map((fila, index) => (
               <tr key={fila.id ?? `fila-${inicio + index}`} className="bg-white dark:bg-slate-900">
                 {mostrarAcciones && (
-                  <td className="sticky left-0 z-10 w-32 bg-white px-1.5 py-2 align-top dark:bg-slate-900">
-                    <div className="flex items-start gap-1.5">
-                      {profile?.role === "admin" ? (
-                        <AccionesAdmin ficha={fila} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
-                      ) : profile?.role === "medico" ? (
-                        <AccionesMedico ficha={fila} uid={user?.uid} nombre={profile?.nombre} onActualizada={onFichaActualizada} />
-                      ) : null}
-                      <div className="min-w-0 leading-tight">
-                        <p className="truncate font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">{fila.pacienteExpediente}</p>
-                        <p className="truncate text-[10px] text-slate-500 dark:text-slate-400">{fila.pacienteNombre}</p>
-                      </div>
-                    </div>
+                  <td className="sticky left-0 z-10 w-10 bg-white px-1 py-2 align-top dark:bg-slate-900">
+                    {profile?.role === "admin" ? (
+                      <AccionesAdmin ficha={fila} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
+                    ) : profile?.role === "medico" ? (
+                      <AccionesMedico ficha={fila} uid={user?.uid} nombre={profile?.nombre} onActualizada={onFichaActualizada} />
+                    ) : null}
                   </td>
                 )}
                 {campos.map(campo => {
