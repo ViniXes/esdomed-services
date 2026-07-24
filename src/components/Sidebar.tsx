@@ -256,10 +256,9 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
-  // Acordeón exclusivo: solo un grupo abierto a la vez. La preferencia manual
-  // guarda con qué grupo activo se hizo; al navegar a otro grupo se descarta
-  // y vuelve a mandar la ruta (derivado en render, sin efectos).
-  const [manualOpen, setManualOpen] = useState<{ activeGroup?: string; open: string | null } | null>(null);
+  // Grupos independientes: todos abiertos por defecto, cada uno se cierra
+  // o abre a gusto sin afectar a los demás.
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
   const { profile, changePassword, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
@@ -277,17 +276,15 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(item.href + "/");
 
-  // Solo un grupo abierto a la vez: por defecto el de la ruta activa; el toggle
-  // manual tiene prioridad hasta que se navega a una ruta de otro grupo.
-  const activeGroup = navItems.find((i) => i.group && isActive(i))?.group;
-  const openGroup =
-    manualOpen && manualOpen.activeGroup === activeGroup
-      ? manualOpen.open
-      : activeGroup ?? null;
-  const isGroupCollapsed = (group: string) => group !== openGroup;
+  const isGroupCollapsed = (group: string) => closedGroups.has(group);
 
   const toggleGroup = (group: string) =>
-    setManualOpen({ activeGroup, open: openGroup === group ? null : group });
+    setClosedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
 
   const handleLogout = async () => {
     await logout();
