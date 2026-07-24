@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, getDocs, limit, orderBy, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown, Search, User2, X } from "lucide-react";
+import { ArrowLeft, Save, AlertTriangle, CheckCircle2, ChevronDown, Search, User2, X, Copy } from "lucide-react";
 import type { Paciente, SolicitudAnexo5 } from "@/types";
 import { calcularEdad, nombreCompleto, toDate } from "@/lib/pacientes/helpers";
 import {
@@ -25,11 +25,8 @@ export default function NuevaAnexo5Page() {
   const [form, setForm] = useState({
     expediente: "",
     nombrePaciente: "",
-    referidoDe: "",
     establecimientoReferencia: "",
-    fechaHoraCita: "",
     especialidad: "",
-    medicoRefiere: "",
     establecimientoQueRefiere: "HOSPITAL NACIONAL EL SALVADOR",
     telefonoEstablecimiento: "7788-5522, 2594-2100, 2594-2139",
   });
@@ -37,11 +34,17 @@ export default function NuevaAnexo5Page() {
   const [guardando, setGuardando] = useState(false);
   const [modalInfo, setModalInfo] = useState<{ tipo: "exito" | "error", mensaje: string } | null>(null);
   const [establecimientosOpen, setEstablecimientosOpen] = useState(false);
+  const [medicoRefiereManual, setMedicoRefiereManual] = useState<string | null>(null);
+  const [ultimoAnexoEnviado, setUltimoAnexoEnviado] = useState<SolicitudAnexo5 | null>(null);
 
   // Búsqueda de paciente por expediente (autocompletado)
   const [buscandoExp, setBuscandoExp] = useState(false);
   const [pacienteEncontrado, setPacienteEncontrado] = useState<Paciente | null>(null);
   const [busquedaExpInfo, setBusquedaExpInfo] = useState<string | null>(null);
+  const medicoDelPerfil = profile?.nombre?.trim().toUpperCase() ?? "";
+  const editandoMedicoRefiere = medicoRefiereManual !== null;
+  const medicoQueRefiere = editandoMedicoRefiere ? medicoRefiereManual : medicoDelPerfil;
+  const medicoQueRefiereNormalizado = medicoQueRefiere.trim().toUpperCase();
 
   const busquedaEstablecimiento = normalizarBusqueda(form.establecimientoReferencia.trim());
   const establecimientosFiltrados = busquedaEstablecimiento
@@ -79,16 +82,9 @@ export default function NuevaAnexo5Page() {
       } as Paciente;
       setPacienteEncontrado(p);
 
-      // "Referido de": si el paciente trae hospital de referencia (establecimiento
-      // de procedencia) lo usamos; si no, por defecto "DEMANDA ESPONTANEA".
-      const referido = p.establecimientoProcedencia?.trim()
-        ? p.establecimientoProcedencia
-        : "DEMANDA ESPONTANEA";
-
       setForm((prev) => ({
         ...prev,
         nombrePaciente: nombreCompleto(p),
-        referidoDe: referido,
       }));
     } catch (e) {
       setBusquedaExpInfo(`Error al buscar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -102,9 +98,8 @@ export default function NuevaAnexo5Page() {
     
     // Validaciones
     if (!form.nombrePaciente.trim()) { setModalInfo({ tipo: "error", mensaje: "El nombre del paciente es obligatorio." }); return; }
-    if (!form.referidoDe.trim()) { setModalInfo({ tipo: "error", mensaje: "El campo 'Referido de' es obligatorio." }); return; }
-    if (!form.establecimientoReferencia.trim()) { setModalInfo({ tipo: "error", mensaje: "El establecimiento de referencia es obligatorio." }); return; }
     if (!form.especialidad.trim()) { setModalInfo({ tipo: "error", mensaje: "La especialidad es obligatoria." }); return; }
+    if (!medicoQueRefiereNormalizado) { setModalInfo({ tipo: "error", mensaje: "No puedes generar el Anexo 5 sin un médico que refiere asignado o digitado." }); return; }
 
     setModalInfo(null);
     setGuardando(true);
@@ -117,14 +112,10 @@ export default function NuevaAnexo5Page() {
         ...(form.expediente.trim() && { expediente: form.expediente.trim().toUpperCase() }),
 
         nombrePaciente: form.nombrePaciente.toUpperCase(),
-        referidoDe: form.referidoDe.toUpperCase(),
         establecimientoReferencia: form.establecimientoReferencia.toUpperCase(),
-        // La fecha/hora de cita es opcional (a veces la ponen a mano después).
-        // Solo se incluye si viene; Firestore rechaza valores undefined.
-        ...(form.fechaHoraCita && { fechaHoraCita: form.fechaHoraCita }),
         especialidad: form.especialidad.toUpperCase(),
-        // Médico que refiere: opcional y libre (no se ata al usuario logueado).
-        ...(form.medicoRefiere.trim() && { medicoRefiere: form.medicoRefiere.trim().toUpperCase() }),
+        medicoRefiere: medicoQueRefiereNormalizado,
+        medicoRefiereFuente: editandoMedicoRefiere ? "manual" : "perfil",
         establecimientoQueRefiere: form.establecimientoQueRefiere.toUpperCase(),
         telefonoEstablecimiento: form.telefonoEstablecimiento,
 
@@ -132,7 +123,8 @@ export default function NuevaAnexo5Page() {
         creadoEn: Timestamp.now() as unknown as Date,
       };
 
-      await addDoc(collection(db, "anexo5"), docData);
+      const referenciaCreada = await addDoc(collection(db, "anexo5"), docData);
+      setUltimoAnexoEnviado({ ...docData, id: referenciaCreada.id });
       setModalInfo({ tipo: "exito", mensaje: "Referencia de Anexo 5 registrada correctamente." });
     } catch (e) {
       setModalInfo({ tipo: "error", mensaje: `Error al guardar: ${e instanceof Error ? e.message : "Desconocido"}` });
@@ -143,20 +135,40 @@ export default function NuevaAnexo5Page() {
 
   const lbl = "block text-xs font-medium text-slate-500 mb-1.5";
 
+  const precargarUltimoAnexo = () => {
+    if (!ultimoAnexoEnviado) return;
+
+    setForm({
+      expediente: ultimoAnexoEnviado.expediente ?? "",
+      nombrePaciente: ultimoAnexoEnviado.nombrePaciente ?? "",
+      establecimientoReferencia: ultimoAnexoEnviado.establecimientoReferencia ?? "",
+      especialidad: ultimoAnexoEnviado.especialidad ?? "",
+      establecimientoQueRefiere: ultimoAnexoEnviado.establecimientoQueRefiere ?? "HOSPITAL NACIONAL EL SALVADOR",
+      telefonoEstablecimiento: ultimoAnexoEnviado.telefonoEstablecimiento ?? "7788-5522, 2594-2100, 2594-2139",
+    });
+    setMedicoRefiereManual(
+      ultimoAnexoEnviado.medicoRefiereFuente === "manual"
+        ? ultimoAnexoEnviado.medicoRefiere
+        : null,
+    );
+    setPacienteEncontrado(null);
+    setBusquedaExpInfo(null);
+    setEstablecimientosOpen(false);
+    setModalInfo(null);
+  };
+
   const resetForm = () => {
     setForm({
       expediente: "",
       nombrePaciente: "",
-      referidoDe: "",
       establecimientoReferencia: "",
-      fechaHoraCita: "",
       especialidad: "",
-      medicoRefiere: "",
       establecimientoQueRefiere: "HOSPITAL NACIONAL EL SALVADOR",
       telefonoEstablecimiento: "7788-5522, 2594-2100, 2594-2139",
     });
     setModalInfo(null);
     setEstablecimientosOpen(false);
+    setMedicoRefiereManual(null);
     setPacienteEncontrado(null);
     setBusquedaExpInfo(null);
   };
@@ -208,19 +220,32 @@ export default function NuevaAnexo5Page() {
       )}
 
       {/* Encabezado */}
-      <div className="flex items-center gap-3 shrink-0">
-        <Link prefetch={false}
-          href="/medico"
-          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
-            Nuevo Anexo 5
-          </h1>
-          <p className="text-xs text-slate-500">Comprobante para el paciente referido en el SIS</p>
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-3">
+          <Link prefetch={false}
+            href="/medico"
+            className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-lg transition-colors"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
+              Nuevo Anexo 5
+            </h1>
+            <p className="text-xs text-slate-500">Comprobante para el paciente referido en el SIS</p>
+          </div>
         </div>
+        {ultimoAnexoEnviado && (
+          <button
+            type="button"
+            onClick={precargarUltimoAnexo}
+            className="flex shrink-0 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900/60"
+          >
+            <Copy size={15} />
+            <span className="hidden sm:inline">Precargar último enviado</span>
+            <span className="sm:hidden">Precargar último</span>
+          </button>
+        )}
       </div>
 
       {/* Formulario */}
@@ -228,11 +253,16 @@ export default function NuevaAnexo5Page() {
         <div className="flex-1 overflow-y-auto p-5 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-5 gap-y-4">
 
-            {/* Fila 1: Expediente */}
+            <div className="md:col-span-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Datos del paciente</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Identificación que completa el médico solicitante.</p>
+            </div>
+
+            {/* Fila 1: Expediente del Hospital El Salvador */}
             <div className="md:col-span-3">
               <label className={lbl}>
-                Expediente
-                <span className="ml-1.5 font-normal text-slate-400">(autocompleta los datos del paciente — no aparece en el impreso)</span>
+                Expediente de Hospital El Salvador
+                <span className="ml-1.5 font-normal text-slate-400">(aparece como NEC en el impreso y autocompleta los datos del paciente)</span>
               </label>
               <div className="flex gap-2">
                 <input type="text" className={inputCls} value={form.expediente}
@@ -288,21 +318,81 @@ export default function NuevaAnexo5Page() {
 
             {/* Fila 2: Nombre paciente (full) */}
             <div className="md:col-span-3">
-              <label className={lbl}>1. Nombre del paciente *</label>
+              <label className={lbl}>1. Nombre del paciente: *</label>
               <input type="text" className={inputCls} value={form.nombrePaciente}
                 onChange={(e) => setForm({ ...form, nombrePaciente: e.target.value })}
                 placeholder="Ej. MARIA ESTHER MONTES MORALES" />
             </div>
 
-            {/* Fila 3: Referido de + Establecimiento de referencia */}
-            <div>
-              <label className={lbl}>2. Referido de *</label>
-              <input type="text" className={inputCls} value={form.referidoDe}
-                onChange={(e) => setForm({ ...form, referidoDe: e.target.value })}
-                placeholder="Ej. DEMANDA ESPONTANEA" />
+            <div className="md:col-span-3 mt-2 border-b border-slate-200 dark:border-slate-700 pb-2">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Datos de la referencia médica</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Información clínica y del establecimiento que refiere.</p>
             </div>
+
+            {/* Establecimiento que refiere + teléfono */}
             <div className="md:col-span-2">
-              <label className={lbl}>3. Establecimiento de referencia *</label>
+              <label className={lbl}>2. Establecimiento que refiere:</label>
+              <input type="text" className={inputCls} value={form.establecimientoQueRefiere}
+                onChange={(e) => setForm({ ...form, establecimientoQueRefiere: e.target.value })} />
+            </div>
+            <div>
+              <label className={lbl}>3. Teléfono del establecimiento:</label>
+              <input type="text" className={inputCls} value={form.telefonoEstablecimiento}
+                onChange={(e) => setForm({ ...form, telefonoEstablecimiento: e.target.value })} />
+            </div>
+
+            {/* Médico + Especialidad */}
+            <div className="md:col-span-2">
+              <label className={lbl}>
+                4. Médico que refiere: *
+                <span className="ml-1 font-normal text-slate-400">
+                  ({editandoMedicoRefiere ? "digitado manualmente" : "tomado de tu perfil"})
+                </span>
+              </label>
+              <input
+                type="text"
+                className={`${inputCls} ${editandoMedicoRefiere ? "" : "cursor-not-allowed bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}
+                value={medicoQueRefiere}
+                onChange={(e) => setMedicoRefiereManual(e.target.value)}
+                readOnly={!editandoMedicoRefiere}
+                aria-readonly={!editandoMedicoRefiere}
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {editandoMedicoRefiere ? (
+                  <button
+                    type="button"
+                    onClick={() => setMedicoRefiereManual(null)}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Usar el médico de mi perfil
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setMedicoRefiereManual(medicoDelPerfil)}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Cambiar médico que refiere
+                  </button>
+                )}
+              </div>
+              {editandoMedicoRefiere && !medicoQueRefiereNormalizado && (
+                <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span>No puedes generar el Anexo 5 sin un médico que refiere asignado o digitado.</span>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className={lbl}>5. Especialidad del médico que refiere: *</label>
+              <input type="text" className={inputCls} value={form.especialidad}
+                onChange={(e) => setForm({ ...form, especialidad: e.target.value })}
+                placeholder="Ej. CIRUGÍA GENERAL" />
+            </div>
+
+            {/* Establecimiento al que se refiere */}
+            <div className="md:col-span-3">
+              <label className={lbl}>6. Establecimiento al que se refiere:</label>
               <div className="relative">
                 <input
                   type="text"
@@ -314,8 +404,7 @@ export default function NuevaAnexo5Page() {
                     setForm({ ...form, establecimientoReferencia: e.target.value });
                     setEstablecimientosOpen(true);
                   }}
-                  placeholder="Seleccione o escriba un hospital"
-                  required
+                  placeholder="Seleccione o escriba un hospital (opcional)"
                   autoComplete="off"
                 />
                 <button
@@ -357,34 +446,11 @@ export default function NuevaAnexo5Page() {
               </div>
             </div>
 
-            {/* Fila 4: Fecha cita + Especialidad + Médico */}
-            <div>
-              <label className={lbl}>4. Fecha y hora de la cita <span className="font-normal text-slate-400">(opcional)</span></label>
-              <input type="datetime-local" className={inputCls} value={form.fechaHoraCita}
-                onChange={(e) => setForm({ ...form, fechaHoraCita: e.target.value })} />
-            </div>
-            <div>
-              <label className={lbl}>5. Especialidad *</label>
-              <input type="text" className={inputCls} value={form.especialidad}
-                onChange={(e) => setForm({ ...form, especialidad: e.target.value })}
-                placeholder="Ej. CIRUGÍA GENERAL" />
-            </div>
-            <div>
-              <label className={lbl}>6. Médico que refiere <span className="font-normal text-slate-400">(opcional)</span></label>
-              <input type="text" className={inputCls} value={form.medicoRefiere}
-                onChange={(e) => setForm({ ...form, medicoRefiere: e.target.value })} />
-            </div>
-
-            {/* Fila 5: Establecimiento + Teléfono */}
-            <div className="md:col-span-2">
-              <label className={lbl}>7. Establecimiento que refiere</label>
-              <input type="text" className={inputCls} value={form.establecimientoQueRefiere}
-                onChange={(e) => setForm({ ...form, establecimientoQueRefiere: e.target.value })} />
-            </div>
-            <div>
-              <label className={lbl}>Teléfono del establecimiento</label>
-              <input type="text" className={inputCls} value={form.telefonoEstablecimiento}
-                onChange={(e) => setForm({ ...form, telefonoEstablecimiento: e.target.value })} />
+            <div className="md:col-span-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-3">
+              <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Datos de la cita por RRI</p>
+              <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                Este bloque no lo llena el médico solicitante. Se imprimirá al final del comprobante para que el médico de Referencia, Retorno e Interconsulta (RRI) complete a mano la fecha y hora de la cita, el médico que atenderá al paciente y la especialidad donde será atendido.
+              </p>
             </div>
 
           </div>
@@ -396,7 +462,7 @@ export default function NuevaAnexo5Page() {
             className="px-5 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50">
             Limpiar
           </button>
-          <button onClick={guardar} disabled={guardando}
+          <button onClick={guardar} disabled={guardando || !medicoQueRefiereNormalizado}
             className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors shadow-sm">
             <Save size={16} />
             {guardando ? "Guardando..." : "Guardar referencia"}

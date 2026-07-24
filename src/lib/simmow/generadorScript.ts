@@ -247,6 +247,12 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
 // Este código NO presiona Grabar. Revise antes de guardar.
 
 ;(async () => {
+  if (window.__simmowLlenadoEnCurso) {
+    console.error('Ya hay un llenado en curso en esta pestaña. Espere a que termine (o recargue la página) antes de pegar el código de nuevo — ejecutarlo dos veces a la vez duplica los caracteres escritos en los campos.');
+    return;
+  }
+  window.__simmowLlenadoEnCurso = true;
+
   const DATA = ${dataJson};
   const errores = [];
 
@@ -863,6 +869,12 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
     const opciones = [...sel.options].map(o => ({
       value: o.value || '',
       text: o.text || '',
+      // SIMMOW valida el combobox comparando el input visible contra el
+      // textContent SIN normalizar de la opción (algunas tienen espacios
+      // dobles en su texto real) — si no coincide exacto, su propio widget
+      // borra el input y el select al perder el foco. Por eso guardamos el
+      // texto crudo aparte del texto normalizado usado para buscar/loguear.
+      rawText: o.textContent || o.text || '',
       normText: norm(o.text || ''),
       normValue: norm(o.value || '')
     })).filter(o => o.value || o.text);
@@ -954,11 +966,11 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
       }
 
       if (visibleInput) {
-        visibleInput.value = op.text;
+        visibleInput.value = op.rawText;
         fire(visibleInput);
 
         if (window.jQuery) {
-          window.jQuery(visibleInput).val(op.text).trigger('change').trigger('blur');
+          window.jQuery(visibleInput).val(op.rawText).trigger('change').trigger('blur');
         }
       }
     } catch (e) {}
@@ -1040,6 +1052,7 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
     return '';
   };
 
+  try {
   console.clear();
   console.log('Iniciando llenado desde el módulo SIMMOW de esdomed-services...');
   console.log(DATA);
@@ -1217,6 +1230,9 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
     console.error('Observaciones del llenado:', errores);
   } else {
     console.log('Sin errores de selector detectados.');
+  }
+  } finally {
+    window.__simmowLlenadoEnCurso = false;
   }
 })();
 `;

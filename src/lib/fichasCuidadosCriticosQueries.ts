@@ -159,6 +159,27 @@ export function getFichasCuidadosCriticosCache(clave: string): CacheFichas | nul
   return cache.get(clave) ?? null;
 }
 
+// Parchea una entrada de la caché tras un cambio hecho fuera del flujo normal
+// de consulta (eliminar/rechazar una ficha desde el lienzo), para que al volver
+// a esta pantalla sin apretar "Actualizar" no reaparezca el dato viejo.
+export function actualizarFichaEnCache(clave: string, ficha: FichaCuidadosCriticos) {
+  const entrada = cache.get(clave);
+  if (!entrada) return;
+  cache.set(clave, {
+    ...entrada,
+    fichas: entrada.fichas.map(item => item.id === ficha.id ? ficha : item),
+  });
+}
+
+export function eliminarFichaDeCache(clave: string, id: string) {
+  const entrada = cache.get(clave);
+  if (!entrada) return;
+  cache.set(clave, {
+    ...entrada,
+    fichas: entrada.fichas.filter(item => item.id !== id),
+  });
+}
+
 export async function consultarFichasCuidadosCriticos(
   clave: string,
   consultas: Query<DocumentData>[],
