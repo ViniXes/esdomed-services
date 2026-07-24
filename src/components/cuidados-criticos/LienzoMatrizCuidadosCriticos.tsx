@@ -157,23 +157,34 @@ export function LienzoMatrizCuidadosCriticos({
         </div>
       </div>
 
-      <div className="scrollbar-matriz-cuidados overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="scrollbar-matriz-cuidados overflow-x-auto">
         <table className="min-w-max border-collapse text-xs">
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
               {mostrarAcciones && (
-                <th className="sticky left-0 z-20 w-10 bg-slate-100 px-1 py-2 dark:bg-slate-800" aria-hidden="true" />
+                <th className="sticky left-0 z-20 w-10 bg-white px-1 py-2 dark:bg-slate-900" aria-hidden="true" />
               )}
-              {campos.map(campo => (
-                <th key={campo.key} className="max-w-56 border-r border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-200">
-                  {campo.label}
-                </th>
-              ))}
+              {campos.map((campo, campoIndex) => {
+                const esPrimera = campoIndex === 0;
+                const esUltima = campoIndex === campos.length - 1;
+                return (
+                  <th
+                    key={campo.key}
+                    className={`max-w-56 border-t border-r border-slate-200 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${
+                      esPrimera ? "border-l rounded-tl-xl" : ""
+                    } ${esUltima ? "rounded-tr-xl" : ""}`}
+                  >
+                    {campo.label}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {filasPagina.map((fila, index) => (
-              <tr key={fila.id ?? `fila-${inicio + index}`} className="bg-white dark:bg-slate-900">
+            {filasPagina.map((fila, index) => {
+              const esUltimaFila = index === filasPagina.length - 1;
+              return (
+              <tr key={fila.id ?? `fila-${inicio + index}`}>
                 {mostrarAcciones && (
                   <td className="sticky left-0 z-10 w-10 bg-white px-1 py-2 align-top dark:bg-slate-900">
                     {profile?.role === "admin" ? (
@@ -183,12 +194,19 @@ export function LienzoMatrizCuidadosCriticos({
                     ) : null}
                   </td>
                 )}
-                {campos.map(campo => {
+                {campos.map((campo, campoIndex) => {
                   const valor = valorCampo(fila, campo.key);
                   const href = campo.key === "registro" ? expedienteHref?.(fila) : undefined;
                   const expedientePendiente = href && fichaPendienteCierreCuidadosCriticos(fila);
+                  const esPrimera = campoIndex === 0;
+                  const esUltima = campoIndex === campos.length - 1;
                   return (
-                    <td key={campo.key} className="max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-300">
+                    <td
+                      key={campo.key}
+                      className={`max-w-56 border-r border-t border-slate-200 bg-white px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${
+                        esPrimera ? `border-l${esUltimaFila ? " rounded-bl-xl" : ""}` : ""
+                      } ${esUltima && esUltimaFila ? "rounded-br-xl" : ""}`}
+                    >
                       {href ? (
                         <Link prefetch={false}
                           href={href}
@@ -207,10 +225,11 @@ export function LienzoMatrizCuidadosCriticos({
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
             {filasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={campos.length + (mostrarAcciones ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={campos.length + (mostrarAcciones ? 1 : 0)} className="rounded-b-xl border-x border-b border-t border-slate-200 bg-white px-4 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900">
                   {filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
                 </td>
               </tr>
