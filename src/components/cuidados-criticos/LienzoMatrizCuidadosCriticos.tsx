@@ -42,6 +42,7 @@ export function LienzoMatrizCuidadosCriticos({
   const { user, profile } = useAuth();
   const puedeGestionarAcciones = Boolean((onFichaEliminada || onFichaActualizada) && (profile?.role === "admin" || profile?.role === "medico"));
   const [modoAcciones, setModoAcciones] = useState(false);
+  const mostrarAcciones = puedeGestionarAcciones && modoAcciones;
   const [exportando, setExportando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [pagina, setPagina] = useState(1);
@@ -160,8 +161,8 @@ export function LienzoMatrizCuidadosCriticos({
         <table className="min-w-max border-collapse text-xs">
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
-              {puedeGestionarAcciones && (
-                <th className="sticky left-0 z-20 w-36 bg-slate-100 px-2 py-2 dark:bg-slate-800" aria-hidden="true" />
+              {mostrarAcciones && (
+                <th className="sticky left-0 z-20 w-32 bg-slate-100 px-1.5 py-2 dark:bg-slate-800" aria-hidden="true" />
               )}
               {campos.map(campo => (
                 <th key={campo.key} className="max-w-56 border-r border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 last:border-r-0 dark:border-slate-700 dark:text-slate-200">
@@ -173,13 +174,13 @@ export function LienzoMatrizCuidadosCriticos({
           <tbody>
             {filasPagina.map((fila, index) => (
               <tr key={fila.id ?? `fila-${inicio + index}`} className="bg-white dark:bg-slate-900">
-                {puedeGestionarAcciones && (
-                  <td className="sticky left-0 z-10 w-36 bg-white px-2 py-2 align-top dark:bg-slate-900">
-                    <div className="flex items-start gap-2 rounded-lg bg-slate-50/80 p-1.5 dark:bg-slate-800/60">
+                {mostrarAcciones && (
+                  <td className="sticky left-0 z-10 w-32 bg-white px-1.5 py-2 align-top dark:bg-slate-900">
+                    <div className="flex items-start gap-1.5">
                       {profile?.role === "admin" ? (
-                        <AccionesAdmin ficha={fila} activo={modoAcciones} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
+                        <AccionesAdmin ficha={fila} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
                       ) : profile?.role === "medico" ? (
-                        <AccionesMedico ficha={fila} uid={user?.uid} nombre={profile?.nombre} activo={modoAcciones} onActualizada={onFichaActualizada} />
+                        <AccionesMedico ficha={fila} uid={user?.uid} nombre={profile?.nombre} onActualizada={onFichaActualizada} />
                       ) : null}
                       <div className="min-w-0 leading-tight">
                         <p className="truncate font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">{fila.pacienteExpediente}</p>
@@ -215,7 +216,7 @@ export function LienzoMatrizCuidadosCriticos({
             ))}
             {filasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={campos.length + (puedeGestionarAcciones ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={campos.length + (mostrarAcciones ? 1 : 0)} className="px-4 py-8 text-center text-slate-400">
                   {filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
                 </td>
               </tr>
@@ -306,12 +307,10 @@ function Paginacion({
 
 function AccionesAdmin({
   ficha,
-  activo,
   onEliminada,
   onActualizada,
 }: {
   ficha: FichaCuidadosCriticos;
-  activo: boolean;
   onEliminada?: (id: string) => void;
   onActualizada?: (ficha: FichaCuidadosCriticos) => void;
 }) {
@@ -387,29 +386,16 @@ function AccionesAdmin({
     }
   };
 
-  // Revisar una solicitud pendiente siempre es posible (es informativo, no un
-  // borrado directo); el borrado directo solo se habilita con el toggle "Eliminar".
-  const interactivo = activo || pendiente;
-
   return (
     <>
       <button
         type="button"
-        onClick={() => interactivo && setModal(pendiente ? "revisar" : "confirmar")}
-        disabled={!interactivo}
-        title={
-          pendiente
-            ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}`
-            : activo
-              ? "Eliminar ficha"
-              : "Activa \"Eliminar\" en la barra de herramientas para habilitar"
-        }
+        onClick={() => setModal(pendiente ? "revisar" : "confirmar")}
+        title={pendiente ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}` : "Eliminar ficha"}
         className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
           pendiente
             ? "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-            : activo
-              ? "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
-              : "border-transparent text-slate-300 dark:text-slate-600"
+            : "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
         }`}
       >
         <Trash2 size={13} />
@@ -517,13 +503,11 @@ function AccionesMedico({
   ficha,
   uid,
   nombre,
-  activo,
   onActualizada,
 }: {
   ficha: FichaCuidadosCriticos;
   uid?: string;
   nombre?: string;
-  activo: boolean;
   onActualizada?: (ficha: FichaCuidadosCriticos) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -538,9 +522,7 @@ function AccionesMedico({
   const solicitud = ficha.solicitudEliminacion;
   const pendiente = solicitud?.estado === "pendiente";
   const rechazada = solicitud?.estado === "rechazada";
-  // Ver el estado de una solicitud propia (pendiente/rechazada) siempre esta
-  // visible; solo enviar una solicitud nueva requiere el toggle "Eliminar" activo.
-  const interactivo = activo && !pendiente;
+  const interactivo = !pendiente;
 
   const enviar = async () => {
     if (!ficha.id || !uid || !nombre || !motivo.trim()) return;
@@ -591,19 +573,13 @@ function AccionesMedico({
           pendiente
             ? `Solicitud enviada, pendiente de revision: ${solicitud?.motivo}`
             : rechazada
-              ? `Solicitud anterior rechazada${solicitud?.notaRechazo ? `: ${solicitud.notaRechazo}` : ""}.${activo ? " Click para volver a solicitar." : ""}`
-              : activo
-                ? "Solicitar eliminación"
-                : "Activa \"Eliminar\" en la barra de herramientas para habilitar"
+              ? `Solicitud anterior rechazada${solicitud?.notaRechazo ? `: ${solicitud.notaRechazo}` : ""}. Click para volver a solicitar.`
+              : "Solicitar eliminación"
         }
         className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors ${
           pendiente
             ? "border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400"
-            : rechazada
-              ? "border-rose-300 bg-rose-50 text-rose-500 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-500"
-              : activo
-                ? "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
-                : "border-transparent text-slate-300 dark:text-slate-600"
+            : "border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400"
         }`}
       >
         <Trash2 size={13} />
