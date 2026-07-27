@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, limit } from "@/lib/firestoreMeter";
+import {
+  collection, query, orderBy, onSnapshot, limit, where, getDocs, Timestamp, QueryConstraint,
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import { FileStack, Search, X, Circle } from "lucide-react";
+import { DateField } from "@/components/ui/DateField";
+import { FileStack, Search, X, Circle, History } from "lucide-react";
 
 type ControlIngreso = {
   id?: string;
@@ -57,9 +60,26 @@ export default function ColaExpedientesPage() {
   const [busqueda, setBusqueda] = useState("");
   const [soloAyer, setSoloAyer] = useState(false);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
+  const [vista, setVista] = useState<"recientes" | "historico">("recientes");
+  const [expHistorico, setExpHistorico] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [historicos, setHistoricos] = useState<ControlIngreso[] | null>(null);
+  const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
 
+  // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
+  // índice compuesto). Fechas anteriores se consultan bajo demanda en la
+  // pestaña Histórico con una lectura única.
   useEffect(() => {
-    const q = query(collection(db, "control_ingresos"), orderBy("creadoEn", "desc"), limit(400));
+    const inicioAyer = new Date();
+    inicioAyer.setDate(inicioAyer.getDate() - 1);
+    inicioAyer.setHours(0, 0, 0, 0);
+    const q = query(
+      collection(db, "control_ingresos"),
+      where("creadoEn", ">=", Timestamp.fromDate(inicioAyer)),
+      orderBy("creadoEn", "desc"),
+      limit(400),
+    );
     return onSnapshot(q, s => {
       setIngresos(s.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
       setUltimaActualizacion(new Date());
@@ -70,8 +90,41 @@ export default function ColaExpedientesPage() {
   const ayer = ingresos.filter(i => esFechaAyer(i.creadoEn));
   const ultimo = ingresos[0] ?? null;
 
+  // Búsqueda histórica: por expediente exacto (sin orderBy, para no exigir
+  // índice compuesto; se ordena en cliente) o por rango de fechas.
+  const buscarHistoricos = async () => {
+    const exp = expHistorico.trim();
+    if (!exp && !fechaDesde && !fechaHasta) return;
+    setBuscandoHistoricos(true);
+    try {
+      let docs: ControlIngreso[];
+      if (exp) {
+        const snap = await getDocs(query(collection(db, "control_ingresos"), where("expediente", "==", exp), limit(200)));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso));
+        if (fechaDesde) docs = docs.filter(i => tsToDate(i.creadoEn) >= new Date(fechaDesde + "T00:00:00"));
+        if (fechaHasta) docs = docs.filter(i => tsToDate(i.creadoEn) <= new Date(fechaHasta + "T23:59:59"));
+        docs.sort((a, b) => tsToDate(b.creadoEn).getTime() - tsToDate(a.creadoEn).getTime());
+      } else {
+        const constraints: QueryConstraint[] = [];
+        if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+        if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+        constraints.push(orderBy("creadoEn", "desc"), limit(500));
+        const snap = await getDocs(query(collection(db, "control_ingresos"), ...constraints));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso));
+      }
+      setHistoricos(docs);
+    } finally {
+      setBuscandoHistoricos(false);
+    }
+  };
+
+  const limpiarHistoricos = () => {
+    setExpHistorico(""); setFechaDesde(""); setFechaHasta("");
+    setHistoricos(null);
+  };
+
   const base = soloAyer ? ayer : ingresos;
-  const lista = base.filter(i => {
+  const recientesFiltrados = base.filter(i => {
     if (!busqueda) return true;
     const q = busqueda.toLowerCase();
     return (
@@ -81,6 +134,7 @@ export default function ColaExpedientesPage() {
       (i.nombres?.toLowerCase() ?? "").includes(q)
     );
   });
+  const lista = vista === "recientes" ? recientesFiltrados : (historicos ?? []);
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -137,53 +191,133 @@ export default function ColaExpedientesPage() {
         </div>
       </div>
 
+      {/* Tabs Recientes / Histórico */}
+      <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+        {([
+          { key: "recientes", label: "Ayer y hoy", icon: Circle },
+          { key: "historico", label: "Histórico", icon: History },
+        ] as const).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setVista(key)}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              vista === key
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
+                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            }`}
+          >
+            <Icon size={key === "recientes" ? 8 : 14} className={key === "recientes" ? "fill-green-500 text-green-500" : ""} />
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Tabla */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
 
         {/* Toolbar */}
-        <div className="space-y-2 md:space-y-0 md:flex md:items-center md:gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 rounded-t-2xl">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-1 h-5 bg-teal-500 rounded-full flex-shrink-0" />
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading truncate">
-              Registros recientes
-            </span>
-            <span className="text-xs text-slate-400 flex-shrink-0">({lista.length})</span>
+        {vista === "recientes" ? (
+          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 rounded-t-2xl">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="w-1 h-5 bg-teal-500 rounded-full flex-shrink-0" />
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading truncate">
+                Registros de ayer y hoy
+              </span>
+              <span className="text-xs text-slate-400 flex-shrink-0">({lista.length})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Search */}
+              <div className="relative flex-1 md:w-56 md:flex-none">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Expediente, DUI o paciente…"
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                />
+                {busqueda && (
+                  <button onClick={() => setBusqueda("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              {/* Ayer toggle */}
+              <button
+                onClick={() => setSoloAyer(v => !v)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                  soloAyer
+                    ? "bg-teal-600 text-white border-teal-600"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                }`}
+              >
+                {soloAyer ? "Ver ambos días" : "Solo ayer"}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Search */}
-            <div className="relative flex-1 md:w-56 md:flex-none">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Expediente, DUI o paciente…"
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                className="w-full pl-8 pr-7 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
-              />
-              {busqueda && (
-                <button onClick={() => setBusqueda("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                  <X size={12} />
+        ) : (
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 rounded-t-2xl space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-5 bg-indigo-500 rounded-full flex-shrink-0" />
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading truncate">
+                Buscar en fechas anteriores
+              </span>
+              {historicos !== null && (
+                <span className="text-xs text-slate-400 flex-shrink-0">({historicos.length})</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[150px] md:max-w-[200px]">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Expediente exacto…"
+                  value={expHistorico}
+                  onChange={e => setExpHistorico(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); buscarHistoricos(); } }}
+                  className="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400 font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 shrink-0">Desde</span>
+                <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+                <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
+              </div>
+              <button
+                onClick={buscarHistoricos}
+                disabled={buscandoHistoricos || (!expHistorico.trim() && !fechaDesde && !fechaHasta)}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Search size={13} /> {buscandoHistoricos ? "Buscando…" : "Buscar"}
+              </button>
+              {historicos !== null && (
+                <button
+                  onClick={limpiarHistoricos}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+                >
+                  <X size={12} /> Limpiar
                 </button>
               )}
             </div>
-            {/* Ayer toggle */}
-            <button
-              onClick={() => setSoloAyer(v => !v)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-                soloAyer
-                  ? "bg-teal-600 text-white border-teal-600"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              {soloAyer ? "Ver todos" : "Solo ayer"}
-            </button>
+            <p className="text-[11px] text-slate-400">
+              Indica un expediente exacto (ej. 123-25), un rango de fechas, o ambos.
+            </p>
           </div>
-        </div>
+        )}
 
         {lista.length === 0 ? (
           <p className="text-sm text-slate-500 py-12 text-center">
-            {ingresos.length === 0 ? "No hay expedientes registrados." : "Sin resultados para la búsqueda."}
+            {vista === "historico"
+              ? historicos === null
+                ? "Define un expediente o un rango de fechas y presiona Buscar."
+                : "Sin resultados para esa búsqueda."
+              : ingresos.length === 0
+                ? "No hay expedientes registrados en las últimas 24-48 horas."
+                : "Sin resultados para la búsqueda."}
           </p>
         ) : (
           <>
