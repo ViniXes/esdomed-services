@@ -12,12 +12,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { ClipboardList, CheckCircle2, Search, X, Pencil } from "lucide-react";
 
+type GeneroIngreso = "masculino" | "femenino";
+
 type ControlIngreso = {
   id?: string;
   expediente: string;
   dui?: string;
   apellidos: string;
   nombres: string;
+  edad?: number;
+  genero?: GeneroIngreso;
   servicio: string;
   ingresoDirectoServicio: boolean;
   responsableIngresoNombre: string;
@@ -29,6 +33,8 @@ type FormState = {
   dui: string;
   apellidos: string;
   nombres: string;
+  edad: string;
+  genero: "" | GeneroIngreso;
   servicio: string;
   ingresoDirectoServicio: boolean;
 };
@@ -41,6 +47,8 @@ const emptyForm = (): FormState => ({
   dui: "",
   apellidos: "",
   nombres: "",
+  edad: "",
+  genero: "",
   servicio: "",
   ingresoDirectoServicio: false,
 });
@@ -97,6 +105,9 @@ export default function ControlIngresosPage() {
       if (field === "nombres" || field === "apellidos") {
         val = val.toUpperCase();
       }
+      if (field === "edad") {
+        val = val.replace(/\D/g, "").slice(0, 3);
+      }
       setForm(prev => ({ ...prev, [field]: val }));
     };
 
@@ -105,6 +116,9 @@ export default function ControlIngresosPage() {
     if (!/^\d+-\d{2}$/.test(form.expediente.trim())) return "El formato del expediente debe ser X-XX (ej. 1-26).";
     if (!form.apellidos.trim()) return "Los apellidos son obligatorios.";
     if (!form.nombres.trim()) return "Los nombres son obligatorios.";
+    if (!form.edad.trim()) return "La edad es obligatoria.";
+    if (!/^\d+$/.test(form.edad.trim()) || parseInt(form.edad, 10) > 120) return "La edad debe ser un número entero válido.";
+    if (!form.genero) return "Seleccione el género.";
     if (!form.servicio.trim()) return "Seleccione el servicio.";
     return null;
   };
@@ -122,6 +136,8 @@ export default function ControlIngresosPage() {
         expediente: form.expediente.trim(),
         apellidos: form.apellidos.trim(),
         nombres: form.nombres.trim(),
+        edad: parseInt(form.edad, 10),
+        genero: form.genero,
         servicio: form.servicio,
         ingresoDirectoServicio: form.ingresoDirectoServicio,
       };
@@ -156,6 +172,8 @@ export default function ControlIngresosPage() {
       dui: ingreso.dui || "",
       apellidos: ingreso.apellidos || "",
       nombres: ingreso.nombres || "",
+      edad: ingreso.edad != null ? String(ingreso.edad) : "",
+      genero: ingreso.genero || "",
       servicio: ingreso.servicio || "",
       ingresoDirectoServicio: ingreso.ingresoDirectoServicio || false,
     });
@@ -339,6 +357,36 @@ export default function ControlIngresosPage() {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                Edad <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.edad}
+                onChange={set("edad")}
+                placeholder="Ej: 45"
+                className={inputCls}
+                autoComplete="off"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                Género <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.genero}
+                onChange={set("genero")}
+                className={`${inputCls} appearance-none`}
+              >
+                <option value="">Seleccione...</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
+            </div>
+
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-slate-500 mb-1.5">
                 Servicio <span className="text-red-500">*</span>
@@ -471,7 +519,11 @@ export default function ControlIngresosPage() {
                 <p className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">
                   {ingreso.apellidos}, {ingreso.nombres}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">{ingreso.servicio}</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {ingreso.servicio}
+                  {ingreso.edad != null && ` · ${ingreso.edad} años`}
+                  {ingreso.genero && ` · ${ingreso.genero === "masculino" ? "Masculino" : "Femenino"}`}
+                </p>
               </div>
               <div className="flex flex-col items-end shrink-0 gap-2">
                 <div className="text-right">
