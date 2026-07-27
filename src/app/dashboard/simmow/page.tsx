@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileCode2, CheckCircle2, Copy, Check, AlertTriangle, Stethoscope, Building2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -140,9 +140,7 @@ export default function SimmowPage() {
   const router = useRouter();
   const { profile, loading } = useAuth();
 
-  const estadoGuardadoAmb = useMemo(() => cargarEstadoAmbulatorioGuardado(), []);
-
-  const [flujo, setFlujo] = useState<Flujo>(() => (estadoGuardadoAmb ? "ambulatoria" : "elegir"));
+  const [flujo, setFlujo] = useState<Flujo>("elegir");
 
   const [paso, setPaso] = useState<Paso>("carga");
   const [procesando, setProcesando] = useState(false);
@@ -153,21 +151,44 @@ export default function SimmowPage() {
   const [errorGeneracion, setErrorGeneracion] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
-  const [pasoAmb, setPasoAmb] = useState<PasoAmbulatorio>(() => estadoGuardadoAmb?.pasoAmb ?? "carga");
+  const [pasoAmb, setPasoAmb] = useState<PasoAmbulatorio>("carga");
   const [procesandoAmb, setProcesandoAmb] = useState(false);
   const [errorAmb, setErrorAmb] = useState<string | null>(null);
-  const [pacientesAmb, setPacientesAmb] = useState<PacienteAmbulatorio[]>(() => estadoGuardadoAmb?.pacientesAmb ?? []);
-  const [seleccionadoAmb, setSeleccionadoAmb] = useState<PacienteAmbulatorio | null>(() => {
-    if (!estadoGuardadoAmb?.expedienteSeleccionado) return null;
-    return (
-      estadoGuardadoAmb.pacientesAmb.find((p) => p.expediente === estadoGuardadoAmb.expedienteSeleccionado) ?? null
-    );
-  });
+  const [pacientesAmb, setPacientesAmb] = useState<PacienteAmbulatorio[]>([]);
+  const [seleccionadoAmb, setSeleccionadoAmb] = useState<PacienteAmbulatorio | null>(null);
   const [copiadoAmb, setCopiadoAmb] = useState(false);
+  const [listoParaPersistirAmb, setListoParaPersistirAmb] = useState(false);
+
+  // Restaura el progreso guardado apenas monta EN EL CLIENTE — tiene que ser
+  // un efecto, no un initializer perezoso de useState: esta página se
+  // renderiza primero en el servidor (sin localStorage) y Next.js hidrata
+  // usando ese resultado, así que un initializer nunca llega a ver el valor
+  // real guardado en el navegador.
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect --
+       Restaurar desde localStorage solo puede pasar tras montar en el
+       cliente (no hay "última prop/estado" de React que sincronizar acá,
+       es una carga única desde una fuente externa al primer render). */
+    const estado = cargarEstadoAmbulatorioGuardado();
+    if (estado) {
+      setFlujo("ambulatoria");
+      setPasoAmb(estado.pasoAmb);
+      setPacientesAmb(estado.pacientesAmb);
+      if (estado.expedienteSeleccionado) {
+        const p = estado.pacientesAmb.find((x) => x.expediente === estado.expedienteSeleccionado);
+        if (p) setSeleccionadoAmb(p);
+      }
+    }
+    setListoParaPersistirAmb(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   // Persiste el progreso de Ambulatoria (con timestamp para el TTL) cada vez
-  // que cambia, para sobrevivir un refresh accidental de la página.
+  // que cambia, para sobrevivir un refresh accidental de la página. Se frena
+  // hasta que termine la restauración de arriba, para no pisar lo guardado
+  // con el estado inicial vacío antes de restaurarlo.
   useEffect(() => {
+    if (!listoParaPersistirAmb) return;
     if (pacientesAmb.length === 0 && pasoAmb === "carga") {
       window.localStorage.removeItem(CLAVE_ESTADO_AMBULATORIO);
       return;
@@ -179,7 +200,7 @@ export default function SimmowPage() {
       expedienteSeleccionado: seleccionadoAmb?.expediente ?? null,
     };
     window.localStorage.setItem(CLAVE_ESTADO_AMBULATORIO, JSON.stringify(estado));
-  }, [pasoAmb, pacientesAmb, seleccionadoAmb]);
+  }, [listoParaPersistirAmb, pasoAmb, pacientesAmb, seleccionadoAmb]);
 
   // La fecha no se extrae de los reportes (no es verídica) — se pide al
   // personal con doble confirmación antes de generar el código, para no
