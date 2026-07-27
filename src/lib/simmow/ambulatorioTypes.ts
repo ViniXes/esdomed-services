@@ -46,9 +46,38 @@ export interface DatosSimmowAmbulatorio {
   establecimientoReferidoTexto: string;
   /** Código del catálogo real de SIMMOW (refdeest es un campo de texto plano de máx. 4 caracteres, no un combobox). */
   establecimientoReferidoCodigo: string;
+  refdeValor: string; // "1" Sin Ref | "2" Priv | "3" Establec | "4" Interconsulta
 
   privadoLibertadTexto: string;
   amenorreaSemanas: string;
+
+  // Campos sin dato de origen en los reportes del SIS — se muestran en la
+  // misma posición visual que SIMMOW para que el personal los complete a
+  // mano ahí mismo (y el generador los manda si vienen con valor).
+  modalidadValor: string;
+  semanaEpidemiologica: string;
+  soloPreventivo: boolean;
+  tipoAtencionValor: string;
+  especialidadValor: string;
+  escuelaPromotora: boolean;
+  discapacidadValor: string;
+  violenciaTipoValor: string;
+  violenciaCondicionValor: string;
+  violenciaAmbitoValor: string;
+  procSaludMentalValor: string;
+  derechohabienteOtrosValor: string;
+  derechohabienteOtrosNumero: string;
+  victimaDH: boolean;
+  victimaDHValor: string;
+  dptconValor: string; // "1" Primera vez | "2" Subsecuente (Diagnóstico Principal)
+  dpstMarcado: boolean; // Sospecha?
+  dstconValor: string; // "1" Primera vez | "2" Subsecuente (Diagnóstico Secundario)
+  especialistaValor: string; // "0" N/A | "1" 1a. Vez | "2" Subsecuente
+  refAValor: string;
+  refAEstablecimientoCodigo: string;
+  referidoAFisioterapia: boolean;
+  ucsf: string;
+  ucsfNombre: string;
 }
 
 export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
@@ -79,8 +108,33 @@ export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
     numeroAfiliacion: "",
     establecimientoReferidoTexto: "",
     establecimientoReferidoCodigo: "",
+    refdeValor: "",
     privadoLibertadTexto: "",
     amenorreaSemanas: "",
+    modalidadValor: "",
+    semanaEpidemiologica: "",
+    soloPreventivo: false,
+    tipoAtencionValor: "",
+    especialidadValor: "",
+    escuelaPromotora: false,
+    discapacidadValor: "",
+    violenciaTipoValor: "",
+    violenciaCondicionValor: "",
+    violenciaAmbitoValor: "",
+    procSaludMentalValor: "",
+    derechohabienteOtrosValor: "",
+    derechohabienteOtrosNumero: "",
+    victimaDH: false,
+    victimaDHValor: "",
+    dptconValor: "",
+    dpstMarcado: false,
+    dstconValor: "",
+    especialistaValor: "0",
+    refAValor: "",
+    refAEstablecimientoCodigo: "",
+    referidoAFisioterapia: false,
+    ucsf: "",
+    ucsfNombre: "",
   };
 }
 

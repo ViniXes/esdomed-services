@@ -37,6 +37,30 @@ interface PayloadAmbulatorio {
   refdeest: string;
   privado_libertad: string;
   amenorrea: string;
+  consultorio: string;
+  semana: string;
+  preventivo: boolean;
+  tipo_atencion: string;
+  especialidad: string;
+  escuela: boolean;
+  dptcon_valor: string;
+  dpst: boolean;
+  dstcon_valor: string;
+  tipo_discapacidad: string;
+  violencia_tipo: string;
+  violencia_condicion: string;
+  violencia_ambito: string;
+  proc_salud_mental: string;
+  otros_derechohabientes: string;
+  numero_otros_derechohabientes: string;
+  victimaDH: boolean;
+  victimaDH2: string;
+  refa_valor: string;
+  refaest: string;
+  especialidad_referido_a: boolean;
+  ucsf: string;
+  ucsf_nombre: string;
+  tipo_consulta_especialista: string;
   advertencias: string[];
 }
 
@@ -64,10 +88,34 @@ function prepararPayloadAmbulatorio(datos: DatosSimmowAmbulatorio, advertencias:
     isss: datos.isss,
     tipoisss_valor: datos.tipoIsssValor || "",
     isssn: datos.numeroAfiliacion || "",
-    refde_valor: datos.establecimientoReferidoCodigo ? "3" : "",
+    refde_valor: datos.refdeValor || (datos.establecimientoReferidoCodigo ? "3" : ""),
     refdeest: datos.establecimientoReferidoCodigo || "",
     privado_libertad: datos.privadoLibertadTexto || "",
     amenorrea: datos.amenorreaSemanas || "",
+    consultorio: datos.modalidadValor || "",
+    semana: datos.semanaEpidemiologica || "",
+    preventivo: datos.soloPreventivo,
+    tipo_atencion: datos.tipoAtencionValor || "",
+    especialidad: datos.especialidadValor || "",
+    escuela: datos.escuelaPromotora,
+    dptcon_valor: datos.dptconValor || "",
+    dpst: datos.dpstMarcado,
+    dstcon_valor: datos.dstconValor || "",
+    tipo_discapacidad: datos.discapacidadValor || "",
+    violencia_tipo: datos.violenciaTipoValor || "",
+    violencia_condicion: datos.violenciaCondicionValor || "",
+    violencia_ambito: datos.violenciaAmbitoValor || "",
+    proc_salud_mental: datos.procSaludMentalValor || "",
+    otros_derechohabientes: datos.derechohabienteOtrosValor || "",
+    numero_otros_derechohabientes: datos.derechohabienteOtrosNumero || "",
+    victimaDH: datos.victimaDH,
+    victimaDH2: datos.victimaDHValor || "",
+    refa_valor: datos.refAValor || "",
+    refaest: datos.refAEstablecimientoCodigo || "",
+    especialidad_referido_a: datos.referidoAFisioterapia,
+    ucsf: datos.ucsf || "",
+    ucsf_nombre: datos.ucsfNombre || "",
+    tipo_consulta_especialista: datos.especialistaValor || "0",
     advertencias,
   };
 }
@@ -402,10 +450,16 @@ export function generarScriptConsolaAmbulatorio(
     console.log(DATA);
 
     setSelect('estable', DATA.estable);
+    setText('fecha', DATA.fecha);
+    setSelect('consultorio', DATA.consultorio);
+    setText('semana', DATA.semana);
+    setCheckbox('preventivo', DATA.preventivo);
+    setSelect('tipo_atencion', DATA.tipo_atencion);
+
     setText('expe', DATA.expe);
     setText('DUI', DATA.DUI);
+    setCheckbox('escuela', DATA.escuela);
     setText('paciente', DATA.paciente);
-    setText('fecha', DATA.fecha);
 
     setRadioByValue('sex', DATA.sex_valor);
 
@@ -422,10 +476,13 @@ export function generarScriptConsolaAmbulatorio(
 
     setRadioByValue('urbano', DATA.urbano_valor);
 
+    setRadioByValue('dptcon', DATA.dptcon_valor);
+    setCheckbox('dpst', DATA.dpst);
     await setCodigoCIE('diag_cd', DATA.diag_cd);
     await sleep(300);
     setText('dp', DATA.dp);
 
+    setRadioByValue('dstcon', DATA.dstcon_valor);
     await setCodigoCIE('diag_cds', DATA.diag_cds);
     await sleep(300);
     setText('ds', DATA.ds);
@@ -434,12 +491,17 @@ export function generarScriptConsolaAmbulatorio(
     await sleep(300);
     setText('ce', DATA.ce);
 
-    // Especialista: N/A (así viene por defecto en SIMMOW; se fija explícito
-    // por si el formulario no arranca limpio).
-    setRadioByValue('tipo_consulta_especialista', '0');
+    setRadioByValue('tipo_consulta_especialista', DATA.tipo_consulta_especialista);
 
+    setSelect('especialidad', DATA.especialidad);
     setText('medico', DATA.medico);
     setText('meddes', DATA.meddes);
+
+    setSelect('tipo_discapacidad', DATA.tipo_discapacidad);
+    setSelect('violencia_tipo', DATA.violencia_tipo);
+    setSelect('violencia_condicion', DATA.violencia_condicion);
+    setSelect('violencia_ambito', DATA.violencia_ambito);
+    setSelect('proc_salud_mental', DATA.proc_salud_mental);
 
     setCheckbox('ingreso', DATA.ingreso);
 
@@ -447,16 +509,28 @@ export function generarScriptConsolaAmbulatorio(
     setRadioByValue('tipoisss', DATA.tipoisss_valor);
     setText('isssn', DATA.isssn);
 
+    setSelect('otros_derechohabientes', DATA.otros_derechohabientes);
+    setText('numero_otros_derechohabientes', DATA.numero_otros_derechohabientes);
+    setCheckbox('victimaDH', DATA.victimaDH);
+    setSelect('victimaDH2', DATA.victimaDH2);
+
     if (DATA.refde_valor) {
       setRadioByValue('refde', DATA.refde_valor);
       setText('refdeest', DATA.refdeest);
     }
 
+    if (DATA.refa_valor) {
+      setRadioByValue('refa', DATA.refa_valor);
+      setText('refaest', DATA.refaest);
+    }
+    setCheckbox('especialidad_referido_a', DATA.especialidad_referido_a);
+
+    setText('ucsf', DATA.ucsf);
+    setText('ucsf_nombre', DATA.ucsf_nombre);
     setSelect('privado_libertad', DATA.privado_libertad);
     setText('amenorrea', DATA.amenorrea);
 
     console.log('Llenado de Atención Ambulatoria finalizado.');
-    console.warn('Revise los campos antes de presionar Grabar — Modalidad, Tipo Atención, Especialidad, Discapacidad, Violencia, Escuela Promotora, Procedimiento Salud Mental, Derechohabiente Otros, Víctima DH, Referido A y UCSF/UCSFE no se autollenan: no hay datos de origen para esos campos.');
 
     if (DATA.advertencias && DATA.advertencias.length) {
       console.warn('Advertencias:', DATA.advertencias);
