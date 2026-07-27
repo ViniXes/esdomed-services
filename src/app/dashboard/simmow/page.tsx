@@ -393,7 +393,10 @@ export default function SimmowPage() {
               <span>
                 Este código no presiona &quot;Grabar&quot; en SIMMOW. Abra SIMMOW, entre a la pantalla de
                 Ingreso/Egreso del paciente, presione F12 para abrir la consola, pegue el código, presione
-                Enter, y revise cada campo antes de grabar manualmente.
+                Enter, y revise cada campo antes de grabar manualmente. <b>Esta herramienta ayuda con la mayor
+                parte del llenado, pero no es responsable de errores de digitación — esa responsabilidad es del
+                personal operativo</b>. Solo se asume responsabilidad por errores de programación ya reportados y
+                confirmados.
               </span>
             </div>
 
@@ -466,7 +469,9 @@ export default function SimmowPage() {
                   <span>
                     Este código no presiona &quot;Grabar&quot; en SIMMOW. Abra SIMMOW, entre a la pantalla de
                     Ingreso/Edición Consulta Curativa, presione F12 para abrir la consola, pegue el código, presione
-                    Enter, y revise cada campo antes de grabar manualmente.
+                    Enter, y revise cada campo antes de grabar manualmente. <b>Esta herramienta ayuda con la mayor
+                    parte del llenado, pero la responsabilidad de una digitación correcta en SIMMOW sigue siendo del
+                    personal operativo</b> — revise cada campo antes de grabar.
                   </span>
                 </div>
                 <button
