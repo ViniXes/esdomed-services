@@ -43,21 +43,31 @@ function areaValorDeArea(area: string | undefined): string {
 }
 
 /**
- * "ISSS Cotizante" / "ISSS Beneficiario" → { isss, tipoIsssValor }. Algunas
- * filas del reporte traen el número de afiliación pero dejan "Tipo de
- * afiliación" vacío (dato incompleto en el SIS, no un error nuestro) — un
- * número de afiliación presente ya es evidencia suficiente de que es ISSS,
- * así que se marca el checkbox igual; Cotizante/Beneficiario solo se marca
- * si el texto lo dice explícitamente (si no, queda para completar a mano).
+ * "ISSS Cotizante" / "ISSS Beneficiario" → { isss, tipoIsssValor }. La
+ * casilla "Afiliación ISSS" de SIMMOW es SOLO para ISSS — otros tipos de
+ * afiliación (ej. "Bienestar Magisterial", IPSFA, ISBM, Veterano de Guerra,
+ * confirmados como valores reales de esta columna) van en "Derechohabiente
+ * Otros", un campo distinto, y NUNCA deben marcar este checkbox.
+ *
+ * Algunas filas traen el número de afiliación pero dejan "Tipo de
+ * afiliación" vacío (dato incompleto en el SIS, no un error nuestro) — SOLO
+ * en ese caso (texto vacío, no un tipo distinto explícito) se asume ISSS por
+ * ser el más común en Emergencia; si el texto sí dice algo (aunque no sea
+ * ISSS) se respeta tal cual y no se marca la casilla.
  */
 function afiliacionIsss(
   tipoAfiliacionTexto: string | undefined,
   numeroAfiliacion: string | undefined
 ): { isss: boolean; tipoIsssValor: string } {
   const t = mayus(tipoAfiliacionTexto || "");
-  const tipoIsssValor = t.includes("COTIZANTE") ? "1" : t.includes("BENEFICIARIO") ? "2" : "";
-  const isss = t.includes("ISSS") || !!numeroAfiliacion;
-  return { isss, tipoIsssValor };
+  if (t.includes("ISSS")) {
+    const tipoIsssValor = t.includes("COTIZANTE") ? "1" : t.includes("BENEFICIARIO") ? "2" : "";
+    return { isss: true, tipoIsssValor };
+  }
+  if (!t && numeroAfiliacion) {
+    return { isss: true, tipoIsssValor: "" };
+  }
+  return { isss: false, tipoIsssValor: "" };
 }
 
 /**
