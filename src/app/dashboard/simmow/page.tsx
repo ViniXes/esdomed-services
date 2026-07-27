@@ -25,6 +25,7 @@ import type { PacienteAmbulatorio } from "@/lib/simmow/ambulatorioTypes";
 import { PasoCargaAmbulatorio, type DatosCargaAmbulatorio } from "@/components/simmow/PasoCargaAmbulatorio";
 import { ListaPacientesAmbulatorio } from "@/components/simmow/ListaPacientesAmbulatorio";
 import { FormularioRevisionAmbulatorio } from "@/components/simmow/FormularioRevisionAmbulatorio";
+import { DateField } from "@/components/ui/DateField";
 
 type Flujo = "elegir" | "hospitalaria" | "ambulatoria";
 type Paso = "carga" | "revision";
@@ -334,7 +335,31 @@ export default function SimmowPage() {
 
   // ── Flujo Atención Ambulatoria ──────────────────────────────────────────
 
+  // DateField trabaja en "YYYY-MM-DD"; SIMMOW espera "DD/MM/AAAA".
+  const isoAFechaSimmow = (iso: string): string => {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return "";
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
+
+  const confirmarFechaAmbulatorio = () => {
+    if (!fechaTemp1Amb || !fechaTemp2Amb) {
+      setErrorFechaAmb("Seleccione la fecha en ambos calendarios.");
+      return;
+    }
+    if (fechaTemp1Amb !== fechaTemp2Amb) {
+      setErrorFechaAmb("Las dos fechas no coinciden — vuelva a seleccionar.");
+      return;
+    }
+    setErrorFechaAmb(null);
+    setFechaConfirmadaAmb(isoAFechaSimmow(fechaTemp1Amb));
+  };
+
   const procesarAmbulatorio = async ({ filasEmergencia, filasRegistro }: DatosCargaAmbulatorio) => {
+    if (!fechaConfirmadaAmb) {
+      setErrorAmb("Confirme la fecha de esta atención antes de cruzar los reportes.");
+      return;
+    }
     setErrorAmb(null);
     setProcesandoAmb(true);
     try {
@@ -344,7 +369,10 @@ export default function SimmowPage() {
         return;
       }
       const enriquecidos = await enriquecerPacientesAmbulatorio(cruzados);
-      setPacientesAmb(enriquecidos);
+      // La fecha se confirmó una sola vez para todo el lote — Registro Diario
+      // de Emergencia es, por definición, el listado de un solo día.
+      const conFecha = enriquecidos.map((p) => ({ ...p, datos: { ...p.datos, fecha: fechaConfirmadaAmb } }));
+      setPacientesAmb(conFecha);
       setPasoAmb("lista");
     } catch (err) {
       setErrorAmb(err instanceof Error ? err.message : "Error procesando los reportes.");
@@ -371,29 +399,11 @@ export default function SimmowPage() {
 
   const seleccionarPacienteAmb = (p: PacienteAmbulatorio) => {
     setSeleccionadoAmb(p);
-    setFechaConfirmadaAmb(null);
-    setFechaTemp1Amb("");
-    setFechaTemp2Amb("");
-    setErrorFechaAmb(null);
     setPasoAmb("revision");
   };
 
-  const confirmarFechaAmbulatorio = () => {
-    if (!fechaTemp1Amb.trim() || !fechaTemp2Amb.trim()) {
-      setErrorFechaAmb("Digite la fecha en ambas casillas.");
-      return;
-    }
-    if (fechaTemp1Amb.trim() !== fechaTemp2Amb.trim()) {
-      setErrorFechaAmb("Las dos fechas no coinciden — revise y vuelva a digitar.");
-      return;
-    }
-    setErrorFechaAmb(null);
-    setFechaConfirmadaAmb(fechaTemp1Amb.trim());
-    actualizarAmb({ fecha: fechaTemp1Amb.trim() });
-  };
-
   const copiarCodigoAmbulatorio = async () => {
-    if (!seleccionadoAmb || !fechaConfirmadaAmb) return;
+    if (!seleccionadoAmb) return;
     const codigo = generarScriptConsolaAmbulatorio(seleccionadoAmb.datos, seleccionadoAmb.advertencias);
 
     try {
@@ -532,7 +542,57 @@ export default function SimmowPage() {
       {flujo === "ambulatoria" && (
         <>
           {pasoAmb === "carga" && (
-            <PasoCargaAmbulatorio procesando={procesandoAmb} error={errorAmb} onProcesar={procesarAmbulatorio} />
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-3">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Fecha de esta atención (Registro Diario de Emergencia es el listado de un solo día — se aplica a
+                  todos los pacientes de este lote)
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  No se extrae de los reportes porque no es confiable. Selecciónela dos veces del calendario para
+                  confirmar — un error aquí es responsabilidad de quien digita.
+                </p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <DateField
+                    value={fechaTemp1Amb}
+                    onChange={(v) => {
+                      setFechaTemp1Amb(v);
+                      setFechaConfirmadaAmb(null);
+                    }}
+                    placeholder="Fecha"
+                    className="w-40"
+                  />
+                  <DateField
+                    value={fechaTemp2Amb}
+                    onChange={(v) => {
+                      setFechaTemp2Amb(v);
+                      setFechaConfirmadaAmb(null);
+                    }}
+                    placeholder="Confirmar fecha"
+                    className="w-40"
+                  />
+                  <button
+                    onClick={confirmarFechaAmbulatorio}
+                    disabled={!fechaTemp1Amb || !fechaTemp2Amb}
+                    className="px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Confirmar fecha
+                  </button>
+                  {fechaConfirmadaAmb && (
+                    <span className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Confirmada: {fechaConfirmadaAmb}
+                    </span>
+                  )}
+                </div>
+                {errorFechaAmb && <p className="text-xs text-red-600 dark:text-red-400">{errorFechaAmb}</p>}
+              </div>
+
+              {fechaConfirmadaAmb ? (
+                <PasoCargaAmbulatorio procesando={procesandoAmb} error={errorAmb} onProcesar={procesarAmbulatorio} />
+              ) : (
+                <p className="text-xs text-slate-500">Confirme la fecha para habilitar la carga de reportes.</p>
+              )}
+            </div>
           )}
 
           {pasoAmb === "lista" && (
@@ -578,58 +638,16 @@ export default function SimmowPage() {
                     personal operativo</b> — revise cada campo antes de grabar.
                   </span>
                 </div>
-                {!fechaConfirmadaAmb ? (
-                  <div className="border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 space-y-2">
-                    <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
-                      Digite la fecha de esta atención dos veces para confirmarla — no se extrae de los reportes
-                      porque no es confiable. Verifique bien: un error aquí es responsabilidad de quien digita.
-                    </p>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <input
-                        value={fechaTemp1Amb}
-                        onChange={(e) => setFechaTemp1Amb(e.target.value)}
-                        placeholder="DD/MM/AAAA"
-                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm w-32"
-                      />
-                      <input
-                        value={fechaTemp2Amb}
-                        onChange={(e) => setFechaTemp2Amb(e.target.value)}
-                        placeholder="Confirmar"
-                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm w-32"
-                      />
-                      <button
-                        onClick={confirmarFechaAmbulatorio}
-                        className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        Confirmar fecha
-                      </button>
-                    </div>
-                    {errorFechaAmb && <p className="text-xs text-red-600 dark:text-red-400">{errorFechaAmb}</p>}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={copiarCodigoAmbulatorio}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
-                      {copiadoAmb ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      {copiadoAmb ? "Copiado correctamente" : "Copiar código para SIMMOW"}
-                    </button>
-                    <span className="text-xs text-slate-500">
-                      Fecha confirmada: {fechaConfirmadaAmb}{" "}
-                      <button
-                        onClick={() => {
-                          setFechaConfirmadaAmb(null);
-                          setFechaTemp1Amb("");
-                          setFechaTemp2Amb("");
-                        }}
-                        className="underline hover:text-slate-700 dark:hover:text-slate-300"
-                      >
-                        cambiar
-                      </button>
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={copiarCodigoAmbulatorio}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {copiadoAmb ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiadoAmb ? "Copiado correctamente" : "Copiar código para SIMMOW"}
+                  </button>
+                  <span className="text-xs text-slate-500">Fecha confirmada para este lote: {fechaConfirmadaAmb}</span>
+                </div>
               </div>
 
               <FormularioRevisionAmbulatorio
