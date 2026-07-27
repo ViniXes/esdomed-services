@@ -284,7 +284,7 @@ export default function SimmowPage() {
 
   const copiarCodigoAmbulatorio = async () => {
     if (!seleccionadoAmb) return;
-    const codigo = generarScriptConsolaAmbulatorio(seleccionadoAmb.datos);
+    const codigo = generarScriptConsolaAmbulatorio(seleccionadoAmb.datos, seleccionadoAmb.advertencias);
 
     try {
       await navigator.clipboard.writeText(codigo);
@@ -449,6 +449,18 @@ export default function SimmowPage() {
           {pasoAmb === "revision" && seleccionadoAmb && (
             <div className="space-y-4">
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+                {seleccionadoAmb.advertencias.length > 0 && (
+                  <div className="mb-3 space-y-1">
+                    {seleccionadoAmb.advertencias.map((a, i) => (
+                      <div
+                        key={i}
+                        className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2"
+                      >
+                        {a}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 mb-3">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>

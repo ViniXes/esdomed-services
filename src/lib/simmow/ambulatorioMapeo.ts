@@ -52,22 +52,27 @@ function areaValorDeArea(area: string | undefined): string {
  * Algunas filas traen el número de afiliación pero dejan "Tipo de
  * afiliación" vacío (dato incompleto en el SIS, no un error nuestro) — SOLO
  * en ese caso (texto vacío, no un tipo distinto explícito) se asume ISSS por
- * ser el más común en Emergencia; si el texto sí dice algo (aunque no sea
- * ISSS) se respeta tal cual y no se marca la casilla.
+ * ser el más común en Emergencia, y se asume Cotizante por defecto (pedido
+ * explícito del usuario: mejor un valor a confirmar que un radio vacío que
+ * el personal olvide revisar) — por eso se marca `asumido: true`, para que
+ * quede una advertencia visible y no se le achaque el descuido a quien
+ * revisa. Si el texto sí dice algo (aunque no sea ISSS) se respeta tal cual
+ * y no se marca la casilla.
  */
 function afiliacionIsss(
   tipoAfiliacionTexto: string | undefined,
   numeroAfiliacion: string | undefined
-): { isss: boolean; tipoIsssValor: string } {
+): { isss: boolean; tipoIsssValor: string; asumido: boolean } {
   const t = mayus(tipoAfiliacionTexto || "");
   if (t.includes("ISSS")) {
-    const tipoIsssValor = t.includes("COTIZANTE") ? "1" : t.includes("BENEFICIARIO") ? "2" : "";
-    return { isss: true, tipoIsssValor };
+    if (t.includes("COTIZANTE")) return { isss: true, tipoIsssValor: "1", asumido: false };
+    if (t.includes("BENEFICIARIO")) return { isss: true, tipoIsssValor: "2", asumido: false };
+    return { isss: true, tipoIsssValor: "1", asumido: true };
   }
   if (!t && numeroAfiliacion) {
-    return { isss: true, tipoIsssValor: "" };
+    return { isss: true, tipoIsssValor: "1", asumido: true };
   }
-  return { isss: false, tipoIsssValor: "" };
+  return { isss: false, tipoIsssValor: "", asumido: false };
 }
 
 /**
@@ -90,6 +95,7 @@ export function cruzarReportes(
         datos: { ...datosAmbulatorioVacios(), expediente },
         enPacientesAtendidos: false,
         enRegistroDiario: false,
+        advertencias: [],
       };
       porExpediente.set(expediente, p);
     }
@@ -129,10 +135,15 @@ export function cruzarReportes(
     p.datos.medicoNombre = d.medico || "";
     p.datos.ingresoHospitalario = p.datos.ingresoHospitalario || !!d.ingresoHospitalario;
     p.datos.tipoAfiliacionTexto = d.tipoAfiliacion || "";
-    const { isss, tipoIsssValor } = afiliacionIsss(d.tipoAfiliacion, d.numeroAfiliacion);
+    const { isss, tipoIsssValor, asumido } = afiliacionIsss(d.tipoAfiliacion, d.numeroAfiliacion);
     p.datos.isss = isss;
     p.datos.tipoIsssValor = tipoIsssValor;
     p.datos.numeroAfiliacion = d.numeroAfiliacion || "";
+    if (asumido) {
+      p.advertencias.push(
+        "El reporte trae N° de afiliación pero no dice si es Cotizante o Beneficiario — se marcó Cotizante por defecto. Verifique con el paciente/expediente antes de grabar."
+      );
+    }
     p.datos.establecimientoReferidoTexto = d.establecimientoReferido || "";
   }
 

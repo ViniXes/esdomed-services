@@ -76,10 +76,18 @@ export function ListaPacientesAmbulatorio({ pacientes, onSeleccionar }: Props) {
                 <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
                   {p.datos.diagPrincipalCodigo ? `${p.datos.diagPrincipalCodigo} — ${p.datos.diagPrincipalTexto}` : "—"}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 space-x-1.5">
                   {!(p.enPacientesAtendidos && p.enRegistroDiario) && (
                     <span className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
                       incompleto
+                    </span>
+                  )}
+                  {p.advertencias.length > 0 && (
+                    <span
+                      className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400"
+                      title={p.advertencias.join(" / ")}
+                    >
+                      revisar
                     </span>
                   )}
                 </td>

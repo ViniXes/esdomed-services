@@ -144,4 +144,6 @@ export interface PacienteAmbulatorio {
   /** De cuál(es) de los dos reportes vino este paciente — para avisar si faltó uno. */
   enPacientesAtendidos: boolean;
   enRegistroDiario: boolean;
+  /** Suposiciones que el cruce tuvo que hacer por datos incompletos del reporte — a revisar antes de copiar. */
+  advertencias: string[];
 }
