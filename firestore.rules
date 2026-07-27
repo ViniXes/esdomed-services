@@ -265,33 +265,6 @@ service cloud.firestore {
       allow delete: if isEsdomed() || isAdmin();
     }
 
-    // ─── Censos de Emergencia ─────────────────────────────────────────────────
-    // Digitación en vivo por los médicos de emergencia (demanda espontánea y
-    // referidos). ESDOMED consulta y exporta; solo admin borra.
-    match /censo_demanda_espontanea/{id} {
-      allow read:   if isStaff() || isMedico();
-      allow create: if isMedico() || isAdmin();
-      allow update: if isMedico() || isEsdomed() || isAdmin();
-      allow delete: if isAdmin();
-    }
-    match /censo_referidos/{id} {
-      allow read:   if isStaff() || isMedico();
-      allow create: if isMedico() || isAdmin();
-      allow update: if isMedico() || isEsdomed() || isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // ─── Registro Diario de Emergencia ────────────────────────────────────────
-    // Reporte del SIS con los pacientes que ENTRAN a emergencia (previo al
-    // cierre de triage). Lo importa ESDOMED; los médicos lo leen para el
-    // prellenado de identidad en los censos.
-    match /registro_diario_emergencia/{id} {
-      allow read:   if isStaff() || isMedico();
-      allow create: if isEsdomed() || isAdmin();
-      allow update: if isEsdomed() || isAdmin();
-      allow delete: if isEsdomed() || isAdmin();
-    }
-
     // ─── Control de ingresos ──────────────────────────────────────────────────
     // Los médicos tienen acceso de solo lectura para ver la cola.
     // Solo el personal ESDOMED puede registrar ingresos.

@@ -18,8 +18,6 @@ const baseNavItems = [
     icon: Ambulance,
     children: [
       { href: "/medico/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
-      { href: "/medico/emergencia/censo-demandas", label: "Censo demanda espontánea", icon: ClipboardList },
-      { href: "/medico/emergencia/censo-referidos", label: "Censo de referidos", icon: FileStack },
     ],
   },
   { href: "/medico/busqueda-telefono", label: "Busqueda de telefono", icon: Phone },
