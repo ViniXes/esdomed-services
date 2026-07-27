@@ -23,7 +23,10 @@ export function ListaPacientesAmbulatorio({ pacientes, onSeleccionar }: Props) {
     );
   }, [pacientes, query]);
 
-  const incompletos = pacientes.filter((p) => !(p.enPacientesAtendidos && p.enRegistroDiario)).length;
+  // Todo paciente en la lista viene de "Registro Diario de Emergencia" (la
+  // lista autoritativa de a quién generarle código); si no aparece también
+  // en "Pacientes Atendidos En Emergencia" le faltan DUI/nombre/fecha.
+  const incompletos = pacientes.filter((p) => !p.enPacientesAtendidos).length;
 
   return (
     <div className="space-y-3">
@@ -46,8 +49,9 @@ export function ListaPacientesAmbulatorio({ pacientes, onSeleccionar }: Props) {
         <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
           <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
           <span>
-            {incompletos} paciente{incompletos === 1 ? "" : "s"} solo aparece{incompletos === 1 ? "" : "n"} en uno de
-            los dos reportes — le{incompletos === 1 ? "" : "s"} faltarán datos clínicos o de identidad al revisar.
+            {incompletos} paciente{incompletos === 1 ? "" : "s"} no aparece{incompletos === 1 ? "" : "n"} en
+            &quot;Pacientes Atendidos En Emergencia&quot; — le{incompletos === 1 ? "" : "s"} faltará DUI, nombre y
+            fecha (complételo a mano al revisar).
           </span>
         </div>
       )}
@@ -77,7 +81,7 @@ export function ListaPacientesAmbulatorio({ pacientes, onSeleccionar }: Props) {
                   {p.datos.diagPrincipalCodigo ? `${p.datos.diagPrincipalCodigo} — ${p.datos.diagPrincipalTexto}` : "—"}
                 </td>
                 <td className="px-3 py-2 space-x-1.5">
-                  {!(p.enPacientesAtendidos && p.enRegistroDiario) && (
+                  {!p.enPacientesAtendidos && (
                     <span className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
                       incompleto
                     </span>

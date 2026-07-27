@@ -12,14 +12,6 @@ import type { FilaMapeada } from "@/lib/emergencia/registroDiarioMapper";
 import { mayus } from "./texto";
 import { datosAmbulatorioVacios, type PacienteAmbulatorio } from "./ambulatorioTypes";
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function formatearFecha(fecha: Date): string {
-  return `${pad2(fecha.getDate())}/${pad2(fecha.getMonth() + 1)}/${fecha.getFullYear()}`;
-}
-
 /** "64 años 7 meses 18 días" → { anios, meses, dias }, cada uno "" si no aparece en el texto. */
 export function edadDesglosada(texto: string | undefined): { anios: string; meses: string; dias: string } {
   const t = String(texto || "");
@@ -76,15 +68,26 @@ function afiliacionIsss(
 }
 
 /**
- * Cruza las filas ya mapeadas de los dos reportes por expediente. Un
- * expediente que solo aparece en uno de los dos reportes igual se incluye
- * (con los campos del otro vacíos) — no se descarta, para que el personal lo
- * revise/complete a mano si hace falta.
+ * Cruza las filas ya mapeadas de los dos reportes por expediente.
+ *
+ * "Registro Diario de Emergencia" es la lista AUTORITATIVA de a quién
+ * hay que generarle código ese día — solo esos expedientes entran a la
+ * lista de pacientes. "Pacientes Atendidos En Emergencia" es puramente
+ * un complemento (DUI, nombre, fecha de ingreso): un expediente que
+ * aparezca ahí pero NO en Registro Diario se descarta por completo, no
+ * genera una fila (pedido explícito del usuario — antes se incluían por
+ * error, inflando la lista con "incompletos" que no correspondía procesar).
  */
 export function cruzarReportes(
   filasEmergencia: FilaEmergenciaMapeada[],
   filasRegistro: FilaMapeada[]
 ): PacienteAmbulatorio[] {
+  const complementoPorExpediente = new Map<string, FilaEmergenciaMapeada>();
+  for (const fila of filasEmergencia) {
+    if (!fila.valido || !fila.expediente) continue;
+    complementoPorExpediente.set(fila.expediente, fila);
+  }
+
   const porExpediente = new Map<string, PacienteAmbulatorio>();
 
   const obtener = (expediente: string): PacienteAmbulatorio => {
@@ -102,20 +105,23 @@ export function cruzarReportes(
     return p;
   };
 
-  for (const fila of filasEmergencia) {
-    if (!fila.valido || !fila.expediente) continue;
-    const p = obtener(fila.expediente);
-    p.enPacientesAtendidos = true;
-    p.datos.dui = fila.datos.dui || "";
-    p.datos.paciente = mayus(fila.pacienteNombre);
-    p.datos.fecha = formatearFecha(fila.datos.fechaHoraIngreso);
-    p.datos.ingresoHospitalario = p.datos.ingresoHospitalario || fila.ingresoHospitalizacion === "si";
-  }
-
   for (const fila of filasRegistro) {
     if (!fila.valido || !fila.expediente) continue;
     const p = obtener(fila.expediente);
     p.enRegistroDiario = true;
+
+    // "Pacientes Atendidos En Emergencia" es SOLO un complemento para DUI y
+    // nombre del paciente — todo lo demás (incluyendo Ingreso Hospitalario)
+    // sale de "Registro Diario de Emergencia", el reporte oficial. La fecha
+    // no se extrae de ningún reporte (no es verídica) — la confirma el
+    // personal a mano con doble confirmación antes de generar el código.
+    const complemento = complementoPorExpediente.get(fila.expediente);
+    if (complemento) {
+      p.enPacientesAtendidos = true;
+      p.datos.dui = complemento.datos.dui || "";
+      p.datos.paciente = mayus(complemento.pacienteNombre);
+    }
+
     const d = fila.datos;
 
     const { anios, meses, dias } = edadDesglosada(d.edadTexto);
@@ -133,7 +139,7 @@ export function cruzarReportes(
     p.datos.causaExternaCodigo = d.causaExterna?.codigo || "";
     p.datos.causaExternaTexto = d.causaExterna?.descripcion || "";
     p.datos.medicoNombre = d.medico || "";
-    p.datos.ingresoHospitalario = p.datos.ingresoHospitalario || !!d.ingresoHospitalario;
+    p.datos.ingresoHospitalario = !!d.ingresoHospitalario;
     p.datos.tipoAfiliacionTexto = d.tipoAfiliacion || "";
     const { isss, tipoIsssValor, asumido } = afiliacionIsss(d.tipoAfiliacion, d.numeroAfiliacion);
     p.datos.isss = isss;

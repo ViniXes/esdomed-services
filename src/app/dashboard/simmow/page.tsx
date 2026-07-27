@@ -127,6 +127,14 @@ export default function SimmowPage() {
   const [seleccionadoAmb, setSeleccionadoAmb] = useState<PacienteAmbulatorio | null>(null);
   const [copiadoAmb, setCopiadoAmb] = useState(false);
 
+  // La fecha no se extrae de los reportes (no es verídica) — se pide al
+  // personal con doble confirmación antes de generar el código, para no
+  // dejarla a la suerte de una sola digitación.
+  const [fechaConfirmadaAmb, setFechaConfirmadaAmb] = useState<string | null>(null);
+  const [fechaTemp1Amb, setFechaTemp1Amb] = useState("");
+  const [fechaTemp2Amb, setFechaTemp2Amb] = useState("");
+  const [errorFechaAmb, setErrorFechaAmb] = useState<string | null>(null);
+
   // Temporalmente solo admin mientras está en pruebas (ver dashboard/layout.tsx).
   useEffect(() => {
     if (!loading && profile && profile.role !== "admin") {
@@ -280,10 +288,37 @@ export default function SimmowPage() {
     setSeleccionadoAmb(null);
     setErrorAmb(null);
     setCopiadoAmb(false);
+    setFechaConfirmadaAmb(null);
+    setFechaTemp1Amb("");
+    setFechaTemp2Amb("");
+    setErrorFechaAmb(null);
+  };
+
+  const seleccionarPacienteAmb = (p: PacienteAmbulatorio) => {
+    setSeleccionadoAmb(p);
+    setFechaConfirmadaAmb(null);
+    setFechaTemp1Amb("");
+    setFechaTemp2Amb("");
+    setErrorFechaAmb(null);
+    setPasoAmb("revision");
+  };
+
+  const confirmarFechaAmbulatorio = () => {
+    if (!fechaTemp1Amb.trim() || !fechaTemp2Amb.trim()) {
+      setErrorFechaAmb("Digite la fecha en ambas casillas.");
+      return;
+    }
+    if (fechaTemp1Amb.trim() !== fechaTemp2Amb.trim()) {
+      setErrorFechaAmb("Las dos fechas no coinciden — revise y vuelva a digitar.");
+      return;
+    }
+    setErrorFechaAmb(null);
+    setFechaConfirmadaAmb(fechaTemp1Amb.trim());
+    actualizarAmb({ fecha: fechaTemp1Amb.trim() });
   };
 
   const copiarCodigoAmbulatorio = async () => {
-    if (!seleccionadoAmb) return;
+    if (!seleccionadoAmb || !fechaConfirmadaAmb) return;
     const codigo = generarScriptConsolaAmbulatorio(seleccionadoAmb.datos, seleccionadoAmb.advertencias);
 
     try {
@@ -439,13 +474,7 @@ export default function SimmowPage() {
                   Procesar otros reportes
                 </button>
               </div>
-              <ListaPacientesAmbulatorio
-                pacientes={pacientesAmb}
-                onSeleccionar={(p) => {
-                  setSeleccionadoAmb(p);
-                  setPasoAmb("revision");
-                }}
-              />
+              <ListaPacientesAmbulatorio pacientes={pacientesAmb} onSeleccionar={seleccionarPacienteAmb} />
             </div>
           )}
 
@@ -474,13 +503,58 @@ export default function SimmowPage() {
                     personal operativo</b> — revise cada campo antes de grabar.
                   </span>
                 </div>
-                <button
-                  onClick={copiarCodigoAmbulatorio}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  {copiadoAmb ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copiadoAmb ? "Copiado correctamente" : "Copiar código para SIMMOW"}
-                </button>
+                {!fechaConfirmadaAmb ? (
+                  <div className="border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+                      Digite la fecha de esta atención dos veces para confirmarla — no se extrae de los reportes
+                      porque no es confiable. Verifique bien: un error aquí es responsabilidad de quien digita.
+                    </p>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <input
+                        value={fechaTemp1Amb}
+                        onChange={(e) => setFechaTemp1Amb(e.target.value)}
+                        placeholder="DD/MM/AAAA"
+                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm w-32"
+                      />
+                      <input
+                        value={fechaTemp2Amb}
+                        onChange={(e) => setFechaTemp2Amb(e.target.value)}
+                        placeholder="Confirmar"
+                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm w-32"
+                      />
+                      <button
+                        onClick={confirmarFechaAmbulatorio}
+                        className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Confirmar fecha
+                      </button>
+                    </div>
+                    {errorFechaAmb && <p className="text-xs text-red-600 dark:text-red-400">{errorFechaAmb}</p>}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={copiarCodigoAmbulatorio}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      {copiadoAmb ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copiadoAmb ? "Copiado correctamente" : "Copiar código para SIMMOW"}
+                    </button>
+                    <span className="text-xs text-slate-500">
+                      Fecha confirmada: {fechaConfirmadaAmb}{" "}
+                      <button
+                        onClick={() => {
+                          setFechaConfirmadaAmb(null);
+                          setFechaTemp1Amb("");
+                          setFechaTemp2Amb("");
+                        }}
+                        className="underline hover:text-slate-700 dark:hover:text-slate-300"
+                      >
+                        cambiar
+                      </button>
+                    </span>
+                  </div>
+                )}
               </div>
 
               <FormularioRevisionAmbulatorio

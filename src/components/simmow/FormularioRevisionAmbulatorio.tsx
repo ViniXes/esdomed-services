@@ -149,7 +149,13 @@ export function FormularioRevisionAmbulatorio({ datos, onChange, onVolver }: Pro
                 <td className={styles.cell}>
                   Modalidad {texto("modalidadValor", styles.mini)}
                   <br />
-                  Fecha {texto("fecha", styles.fecha)}
+                  Fecha{" "}
+                  <input
+                    className={styles.fecha}
+                    value={v("fecha") || "(confirmar abajo)"}
+                    readOnly
+                    title="La fecha se fija con la doble confirmación antes de copiar el código, no aquí."
+                  />
                   <br />
                   Semana Epidemiológica {texto("semanaEpidemiologica", styles.mini)}
                   <br />
