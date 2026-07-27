@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileCode2, CheckCircle2, Copy, Check, AlertTriangle, Stethoscope, Building2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +29,37 @@ import { FormularioRevisionAmbulatorio } from "@/components/simmow/FormularioRev
 type Flujo = "elegir" | "hospitalaria" | "ambulatoria";
 type Paso = "carga" | "revision";
 type PasoAmbulatorio = "carga" | "lista" | "revision";
+
+// Al recargar la página no debe botar al personal de vuelta a "elegir flujo"
+// ni borrar de un solo la lista de pacientes ya cruzada — se guarda en el
+// navegador un rato (pedido explícito del usuario) para sobrevivir un
+// refresh accidental. TTL corto: es progreso de trabajo del día, no algo que
+// deba sobrevivir para siempre (ni cruzar días distintos por error).
+const CLAVE_ESTADO_AMBULATORIO = "simmow_ambulatorio_estado";
+const TTL_ESTADO_AMBULATORIO_MS = 4 * 60 * 60 * 1000; // 4 horas
+
+interface EstadoPersistidoAmbulatorio {
+  guardadoEn: number;
+  pasoAmb: PasoAmbulatorio;
+  pacientesAmb: PacienteAmbulatorio[];
+  expedienteSeleccionado: string | null;
+}
+
+function cargarEstadoAmbulatorioGuardado(): EstadoPersistidoAmbulatorio | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const crudo = window.localStorage.getItem(CLAVE_ESTADO_AMBULATORIO);
+    if (!crudo) return null;
+    const estado = JSON.parse(crudo) as EstadoPersistidoAmbulatorio;
+    if (Date.now() - estado.guardadoEn > TTL_ESTADO_AMBULATORIO_MS) {
+      window.localStorage.removeItem(CLAVE_ESTADO_AMBULATORIO);
+      return null;
+    }
+    return estado;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Resuelve el código interno de SIMMOW para el médico y el código del
@@ -109,7 +140,9 @@ export default function SimmowPage() {
   const router = useRouter();
   const { profile, loading } = useAuth();
 
-  const [flujo, setFlujo] = useState<Flujo>("elegir");
+  const estadoGuardadoAmb = useMemo(() => cargarEstadoAmbulatorioGuardado(), []);
+
+  const [flujo, setFlujo] = useState<Flujo>(() => (estadoGuardadoAmb ? "ambulatoria" : "elegir"));
 
   const [paso, setPaso] = useState<Paso>("carga");
   const [procesando, setProcesando] = useState(false);
@@ -120,12 +153,33 @@ export default function SimmowPage() {
   const [errorGeneracion, setErrorGeneracion] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
-  const [pasoAmb, setPasoAmb] = useState<PasoAmbulatorio>("carga");
+  const [pasoAmb, setPasoAmb] = useState<PasoAmbulatorio>(() => estadoGuardadoAmb?.pasoAmb ?? "carga");
   const [procesandoAmb, setProcesandoAmb] = useState(false);
   const [errorAmb, setErrorAmb] = useState<string | null>(null);
-  const [pacientesAmb, setPacientesAmb] = useState<PacienteAmbulatorio[]>([]);
-  const [seleccionadoAmb, setSeleccionadoAmb] = useState<PacienteAmbulatorio | null>(null);
+  const [pacientesAmb, setPacientesAmb] = useState<PacienteAmbulatorio[]>(() => estadoGuardadoAmb?.pacientesAmb ?? []);
+  const [seleccionadoAmb, setSeleccionadoAmb] = useState<PacienteAmbulatorio | null>(() => {
+    if (!estadoGuardadoAmb?.expedienteSeleccionado) return null;
+    return (
+      estadoGuardadoAmb.pacientesAmb.find((p) => p.expediente === estadoGuardadoAmb.expedienteSeleccionado) ?? null
+    );
+  });
   const [copiadoAmb, setCopiadoAmb] = useState(false);
+
+  // Persiste el progreso de Ambulatoria (con timestamp para el TTL) cada vez
+  // que cambia, para sobrevivir un refresh accidental de la página.
+  useEffect(() => {
+    if (pacientesAmb.length === 0 && pasoAmb === "carga") {
+      window.localStorage.removeItem(CLAVE_ESTADO_AMBULATORIO);
+      return;
+    }
+    const estado: EstadoPersistidoAmbulatorio = {
+      guardadoEn: Date.now(),
+      pasoAmb,
+      pacientesAmb,
+      expedienteSeleccionado: seleccionadoAmb?.expediente ?? null,
+    };
+    window.localStorage.setItem(CLAVE_ESTADO_AMBULATORIO, JSON.stringify(estado));
+  }, [pasoAmb, pacientesAmb, seleccionadoAmb]);
 
   // La fecha no se extrae de los reportes (no es verídica) — se pide al
   // personal con doble confirmación antes de generar el código, para no
