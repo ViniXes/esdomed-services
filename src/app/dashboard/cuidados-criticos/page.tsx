@@ -70,6 +70,7 @@ export default function CuidadosCriticosDashboardPage() {
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [filtroMes, setFiltroMes] = useState<FiltroMes>(() => new Date().getMonth() + 1);
   const [filtroCierre, setFiltroCierre] = useState<FiltroCierre>("todos");
+  const [soloSolicitudes, setSoloSolicitudes] = useState(false);
 
   const puedeVer = puedeVerModuloCuidadosCriticos(profile);
   const anioConsulta = new Date().getFullYear();
@@ -118,6 +119,17 @@ export default function CuidadosCriticosDashboardPage() {
   });
   const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
   const solicitudesEliminacionPendientes = fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+  const fichasMostradas = soloSolicitudes
+    ? fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente")
+    : fichasFiltradas;
+
+  const alternarSoloSolicitudes = () => {
+    setSoloSolicitudes(prev => {
+      const siguiente = !prev;
+      if (siguiente) setFiltroMes("todos"); // evita que el periodo esconda la solicitud que se busca
+      return siguiente;
+    });
+  };
 
   const manejarFichaEliminada = (id: string) => {
     setFichas(prev => prev.filter(item => item.id !== id));
@@ -163,8 +175,23 @@ export default function CuidadosCriticosDashboardPage() {
         <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "uci").length} />
         <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "ucin").length} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
-        <Stat icon={<Trash2 size={18} />} label="Solicitudes de eliminación" value={solicitudesEliminacionPendientes} alerta={solicitudesEliminacionPendientes > 0} />
+        <Stat
+          icon={<Trash2 size={18} />}
+          label="Solicitudes de eliminación"
+          value={solicitudesEliminacionPendientes}
+          alerta={solicitudesEliminacionPendientes > 0}
+          onClick={solicitudesEliminacionPendientes > 0 || soloSolicitudes ? alternarSoloSolicitudes : undefined}
+          activo={soloSolicitudes}
+        />
       </div>
+      {soloSolicitudes && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+          Mostrando solo fichas con solicitud de eliminación pendiente. Activa <strong>&quot;Eliminar&quot;</strong> en la tabla para ver el ícono y revisarla.
+          <button type="button" onClick={alternarSoloSolicitudes} className="ml-auto font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-100">
+            Ver todas
+          </button>
+        </div>
+      )}
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -214,7 +241,7 @@ export default function CuidadosCriticosDashboardPage() {
         </div>
         <LienzoMatrizCuidadosCriticos
           tipo={filtro === "uci" ? "uci" : "ucin"}
-          fichas={fichasFiltradas}
+          fichas={fichasMostradas}
           onRefresh={consultarFichas}
           refreshing={consultando}
           refreshLabel={consultadoEn ? "Actualizar matriz" : "Consultar matriz"}
@@ -226,11 +253,27 @@ export default function CuidadosCriticosDashboardPage() {
   );
 }
 
-function Stat({ icon, label, value, alerta = false }: { icon: React.ReactNode; label: string; value: number | string; alerta?: boolean }) {
+function Stat({
+  icon, label, value, alerta = false, onClick, activo = false,
+}: {
+  icon: React.ReactNode; label: string; value: number | string; alerta?: boolean; onClick?: () => void; activo?: boolean;
+}) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className={`rounded-xl border p-4 ${alerta ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
-      <div className={`flex items-center gap-2 ${alerta ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>{icon}<span className={`text-xs font-medium ${alerta ? "text-amber-700 dark:text-amber-400" : "text-slate-500"}`}>{label}</span></div>
-      <p className={`mt-2 text-2xl font-bold ${alerta ? "text-amber-700 dark:text-amber-300" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
-    </div>
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`rounded-xl border p-4 text-left transition-colors ${onClick ? "cursor-pointer hover:border-amber-400" : ""} ${
+        activo
+          ? "border-amber-500 bg-amber-100 ring-2 ring-amber-300 dark:border-amber-500 dark:bg-amber-950 dark:ring-amber-800"
+          : alerta
+            ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40"
+            : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+      }`}
+    >
+      <div className={`flex items-center gap-2 ${alerta || activo ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>{icon}<span className={`text-xs font-medium ${alerta || activo ? "text-amber-700 dark:text-amber-400" : "text-slate-500"}`}>{label}</span></div>
+      <p className={`mt-2 text-2xl font-bold ${alerta || activo ? "text-amber-700 dark:text-amber-300" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
+      {onClick && <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">{activo ? "Mostrando solo estas ▾" : "Click para filtrar"}</p>}
+    </Wrapper>
   );
 }

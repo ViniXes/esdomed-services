@@ -75,6 +75,28 @@
   font-size: 8pt;
 }
 
+/* Colores adicionales del formulario de Atención Ambulatoria (segunda
+   columna de etiquetas/valores) — extraídos en vivo de la tabla real. */
+.labelDer {
+  background: #ffcc99;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.labelKhaki {
+  background: #f0e68c;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.cellWhite {
+  background: #ffffff;
+  color: #000000;
+  font-size: 8pt;
+}
+
 .form input,
 .form select,
 .form textarea {
