@@ -3,6 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import { MedicoCombobox } from "./MedicoCombobox";
 import type { DatosSimmowAmbulatorio } from "@/lib/simmow/ambulatorioTypes";
+import styles from "./FormularioRevision.module.css";
 
 interface Props {
   datos: DatosSimmowAmbulatorio;
@@ -10,186 +11,297 @@ interface Props {
   onVolver: () => void;
 }
 
-const input =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm";
-const label = "text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 block";
-
-function Campo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <span className={label}>{titulo}</span>
-      {children}
-    </div>
-  );
-}
-
 /**
- * Revisión simple tipo tarjeta de un paciente de Atención Ambulatoria antes
- * de generar el código — no es la réplica visual exacta del formulario real
- * de SIMMOW (esa réplica sí aplica al flujo hospitalario, que es una sola
- * tabla compleja; acá son pocos campos sueltos).
+ * Réplica visual de la tabla de SIMMOW — reutiliza el mismo CSS module que
+ * el flujo hospitalario (FormularioRevision.module.css) para que el personal
+ * se ubique con los mismos colores/orden que ve en la pantalla real de
+ * "Ingreso/Edición Consulta Curativa" al momento de revisar antes de copiar.
+ * Solo cubre los campos que este flujo autollena — el resto del formulario
+ * real (odontología, planificación familiar, etc.) no aplica aquí.
  */
 export function FormularioRevisionAmbulatorio({ datos, onChange, onVolver }: Props) {
-  const v = (campo: keyof DatosSimmowAmbulatorio) => String(datos[campo] ?? "");
-  const set = (campo: keyof DatosSimmowAmbulatorio) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => onChange({ [campo]: e.target.value } as Partial<DatosSimmowAmbulatorio>);
+  const v = (campo: keyof DatosSimmowAmbulatorio): string => String(datos[campo] ?? "");
+  const set =
+    (campo: keyof DatosSimmowAmbulatorio) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      onChange({ [campo]: e.target.value } as Partial<DatosSimmowAmbulatorio>);
+    };
+
+  const texto = (campo: keyof DatosSimmowAmbulatorio, className: string) => (
+    <input key={campo} className={className} value={v(campo)} onChange={set(campo)} />
+  );
+
+  const areaTexto = (campo: keyof DatosSimmowAmbulatorio, className: string) => (
+    <textarea key={campo} className={className} value={v(campo)} onChange={set(campo)} />
+  );
 
   return (
-    <div className="space-y-4">
+    <div>
       <button
         onClick={onVolver}
-        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+        className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white mb-3"
       >
         <ArrowLeft size={14} /> Volver a la lista
       </button>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Campo titulo="Expediente Clínico">
-            <input className={input} value={v("expediente")} onChange={set("expediente")} />
-          </Campo>
-          <Campo titulo="DUI">
-            <input className={input} value={v("dui")} onChange={set("dui")} />
-          </Campo>
-          <Campo titulo="Fecha">
-            <input className={input} value={v("fecha")} onChange={set("fecha")} placeholder="DD/MM/AAAA" />
-          </Campo>
+      <div className={styles.wrap}>
+        <div className={styles.form}>
+          <table className={styles.table}>
+            <tbody>
+              <tr>
+                <td className={styles.title} colSpan={2}>
+                  Ingreso / Edición Consulta Curativa / Atención Preventiva
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.cellAlt}>
+                  <b>&nbsp;&nbsp;Establecimiento</b>
+                </td>
+                <td className={styles.cell}>
+                  <select defaultValue="">
+                    <option>Hospital Nacional San Salvador SS El Salvador</option>
+                  </select>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.section} colSpan={2}>
+                  &nbsp;&nbsp;Información del Paciente :
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Expediente Clínico</td>
+                <td className={styles.cell}>
+                  {texto("expediente", styles.exp)}
+                  &nbsp;&nbsp;DUI
+                  {texto("dui", styles.doc)}
+                  &nbsp;(sin guion)
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Nombre del Paciente</td>
+                <td className={styles.cell}>{texto("paciente", styles.dir)}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>
+                  &nbsp;&nbsp;<b>Sexo</b>
+                </td>
+                <td className={styles.cell}>
+                  {(
+                    [
+                      { valor: "1", etiqueta: "Masculino" },
+                      { valor: "2", etiqueta: "Femenino" },
+                      { valor: "3", etiqueta: "Intersexual" },
+                    ] as const
+                  ).map((op) => (
+                    <label key={op.valor}>
+                      <input
+                        type="radio"
+                        name="sexo_ui"
+                        checked={v("sexoValor") === op.valor}
+                        onChange={() => onChange({ sexoValor: op.valor })}
+                      />{" "}
+                      {op.etiqueta}{" "}
+                    </label>
+                  ))}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>
+                  &nbsp;&nbsp;<b>Edad</b>
+                </td>
+                <td className={styles.cell}>
+                  {texto("edadAnios", styles.mini)} años&nbsp;&nbsp;
+                  <input className={styles.mini} value={v("edadMeses")} readOnly /> meses&nbsp;&nbsp;
+                  <input className={styles.mini} value={v("edadDias")} readOnly /> días
+                  <span style={{ marginLeft: 8, fontSize: "7pt", color: "#555" }}>
+                    (solo años se digita en SIMMOW)
+                  </span>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>
+                  &nbsp;&nbsp;<b>Fecha</b>
+                </td>
+                <td className={styles.cell}>{texto("fecha", styles.fecha)}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>
+                  &nbsp;&nbsp;<b>[ Departamento ] [ Distrito ]</b>
+                </td>
+                <td className={styles.cell}>
+                  {texto("departamento", styles.nombre)}
+                  {texto("municipio", styles.nombre)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>
+                  &nbsp;&nbsp;<b>Área</b>
+                </td>
+                <td className={styles.cell}>
+                  {(
+                    [
+                      { valor: "1", etiqueta: "Urbana" },
+                      { valor: "2", etiqueta: "Rural" },
+                    ] as const
+                  ).map((op) => (
+                    <label key={op.valor}>
+                      <input
+                        type="radio"
+                        name="area_ui"
+                        checked={v("areaValor") === op.valor}
+                        onChange={() => onChange({ areaValor: op.valor })}
+                      />{" "}
+                      {op.etiqueta}{" "}
+                    </label>
+                  ))}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.section} colSpan={2}>
+                  &nbsp;&nbsp;Diagnósticos :
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Diagnóstico Principal</td>
+                <td className={styles.cell}>
+                  &nbsp;Código:
+                  {texto("diagPrincipalCodigo", styles.codigo)}
+                  &nbsp;&nbsp;
+                  {areaTexto("diagPrincipalTexto", styles.dx)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Diagnóstico Secundario</td>
+                <td className={styles.cell}>
+                  &nbsp;Código:
+                  {texto("diagSecundarioCodigo", styles.codigo)}
+                  &nbsp;&nbsp;
+                  {areaTexto("diagSecundarioTexto", styles.dx)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Causa Externa de Morbilidad</td>
+                <td className={styles.cell}>
+                  &nbsp;Código:
+                  {texto("causaExternaCodigo", styles.codigo)}
+                  &nbsp;&nbsp;
+                  {areaTexto("causaExternaTexto", styles.dx)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.section} colSpan={2}>
+                  &nbsp;&nbsp;Recurso y Referencias :
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Código Recurso (Médico)</td>
+                <td className={styles.cell}>
+                  <MedicoCombobox
+                    nombre={v("medicoNombre")}
+                    codigo={v("medicoCodigoSimmow")}
+                    codigoClassName={styles.codigo}
+                    nombreClassName={styles.nombre}
+                    onChange={(nombreNuevo, codigoNuevo) =>
+                      onChange({ medicoNombre: nombreNuevo, medicoCodigoSimmow: codigoNuevo })
+                    }
+                  />
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Ingreso Hospitalario</td>
+                <td className={styles.cell}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={datos.ingresoHospitalario}
+                      onChange={(e) => onChange({ ingresoHospitalario: e.target.checked })}
+                    />{" "}
+                    Marcar si ingresó
+                  </label>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Afiliación ISSS</td>
+                <td className={styles.cell}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={datos.isss}
+                      onChange={(e) => onChange({ isss: e.target.checked })}
+                    />{" "}
+                    ISSS
+                  </label>
+                  &nbsp;&nbsp;
+                  {(
+                    [
+                      { valor: "1", etiqueta: "Cotizante" },
+                      { valor: "2", etiqueta: "Beneficiario" },
+                    ] as const
+                  ).map((op) => (
+                    <label key={op.valor}>
+                      <input
+                        type="radio"
+                        name="tipoisss_ui"
+                        checked={v("tipoIsssValor") === op.valor}
+                        onChange={() => onChange({ tipoIsssValor: op.valor })}
+                      />{" "}
+                      {op.etiqueta}{" "}
+                    </label>
+                  ))}
+                  &nbsp;&nbsp;N° de Afiliación
+                  {texto("numeroAfiliacion", styles.doc)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>
+                  &nbsp;&nbsp;Referido De / Interconsulta De
+                  <br />
+                  &nbsp;&nbsp;Establecimiento (texto original)
+                </td>
+                <td className={styles.cell}>
+                  {texto("establecimientoReferidoTexto", styles.referencia)}
+                  <br />
+                  &nbsp;Código SIMMOW:
+                  {texto("establecimientoReferidoCodigo", styles.codigo)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Personas Privadas de Libertad</td>
+                <td className={styles.cell}>{texto("privadoLibertadTexto", styles.nombre)}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Amenorrea</td>
+                <td className={styles.cell}>{texto("amenorreaSemanas", styles.mini)} semanas</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p style={{ color: "#ffffff", fontSize: "7pt", marginTop: 10, opacity: 0.8 }}>
+            Modalidad, Tipo Atención, Especialidad, Discapacidad, Violencia, Escuela Promotora, Procedimiento Salud
+            Mental, Derechohabiente Otros, Víctima DH, Referido A y UCSF/UCSFE no tienen dato de origen en los
+            reportes del SIS — complételos manualmente en SIMMOW si aplican.
+          </p>
         </div>
-
-        <Campo titulo="Nombre del Paciente">
-          <input className={input} value={v("paciente")} onChange={set("paciente")} />
-        </Campo>
-
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <Campo titulo="Sexo">
-            <select className={input} value={v("sexoValor")} onChange={set("sexoValor")}>
-              <option value="">—</option>
-              <option value="1">Masculino</option>
-              <option value="2">Femenino</option>
-              <option value="3">Intersexual</option>
-            </select>
-          </Campo>
-          <Campo titulo="Edad (años)">
-            <input className={input} value={v("edadAnios")} onChange={set("edadAnios")} />
-          </Campo>
-          <Campo titulo="Meses">
-            <input className={input} value={v("edadMeses")} onChange={set("edadMeses")} />
-          </Campo>
-          <Campo titulo="Días">
-            <input className={input} value={v("edadDias")} onChange={set("edadDias")} />
-          </Campo>
-          <Campo titulo="Área">
-            <select className={input} value={v("areaValor")} onChange={set("areaValor")}>
-              <option value="">—</option>
-              <option value="1">Urbana</option>
-              <option value="2">Rural</option>
-            </select>
-          </Campo>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo titulo="Departamento">
-            <input className={input} value={v("departamento")} onChange={set("departamento")} />
-          </Campo>
-          <Campo titulo="Municipio / Distrito">
-            <input className={input} value={v("municipio")} onChange={set("municipio")} />
-          </Campo>
-        </div>
-
-        <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr] gap-2 items-start">
-            <Campo titulo="Cód. CIE-10 (Dx Principal)">
-              <input className={input} value={v("diagPrincipalCodigo")} onChange={set("diagPrincipalCodigo")} />
-            </Campo>
-            <Campo titulo="Diagnóstico Principal">
-              <textarea className={input} rows={2} value={v("diagPrincipalTexto")} onChange={set("diagPrincipalTexto")} />
-            </Campo>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr] gap-2 items-start">
-            <Campo titulo="Cód. CIE-10 (Dx Secundario)">
-              <input className={input} value={v("diagSecundarioCodigo")} onChange={set("diagSecundarioCodigo")} />
-            </Campo>
-            <Campo titulo="Diagnóstico Secundario">
-              <textarea className={input} rows={2} value={v("diagSecundarioTexto")} onChange={set("diagSecundarioTexto")} />
-            </Campo>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[100px_1fr] gap-2 items-start">
-            <Campo titulo="Cód. CIE-10 (Causa Externa)">
-              <input className={input} value={v("causaExternaCodigo")} onChange={set("causaExternaCodigo")} />
-            </Campo>
-            <Campo titulo="Causa Externa de Morbilidad">
-              <textarea className={input} rows={2} value={v("causaExternaTexto")} onChange={set("causaExternaTexto")} />
-            </Campo>
-          </div>
-        </div>
-
-        <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
-          <Campo titulo="Médico (Código Recurso)">
-            <div className="flex gap-2">
-              <MedicoCombobox
-                nombre={v("medicoNombre")}
-                codigo={v("medicoCodigoSimmow")}
-                codigoClassName={input + " w-28 flex-shrink-0"}
-                nombreClassName={input}
-                onChange={(nombreNuevo, codigoNuevo) =>
-                  onChange({ medicoNombre: nombreNuevo, medicoCodigoSimmow: codigoNuevo })
-                }
-              />
-            </div>
-          </Campo>
-        </div>
-
-        <div className="border-t border-slate-100 dark:border-slate-800 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={datos.ingresoHospitalario}
-              onChange={(e) => onChange({ ingresoHospitalario: e.target.checked })}
-            />
-            Ingreso Hospitalario
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={datos.isss} onChange={(e) => onChange({ isss: e.target.checked })} />
-            Afiliación ISSS
-          </label>
-          {datos.isss && (
-            <Campo titulo="Tipo / N° de afiliación">
-              <div className="flex gap-2">
-                <select className={input} value={v("tipoIsssValor")} onChange={set("tipoIsssValor")}>
-                  <option value="">—</option>
-                  <option value="1">Cotizante</option>
-                  <option value="2">Beneficiario</option>
-                </select>
-                <input className={input} value={v("numeroAfiliacion")} onChange={set("numeroAfiliacion")} />
-              </div>
-            </Campo>
-          )}
-        </div>
-
-        <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
-          <Campo titulo="Referido De / Interconsulta De (texto original del SIS)">
-            <input className={input} value={v("establecimientoReferidoTexto")} readOnly />
-          </Campo>
-          <Campo titulo="Código de establecimiento en SIMMOW (Referido De)">
-            <input className={input} value={v("establecimientoReferidoCodigo")} onChange={set("establecimientoReferidoCodigo")} />
-          </Campo>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo titulo="Personas privadas de libertad">
-            <input className={input} value={v("privadoLibertadTexto")} onChange={set("privadoLibertadTexto")} />
-          </Campo>
-          <Campo titulo="Semana de amenorrea">
-            <input className={input} value={v("amenorreaSemanas")} onChange={set("amenorreaSemanas")} />
-          </Campo>
-        </div>
-
-        <p className="text-xs text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-          Modalidad, Tipo Atención, Especialidad, Discapacidad, Violencia, Escuela Promotora, Procedimiento Salud
-          Mental, Derechohabiente Otros, Víctima DH, Referido A y UCSF/UCSFE no tienen dato de origen en los reportes
-          del SIS — complételos manualmente en SIMMOW si aplican.
-        </p>
       </div>
     </div>
   );
