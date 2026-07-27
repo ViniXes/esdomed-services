@@ -42,13 +42,22 @@ function areaValorDeArea(area: string | undefined): string {
   return "";
 }
 
-/** "ISSS Cotizante" / "ISSS Beneficiario" → { isss, tipoIsssValor }. */
-function afiliacionIsss(tipoAfiliacionTexto: string | undefined): { isss: boolean; tipoIsssValor: string } {
+/**
+ * "ISSS Cotizante" / "ISSS Beneficiario" → { isss, tipoIsssValor }. Algunas
+ * filas del reporte traen el número de afiliación pero dejan "Tipo de
+ * afiliación" vacío (dato incompleto en el SIS, no un error nuestro) — un
+ * número de afiliación presente ya es evidencia suficiente de que es ISSS,
+ * así que se marca el checkbox igual; Cotizante/Beneficiario solo se marca
+ * si el texto lo dice explícitamente (si no, queda para completar a mano).
+ */
+function afiliacionIsss(
+  tipoAfiliacionTexto: string | undefined,
+  numeroAfiliacion: string | undefined
+): { isss: boolean; tipoIsssValor: string } {
   const t = mayus(tipoAfiliacionTexto || "");
-  if (!t.includes("ISSS")) return { isss: false, tipoIsssValor: "" };
-  if (t.includes("COTIZANTE")) return { isss: true, tipoIsssValor: "1" };
-  if (t.includes("BENEFICIARIO")) return { isss: true, tipoIsssValor: "2" };
-  return { isss: true, tipoIsssValor: "" };
+  const tipoIsssValor = t.includes("COTIZANTE") ? "1" : t.includes("BENEFICIARIO") ? "2" : "";
+  const isss = t.includes("ISSS") || !!numeroAfiliacion;
+  return { isss, tipoIsssValor };
 }
 
 /**
@@ -110,7 +119,7 @@ export function cruzarReportes(
     p.datos.medicoNombre = d.medico || "";
     p.datos.ingresoHospitalario = p.datos.ingresoHospitalario || !!d.ingresoHospitalario;
     p.datos.tipoAfiliacionTexto = d.tipoAfiliacion || "";
-    const { isss, tipoIsssValor } = afiliacionIsss(d.tipoAfiliacion);
+    const { isss, tipoIsssValor } = afiliacionIsss(d.tipoAfiliacion, d.numeroAfiliacion);
     p.datos.isss = isss;
     p.datos.tipoIsssValor = tipoIsssValor;
     p.datos.numeroAfiliacion = d.numeroAfiliacion || "";
