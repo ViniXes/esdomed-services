@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   collection, query, orderBy, onSnapshot, limit, where, getDocs, Timestamp, QueryConstraint,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
-import { FileStack, Search, X, Circle, History, Plus, ClipboardList, Building2 } from "lucide-react";
+import { FileStack, Search, X, Circle, History, Plus, ClipboardList, Building2, Pencil } from "lucide-react";
 
 type ControlIngreso = {
   id?: string;
@@ -49,13 +50,43 @@ function esFechaHoy(ts: unknown): boolean {
     d.getDate() === hoy.getDate();
 }
 
+// Estado de censo de un expediente dentro de la ventana ayer+hoy.
+type CensoEstado = { tipo: "demanda" | "referido"; estado: "abierto" | "cerrado"; id: string };
+
+const CENSO_TIPO_LABEL: Record<CensoEstado["tipo"], string> = {
+  demanda: "Demanda",
+  referido: "Referido",
+};
+
+// Badge del estado de censo de la fila: pendiente / en proceso / completado.
+function BadgeCenso({ censo }: { censo: CensoEstado | null }) {
+  if (!censo) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 whitespace-nowrap">
+        Censo pendiente
+      </span>
+    );
+  }
+  return censo.estado === "cerrado" ? (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 whitespace-nowrap">
+      {CENSO_TIPO_LABEL[censo.tipo]} · Completado
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900 whitespace-nowrap">
+      {CENSO_TIPO_LABEL[censo.tipo]} · En proceso
+    </span>
+  );
+}
+
 // Botón "+" de cada registro del tablero: registrar ESA atención en uno de
 // los dos censos de emergencia llevándose la identidad ya digitada por
 // ESDOMED (expediente, nombre, edad, género). El menú se dibuja con posición
 // fija para que no lo recorte el overflow horizontal de la tabla.
+// Si el expediente ya está en un censo, el botón se sustituye por el badge:
+// un paciente no se registra en los dos censos.
 const MENU_CENSO_W = 288;
 
-function MenuCensoFila({ ingreso }: { ingreso: ControlIngreso }) {
+function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: CensoEstado | null }) {
   const router = useRouter();
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -98,8 +129,27 @@ function MenuCensoFila({ ingreso }: { ingreso: ControlIngreso }) {
     router.push(`/medico/censos/${censo}?${p.toString()}`);
   };
 
+  // Ya registrado en un censo: se muestra el estado con lápiz para editarlo;
+  // no se permite volver a registrarlo (ni en el otro censo).
+  if (censo) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <BadgeCenso censo={censo} />
+        <Link
+          href={`/medico/censos/${censo.tipo === "demanda" ? "demanda-espontanea" : "referidos"}?editar=${censo.id}`}
+          className="inline-flex p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+          aria-label="Editar registro de censo"
+          title="Editar registro de censo"
+        >
+          <Pencil size={13} />
+        </Link>
+      </span>
+    );
+  }
+
   return (
-    <div ref={ref} className="inline-block">
+    <div ref={ref} className="inline-flex items-center gap-1.5">
+      <BadgeCenso censo={null} />
       <button
         onClick={abrir}
         title="Registrar en censo"
@@ -172,6 +222,8 @@ export default function ColaExpedientesPage() {
   const [fechaHasta, setFechaHasta] = useState("");
   const [historicos, setHistoricos] = useState<ControlIngreso[] | null>(null);
   const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
+  const [censosDemanda, setCensosDemanda] = useState<Map<string, { id: string; estado: "abierto" | "cerrado" }>>(new Map());
+  const [censosReferido, setCensosReferido] = useState<Map<string, { id: string; estado: "abierto" | "cerrado" }>>(new Map());
 
   // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
   // índice compuesto). Fechas anteriores se consultan bajo demanda en la
@@ -191,6 +243,47 @@ export default function ColaExpedientesPage() {
       setUltimaActualizacion(new Date());
     });
   }, []);
+
+  // Estado de censo por expediente, acotado a la misma ventana ayer+hoy
+  // (volumen chico: ~50 registros/día entre ambos censos). Alimenta los
+  // badges y el bloqueo del botón "+" cuando ya hay censo.
+  useEffect(() => {
+    const inicioAyer = new Date();
+    inicioAyer.setDate(inicioAyer.getDate() - 1);
+    inicioAyer.setHours(0, 0, 0, 0);
+    const sub = (col: string, setter: (m: Map<string, { id: string; estado: "abierto" | "cerrado" }>) => void) =>
+      onSnapshot(
+        query(
+          collection(db, col),
+          where("fecha", ">=", Timestamp.fromDate(inicioAyer)),
+          orderBy("fecha", "desc"),
+          limit(600),
+        ),
+        s => {
+          const m = new Map<string, { id: string; estado: "abierto" | "cerrado" }>();
+          // Orden desc: el primer doc por expediente es el más reciente.
+          s.docs.forEach(d => {
+            const data = d.data();
+            if (typeof data.expediente === "string" && !m.has(data.expediente)) {
+              m.set(data.expediente, { id: d.id, estado: data.estadoRegistro === "cerrado" ? "cerrado" : "abierto" });
+            }
+          });
+          setter(m);
+        },
+        () => { /* sin permisos/reglas aún: los badges simplemente no se muestran */ },
+      );
+    const u1 = sub("censo_demanda_espontanea", setCensosDemanda);
+    const u2 = sub("censo_referidos", setCensosReferido);
+    return () => { u1(); u2(); };
+  }, []);
+
+  const censoDe = (expediente: string): CensoEstado | null => {
+    const d = censosDemanda.get(expediente);
+    if (d) return { tipo: "demanda", estado: d.estado, id: d.id };
+    const r = censosReferido.get(expediente);
+    if (r) return { tipo: "referido", estado: r.estado, id: r.id };
+    return null;
+  };
 
   const hoy  = ingresos.filter(i => esFechaHoy(i.creadoEn));
   const ayer = ingresos.filter(i => esFechaAyer(i.creadoEn));
@@ -429,7 +522,7 @@ export default function ColaExpedientesPage() {
           <>
             {/* Tabla md+ */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+              <table className="w-full text-sm min-w-[880px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[120px]">Fecha</th>
@@ -438,7 +531,7 @@ export default function ColaExpedientesPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[120px]">DUI</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[180px]">Paciente</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[220px]">Servicio</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[70px]">Censo</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[240px]">Censo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -473,8 +566,8 @@ export default function ColaExpedientesPage() {
                           {ingreso.servicio}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <MenuCensoFila ingreso={ingreso} />
+                      <td className="px-4 py-3 text-left whitespace-nowrap">
+                        <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso.expediente)} />
                       </td>
                     </tr>
                   ))}
@@ -515,7 +608,7 @@ export default function ColaExpedientesPage() {
                         <p className="text-xs font-mono text-slate-500">{formatFecha(ingreso.creadoEn)}</p>
                         <p className="text-xs font-mono text-slate-400">{formatHora(ingreso.creadoEn)}</p>
                       </div>
-                      <MenuCensoFila ingreso={ingreso} />
+                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso.expediente)} />
                     </div>
                   </div>
                 </div>

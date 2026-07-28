@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addDoc, collection, Timestamp } from "@/lib/firestoreMeter";
+import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -17,6 +17,7 @@ import {
   NotebookPen, Plus, Stethoscope, Syringe, Timer, Users,
 } from "lucide-react";
 import type { Genero, TurnoEmergencia } from "@/types";
+import { toDate } from "@/lib/pacientes/helpers";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   DESENLACES_SIN_INGRESO, DISPOSITIVOS_O2, HOSPITALES_REFERENCIA,
@@ -96,6 +97,7 @@ export default function CensoReferidosPage() {
   );
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nuevaNota, setNuevaNota] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [buscandoId, setBuscandoId] = useState(false);
@@ -110,6 +112,48 @@ export default function CensoReferidosPage() {
   // Datos que vienen del botón "+" de la cola de expedientes (identidad y
   // fecha/hora del registro de ESDOMED). Todo sigue siendo editable.
   useEffect(() => {
+    // Modo edición: ?editar=<id> (desde el libro de consulta de censos).
+    const editar = new URLSearchParams(window.location.search).get("editar");
+    if (editar) {
+      (async () => {
+        try {
+          const snap = await getDoc(doc(db, "censo_referidos", editar));
+          if (!snap.exists()) { setError("No se encontró el registro a editar."); return; }
+          const r = snap.data();
+          const fecha = toDate(r.fecha) ?? new Date();
+          setEditandoId(editar);
+          setForm((f) => ({
+            ...f,
+            fechaHora: toDtLocal(fecha),
+            turno: r.turno ?? f.turno,
+            expediente: r.expediente ?? "",
+            nombre: r.pacienteNombre ?? "",
+            edad: r.edad !== undefined && r.edad !== null ? String(r.edad) : "",
+            genero: r.genero ?? null,
+            hospitalReferencia: r.hospitalReferencia ?? "",
+            referenciaSis: r.referenciaSis !== false,
+            condicion: r.condicion ?? null,
+            dispositivoO2: r.dispositivoO2 ?? "No",
+            diagnosticos: r.diagnosticos ?? [],
+            discrepanciaDiagnostico: r.discrepanciaDiagnostico ?? "no",
+            modificacionServicio: r.modificacionServicio ?? "no",
+            servicioIngreso: r.servicioIngreso ?? "",
+            staffEvalua: r.staffEvalua ?? "",
+            reevaluacion: r.reevaluacion ?? "",
+            tiempoPermanencia: r.tiempoPermanencia ?? "",
+            razonDemora: r.razonDemora ?? "",
+            procedimientosMaxima: r.procedimientosMaxima ?? [],
+            otrosProcedimientos: r.otrosProcedimientos ?? [],
+            notas: ((r.notas ?? []) as { texto: string; fecha: unknown }[])
+              .map((n) => ({ texto: n.texto, fecha: (toDate(n.fecha) ?? new Date()).toISOString() })),
+            medicosGenerales: r.medicosGenerales ?? f.medicosGenerales,
+          }));
+        } catch (e) {
+          setError(`No se pudo cargar el registro: ${e instanceof Error ? e.message : "error"}`);
+        }
+      })();
+      return;
+    }
     const p = leerPrefillCola();
     if (!p) return;
     setForm((f) => ({
@@ -166,7 +210,20 @@ export default function CensoReferidosPage() {
       const fecha = new Date(form.fechaHora);
       localStorage.setItem(LS_MEDICOS_GENERALES, form.medicosGenerales.trim());
 
-      await addDoc(collection(db, "censo_referidos"), {
+      // Un paciente no puede estar en los dos censos el mismo día.
+      const mismoDia = (d?: Date) =>
+        !!d && d.getFullYear() === fecha.getFullYear() && d.getMonth() === fecha.getMonth() && d.getDate() === fecha.getDate();
+      const enDemanda = await getDocs(query(
+        collection(db, "censo_demanda_espontanea"),
+        where("expediente", "==", form.expediente.trim()),
+      ));
+      if (enDemanda.docs.some((d) => mismoDia(toDate(d.data().fecha)))) {
+        setError("Este expediente ya está registrado en el censo de DEMANDA ESPONTÁNEA para esta fecha; un paciente no puede estar en ambos censos.");
+        setGuardando(false);
+        return;
+      }
+
+      const datos = {
         estadoRegistro: faltan.length ? "abierto" : "cerrado",
         camposFaltantes: faltan,
         fecha: Timestamp.fromDate(fecha),
@@ -193,10 +250,21 @@ export default function CensoReferidosPage() {
         otrosProcedimientos: form.otrosProcedimientos,
         notas: notas.map((n) => ({ texto: n.texto, fecha: Timestamp.fromDate(new Date(n.fecha)) })),
         medicosGenerales: form.medicosGenerales.trim() || null,
-        creadoEn: Timestamp.now(),
-        creadoPorId: profile.uid,
-        creadoPorNombre: profile.nombre,
-      });
+      };
+
+      if (editandoId) {
+        await updateDoc(doc(db, "censo_referidos", editandoId), {
+          ...datos,
+          actualizadoEn: Timestamp.now(),
+        });
+      } else {
+        await addDoc(collection(db, "censo_referidos"), {
+          ...datos,
+          creadoEn: Timestamp.now(),
+          creadoPorId: profile.uid,
+          creadoPorNombre: profile.nombre,
+        });
+      }
 
       setGuardado({ expediente: form.expediente.trim(), cerrado: faltan.length === 0 });
     } catch (e) {
@@ -225,7 +293,7 @@ export default function CensoReferidosPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
-              Referido registrado en el censo
+              {editandoId ? "Cambios guardados en el censo" : "Referido registrado en el censo"}
             </h1>
             <p className="text-sm text-slate-500 mt-1">
               Expediente <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{guardado.expediente}</span>
@@ -236,9 +304,15 @@ export default function CensoReferidosPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button onClick={registrarOtra} className={`${BOTON_PRIMARIO} px-4 py-2`}>
-              <Plus size={15} /> Registrar otro referido
-            </button>
+            {editandoId ? (
+              <button onClick={() => router.push("/medico/censos")} className={`${BOTON_PRIMARIO} px-4 py-2`}>
+                <ArrowLeft size={15} /> Volver al libro de censos
+              </button>
+            ) : (
+              <button onClick={registrarOtra} className={`${BOTON_PRIMARIO} px-4 py-2`}>
+                <Plus size={15} /> Registrar otro referido
+              </button>
+            )}
             <button
               onClick={() => router.push("/medico/cola-expedientes")}
               className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -257,18 +331,23 @@ export default function CensoReferidosPage() {
       {/* Header */}
       <div className="space-y-3">
         <Link
-          href="/medico/cola-expedientes"
+          href={editandoId ? "/medico/censos" : "/medico/cola-expedientes"}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
-          <ArrowLeft size={13} /> Volver a la cola de expedientes
+          <ArrowLeft size={13} /> {editandoId ? "Volver al libro de censos" : "Volver a la cola de expedientes"}
         </Link>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-blue-50 dark:bg-[var(--color-institutional-navy)] rounded-xl flex items-center justify-center border border-blue-100 dark:border-[#c9a892]/30 flex-shrink-0">
             <Building2 size={17} className="text-[#1c1e4d] dark:text-[#c9a892]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight flex items-center gap-2 flex-wrap">
               Censo de referidos
+              {editandoId && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900 rounded-full">
+                  Editando registro
+                </span>
+              )}
             </h1>
             <p className="text-xs text-slate-500">Unidad de Emergencia · un registro por paciente referido</p>
           </div>
@@ -462,14 +541,14 @@ export default function CensoReferidosPage() {
         <FaltantesHint faltantes={camposFaltantes(form)} />
         <div className="flex items-center gap-3 ml-auto">
           <Link
-            href="/medico/cola-expedientes"
+            href={editandoId ? "/medico/censos" : "/medico/cola-expedientes"}
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >
             Cancelar
           </Link>
           <button onClick={guardar} disabled={guardando} className={`${BOTON_PRIMARIO} px-5 py-2`}>
             {guardando ? <Loader2 size={15} className="animate-spin" /> : null}
-            {guardando ? "Guardando..." : "Registrar referido"}
+            {guardando ? "Guardando..." : editandoId ? "Guardar cambios" : "Registrar referido"}
           </button>
         </div>
       </div>

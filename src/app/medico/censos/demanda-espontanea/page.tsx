@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addDoc, collection, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
+import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -96,6 +96,7 @@ export default function CensoDemandaEspontaneaPage() {
   );
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nuevaNota, setNuevaNota] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [buscandoId, setBuscandoId] = useState(false);
@@ -109,6 +110,51 @@ export default function CensoDemandaEspontaneaPage() {
   // hora. Se lee después de montar para no desalinear la hidratación; todo
   // sigue siendo editable.
   useEffect(() => {
+    // Modo edición: ?editar=<id> (desde el libro de consulta de censos).
+    const editar = new URLSearchParams(window.location.search).get("editar");
+    if (editar) {
+      (async () => {
+        try {
+          const snap = await getDoc(doc(db, "censo_demanda_espontanea", editar));
+          if (!snap.exists()) { setError("No se encontró el registro a editar."); return; }
+          const r = snap.data();
+          const fecha = toDate(r.fecha) ?? new Date();
+          setEditandoId(editar);
+          setForm((f) => ({
+            ...f,
+            fechaHora: toDtLocal(fecha),
+            turno: r.turno ?? f.turno,
+            expediente: r.expediente ?? "",
+            nombre: r.pacienteNombre ?? "",
+            edad: r.edad !== undefined && r.edad !== null ? String(r.edad) : "",
+            genero: r.genero ?? null,
+            triage: r.triage ?? null,
+            condicion: r.condicion ?? "vivo",
+            diagnosticos: r.diagnosticos ?? [],
+            especialidad: r.especialidad ?? "",
+            traeReferencia: !!r.traeReferencia,
+            lugarReferencia: r.lugarReferencia ?? "",
+            destino: r.destino ?? null,
+            servicioIngresar: r.servicioIngresar ?? "",
+            centroRefiere: r.centroRefiere ?? "",
+            staffEvalua: r.staffEvalua ?? "",
+            reevaluacion: r.reevaluacion ?? "",
+            ventilacionMecanica: !!r.ventilacionMecanica,
+            aseguradoIsss: !!r.aseguradoIsss,
+            empleadoHes: !!r.empleadoHes,
+            dependencia: r.dependencia ?? "",
+            procedimientosMaxima: r.procedimientosMaxima ?? [],
+            procedimientosUE: r.procedimientosUE ?? [],
+            notas: ((r.notas ?? []) as { texto: string; fecha: unknown }[])
+              .map((n) => ({ texto: n.texto, fecha: (toDate(n.fecha) ?? new Date()).toISOString() })),
+            medicosGenerales: r.medicosGenerales ?? f.medicosGenerales,
+          }));
+        } catch (e) {
+          setError(`No se pudo cargar el registro: ${e instanceof Error ? e.message : "error"}`);
+        }
+      })();
+      return;
+    }
     const p = leerPrefillCola();
     if (!p) return;
     setForm((f) => ({
@@ -165,6 +211,19 @@ export default function CensoDemandaEspontaneaPage() {
       const fecha = new Date(form.fechaHora);
       localStorage.setItem(LS_MEDICOS_GENERALES, form.medicosGenerales.trim());
 
+      // Un paciente no puede estar en los dos censos el mismo día.
+      const mismoDia = (d?: Date) =>
+        !!d && d.getFullYear() === fecha.getFullYear() && d.getMonth() === fecha.getMonth() && d.getDate() === fecha.getDate();
+      const enReferidos = await getDocs(query(
+        collection(db, "censo_referidos"),
+        where("expediente", "==", form.expediente.trim()),
+      ));
+      if (enReferidos.docs.some((d) => mismoDia(toDate(d.data().fecha)))) {
+        setError("Este expediente ya está registrado en el censo de REFERIDOS para esta fecha; un paciente no puede estar en ambos censos.");
+        setGuardando(false);
+        return;
+      }
+
       // Derivado: ¿el mismo expediente consultó en las 48 h previas?
       const previos = await getDocs(query(
         collection(db, "censo_demanda_espontanea"),
@@ -172,11 +231,12 @@ export default function CensoDemandaEspontaneaPage() {
       ));
       const hace48h = fecha.getTime() - 48 * 60 * 60 * 1000;
       const consulta48h = previos.docs.some((d) => {
+        if (d.id === editandoId) return false;
         const t = toDate(d.data().fecha)?.getTime() ?? 0;
         return t >= hace48h && t < fecha.getTime();
       });
 
-      await addDoc(collection(db, "censo_demanda_espontanea"), {
+      const datos = {
         estadoRegistro: faltan.length ? "abierto" : "cerrado",
         camposFaltantes: faltan,
         fecha: Timestamp.fromDate(fecha),
@@ -206,10 +266,21 @@ export default function CensoDemandaEspontaneaPage() {
         procedimientosUE: form.procedimientosUE,
         notas: notas.map((n) => ({ texto: n.texto, fecha: Timestamp.fromDate(new Date(n.fecha)) })),
         medicosGenerales: form.medicosGenerales.trim() || null,
-        creadoEn: Timestamp.now(),
-        creadoPorId: profile.uid,
-        creadoPorNombre: profile.nombre,
-      });
+      };
+
+      if (editandoId) {
+        await updateDoc(doc(db, "censo_demanda_espontanea", editandoId), {
+          ...datos,
+          actualizadoEn: Timestamp.now(),
+        });
+      } else {
+        await addDoc(collection(db, "censo_demanda_espontanea"), {
+          ...datos,
+          creadoEn: Timestamp.now(),
+          creadoPorId: profile.uid,
+          creadoPorNombre: profile.nombre,
+        });
+      }
 
       setGuardado({ expediente: form.expediente.trim(), cerrado: faltan.length === 0 });
     } catch (e) {
@@ -238,7 +309,7 @@ export default function CensoDemandaEspontaneaPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
-              Atención registrada en el censo
+              {editandoId ? "Cambios guardados en el censo" : "Atención registrada en el censo"}
             </h1>
             <p className="text-sm text-slate-500 mt-1">
               Expediente <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{guardado.expediente}</span>
@@ -249,9 +320,15 @@ export default function CensoDemandaEspontaneaPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button onClick={registrarOtra} className={`${BOTON_PRIMARIO} px-4 py-2`}>
-              <Plus size={15} /> Registrar otra atención
-            </button>
+            {editandoId ? (
+              <button onClick={() => router.push("/medico/censos")} className={`${BOTON_PRIMARIO} px-4 py-2`}>
+                <ArrowLeft size={15} /> Volver al libro de censos
+              </button>
+            ) : (
+              <button onClick={registrarOtra} className={`${BOTON_PRIMARIO} px-4 py-2`}>
+                <Plus size={15} /> Registrar otra atención
+              </button>
+            )}
             <button
               onClick={() => router.push("/medico/cola-expedientes")}
               className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -270,18 +347,23 @@ export default function CensoDemandaEspontaneaPage() {
       {/* Header */}
       <div className="space-y-3">
         <Link
-          href="/medico/cola-expedientes"
+          href={editandoId ? "/medico/censos" : "/medico/cola-expedientes"}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
-          <ArrowLeft size={13} /> Volver a la cola de expedientes
+          <ArrowLeft size={13} /> {editandoId ? "Volver al libro de censos" : "Volver a la cola de expedientes"}
         </Link>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-blue-50 dark:bg-[var(--color-institutional-navy)] rounded-xl flex items-center justify-center border border-blue-100 dark:border-[#c9a892]/30 flex-shrink-0">
             <ClipboardList size={17} className="text-[#1c1e4d] dark:text-[#c9a892]" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight flex items-center gap-2 flex-wrap">
               Censo de demanda espontánea
+              {editandoId && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900 rounded-full">
+                  Editando registro
+                </span>
+              )}
             </h1>
             <p className="text-xs text-slate-500">Unidad de Emergencia · un registro por atención</p>
           </div>
@@ -464,14 +546,14 @@ export default function CensoDemandaEspontaneaPage() {
         <FaltantesHint faltantes={camposFaltantes(form)} />
         <div className="flex items-center gap-3 ml-auto">
           <Link
-            href="/medico/cola-expedientes"
+            href={editandoId ? "/medico/censos" : "/medico/cola-expedientes"}
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >
             Cancelar
           </Link>
           <button onClick={guardar} disabled={guardando} className={`${BOTON_PRIMARIO} px-5 py-2`}>
             {guardando ? <Loader2 size={15} className="animate-spin" /> : null}
-            {guardando ? "Guardando..." : "Registrar atención"}
+            {guardando ? "Guardando..." : editandoId ? "Guardar cambios" : "Registrar atención"}
           </button>
         </div>
       </div>
