@@ -4,7 +4,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -29,6 +29,10 @@ export interface NavItem {
 interface SidebarProps {
   navItems: NavItem[];
   roleLabel: string;
+  /** Para perfiles con menús extensos, inicia todas las secciones cerradas. */
+  collapseGroupsInitially?: boolean;
+  /** Habilita el control de escritorio para ocultar el panel lateral. */
+  allowDesktopPanelCollapse?: boolean;
 }
 
 interface SidebarBodyProps extends SidebarProps {
@@ -39,6 +43,7 @@ interface SidebarBodyProps extends SidebarProps {
   toggleGroup: (group: string) => void;
   onChangePassword: () => void;
   onLogout: () => void;
+  onCollapseDesktopPanel?: () => void;
   onNavigate?: () => void;
   toggle: () => void;
 }
@@ -137,6 +142,7 @@ function SidebarBody({
   onNavigate,
   onChangePassword,
   onLogout,
+  onCollapseDesktopPanel,
 }: SidebarBodyProps) {
   const renderItem = (item: NavItem) =>
     item.children?.length
@@ -242,12 +248,27 @@ function SidebarBody({
           <LogOut size={16} />
           Cerrar sesión
         </button>
+        {onCollapseDesktopPanel && (
+          <button
+            type="button"
+            onClick={onCollapseDesktopPanel}
+            className="hidden md:flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 transition-all"
+          >
+            <PanelLeftClose size={16} />
+            Ocultar panel
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-export function Sidebar({ navItems, roleLabel }: SidebarProps) {
+export function Sidebar({
+  navItems,
+  roleLabel,
+  collapseGroupsInitially = false,
+  allowDesktopPanelCollapse = false,
+}: SidebarProps) {
   const [open, setOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -256,9 +277,10 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
-  // Grupos independientes: todos abiertos por defecto, cada uno se cierra
-  // o abre a gusto sin afectar a los demás.
+  // Grupos independientes: cada uno se cierra o abre a gusto sin afectar a los demás.
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
+  const [openedGroups, setOpenedGroups] = useState<Set<string>>(new Set());
+  const [desktopPanelCollapsed, setDesktopPanelCollapsed] = useState(false);
   const { profile, changePassword, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
@@ -276,15 +298,22 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(item.href + "/");
 
-  const isGroupCollapsed = (group: string) => closedGroups.has(group);
+  const isGroupCollapsed = (group: string) =>
+    collapseGroupsInitially ? !openedGroups.has(group) : closedGroups.has(group);
 
-  const toggleGroup = (group: string) =>
-    setClosedGroups((prev) => {
+  const toggleGroup = (group: string) => {
+    const setGroups = collapseGroupsInitially ? setOpenedGroups : setClosedGroups;
+    setGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
       else next.add(group);
       return next;
     });
+  };
+
+  const toggleDesktopPanel = () => {
+    setDesktopPanelCollapsed((previous) => !previous);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -353,6 +382,7 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
       setOpen(false);
     },
     onLogout: handleLogout,
+    onCollapseDesktopPanel: allowDesktopPanelCollapse ? toggleDesktopPanel : undefined,
   };
 
   return (
@@ -420,11 +450,32 @@ export function Sidebar({ navItems, roleLabel }: SidebarProps) {
         <SidebarBody {...sidebarProps} onNavigate={() => setOpen(false)} />
       </aside>
 
-      <aside className="hidden md:block w-60 flex-shrink-0">
-        <div className="h-screen sticky top-0">
+      <aside
+        className={`hidden md:block relative flex-shrink-0 transition-[width] duration-300 ease-out ${
+          allowDesktopPanelCollapse && desktopPanelCollapsed ? "w-0" : "w-60"
+        }`}
+        aria-label="Navegación principal"
+      >
+        <div className={`h-screen sticky top-0 w-60 transition-all duration-300 ease-out ${
+          allowDesktopPanelCollapse && desktopPanelCollapsed
+            ? "-translate-x-full opacity-0 pointer-events-none"
+            : "translate-x-0 opacity-100"
+        }`}>
           <SidebarBody {...sidebarProps} />
         </div>
       </aside>
+
+      {allowDesktopPanelCollapse && desktopPanelCollapsed && (
+        <button
+          type="button"
+          onClick={toggleDesktopPanel}
+          className="hidden md:flex fixed left-0 top-1/2 z-40 h-12 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-slate-200 bg-white text-slate-500 shadow-lg shadow-slate-900/10 transition-colors hover:bg-slate-50 hover:text-[#1c1e4d] dark:border-[#c9a892]/35 dark:bg-[var(--color-institutional-dark)] dark:text-slate-300 dark:shadow-black/30 dark:hover:bg-slate-800 dark:hover:text-white"
+          aria-label="Mostrar panel lateral"
+          title="Mostrar panel lateral"
+        >
+          <PanelLeftOpen size={17} />
+        </button>
+      )}
 
       {showPasswordModal && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
