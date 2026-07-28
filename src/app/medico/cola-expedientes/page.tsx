@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   collection, query, orderBy, onSnapshot, limit, where, getDocs, Timestamp, QueryConstraint,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
-import { FileStack, Search, X, Circle, History } from "lucide-react";
+import { FileStack, Search, X, Circle, History, Plus, ClipboardList, Building2 } from "lucide-react";
 
 type ControlIngreso = {
   id?: string;
@@ -14,6 +15,8 @@ type ControlIngreso = {
   dui?: string;
   apellidos: string;
   nombres: string;
+  edad?: number;
+  genero?: "masculino" | "femenino";
   servicio: string;
   ingresoDirectoServicio?: boolean;
   responsableIngresoNombre: string;
@@ -44,6 +47,109 @@ function esFechaHoy(ts: unknown): boolean {
   return d.getFullYear() === hoy.getFullYear() &&
     d.getMonth() === hoy.getMonth() &&
     d.getDate() === hoy.getDate();
+}
+
+// Botón "+" de cada registro del tablero: registrar ESA atención en uno de
+// los dos censos de emergencia llevándose la identidad ya digitada por
+// ESDOMED (expediente, nombre, edad, género). El menú se dibuja con posición
+// fija para que no lo recorte el overflow horizontal de la tabla.
+const MENU_CENSO_W = 288;
+
+function MenuCensoFila({ ingreso }: { ingreso: ControlIngreso }) {
+  const router = useRouter();
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pos) return;
+    const cerrarClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setPos(null);
+    };
+    const cerrar = () => setPos(null);
+    document.addEventListener("mousedown", cerrarClick);
+    window.addEventListener("scroll", cerrar, true);
+    window.addEventListener("resize", cerrar);
+    return () => {
+      document.removeEventListener("mousedown", cerrarClick);
+      window.removeEventListener("scroll", cerrar, true);
+      window.removeEventListener("resize", cerrar);
+    };
+  }, [pos]);
+
+  const abrir = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (pos) return setPos(null);
+    const r = e.currentTarget.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.right - MENU_CENSO_W, window.innerWidth - MENU_CENSO_W - 8));
+    // Abre hacia arriba si no cabe abajo (~150px de menú).
+    const top = r.bottom + 150 > window.innerHeight ? r.top - 150 - 6 : r.bottom + 6;
+    setPos({ top, left });
+  };
+
+  const irACenso = (censo: "demanda-espontanea" | "referidos") => {
+    setPos(null);
+    const p = new URLSearchParams({ exp: ingreso.expediente });
+    const nombre = `${ingreso.nombres ?? ""} ${ingreso.apellidos ?? ""}`.replace(/\s+/g, " ").trim();
+    if (nombre) p.set("nombre", nombre);
+    if (typeof ingreso.edad === "number") p.set("edad", String(ingreso.edad));
+    if (ingreso.genero === "masculino" || ingreso.genero === "femenino") p.set("genero", ingreso.genero);
+    // El momento de la atención hereda la fecha/hora en que ESDOMED registró
+    // el expediente (mismo registro del que salen nombre, edad y sexo).
+    if (ingreso.creadoEn) p.set("fecha", String(tsToDate(ingreso.creadoEn).getTime()));
+    router.push(`/medico/censos/${censo}?${p.toString()}`);
+  };
+
+  return (
+    <div ref={ref} className="inline-block">
+      <button
+        onClick={abrir}
+        title="Registrar en censo"
+        aria-label="Registrar en censo"
+        className={`p-1.5 rounded-lg border transition-colors ${
+          pos
+            ? "bg-blue-600 text-white border-blue-600"
+            : "text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 hover:bg-blue-600 hover:text-white hover:border-blue-600"
+        }`}
+      >
+        <Plus size={14} />
+      </button>
+
+      {pos && (
+        <div
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: MENU_CENSO_W }}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden z-50"
+        >
+          <p className="px-4 pt-2.5 pb-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 truncate">
+            {ingreso.expediente} · {ingreso.nombres} {ingreso.apellidos}
+          </p>
+          <button
+            onClick={() => irACenso("demanda-espontanea")}
+            className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <div className="w-8 h-8 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <ClipboardList size={15} className="text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Censo de demanda espontánea</p>
+              <p className="text-xs text-slate-500 mt-0.5">Paciente que consulta sin referencia</p>
+            </div>
+          </button>
+          <div className="border-t border-slate-100 dark:border-slate-800" />
+          <button
+            onClick={() => irACenso("referidos")}
+            className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Building2 size={15} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Censo de referidos</p>
+              <p className="text-xs text-slate-500 mt-0.5">Paciente referido de otro establecimiento</p>
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function esFechaAyer(ts: unknown): boolean {
@@ -332,6 +438,7 @@ export default function ColaExpedientesPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[120px]">DUI</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[180px]">Paciente</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[220px]">Servicio</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[70px]">Censo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -365,6 +472,9 @@ export default function ColaExpedientesPage() {
                         <span className="text-xs font-medium bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-md">
                           {ingreso.servicio}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <MenuCensoFila ingreso={ingreso} />
                       </td>
                     </tr>
                   ))}
@@ -400,9 +510,12 @@ export default function ColaExpedientesPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex-shrink-0 text-right">
-                      <p className="text-xs font-mono text-slate-500">{formatFecha(ingreso.creadoEn)}</p>
-                      <p className="text-xs font-mono text-slate-400">{formatHora(ingreso.creadoEn)}</p>
+                    <div className="flex-shrink-0 flex flex-col items-end gap-2">
+                      <div className="text-right">
+                        <p className="text-xs font-mono text-slate-500">{formatFecha(ingreso.creadoEn)}</p>
+                        <p className="text-xs font-mono text-slate-400">{formatHora(ingreso.creadoEn)}</p>
+                      </div>
+                      <MenuCensoFila ingreso={ingreso} />
                     </div>
                   </div>
                 </div>
