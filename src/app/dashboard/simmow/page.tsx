@@ -14,7 +14,11 @@ import {
 } from "@/lib/simmow/certificadoExtractor";
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import { generarScriptConsola } from "@/lib/simmow/generadorScript";
-import { cargarEstablecimientos, mejorCoincidenciaEstablecimiento } from "@/lib/simmow/establecimientos";
+import {
+  cargarEstablecimientos,
+  esEstablecimientoPrivado,
+  mejorCoincidenciaEstablecimiento,
+} from "@/lib/simmow/establecimientos";
 import { cargarMedicos, mejorCoincidenciaMedico } from "@/lib/simmow/medicos";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
@@ -84,8 +88,19 @@ async function enriquecerPacientesAmbulatorio(pacientes: PacienteAmbulatorio[]):
         establecimientos,
         datos.establecimientoReferidoTexto
       );
-      if (coincidenciaEstablecimiento) datos.establecimientoReferidoCodigo = coincidenciaEstablecimiento.codigo;
+      if (coincidenciaEstablecimiento) {
+        datos.establecimientoReferidoCodigo = coincidenciaEstablecimiento.codigo;
+        // "Priv" para privados (Hospital/Clínica Privada...), "Establec" para
+        // el resto del catálogo (Hospital Nacional, UCSF, Unidad de Salud...).
+        datos.refdeValor = esEstablecimientoPrivado(coincidenciaEstablecimiento.nombre) ? "2" : "3";
+      }
     }
+
+    // "Referido A" no trae dato de origen en ninguno de los dos reportes hoy
+    // (se completa a mano en el formulario de revisión) — si algún día se
+    // resuelve automáticamente un establecimiento para este campo, debe
+    // decidir Priv/Establec con el mismo criterio de arriba
+    // (esEstablecimientoPrivado), no dejarlo fijo en "Establec".
 
     return { ...p, datos };
   });

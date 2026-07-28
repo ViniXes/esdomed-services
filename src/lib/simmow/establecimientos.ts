@@ -81,3 +81,14 @@ export function mejorCoincidenciaEstablecimiento(
   const umbral = Math.max(2, Math.ceil(tokens.length * 0.6));
   return mejorScore >= umbral ? mejor : null;
 }
+
+/**
+ * El catálogo de SIMMOW marca los establecimientos privados con "Privado"/
+ * "Privada" en el nombre (ej. "Hospital Privado San Salvador SS Bautista",
+ * "Clinica Privada Cojutepeque CU..."). Se usa para decidir automáticamente
+ * entre "Priv" y "Establec" en los radios de Referido De/A — el resto
+ * (Hospital Nacional, UCSF, Unidad de Salud, etc.) es público.
+ */
+export function esEstablecimientoPrivado(nombre: string): boolean {
+  return /privad[oa]/i.test(nombre);
+}
