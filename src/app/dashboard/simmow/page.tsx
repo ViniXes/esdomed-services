@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileCode2, CheckCircle2, Copy, Check, AlertTriangle, Stethoscope, Building2 } from "lucide-react";
+import { FileCode2, CheckCircle2, Copy, Check, AlertTriangle, Stethoscope, Building2, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { extraerDocumento } from "@/lib/simmow/pdfEngine";
 import { esFieh, extraerFieh } from "@/lib/simmow/fiehExtractor";
@@ -14,12 +14,17 @@ import {
 } from "@/lib/simmow/certificadoExtractor";
 import { aplicarReglasCondicionEgreso } from "@/lib/simmow/reglas";
 import { generarScriptConsola } from "@/lib/simmow/generadorScript";
-import { cargarEstablecimientos, mejorCoincidenciaEstablecimiento } from "@/lib/simmow/establecimientos";
+import {
+  cargarEstablecimientos,
+  esEstablecimientoPrivado,
+  mejorCoincidenciaEstablecimiento,
+} from "@/lib/simmow/establecimientos";
 import { cargarMedicos, mejorCoincidenciaMedico } from "@/lib/simmow/medicos";
 import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/simmow/types";
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 import { FormularioRevision } from "@/components/simmow/FormularioRevision";
 import { cruzarReportes } from "@/lib/simmow/ambulatorioMapeo";
+import { semanaEpidemiologica } from "@/lib/simmow/texto";
 import { generarScriptConsolaAmbulatorio } from "@/lib/simmow/ambulatorioGeneradorScript";
 import type { PacienteAmbulatorio } from "@/lib/simmow/ambulatorioTypes";
 import { PasoCargaAmbulatorio, type DatosCargaAmbulatorio } from "@/components/simmow/PasoCargaAmbulatorio";
@@ -84,8 +89,19 @@ async function enriquecerPacientesAmbulatorio(pacientes: PacienteAmbulatorio[]):
         establecimientos,
         datos.establecimientoReferidoTexto
       );
-      if (coincidenciaEstablecimiento) datos.establecimientoReferidoCodigo = coincidenciaEstablecimiento.codigo;
+      if (coincidenciaEstablecimiento) {
+        datos.establecimientoReferidoCodigo = coincidenciaEstablecimiento.codigo;
+        // "Priv" para privados (Hospital/Clínica Privada...), "Establec" para
+        // el resto del catálogo (Hospital Nacional, UCSF, Unidad de Salud...).
+        datos.refdeValor = esEstablecimientoPrivado(coincidenciaEstablecimiento.nombre) ? "2" : "3";
+      }
     }
+
+    // "Referido A" no trae dato de origen en ninguno de los dos reportes hoy
+    // (se completa a mano en el formulario de revisión) — si algún día se
+    // resuelve automáticamente un establecimiento para este campo, debe
+    // decidir Priv/Establec con el mismo criterio de arriba
+    // (esEstablecimientoPrivado), no dejarlo fijo en "Establec".
 
     return { ...p, datos };
   });
@@ -342,6 +358,19 @@ export default function SimmowPage() {
     return `${m[3]}/${m[2]}/${m[1]}`;
   };
 
+  const isoADateLocal = (iso: string): Date | null => {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  };
+
+  // Comparación lexicográfica de "YYYY-MM-DD" equivale a comparación cronológica.
+  const hoyIso = (): string => {
+    const h = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${h.getFullYear()}-${p(h.getMonth() + 1)}-${p(h.getDate())}`;
+  };
+
   const confirmarFechaAmbulatorio = () => {
     if (!fechaTemp1Amb || !fechaTemp2Amb) {
       setErrorFechaAmb("Seleccione la fecha en ambos calendarios.");
@@ -349,6 +378,10 @@ export default function SimmowPage() {
     }
     if (fechaTemp1Amb !== fechaTemp2Amb) {
       setErrorFechaAmb("Las dos fechas no coinciden — vuelva a seleccionar.");
+      return;
+    }
+    if (fechaTemp1Amb > hoyIso()) {
+      setErrorFechaAmb("La fecha no puede ser mayor a hoy — verifique el día seleccionado.");
       return;
     }
     setErrorFechaAmb(null);
@@ -369,9 +402,15 @@ export default function SimmowPage() {
         return;
       }
       const enriquecidos = await enriquecerPacientesAmbulatorio(cruzados);
-      // La fecha se confirmó una sola vez para todo el lote — Registro Diario
-      // de Emergencia es, por definición, el listado de un solo día.
-      const conFecha = enriquecidos.map((p) => ({ ...p, datos: { ...p.datos, fecha: fechaConfirmadaAmb } }));
+      // La fecha (y la semana epidemiológica que se calcula de ahí) se
+      // confirmó una sola vez para todo el lote — Registro Diario de
+      // Emergencia es, por definición, el listado de un solo día.
+      const fechaComoDate = isoADateLocal(fechaTemp1Amb);
+      const semana = fechaComoDate ? String(semanaEpidemiologica(fechaComoDate)) : "";
+      const conFecha = enriquecidos.map((p) => ({
+        ...p,
+        datos: { ...p.datos, fecha: fechaConfirmadaAmb, semanaEpidemiologica: semana },
+      }));
       setPacientesAmb(conFecha);
       setPasoAmb("lista");
     } catch (err) {
@@ -400,6 +439,59 @@ export default function SimmowPage() {
   const seleccionarPacienteAmb = (p: PacienteAmbulatorio) => {
     setSeleccionadoAmb(p);
     setPasoAmb("revision");
+  };
+
+  const TEXTO_SEXO: Record<string, string> = { "1": "Masculino", "2": "Femenino", "3": "Intersexual" };
+  const TEXTO_AREA: Record<string, string> = { "1": "Urbana", "2": "Rural" };
+  const TEXTO_TIPO_ISSS: Record<string, string> = { "1": "Cotizante", "2": "Beneficiario" };
+
+  /**
+   * Reporte consolidado (Excel) para que el personal lo tenga abierto al lado
+   * mientras revisa cada código generado antes de grabarlo en SIMMOW — mismo
+   * espíritu que el "REPORTE EMERGENCIA COMPLETO" que arman a mano hoy, pero
+   * ya con los códigos de médico/establecimiento resueltos contra el catálogo
+   * real de SIMMOW (lo que de verdad hay que verificar).
+   */
+  const exportarReporteConsolidadoAmb = async () => {
+    const XLSX = await import("xlsx");
+
+    const filas = pacientesAmb.map((p) => {
+      const d = p.datos;
+      return {
+        Expediente: d.expediente,
+        "Nombre del Paciente": d.paciente,
+        DUI: d.dui,
+        Sexo: TEXTO_SEXO[d.sexoValor] ?? "",
+        "Edad (años)": d.edadAnios,
+        Departamento: d.departamento,
+        "Municipio / Distrito": d.municipio,
+        Área: TEXTO_AREA[d.areaValor] ?? "",
+        "Cód. CIE-10 Dx Principal": d.diagPrincipalCodigo,
+        "Diagnóstico Principal": d.diagPrincipalTexto,
+        "Cód. CIE-10 Dx Secundario": d.diagSecundarioCodigo,
+        "Diagnóstico Secundario": d.diagSecundarioTexto,
+        "Cód. CIE-10 Causa Externa": d.causaExternaCodigo,
+        "Causa Externa de Morbilidad": d.causaExternaTexto,
+        Médico: d.medicoNombre,
+        "Código SIMMOW Médico": d.medicoCodigoSimmow,
+        "Ingreso Hospitalario": d.ingresoHospitalario ? "Sí" : "No",
+        "Afiliación ISSS": d.isss ? "Sí" : "No",
+        "Tipo ISSS": TEXTO_TIPO_ISSS[d.tipoIsssValor] ?? "",
+        "N° de Afiliación": d.numeroAfiliacion,
+        "Establecimiento Referido (texto original)": d.establecimientoReferidoTexto,
+        "Código SIMMOW Establecimiento": d.establecimientoReferidoCodigo,
+        Fecha: d.fecha,
+        "Semana Epidemiológica": d.semanaEpidemiologica,
+        "En Pacientes Atendidos En Emergencia": p.enPacientesAtendidos ? "Sí" : "No",
+        Advertencias: p.advertencias.join(" / "),
+      };
+    });
+
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Atención Ambulatoria");
+    const nombreArchivo = `reporte_consolidado_ambulatoria_${fechaConfirmadaAmb?.replace(/\//g, "-") ?? "sin_fecha"}.xlsx`;
+    XLSX.writeFile(libro, nombreArchivo);
   };
 
   const copiarCodigoAmbulatorio = async () => {
@@ -561,6 +653,7 @@ export default function SimmowPage() {
                     }}
                     placeholder="Fecha"
                     className="w-40"
+                    maxDate={new Date()}
                   />
                   <DateField
                     value={fechaTemp2Amb}
@@ -570,6 +663,7 @@ export default function SimmowPage() {
                     }}
                     placeholder="Confirmar fecha"
                     className="w-40"
+                    maxDate={new Date()}
                   />
                   <button
                     onClick={confirmarFechaAmbulatorio}
@@ -580,7 +674,8 @@ export default function SimmowPage() {
                   </button>
                   {fechaConfirmadaAmb && (
                     <span className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Confirmada: {fechaConfirmadaAmb}
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Confirmada: {fechaConfirmadaAmb} — Semana
+                      Epidemiológica {isoADateLocal(fechaTemp1Amb) ? semanaEpidemiologica(isoADateLocal(fechaTemp1Amb)!) : ""}
                     </span>
                   )}
                 </div>
@@ -602,13 +697,25 @@ export default function SimmowPage() {
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   {pacientesAmb.length} pacientes cruzados — elija uno para revisar y generar el código
                 </h2>
-                <button
-                  onClick={reiniciarAmb}
-                  className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                >
-                  Procesar otros reportes
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={exportarReporteConsolidadoAmb}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white font-medium rounded-lg transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Descargar reporte consolidado (Excel)
+                  </button>
+                  <button
+                    onClick={reiniciarAmb}
+                    className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  >
+                    Procesar otros reportes
+                  </button>
+                </div>
               </div>
+              <p className="text-xs text-slate-500">
+                Descargue el reporte y ábralo en Excel para ir marcando/comparando cada paciente mientras revisa el
+                código generado, antes de grabarlo en SIMMOW.
+              </p>
               <ListaPacientesAmbulatorio pacientes={pacientesAmb} onSeleccionar={seleccionarPacienteAmb} />
             </div>
           )}

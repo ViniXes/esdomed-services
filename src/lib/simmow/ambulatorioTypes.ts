@@ -115,7 +115,9 @@ export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
     semanaEpidemiologica: "",
     soloPreventivo: false,
     tipoAtencionValor: "",
-    especialidadValor: "",
+    // Todo este flujo es de Emergencia — igual que "Servicio: Emergencia" ya
+    // es fijo, Especialidad también se preselecciona así por defecto.
+    especialidadValor: "Emergencia",
     escuelaPromotora: false,
     discapacidadValor: "",
     violenciaTipoValor: "",
@@ -126,10 +128,16 @@ export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
     derechohabienteOtrosNumero: "",
     victimaDH: false,
     victimaDHValor: "",
+    // dptconValor/dstconValor NO llevan un default fijo acá: solo se marcan
+    // "Primera vez" cuando el paciente sí tiene ese diagnóstico (se calcula en
+    // cruzarReportes) — si no hay diagnóstico secundario, por ejemplo, debe
+    // quedar sin marcar, no con el radio elegido y el código en blanco.
     dptconValor: "",
     dpstMarcado: false,
     dstconValor: "",
-    especialistaValor: "0",
+    // Especialista sí es fijo: Diagnóstico Principal siempre viene con dato
+    // (campo obligatorio), así que "1a. Vez" siempre aplica acá.
+    especialistaValor: "1",
     refAValor: "",
     refAEstablecimientoCodigo: "",
     referidoAFisioterapia: false,
