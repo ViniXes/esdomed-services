@@ -115,7 +115,9 @@ export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
     semanaEpidemiologica: "",
     soloPreventivo: false,
     tipoAtencionValor: "",
-    especialidadValor: "",
+    // Todo este flujo es de Emergencia — igual que "Servicio: Emergencia" ya
+    // es fijo, Especialidad también se preselecciona así por defecto.
+    especialidadValor: "Emergencia",
     escuelaPromotora: false,
     discapacidadValor: "",
     violenciaTipoValor: "",
