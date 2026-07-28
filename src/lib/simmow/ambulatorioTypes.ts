@@ -128,10 +128,13 @@ export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
     derechohabienteOtrosNumero: "",
     victimaDH: false,
     victimaDHValor: "",
-    dptconValor: "",
+    // Por defecto se asume primera vez para ambos diagnósticos y para
+    // Especialista — pedido explícito del usuario, no un valor que traiga
+    // ningún reporte.
+    dptconValor: "1",
     dpstMarcado: false,
-    dstconValor: "",
-    especialistaValor: "0",
+    dstconValor: "1",
+    especialistaValor: "1",
     refAValor: "",
     refAEstablecimientoCodigo: "",
     referidoAFisioterapia: false,
