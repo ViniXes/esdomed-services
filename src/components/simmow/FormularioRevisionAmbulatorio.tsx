@@ -152,12 +152,18 @@ export function FormularioRevisionAmbulatorio({ datos, onChange, onVolver }: Pro
                   Fecha{" "}
                   <input
                     className={styles.fecha}
-                    value={v("fecha") || "(confirmar abajo)"}
+                    value={v("fecha")}
                     readOnly
-                    title="La fecha se fija con la doble confirmación antes de copiar el código, no aquí."
+                    title="La fecha se confirma una sola vez para todo el lote, en la pantalla de carga."
                   />
                   <br />
-                  Semana Epidemiológica {texto("semanaEpidemiologica", styles.mini)}
+                  Semana Epidemiológica{" "}
+                  <input
+                    className={styles.mini}
+                    value={v("semanaEpidemiologica")}
+                    readOnly
+                    title="Se calcula sola a partir de la fecha confirmada (calendario epidemiológico MMWR/CDC)."
+                  />
                   <br />
                   {checkbox("soloPreventivo", "Solo Preventivo")}
                   <br />

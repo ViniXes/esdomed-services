@@ -24,6 +24,7 @@ import type { DatosSimmow, DocumentoExtraido, ResultadoExtraccion } from "@/lib/
 import { PasoCarga, type DatosCarga } from "@/components/simmow/PasoCarga";
 import { FormularioRevision } from "@/components/simmow/FormularioRevision";
 import { cruzarReportes } from "@/lib/simmow/ambulatorioMapeo";
+import { semanaEpidemiologica } from "@/lib/simmow/texto";
 import { generarScriptConsolaAmbulatorio } from "@/lib/simmow/ambulatorioGeneradorScript";
 import type { PacienteAmbulatorio } from "@/lib/simmow/ambulatorioTypes";
 import { PasoCargaAmbulatorio, type DatosCargaAmbulatorio } from "@/components/simmow/PasoCargaAmbulatorio";
@@ -357,6 +358,12 @@ export default function SimmowPage() {
     return `${m[3]}/${m[2]}/${m[1]}`;
   };
 
+  const isoADateLocal = (iso: string): Date | null => {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  };
+
   // Comparación lexicográfica de "YYYY-MM-DD" equivale a comparación cronológica.
   const hoyIso = (): string => {
     const h = new Date();
@@ -395,9 +402,15 @@ export default function SimmowPage() {
         return;
       }
       const enriquecidos = await enriquecerPacientesAmbulatorio(cruzados);
-      // La fecha se confirmó una sola vez para todo el lote — Registro Diario
-      // de Emergencia es, por definición, el listado de un solo día.
-      const conFecha = enriquecidos.map((p) => ({ ...p, datos: { ...p.datos, fecha: fechaConfirmadaAmb } }));
+      // La fecha (y la semana epidemiológica que se calcula de ahí) se
+      // confirmó una sola vez para todo el lote — Registro Diario de
+      // Emergencia es, por definición, el listado de un solo día.
+      const fechaComoDate = isoADateLocal(fechaTemp1Amb);
+      const semana = fechaComoDate ? String(semanaEpidemiologica(fechaComoDate)) : "";
+      const conFecha = enriquecidos.map((p) => ({
+        ...p,
+        datos: { ...p.datos, fecha: fechaConfirmadaAmb, semanaEpidemiologica: semana },
+      }));
       setPacientesAmb(conFecha);
       setPasoAmb("lista");
     } catch (err) {
@@ -608,7 +621,8 @@ export default function SimmowPage() {
                   </button>
                   {fechaConfirmadaAmb && (
                     <span className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Confirmada: {fechaConfirmadaAmb}
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Confirmada: {fechaConfirmadaAmb} — Semana
+                      Epidemiológica {isoADateLocal(fechaTemp1Amb) ? semanaEpidemiologica(isoADateLocal(fechaTemp1Amb)!) : ""}
                     </span>
                   )}
                 </div>

@@ -146,3 +146,21 @@ export function buscar(texto: string, regex: RegExp): string {
   const m = String(texto || "").match(regex);
   return m ? limpiarDato(m[1]) : "";
 }
+
+/**
+ * Semana epidemiológica MMWR/CDC (la misma que usa el calendario
+ * epidemiológico universal que sigue OPS/MINSAL): semanas de domingo a
+ * sábado; la semana 1 de un año es la que contiene el primer miércoles de
+ * ese año. Si el 1 de enero cae jueves/viernes/sábado, esos días quedan en
+ * la última semana (52 o 53) del año anterior.
+ */
+export function semanaEpidemiologica(fecha: Date): number {
+  const d = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
+  const diaSemana = d.getUTCDay(); // 0=domingo .. 6=sábado
+  const miercoles = new Date(d);
+  miercoles.setUTCDate(d.getUTCDate() + (3 - diaSemana));
+  const anio = miercoles.getUTCFullYear();
+  const inicioAnio = new Date(Date.UTC(anio, 0, 1));
+  const dias = Math.round((miercoles.getTime() - inicioAnio.getTime()) / 86400000);
+  return Math.floor(dias / 7) + 1;
+}
