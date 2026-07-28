@@ -342,6 +342,13 @@ export default function SimmowPage() {
     return `${m[3]}/${m[2]}/${m[1]}`;
   };
 
+  // Comparación lexicográfica de "YYYY-MM-DD" equivale a comparación cronológica.
+  const hoyIso = (): string => {
+    const h = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${h.getFullYear()}-${p(h.getMonth() + 1)}-${p(h.getDate())}`;
+  };
+
   const confirmarFechaAmbulatorio = () => {
     if (!fechaTemp1Amb || !fechaTemp2Amb) {
       setErrorFechaAmb("Seleccione la fecha en ambos calendarios.");
@@ -349,6 +356,10 @@ export default function SimmowPage() {
     }
     if (fechaTemp1Amb !== fechaTemp2Amb) {
       setErrorFechaAmb("Las dos fechas no coinciden — vuelva a seleccionar.");
+      return;
+    }
+    if (fechaTemp1Amb > hoyIso()) {
+      setErrorFechaAmb("La fecha no puede ser mayor a hoy — verifique el día seleccionado.");
       return;
     }
     setErrorFechaAmb(null);
@@ -561,6 +572,7 @@ export default function SimmowPage() {
                     }}
                     placeholder="Fecha"
                     className="w-40"
+                    maxDate={new Date()}
                   />
                   <DateField
                     value={fechaTemp2Amb}
@@ -570,6 +582,7 @@ export default function SimmowPage() {
                     }}
                     placeholder="Confirmar fecha"
                     className="w-40"
+                    maxDate={new Date()}
                   />
                   <button
                     onClick={confirmarFechaAmbulatorio}

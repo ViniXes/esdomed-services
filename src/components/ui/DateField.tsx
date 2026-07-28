@@ -21,6 +21,8 @@ interface DateFieldProps {
   fromYear?: number;
   /** Año máximo seleccionable (por defecto el año próximo). */
   toYear?: number;
+  /** Si se da, bloquea los días posteriores a esta fecha (ej. no permitir futuro). */
+  maxDate?: Date;
 }
 
 // "YYYY-MM-DD" → Date local a medianoche (evita el corrimiento UTC en UTC-6).
@@ -45,7 +47,7 @@ const MARGEN = 8;
 
 export function DateField({
   value, onChange, placeholder = "Seleccionar fecha", ariaLabel, clearable, disabled, className = "",
-  fromYear = 2020, toYear,
+  fromYear = 2020, toYear, maxDate,
 }: DateFieldProps) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
@@ -144,6 +146,7 @@ export function DateField({
             captionLayout="dropdown"
             startMonth={new Date(fromYear, 0)}
             endMonth={new Date(toYear ?? hoy.getFullYear() + 1, 11)}
+            disabled={maxDate ? { after: maxDate } : undefined}
             onSelect={(d) => { onChange(d ? dateToValue(d) : ""); setOpen(false); }}
           />
         </div>,
