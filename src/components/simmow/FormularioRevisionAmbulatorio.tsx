@@ -332,10 +332,27 @@ export function FormularioRevisionAmbulatorio({ datos, onChange, onVolver }: Pro
                   <textarea className={styles.dir} value="" readOnly placeholder="(sin dato de origen)" />
                 </td>
                 <td className={styles.cellWhite} colSpan={2}>
-                  Derechohabiente Otros {selectOp("derechohabienteOtrosValor", OP_DERECHOHABIENTE_OTROS)} N°
-                  {texto("derechohabienteOtrosNumero", styles.doc)}
-                  <br />
-                  {checkbox("victimaDH", "Víctima DH")} {selectOp("victimaDHValor", OP_VICTIMA_DH)}
+                  <table className={styles.subTable}>
+                    <tbody>
+                      <tr>
+                        <td className={styles.subLabel}>
+                          &nbsp;Derechohabiente
+                          <br />
+                          &nbsp;Otros
+                        </td>
+                        <td className={styles.subCell}>
+                          {selectOp("derechohabienteOtrosValor", OP_DERECHOHABIENTE_OTROS)} N°{" "}
+                          {texto("derechohabienteOtrosNumero", styles.doc)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className={styles.subLabel}>&nbsp;Víctima DH</td>
+                        <td className={styles.subCell}>
+                          {checkbox("victimaDH", "")} {selectOp("victimaDHValor", OP_VICTIMA_DH)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </td>
               </tr>
 

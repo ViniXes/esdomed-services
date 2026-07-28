@@ -97,6 +97,27 @@
   font-size: 8pt;
 }
 
+/* Sub-tabla anidada dentro de una celda blanca (ej. Derechohabiente Otros /
+   Víctima DH dentro de la fila de Dirección) — misma paleta que .labelDer/
+   .cell pero sin el ancho fijo de 250px, que en SIMMOW real solo aplica a
+   las columnas de la tabla principal. */
+.subTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.subLabel {
+  background: #ffcc99;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.subCell {
+  background: #cccccc;
+  color: #000000;
+  font-size: 8pt;
+}
+
 .form input,
 .form select,
 .form textarea {
