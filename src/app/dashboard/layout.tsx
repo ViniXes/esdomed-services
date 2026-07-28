@@ -127,7 +127,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           group: G_PACIENTES,
           children: [
             { href: "/dashboard/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
-            { href: "/dashboard/emergencia/registro-diario", label: "Registro diario", icon: ListChecks },
           ],
         }]
       : []),
