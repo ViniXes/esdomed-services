@@ -136,6 +136,10 @@ export function cruzarReportes(
     p.datos.diagPrincipalTexto = d.diagnosticoPrincipal?.descripcion || "";
     p.datos.diagSecundarioCodigo = d.diagnosticoSecundario?.codigo || "";
     p.datos.diagSecundarioTexto = d.diagnosticoSecundario?.descripcion || "";
+    // "Primera vez" solo se marca si de verdad hay diagnóstico que poner — si
+    // no, debe quedar sin marcar (no un radio elegido con el código en blanco).
+    p.datos.dptconValor = p.datos.diagPrincipalCodigo || p.datos.diagPrincipalTexto ? "1" : "";
+    p.datos.dstconValor = p.datos.diagSecundarioCodigo || p.datos.diagSecundarioTexto ? "1" : "";
     p.datos.causaExternaCodigo = d.causaExterna?.codigo || "";
     p.datos.causaExternaTexto = d.causaExterna?.descripcion || "";
     p.datos.medicoNombre = d.medico || "";

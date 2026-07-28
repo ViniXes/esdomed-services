@@ -128,12 +128,15 @@ export function datosAmbulatorioVacios(): DatosSimmowAmbulatorio {
     derechohabienteOtrosNumero: "",
     victimaDH: false,
     victimaDHValor: "",
-    // Por defecto se asume primera vez para ambos diagnósticos y para
-    // Especialista — pedido explícito del usuario, no un valor que traiga
-    // ningún reporte.
-    dptconValor: "1",
+    // dptconValor/dstconValor NO llevan un default fijo acá: solo se marcan
+    // "Primera vez" cuando el paciente sí tiene ese diagnóstico (se calcula en
+    // cruzarReportes) — si no hay diagnóstico secundario, por ejemplo, debe
+    // quedar sin marcar, no con el radio elegido y el código en blanco.
+    dptconValor: "",
     dpstMarcado: false,
-    dstconValor: "1",
+    dstconValor: "",
+    // Especialista sí es fijo: Diagnóstico Principal siempre viene con dato
+    // (campo obligatorio), así que "1a. Vez" siempre aplica acá.
     especialistaValor: "1",
     refAValor: "",
     refAEstablecimientoCodigo: "",
