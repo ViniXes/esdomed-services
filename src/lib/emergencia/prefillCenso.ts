@@ -23,6 +23,8 @@ export interface PrefillCola {
   edad?: string;
   genero?: Genero;
   fechaRegistro?: Date;
+  /** id del doc de control_ingresos desde cuyo "+" se abrió el formulario. */
+  controlIngresoId?: string;
 }
 
 export function leerPrefillCola(): PrefillCola | null {
@@ -30,6 +32,8 @@ export function leerPrefillCola(): PrefillCola | null {
   const exp = p.get("exp");
   if (!exp) return null;
   const out: PrefillCola = { expediente: exp };
+  const ci = p.get("ci");
+  if (ci) out.controlIngresoId = ci;
   const nombre = p.get("nombre");
   if (nombre) out.nombre = nombre.toUpperCase();
   const edad = p.get("edad");

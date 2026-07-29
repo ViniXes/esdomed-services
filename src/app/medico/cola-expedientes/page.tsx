@@ -50,8 +50,20 @@ function esFechaHoy(ts: unknown): boolean {
     d.getDate() === hoy.getDate();
 }
 
-// Estado de censo de un expediente dentro de la ventana ayer+hoy.
+// Estado de censo de una ATENCIÓN (registro de la cola) dentro de la ventana
+// ayer+hoy. Un paciente puede consultar varias veces, así que el censo se
+// vincula al registro exacto de control_ingresos (controlIngresoId); para
+// censos digitados sin pasar por la cola se cae al expediente + mismo día.
 type CensoEstado = { tipo: "demanda" | "referido"; estado: "abierto" | "cerrado"; id: string };
+
+type CensoLookup = {
+  porCi: Map<string, { id: string; estado: "abierto" | "cerrado" }>;
+  porExpSinCi: Map<string, { id: string; estado: "abierto" | "cerrado"; fecha: Date }[]>;
+};
+
+function esMismoDia(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
 
 const CENSO_TIPO_LABEL: Record<CensoEstado["tipo"], string> = {
   demanda: "Demanda",
@@ -119,6 +131,9 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
   const irACenso = (censo: "demanda-espontanea" | "referidos") => {
     setPos(null);
     const p = new URLSearchParams({ exp: ingreso.expediente });
+    // Vincula el censo a ESTE registro de la cola (un paciente puede tener
+    // varias consultas; el censo se diferencia por atención).
+    if (ingreso.id) p.set("ci", ingreso.id);
     const nombre = `${ingreso.nombres ?? ""} ${ingreso.apellidos ?? ""}`.replace(/\s+/g, " ").trim();
     if (nombre) p.set("nombre", nombre);
     if (typeof ingreso.edad === "number") p.set("edad", String(ingreso.edad));
@@ -222,8 +237,8 @@ export default function ColaExpedientesPage() {
   const [fechaHasta, setFechaHasta] = useState("");
   const [historicos, setHistoricos] = useState<ControlIngreso[] | null>(null);
   const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
-  const [censosDemanda, setCensosDemanda] = useState<Map<string, { id: string; estado: "abierto" | "cerrado" }>>(new Map());
-  const [censosReferido, setCensosReferido] = useState<Map<string, { id: string; estado: "abierto" | "cerrado" }>>(new Map());
+  const [censosDemanda, setCensosDemanda] = useState<CensoLookup>({ porCi: new Map(), porExpSinCi: new Map() });
+  const [censosReferido, setCensosReferido] = useState<CensoLookup>({ porCi: new Map(), porExpSinCi: new Map() });
 
   // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
   // índice compuesto). Fechas anteriores se consultan bajo demanda en la
@@ -251,7 +266,7 @@ export default function ColaExpedientesPage() {
     const inicioAyer = new Date();
     inicioAyer.setDate(inicioAyer.getDate() - 1);
     inicioAyer.setHours(0, 0, 0, 0);
-    const sub = (col: string, setter: (m: Map<string, { id: string; estado: "abierto" | "cerrado" }>) => void) =>
+    const sub = (col: string, setter: (m: CensoLookup) => void) =>
       onSnapshot(
         query(
           collection(db, col),
@@ -260,15 +275,20 @@ export default function ColaExpedientesPage() {
           limit(600),
         ),
         s => {
-          const m = new Map<string, { id: string; estado: "abierto" | "cerrado" }>();
-          // Orden desc: el primer doc por expediente es el más reciente.
+          const porCi = new Map<string, { id: string; estado: "abierto" | "cerrado" }>();
+          const porExpSinCi = new Map<string, { id: string; estado: "abierto" | "cerrado"; fecha: Date }[]>();
           s.docs.forEach(d => {
             const data = d.data();
-            if (typeof data.expediente === "string" && !m.has(data.expediente)) {
-              m.set(data.expediente, { id: d.id, estado: data.estadoRegistro === "cerrado" ? "cerrado" : "abierto" });
+            const estado: "abierto" | "cerrado" = data.estadoRegistro === "cerrado" ? "cerrado" : "abierto";
+            if (typeof data.controlIngresoId === "string" && data.controlIngresoId) {
+              if (!porCi.has(data.controlIngresoId)) porCi.set(data.controlIngresoId, { id: d.id, estado });
+            } else if (typeof data.expediente === "string") {
+              const lista = porExpSinCi.get(data.expediente) ?? [];
+              lista.push({ id: d.id, estado, fecha: tsToDate(data.fecha) });
+              porExpSinCi.set(data.expediente, lista);
             }
           });
-          setter(m);
+          setter({ porCi, porExpSinCi });
         },
         () => { /* sin permisos/reglas aún: los badges simplemente no se muestran */ },
       );
@@ -277,11 +297,23 @@ export default function ColaExpedientesPage() {
     return () => { u1(); u2(); };
   }, []);
 
-  const censoDe = (expediente: string): CensoEstado | null => {
-    const d = censosDemanda.get(expediente);
-    if (d) return { tipo: "demanda", estado: d.estado, id: d.id };
-    const r = censosReferido.get(expediente);
-    if (r) return { tipo: "referido", estado: r.estado, id: r.id };
+  // El match es por ATENCIÓN: primero por el vínculo exacto al registro de la
+  // cola; si el censo se digitó sin pasar por la cola (sin vínculo), se cae a
+  // expediente + mismo día del registro.
+  const censoDe = (ingreso: ControlIngreso): CensoEstado | null => {
+    const fuentes: { tipo: CensoEstado["tipo"]; l: CensoLookup }[] = [
+      { tipo: "demanda", l: censosDemanda },
+      { tipo: "referido", l: censosReferido },
+    ];
+    for (const { tipo, l } of fuentes) {
+      const c = ingreso.id ? l.porCi.get(ingreso.id) : undefined;
+      if (c) return { tipo, estado: c.estado, id: c.id };
+    }
+    const dia = tsToDate(ingreso.creadoEn);
+    for (const { tipo, l } of fuentes) {
+      const c = l.porExpSinCi.get(ingreso.expediente)?.find(x => esMismoDia(x.fecha, dia));
+      if (c) return { tipo, estado: c.estado, id: c.id };
+    }
     return null;
   };
 
@@ -567,7 +599,7 @@ export default function ColaExpedientesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso.expediente)} />
+                        <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} />
                       </td>
                     </tr>
                   ))}
@@ -608,7 +640,7 @@ export default function ColaExpedientesPage() {
                         <p className="text-xs font-mono text-slate-500">{formatFecha(ingreso.creadoEn)}</p>
                         <p className="text-xs font-mono text-slate-400">{formatHora(ingreso.creadoEn)}</p>
                       </div>
-                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso.expediente)} />
+                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} />
                     </div>
                   </div>
                 </div>

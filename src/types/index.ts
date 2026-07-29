@@ -1435,6 +1435,12 @@ export interface CensoDemandaEspontanea {
   edad?: number;
   genero: Genero | null;          // null mientras el registro está abierto
 
+  // Vínculo con el registro EXACTO de control_ingresos desde cuyo botón "+"
+  // se creó (un paciente puede tener varias consultas en la cola; el censo se
+  // diferencia por atención, no solo por expediente). null si se digitó sin
+  // pasar por la cola.
+  controlIngresoId?: string | null;
+
   // ── Evaluación (criterio del médico) ──
   triage: TriageEmergencia | null;
   condicion: "vivo" | "fallecido";
@@ -1503,6 +1509,10 @@ export interface CensoReferido {
   pacienteNombre: string;
   edad?: number;
   genero: Genero | null;          // null mientras el registro está abierto
+
+  // Vínculo con el registro exacto de control_ingresos (ver
+  // CensoDemandaEspontanea.controlIngresoId).
+  controlIngresoId?: string | null;
 
   // ── Referencia ──
   hospitalReferencia: string;     // catálogo HOSPITALES_REFERENCIA

@@ -97,6 +97,9 @@ export default function CensoDemandaEspontaneaPage() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  // Registro de control_ingresos al que se vincula esta atención (diferencia
+  // censos cuando el paciente consulta varias veces). null = digitado directo.
+  const [controlIngresoId, setControlIngresoId] = useState<string | null>(null);
   const [nuevaNota, setNuevaNota] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [buscandoId, setBuscandoId] = useState(false);
@@ -120,6 +123,7 @@ export default function CensoDemandaEspontaneaPage() {
           const r = snap.data();
           const fecha = toDate(r.fecha) ?? new Date();
           setEditandoId(editar);
+          setControlIngresoId(typeof r.controlIngresoId === "string" ? r.controlIngresoId : null);
           setForm((f) => ({
             ...f,
             fechaHora: toDtLocal(fecha),
@@ -157,6 +161,7 @@ export default function CensoDemandaEspontaneaPage() {
     }
     const p = leerPrefillCola();
     if (!p) return;
+    setControlIngresoId(p.controlIngresoId ?? null);
     setForm((f) => ({
       ...f,
       expediente: p.expediente,
@@ -211,15 +216,23 @@ export default function CensoDemandaEspontaneaPage() {
       const fecha = new Date(form.fechaHora);
       localStorage.setItem(LS_MEDICOS_GENERALES, form.medicosGenerales.trim());
 
-      // Un paciente no puede estar en los dos censos el mismo día.
+      // Una misma ATENCIÓN no puede estar en los dos censos. Si ambos registros
+      // tienen vínculo con la cola se compara el vínculo exacto (el paciente
+      // puede consultar varias veces); sin vínculo se compara por mismo día.
       const mismoDia = (d?: Date) =>
         !!d && d.getFullYear() === fecha.getFullYear() && d.getMonth() === fecha.getMonth() && d.getDate() === fecha.getDate();
       const enReferidos = await getDocs(query(
         collection(db, "censo_referidos"),
         where("expediente", "==", form.expediente.trim()),
       ));
-      if (enReferidos.docs.some((d) => mismoDia(toDate(d.data().fecha)))) {
-        setError("Este expediente ya está registrado en el censo de REFERIDOS para esta fecha; un paciente no puede estar en ambos censos.");
+      const conflicto = enReferidos.docs.some((d) => {
+        const otro = d.data();
+        const otroCi = typeof otro.controlIngresoId === "string" && otro.controlIngresoId ? otro.controlIngresoId : null;
+        if (controlIngresoId && otroCi) return otroCi === controlIngresoId;
+        return mismoDia(toDate(otro.fecha));
+      });
+      if (conflicto) {
+        setError("Esta atención ya está registrada en el censo de REFERIDOS; un paciente no puede estar en ambos censos por la misma atención.");
         setGuardando(false);
         return;
       }
@@ -245,6 +258,7 @@ export default function CensoDemandaEspontaneaPage() {
         pacienteNombre: form.nombre.trim().toUpperCase(),
         edad: form.edad.trim() ? Number(form.edad) : null,
         genero: form.genero,
+        controlIngresoId,
         triage: form.triage,
         condicion: form.condicion,
         diagnosticos: dx.map((d) => ({ codigo: d.codigo.trim().toUpperCase(), descripcion: d.descripcion.trim() })),
@@ -292,6 +306,7 @@ export default function CensoDemandaEspontaneaPage() {
 
   const registrarOtra = () => {
     setForm(formVacio(localStorage.getItem(LS_MEDICOS_GENERALES) ?? ""));
+    setControlIngresoId(null);
     setNuevaNota("");
     setFuentePrellenado(null);
     setError(null);
