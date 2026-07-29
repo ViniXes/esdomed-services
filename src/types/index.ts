@@ -1387,3 +1387,171 @@ export interface ChecklistVehiculo {
   observaciones?: string;
   creadoEn: Date;
 }
+
+// ============================================================================
+// Censos de Emergencia (demanda espontánea y referidos)
+// ============================================================================
+// Digitación en vivo por los médicos de emergencia; reemplaza los libros de
+// Excel "DEMANDAS ESPONTANEAS" y "REFERIDOS A HES" (una hoja por mes). Los
+// catálogos normalizados viven en src/lib/emergencia/censos.ts. Solo se
+// prellena la identidad del paciente (padrón personas + control de ingresos);
+// todo lo clínico es criterio del médico que digita.
+
+// Rangos de turno fijos del censo (columna HORARIO del Excel).
+export type TurnoEmergencia = "t00_07" | "t07_15" | "t15_19" | "t19_24";
+
+export type TriageEmergencia = "rojo" | "amarillo" | "verde";
+
+// Destino del paciente en demanda espontánea (columna DESTINO DE PACIENTE).
+// "alta_voluntaria" cubre también el alta exigida (misma figura en el censo).
+export type DestinoEmergencia =
+  | "alta"
+  | "alta_voluntaria"
+  | "ingreso"
+  | "referencia"
+  | "fuga";
+
+// Estado de digitación de un registro de censo. Es DERIVADO al guardar:
+// "abierto" mientras falte algún campo obligatorio (el médico registra al
+// paciente al entrar y completa durante/al final del turno), "cerrado"
+// automáticamente cuando todo está digitado.
+export type EstadoRegistroCenso = "abierto" | "cerrado";
+
+// Quién hizo la atención: DERIVADO al guardar según a qué lista oficial
+// (STAFF_EMERGENCIA / MEDICOS_GENERALES_EMERGENCIA) pertenece el nombre en
+// staffEvalua. Separa las atenciones del staff de las de médicos generales.
+// null = nombre fuera de las listas (registros antiguos de texto libre).
+export type TipoEvaluadorEmergencia = "staff" | "medico_general";
+
+export interface CensoDemandaEspontanea {
+  id?: string;
+
+  // ── Digitación ──
+  estadoRegistro: EstadoRegistroCenso;
+  camposFaltantes?: string[];     // qué falta para cerrar (snapshot al guardar)
+
+  // ── Atención ──
+  fecha: Date;                    // estampa de la atención (auto al crear)
+  turno: TurnoEmergencia;         // lo elige el médico (chips)
+
+  // ── Identidad (prellenada de personas / control de ingresos; editable) ──
+  expediente: string;
+  pacienteNombre: string;
+  edad?: number;
+  genero: Genero | null;          // null mientras el registro está abierto
+
+  // Vínculo con el registro EXACTO de control_ingresos desde cuyo botón "+"
+  // se creó (un paciente puede tener varias consultas en la cola; el censo se
+  // diferencia por atención, no solo por expediente). null si se digitó sin
+  // pasar por la cola.
+  controlIngresoId?: string | null;
+
+  // ── Evaluación (criterio del médico) ──
+  triage: TriageEmergencia | null;
+  condicion: "vivo" | "fallecido";
+  diagnosticos: DiagnosticoCIE[]; // impresión diagnóstica, restringida a CIE-10
+  especialidad: string;           // catálogo ESPECIALIDADES_EMERGENCIA
+
+  // ── Referencia de entrada ──
+  traeReferencia: boolean;
+  lugarReferencia?: string;       // solo si traeReferencia
+
+  // ── Destino ──
+  destino: DestinoEmergencia | null;
+  servicioIngresar?: string;      // solo si destino == "ingreso"
+  centroRefiere?: string;         // solo si destino == "referencia"
+
+  // ── Médicos ──
+  staffEvalua: string;            // nombre del médico que evalúa (staff o general)
+  evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
+  reevaluacion?: string;          // vacío/undefined = no aplica
+  medicosGenerales?: string;      // los del turno (se copia a cada registro)
+  ventilacionMecanica: boolean;
+
+  // ── Administrativo ──
+  consulta48h: boolean;           // derivado: mismo expediente en las últimas 48 h
+  aseguradoIsss: boolean;
+  empleadoHes: boolean;
+  dependencia?: string;           // solo si empleadoHes
+
+  // ── Procedimientos (catálogo, chips) ──
+  procedimientosMaxima: string[]; // vacío = "NO"
+  procedimientosUE: string[];
+
+  // PLAN Y OBSERVACIONES — notas médicas agregables, cada una con estampa
+  // de fecha/hora al momento de agregarla. Único texto libre del censo.
+  notas?: { texto: string; fecha: Date }[];
+
+  // ── Trazabilidad ──
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}
+
+// Clasificación derivada de la columna "REFERENCIA EN SIS (no modificar)":
+// se calcula de hospitalReferencia + referenciaSis, nunca se digita.
+export type ClasificacionSisReferido =
+  | "HNSR CON REF SIS"
+  | "HNSR SIN REF SIS"
+  | "OTROS HOSP CON REF SIS"
+  | "OTROS HOSP SIN REF SIS"
+  | "DR SV";
+
+export interface CensoReferido {
+  id?: string;
+
+  // ── Digitación ──
+  estadoRegistro: EstadoRegistroCenso;
+  camposFaltantes?: string[];     // qué falta para cerrar (snapshot al guardar)
+
+  // ── Atención ──
+  fecha: Date;
+  turno: TurnoEmergencia;
+
+  // ── Identidad (prellenada de personas / control de ingresos; editable) ──
+  expediente: string;
+  pacienteNombre: string;
+  edad?: number;
+  genero: Genero | null;          // null mientras el registro está abierto
+
+  // Vínculo con el registro exacto de control_ingresos (ver
+  // CensoDemandaEspontanea.controlIngresoId).
+  controlIngresoId?: string | null;
+
+  // ── Referencia ──
+  hospitalReferencia: string;     // catálogo HOSPITALES_REFERENCIA
+  referenciaSis: boolean;         // ¿trae referencia registrada en SIS?
+  clasificacionSis: ClasificacionSisReferido | null; // derivada (null sin hospital)
+
+  // ── Evaluación ──
+  condicion: "estable" | "inestable" | null;
+  dispositivoO2: string;          // catálogo DISPOSITIVOS_O2
+  diagnosticos: DiagnosticoCIE[];
+  discrepanciaDiagnostico: "si" | "no" | "no_aplica";
+  modificacionServicio: "si" | "no" | "no_aplica";
+  servicioIngreso: string;        // SERVICIOS_HOSPITALARIOS o DESENLACES_SIN_INGRESO
+
+  // ── Médicos ──
+  staffEvalua: string;            // nombre del médico que evalúa (staff o general)
+  evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
+  reevaluacion?: string;          // vacío/undefined = no aplica
+  medicosGenerales?: string;
+
+  // ── Tiempos ──
+  tiempoPermanencia: string;      // catálogo TIEMPOS_PERMANENCIA
+  razonDemora?: string;           // catálogo RAZONES_DEMORA — solo si > 1 hora
+
+  // ── Procedimientos ──
+  procedimientosMaxima: string[];
+  otrosProcedimientos: string[];
+
+  // OBSERVACIONES — notas médicas agregables con estampa de fecha/hora.
+  notas?: { texto: string; fecha: Date }[];
+
+  // ── Trazabilidad ──
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+  actualizadoEn?: Date;
+}

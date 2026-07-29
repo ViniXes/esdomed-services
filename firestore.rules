@@ -346,6 +346,24 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Censos de Emergencia ─────────────────────────────────────────────────
+    // Digitan los médicos de emergencia (rol medico); ESDOMED supervisa.
+    match /censo_demanda_espontanea/{id} {
+      allow read:   if isMedico() || isEsdomed() || isAdmin();
+      allow create: if (isMedico() || isEsdomed() || isAdmin())
+                    && request.resource.data.creadoPorId == uid();
+      allow update: if isMedico() || isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /censo_referidos/{id} {
+      allow read:   if isMedico() || isEsdomed() || isAdmin();
+      allow create: if (isMedico() || isEsdomed() || isAdmin())
+                    && request.resource.data.creadoPorId == uid();
+      allow update: if isMedico() || isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Incapacidades ────────────────────────────────────────────────────────
     match /incapacidades/{id} {
       // Lectura pública para el cuerpo médico: cualquier médico (o staff) puede ver
