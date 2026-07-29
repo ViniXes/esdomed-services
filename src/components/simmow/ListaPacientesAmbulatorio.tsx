@@ -94,6 +94,14 @@ export function ListaPacientesAmbulatorio({ pacientes, onSeleccionar }: Props) {
                       revisar
                     </span>
                   )}
+                  {p.codigoCopiadoEn && (
+                    <span
+                      className="text-[10px] uppercase tracking-wide text-orange-700 dark:text-orange-400 font-semibold"
+                      title={`Código ya copiado el ${new Date(p.codigoCopiadoEn).toLocaleString("es-SV")} — cuidado de no duplicar en SIMMOW.`}
+                    >
+                      ya copiado
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}

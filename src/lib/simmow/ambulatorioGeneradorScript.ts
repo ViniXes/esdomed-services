@@ -8,6 +8,7 @@
 // normalizado) de las opciones cuando corresponda.
 
 import type { DatosSimmowAmbulatorio } from "./ambulatorioTypes";
+import { soloNumeros } from "./texto";
 
 interface PayloadAmbulatorio {
   estable: string;
@@ -69,7 +70,11 @@ function prepararPayloadAmbulatorio(datos: DatosSimmowAmbulatorio, advertencias:
     estable: "2317",
     fecha: datos.fecha || "",
     expe: datos.expediente || "",
-    DUI: datos.dui || "",
+    // Solo en el código que se pega en SIMMOW: el campo DUI ahí es sin guion
+    // (así lo indica la propia pantalla de revisión). En todos los demás
+    // lugares (revisión, lista, Excel) el DUI se muestra tal como viene del
+    // reporte, con guion incluido — no se toca ese dato en ningún otro lado.
+    DUI: soloNumeros(datos.dui || ""),
     paciente: datos.paciente || "",
     sex_valor: datos.sexoValor || "",
     edad: datos.edadAnios || "",

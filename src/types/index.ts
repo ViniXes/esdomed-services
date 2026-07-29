@@ -23,6 +23,11 @@ export interface UserProfile {
   // Aceptación de los términos y condiciones de uso. Si la versión no coincide con
   // la vigente (TERMINOS_VERSION), se vuelve a pedir la aceptación al ingresar.
   terminosAceptados?: { version: string; fecha: Date };
+  // Aceptación de los términos y condiciones específicos de la herramienta SIMMOW
+  // (roles esdomed/asistente_esdomed/admin). Independiente de terminosAceptados:
+  // se pide además, no en vez de, la primera vez que se entra a /dashboard/simmow.
+  // Si la versión no coincide con TERMINOS_SIMMOW_VERSION, se vuelve a pedir.
+  terminosSimmowAceptados?: { version: string; fecha: Date };
   createdAt: Date;
 }
 
