@@ -8,6 +8,7 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
+import { Ambulance } from "lucide-react";
 import { Icon } from "@iconify/react";
 import medicalKit from "@iconify-icons/solar/medical-kit-linear";
 import calendar from "@iconify-icons/solar/calendar-minimalistic-linear";
@@ -389,7 +390,7 @@ export default function ColaExpedientesPage() {
         <div className="relative flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#4f5ee8] text-white shadow-lg shadow-blue-500/20">
-            <Icon icon={medicalKit} width={25} />
+            <Ambulance size={25} strokeWidth={2.1} />
           </div>
           <div>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Tablero médico</p>
