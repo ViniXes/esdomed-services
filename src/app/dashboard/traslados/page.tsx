@@ -36,7 +36,7 @@ function dedupe(...listas: SolicitudTraslado[][]): SolicitudTraslado[] {
 }
 
 export default function DashboardTrasladosPage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
 
   // Zona 1: en vivo — últimas 50 (cualquier estado) + todas las pendientes.
   const [recientes, setRecientes] = useState<SolicitudTraslado[]>([]);
@@ -140,6 +140,19 @@ export default function DashboardTrasladosPage() {
       } catch (err) {
         // No bloqueamos la aprobación del traslado si la sincronización falla
         console.error("Error sincronizando traslado con paciente:", err);
+      }
+      // Si el traslado saca al paciente de una unidad UCI/UCIN, cierra automáticamente
+      // la ficha de esa unidad (mismo efecto que un egreso vivo/fallecido manual).
+      try {
+        if (user) {
+          const token = await user.getIdToken();
+          await fetch(`/api/esdomed/traslados/${id}/cerrar-ficha-critica`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      } catch (err) {
+        console.error("Error cerrando ficha UCI/UCIN tras traslado:", err);
       }
     }
     // La lista en vivo se actualiza sola (listeners). Los resultados de búsqueda son
