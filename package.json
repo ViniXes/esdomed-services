@@ -14,6 +14,8 @@
     "recalcular-dias": "node scripts/recalcular-dias-incapacidad.mjs"
   },
   "dependencies": {
+    "@iconify-icons/solar": "^1.2.3",
+    "@iconify/react": "^6.0.2",
     "@supabase/supabase-js": "^2.110.5",
     "@types/leaflet": "^1.9.21",
     "claude": "^0.1.1",
