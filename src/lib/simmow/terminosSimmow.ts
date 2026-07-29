@@ -13,7 +13,7 @@
 // ============================================================================
 
 /** Versión vigente. Al cambiarla, se vuelve a pedir la aceptación a todos. */
-export const TERMINOS_SIMMOW_VERSION = "1.1";
+export const TERMINOS_SIMMOW_VERSION = "1.2";
 
 /** Fecha de entrada en vigencia de la versión vigente (solo informativa). */
 export const TERMINOS_SIMMOW_FECHA = "29 de julio de 2026";
@@ -24,9 +24,11 @@ export interface SeccionTerminos {
 }
 
 export const TERMINOS_SIMMOW_INTRO =
-  "Esta sección del portal es una herramienta de apoyo para agilizar el llenado de los formularios de SIMMOW " +
-  "(Ingreso/Edición de Egreso e Ingreso/Edición de Consulta Curativa / Atención Preventiva). Antes de usarla, lea y " +
-  "acepte las siguientes condiciones, adicionales a los términos generales del portal que ya aceptó.";
+  "Esta sección del portal es una herramienta de apoyo para el llenado de los formularios de SIMMOW " +
+  "(Ingreso/Edición de Egreso e Ingreso/Edición de Consulta Curativa / Atención Preventiva). Su objetivo principal " +
+  "es mejorar la calidad de la digitación de ESDOMED en SIMMOW, reduciendo errores de transcripción — la agilidad " +
+  "en el llenado es un beneficio adicional, no el propósito principal. Antes de usarla, lea y acepte las siguientes " +
+  "condiciones, adicionales a los términos generales del portal que ya aceptó.";
 
 export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
   {
@@ -41,7 +43,27 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     ],
   },
   {
-    titulo: "2. Revisión obligatoria antes de grabar",
+    titulo: "2. Uso voluntario y complementario a la digitación humana",
+    parrafos: [
+      "El uso de esta herramienta NO es obligatorio. Es un apoyo opcional para quien quiera usarla — el personal que " +
+        "prefiera digitar directamente en SIMMOW sin generar ni pegar el código puede seguir haciéndolo con toda " +
+        "normalidad, sin que eso represente ninguna falta.",
+      "Su desarrollo no busca sustituir la digitación humana, sino fortalecerla: reducir los errores de transcripción " +
+        "y mejorar la calidad de la información que ESDOMED digita en SIMMOW, quitándole al personal la parte más " +
+        "mecánica y repetitiva del llenado para que pueda concentrar su atención en revisar que el dato quede " +
+        "correcto. La agilidad es un beneficio adicional, no el propósito principal. La decisión final sobre lo que " +
+        "se graba en SIMMOW, y la responsabilidad sobre esa información, siempre son de la persona que lo graba — " +
+        "use o no esta herramienta para ese llenado.",
+      "Esta herramienta tampoco forma parte de un sistema oficial del Ministerio de Salud ni de una obligación " +
+        "contractual de ningún supervisor, jefe o encargado de ESDOMED — es una iniciativa voluntaria, desarrollada " +
+        "en aras de la mejora continua del servicio. En consecuencia, brindar, mantener o continuar ofreciéndola no " +
+        "es una obligación de ningún supervisor o jefe: su disponibilidad, funcionalidades o continuidad pueden " +
+        "modificarse, suspenderse o descontinuarse en cualquier momento, sin que ello genere al personal derecho " +
+        "alguno a exigir su mantenimiento.",
+    ],
+  },
+  {
+    titulo: "3. Revisión obligatoria antes de grabar",
     parrafos: [
       "Después de pegar el código, usted debe revisar campo por campo que la información quedó correcta antes de " +
         "presionar \"Grabar\" en SIMMOW — comparándola contra el expediente, el reporte del SIS o el documento fuente, " +
@@ -53,7 +75,7 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     ],
   },
   {
-    titulo: "3. Responsabilidad por la digitación",
+    titulo: "4. Responsabilidad por la digitación",
     parrafos: [
       "Esta herramienta ayuda con la mayor parte del llenado, pero no es responsable de errores de digitación — esa " +
         "responsabilidad es del personal operativo que revisa y graba la información en SIMMOW, independientemente " +
@@ -70,7 +92,7 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     ],
   },
   {
-    titulo: "4. Exclusión expresa de excusas frente a un dato mal digitado",
+    titulo: "5. Exclusión expresa de excusas frente a un dato mal digitado",
     parrafos: [
       "Al aceptar estos términos, usted reconoce expresamente que ninguna de las siguientes circunstancias exime, " +
         "atenúa ni justifica su responsabilidad personal por un dato mal digitado, mal revisado o mal grabado en " +
@@ -95,18 +117,18 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
         "condiciones en adelante.",
       "• Que se alegue, sin haberlo reportado antes por el canal oficial dispuesto para ello, que la herramienta " +
         "\"falló\" — solo constituye una posible excepción a su responsabilidad un error de programación reportado " +
-        "por ese canal y confirmado por quien administra la herramienta, conforme a la sección 3. Un reporte hecho " +
+        "por ese canal y confirmado por quien administra la herramienta, conforme a la sección 4. Un reporte hecho " +
         "después de haber grabado el dato incorrecto no borra la responsabilidad por ese dato ya grabado, aunque sí " +
         "sirve para prevenir que el mismo error se repita en adelante.",
     ],
   },
   {
-    titulo: "5. Cómo reportar un error de la herramienta (reporte técnico, no un reclamo)",
+    titulo: "6. Cómo reportar un error de la herramienta (reporte técnico, no un reclamo)",
     parrafos: [
       "Si detecta que un campo se llena mal de forma sistemática (no un dato de origen incorrecto, sino un error de " +
         "la herramienta), repórtelo de inmediato por el canal oficial dispuesto para ello, para que se corrija. " +
         "Mientras un error no se reporte por ese canal y se confirme, no se considera responsabilidad de la " +
-        "herramienta conforme a las secciones 3 y 4.",
+        "herramienta conforme a las secciones 4 y 5.",
       "Este canal es exclusivamente un reporte técnico de un posible error de programación — no es un reclamo, " +
         "queja o solicitud formal de servicio, y su presentación no genera ningún derecho a una respuesta en un " +
         "plazo determinado ni a que el error, de confirmarse, se corrija de inmediato. Es simplemente la vía para " +
@@ -117,7 +139,7 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     ],
   },
   {
-    titulo: "6. Confidencialidad de la información",
+    titulo: "7. Confidencialidad de la información",
     parrafos: [
       "Los documentos y reportes que se suben a esta herramienta contienen datos personales y datos de salud de " +
         "pacientes. Su tratamiento sigue sujeto al deber de confidencialidad y a los términos generales del portal ya " +
@@ -125,16 +147,8 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     ],
   },
   {
-    titulo: "7. Naturaleza voluntaria de la herramienta",
+    titulo: "8. Mejora continua y vigencia",
     parrafos: [
-      "Esta herramienta no forma parte de un sistema oficial del Ministerio de Salud ni de una obligación " +
-        "contractual de ningún supervisor, jefe o encargado de ESDOMED — es una iniciativa voluntaria, desarrollada " +
-        "en aras de la mejora continua del servicio, para facilitar (no sustituir) el trabajo que el personal ya " +
-        "realiza en SIMMOW.",
-      "En consecuencia, brindar, mantener, mejorar o continuar ofreciendo esta herramienta no es una obligación de " +
-        "ningún supervisor o jefe. Su disponibilidad, funcionalidades o continuidad pueden modificarse, suspenderse o " +
-        "descontinuarse en cualquier momento, sin que ello constituya incumplimiento de ninguna obligación laboral " +
-        "ni le genere al personal derecho alguno a exigir su mantenimiento.",
       "Esta herramienta puede recibir ajustes conforme se detectan casos nuevos en los reportes o cambios en los " +
         "formularios reales de SIMMOW. El uso continuado implica la aceptación de la versión vigente de estos " +
         "términos; si se modifican de forma relevante, se le pedirá aceptarlos de nuevo al ingresar.",

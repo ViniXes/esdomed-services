@@ -33,6 +33,8 @@ import { FormularioRevisionAmbulatorio } from "@/components/simmow/FormularioRev
 import { DateField } from "@/components/ui/DateField";
 import { TerminosSimmowGate } from "@/components/simmow/TerminosSimmowGate";
 import { ReportarErrorSimmow } from "@/components/simmow/ReportarErrorSimmow";
+import { VerTerminosSimmow } from "@/components/simmow/VerTerminosSimmow";
+import { RecordatorioTerminosSimmow } from "@/components/simmow/RecordatorioTerminosSimmow";
 
 type Flujo = "elegir" | "hospitalaria" | "ambulatoria";
 type Paso = "carga" | "revision";
@@ -539,9 +541,12 @@ export default function SimmowPage() {
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
           SIMMOW — Generador de código de llenado
         </h1>
+        <span className="ml-auto">
+          <VerTerminosSimmow />
+        </span>
         <button
           onClick={() => router.push("/dashboard/simmow/reportes")}
-          className="ml-auto text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
         >
           Ver reportes de errores
         </button>
@@ -554,6 +559,8 @@ export default function SimmowPage() {
           </button>
         )}
       </div>
+
+      <RecordatorioTerminosSimmow />
 
       {flujo === "elegir" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
