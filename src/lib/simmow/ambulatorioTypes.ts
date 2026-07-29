@@ -154,4 +154,6 @@ export interface PacienteAmbulatorio {
   enRegistroDiario: boolean;
   /** Suposiciones que el cruce tuvo que hacer por datos incompletos del reporte — a revisar antes de copiar. */
   advertencias: string[];
+  /** Marca de tiempo (Date.now()) de la última vez que se copió el código de este paciente — para avisar y no duplicar en SIMMOW. undefined = nunca copiado. */
+  codigoCopiadoEn?: number;
 }

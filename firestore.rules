@@ -60,10 +60,12 @@ service cloud.firestore {
       allow read:   if isRealUser() || (isAuth() && uid() == userId);
       allow create: if isAdmin();
       // El admin puede actualizar cualquier campo. Además, cada usuario puede
-      // registrar SOLO su propia aceptación de términos (campo terminosAceptados).
+      // registrar SOLO su propia aceptación de términos (generales y/o los
+      // específicos de la herramienta SIMMOW).
       allow update: if isAdmin()
         || (isAuth() && uid() == userId
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['terminosAceptados']));
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['terminosAceptados', 'terminosSimmowAceptados']));
       allow delete: if isAdmin();
     }
 
@@ -215,6 +217,18 @@ service cloud.firestore {
       allow update: if isStaff() || isPsicologia() || isTrabajoSocial();
       allow delete: if isAdmin()
                     || (isEsdomed() && resource.data.tramiteCerrado != true);
+    }
+
+    // ─── Reportes de errores de la herramienta SIMMOW ─────────────────────────
+    // Reporte técnico (no un reclamo formal) que sustenta la cláusula de
+    // "reportado y confirmado" de los términos de uso de la herramienta
+    // (ver src/lib/simmow/terminosSimmow.ts). Solo un admin puede marcarlo
+    // confirmado/no-es-error; quien lo crea no puede alterar su propio reporte.
+    match /reportes_bugs_simmow/{id} {
+      allow read:   if isEsdomed() || isAdmin();
+      allow create: if (isEsdomed() || isAdmin()) && request.resource.data.uid == uid();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ─── Solicitudes de impresión ─────────────────────────────────────────────

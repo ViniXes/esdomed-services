@@ -31,6 +31,8 @@ import { PasoCargaAmbulatorio, type DatosCargaAmbulatorio } from "@/components/s
 import { ListaPacientesAmbulatorio } from "@/components/simmow/ListaPacientesAmbulatorio";
 import { FormularioRevisionAmbulatorio } from "@/components/simmow/FormularioRevisionAmbulatorio";
 import { DateField } from "@/components/ui/DateField";
+import { TerminosSimmowGate } from "@/components/simmow/TerminosSimmowGate";
+import { ReportarErrorSimmow } from "@/components/simmow/ReportarErrorSimmow";
 
 type Flujo = "elegir" | "hospitalaria" | "ambulatoria";
 type Paso = "carga" | "revision";
@@ -514,19 +516,39 @@ export default function SimmowPage() {
 
     setCopiadoAmb(true);
     setTimeout(() => setCopiadoAmb(false), 2500);
+
+    // Marca este paciente como "ya copiado" (en la lista y en el seleccionado)
+    // para avisar si se vuelve a abrir/copiar y así no duplicar la atención
+    // en SIMMOW — solo se marca cuando de verdad se hizo clic en copiar, no
+    // solo por abrir la pantalla de revisión.
+    const ahora = Date.now();
+    const expedienteActual = seleccionadoAmb.expediente;
+    setPacientesAmb((lista) =>
+      lista.map((p) => (p.expediente === expedienteActual ? { ...p, codigoCopiadoEn: ahora } : p))
+    );
+    setSeleccionadoAmb((p) => (p ? { ...p, codigoCopiadoEn: ahora } : p));
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <>
+      <TerminosSimmowGate />
+      <ReportarErrorSimmow />
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-2 mb-6">
         <FileCode2 className="h-6 w-6 text-blue-600 dark:text-[#c9a892]" />
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
           SIMMOW — Generador de código de llenado
         </h1>
+        <button
+          onClick={() => router.push("/dashboard/simmow/reportes")}
+          className="ml-auto text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+        >
+          Ver reportes de errores
+        </button>
         {flujo !== "elegir" && (
           <button
             onClick={() => setFlujo("elegir")}
-            className="ml-auto text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+            className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           >
             Cambiar de flujo
           </button>
@@ -735,6 +757,16 @@ export default function SimmowPage() {
                     ))}
                   </div>
                 )}
+                {seleccionadoAmb.codigoCopiadoEn && (
+                  <div className="flex items-start gap-2 text-xs text-orange-800 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border border-orange-300 dark:border-orange-800 rounded-lg px-3 py-2 mb-3 font-medium">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      Ya generó y copió el código de este paciente antes, el{" "}
+                      {new Date(seleccionadoAmb.codigoCopiadoEn).toLocaleString("es-SV")}. Verifique que no lo haya
+                      grabado ya en SIMMOW antes de pegarlo de nuevo — evite duplicar la atención.
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 mb-3">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>
@@ -751,7 +783,11 @@ export default function SimmowPage() {
                     className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     {copiadoAmb ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copiadoAmb ? "Copiado correctamente" : "Copiar código para SIMMOW"}
+                    {copiadoAmb
+                      ? "Copiado correctamente"
+                      : seleccionadoAmb.codigoCopiadoEn
+                        ? "Copiar de nuevo"
+                        : "Copiar código para SIMMOW"}
                   </button>
                   <span className="text-xs text-slate-500">Fecha confirmada para este lote: {fechaConfirmadaAmb}</span>
                 </div>
@@ -766,6 +802,7 @@ export default function SimmowPage() {
           )}
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
