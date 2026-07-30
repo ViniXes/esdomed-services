@@ -8,7 +8,20 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
-import { FileStack, Search, X, Circle, History, Plus, ClipboardList, Building2, Pencil } from "lucide-react";
+import { Ambulance } from "lucide-react";
+import { Icon } from "@iconify/react";
+import medicalKit from "@iconify-icons/solar/medical-kit-linear";
+import calendar from "@iconify-icons/solar/calendar-minimalistic-linear";
+import pulse from "@iconify-icons/solar/pulse-linear";
+import user from "@iconify-icons/solar/user-rounded-linear";
+import clock from "@iconify-icons/solar/clock-circle-linear";
+import history from "@iconify-icons/solar/history-linear";
+import magnifer from "@iconify-icons/solar/magnifer-linear";
+import closeCircle from "@iconify-icons/solar/close-circle-linear";
+import addCircle from "@iconify-icons/solar/add-circle-linear";
+import clipboardList from "@iconify-icons/solar/clipboard-list-linear";
+import hospital from "@iconify-icons/solar/hospital-linear";
+import pen from "@iconify-icons/solar/pen-2-linear";
 
 type ControlIngreso = {
   id?: string;
@@ -156,7 +169,7 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
           aria-label="Editar registro de censo"
           title="Editar registro de censo"
         >
-          <Pencil size={13} />
+          <Icon icon={pen} width={15} />
         </Link>
       </span>
     );
@@ -175,7 +188,7 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
             : "text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 hover:bg-blue-600 hover:text-white hover:border-blue-600"
         }`}
       >
-        <Plus size={14} />
+        <Icon icon={addCircle} width={17} />
       </button>
 
       {pos && (
@@ -191,7 +204,7 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
             className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             <div className="w-8 h-8 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-              <ClipboardList size={15} className="text-orange-600 dark:text-orange-400" />
+              <Icon icon={clipboardList} width={18} className="text-orange-600 dark:text-orange-400" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Censo de demanda espontánea</p>
@@ -204,7 +217,7 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
             className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
             <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Building2 size={15} className="text-indigo-600 dark:text-indigo-400" />
+              <Icon icon={hospital} width={18} className="text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Censo de referidos</p>
@@ -368,52 +381,68 @@ export default function ColaExpedientesPage() {
   const lista = vista === "recientes" ? recientesFiltrados : (historicos ?? []);
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/70 to-indigo-50/80 px-5 py-5 shadow-sm dark:border-blue-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/40 md:px-6">
+        <div className="absolute -right-10 -top-14 h-40 w-40 rounded-full bg-indigo-200/35 blur-2xl dark:bg-indigo-500/10" />
+        <div className="absolute right-24 bottom-0 h-24 w-24 rounded-full bg-cyan-200/35 blur-xl dark:bg-cyan-500/10" />
+        <div className="relative flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950 rounded-xl flex items-center justify-center border border-teal-200 dark:border-teal-900 flex-shrink-0">
-            <FileStack size={17} className="text-teal-600 dark:text-teal-400" />
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#4f5ee8] text-white shadow-lg shadow-blue-500/20">
+            <Ambulance size={25} strokeWidth={2.1} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Tablero médico</p>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight md:text-2xl">
               Cola de expedientes
             </h1>
             <p className="text-xs text-slate-500">Expedientes registrados por ESDOMED — consulta en tiempo real</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 flex-shrink-0 pt-1">
-          <Circle size={7} className="fill-green-500 text-green-500" />
+        <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm backdrop-blur-sm dark:border-emerald-900 dark:bg-slate-900/80 dark:text-emerald-400">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          </span>
           <span className="hidden sm:inline">En vivo</span>
           {ultimaActualizacion && (
-            <span className="hidden md:inline text-slate-400">
+            <span className="hidden border-l border-emerald-200 pl-2 text-emerald-600/75 md:inline dark:border-emerald-900 dark:text-emerald-400/75">
               · {ultimaActualizacion.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
             </span>
           )}
+        </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+        <div className="group relative overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-blue-900/60 dark:bg-slate-900">
+          <div className="absolute right-0 top-0 h-16 w-16 rounded-bl-[2rem] bg-blue-50 dark:bg-blue-950/50" />
+          <div className="relative mb-3 flex items-center justify-between"><span className="grid h-8 w-8 place-items-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={calendar} width={18} /></span><span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">24 h</span></div>
           <p className="text-xs font-medium text-slate-500 mb-1">Expedientes de ayer</p>
           <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 font-heading">{ayer.length}</p>
           <p className="text-[11px] text-slate-400 mt-1">Registros del día anterior</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+        <div className="group relative overflow-hidden rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-indigo-900/60 dark:bg-slate-900">
+          <div className="absolute right-0 top-0 h-16 w-16 rounded-bl-[2rem] bg-indigo-50 dark:bg-indigo-950/50" />
+          <div className="relative mb-3 flex items-center justify-between"><span className="grid h-8 w-8 place-items-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"><Icon icon={pulse} width={18} /></span><span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Hoy</span></div>
           <p className="text-xs font-medium text-slate-500 mb-1">Expedientes de hoy</p>
           <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 font-heading">{hoy.length}</p>
           <p className="text-[11px] text-slate-400 mt-1">Registros del día actual</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+        <div className="group relative overflow-hidden rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-cyan-900/60 dark:bg-slate-900">
+          <div className="absolute right-0 top-0 h-16 w-16 rounded-bl-[2rem] bg-cyan-50 dark:bg-cyan-950/50" />
+          <div className="relative mb-3 flex items-center justify-between"><span className="grid h-8 w-8 place-items-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-300"><Icon icon={user} width={18} /></span><span className="text-[10px] font-bold uppercase tracking-wider text-cyan-500">Actual</span></div>
           <p className="text-xs font-medium text-slate-500 mb-1">Último expediente</p>
-          <p className="text-2xl font-bold text-teal-600 dark:text-teal-400 font-mono truncate">
+          <p className="text-2xl font-bold text-cyan-700 dark:text-cyan-300 font-mono truncate">
             {ultimo?.expediente ?? "—"}
           </p>
           <p className="text-[11px] text-slate-400 mt-1">Registro más reciente</p>
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+        <div className="group relative overflow-hidden rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/60 dark:bg-slate-900">
+          <div className="absolute right-0 top-0 h-16 w-16 rounded-bl-[2rem] bg-emerald-50 dark:bg-emerald-950/50" />
+          <div className="relative mb-3 flex items-center justify-between"><span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300"><Icon icon={clock} width={18} /></span><span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">En vivo</span></div>
           <p className="text-xs font-medium text-slate-500 mb-1">Hora del último</p>
           <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
             {ultimo ? formatHora(ultimo.creadoEn) : "—"}
@@ -423,34 +452,34 @@ export default function ColaExpedientesPage() {
       </div>
 
       {/* Tabs Recientes / Histórico */}
-      <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="inline-flex items-center gap-1 rounded-2xl border border-blue-100 bg-white p-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {([
-          { key: "recientes", label: "Ayer y hoy", icon: Circle },
-          { key: "historico", label: "Histórico", icon: History },
-        ] as const).map(({ key, label, icon: Icon }) => (
+          { key: "recientes", label: "Ayer y hoy", icon: pulse },
+          { key: "historico", label: "Histórico", icon: history },
+        ] as const).map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setVista(key)}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               vista === key
-                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-700"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             }`}
           >
-            <Icon size={key === "recientes" ? 8 : 14} className={key === "recientes" ? "fill-green-500 text-green-500" : ""} />
+            <Icon icon={icon} width={key === "recientes" ? 15 : 16} className={vista === key ? "text-white" : key === "recientes" ? "text-emerald-500" : ""} />
             {label}
           </button>
         ))}
       </div>
 
       {/* Tabla */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
 
         {/* Toolbar */}
         {vista === "recientes" ? (
-          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:gap-3 px-4 py-3 border-b border-slate-100 dark:border-slate-800 rounded-t-2xl">
+          <div className="space-y-2 bg-gradient-to-r from-blue-50/80 via-white to-violet-50/60 px-4 py-3.5 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60 md:flex md:items-center md:gap-3 md:space-y-0">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-1 h-5 bg-teal-500 rounded-full flex-shrink-0" />
+              <div className="grid h-7 w-7 place-items-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={medicalKit} width={17} /></div>
               <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading truncate">
                 Registros de ayer y hoy
               </span>
@@ -459,18 +488,18 @@ export default function ColaExpedientesPage() {
             <div className="flex items-center gap-2">
               {/* Search */}
               <div className="relative flex-1 md:w-56 md:flex-none">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Icon icon={magnifer} width={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Expediente, DUI o paciente…"
                   value={busqueda}
                   onChange={e => setBusqueda(e.target.value)}
-                  className="w-full pl-8 pr-7 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-7 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
                 {busqueda && (
                   <button onClick={() => setBusqueda("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    <X size={12} />
+                    <Icon icon={closeCircle} width={15} />
                   </button>
                 )}
               </div>
@@ -479,8 +508,8 @@ export default function ColaExpedientesPage() {
                 onClick={() => setSoloAyer(v => !v)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
                   soloAyer
-                    ? "bg-teal-600 text-white border-teal-600"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    ? "border-[#4f5ee8] bg-[#4f5ee8] text-white shadow-sm shadow-blue-500/25"
+                    : "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
                 }`}
               >
                 {soloAyer ? "Ver ambos días" : "Solo ayer"}
@@ -488,9 +517,9 @@ export default function ColaExpedientesPage() {
             </div>
           </div>
         ) : (
-          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 rounded-t-2xl space-y-2">
+          <div className="space-y-2 bg-gradient-to-r from-indigo-50/80 via-white to-blue-50/60 px-4 py-3.5 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60">
             <div className="flex items-center gap-2">
-              <div className="w-1 h-5 bg-indigo-500 rounded-full flex-shrink-0" />
+              <div className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300"><Icon icon={history} width={17} /></div>
               <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading truncate">
                 Buscar en fechas anteriores
               </span>
@@ -500,14 +529,14 @@ export default function ColaExpedientesPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[150px] md:max-w-[200px]">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Icon icon={magnifer} width={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Expediente exacto…"
                   value={expHistorico}
                   onChange={e => setExpHistorico(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); buscarHistoricos(); } }}
-                  className="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400 font-mono"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm font-mono text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
               <div className="flex items-center gap-1.5">
@@ -521,16 +550,16 @@ export default function ColaExpedientesPage() {
               <button
                 onClick={buscarHistoricos}
                 disabled={buscandoHistoricos || (!expHistorico.trim() && !fechaDesde && !fechaHasta)}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 rounded-xl bg-[#4f5ee8] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-500/25 transition-colors hover:bg-[#5b6bf0] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Search size={13} /> {buscandoHistoricos ? "Buscando…" : "Buscar"}
+                <Icon icon={magnifer} width={17} /> {buscandoHistoricos ? "Buscando…" : "Buscar"}
               </button>
               {historicos !== null && (
                 <button
                   onClick={limpiarHistoricos}
                   className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
                 >
-                  <X size={12} /> Limpiar
+                  <Icon icon={closeCircle} width={15} /> Limpiar
                 </button>
               )}
             </div>
@@ -556,7 +585,7 @@ export default function ColaExpedientesPage() {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm min-w-[880px]">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                  <tr className="border-y border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[120px]">Fecha</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[90px]">Hora</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-[110px]">Expediente</th>
@@ -568,7 +597,7 @@ export default function ColaExpedientesPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {lista.map(ingreso => (
-                    <tr key={ingreso.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr key={ingreso.id} className="transition-colors hover:bg-blue-50/55 dark:hover:bg-slate-800/60">
                       <td className="px-4 py-3 text-xs text-slate-500 font-mono whitespace-nowrap">
                         {formatFecha(ingreso.creadoEn)}
                       </td>
@@ -577,11 +606,11 @@ export default function ColaExpedientesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono font-semibold text-sm text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 px-2 py-0.5 rounded-md">
+                          <span className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
                             {ingreso.expediente}
                           </span>
                           {ingreso.ingresoDirectoServicio && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded">
+                            <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">
                               Directo
                             </span>
                           )}
@@ -594,7 +623,7 @@ export default function ColaExpedientesPage() {
                         {ingreso.apellidos}, {ingreso.nombres}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs font-medium bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-md">
+                        <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
                           {ingreso.servicio}
                         </span>
                       </td>
@@ -610,15 +639,15 @@ export default function ColaExpedientesPage() {
             {/* Cards mobile */}
             <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
               {lista.map(ingreso => (
-                <div key={ingreso.id} className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                <div key={ingreso.id} className="px-4 py-3 transition-colors hover:bg-blue-50/55 dark:hover:bg-slate-800/60">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="font-mono font-semibold text-sm text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 px-2 py-0.5 rounded-md">
+                        <span className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
                           {ingreso.expediente}
                         </span>
                         {ingreso.ingresoDirectoServicio && (
-                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded">
+                          <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">
                             Directo
                           </span>
                         )}
@@ -630,7 +659,7 @@ export default function ColaExpedientesPage() {
                         <p className="text-xs text-slate-500 font-mono mt-0.5">DUI: {ingreso.dui}</p>
                       )}
                       <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-medium bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded">
+                        <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
                           {ingreso.servicio}
                         </span>
                       </div>

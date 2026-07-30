@@ -10,7 +10,14 @@ import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
-import { ClipboardList, CheckCircle2, Search, X, Pencil } from "lucide-react";
+import { Ambulance } from "lucide-react";
+import { Icon } from "@iconify/react";
+import documentAdd from "@iconify-icons/solar/document-add-linear";
+import calendar from "@iconify-icons/solar/calendar-minimalistic-linear";
+import checkCircle from "@iconify-icons/solar/check-circle-linear";
+import magnifer from "@iconify-icons/solar/magnifer-linear";
+import closeCircle from "@iconify-icons/solar/close-circle-linear";
+import pen from "@iconify-icons/solar/pen-2-linear";
 
 type GeneroIngreso = "masculino" | "femenino";
 
@@ -40,7 +47,7 @@ type FormState = {
 };
 
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] dark:focus:border-[#c9a892] transition";
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-600 dark:focus:bg-slate-800";
 
 const emptyForm = (): FormState => ({
   expediente: "",
@@ -52,6 +59,8 @@ const emptyForm = (): FormState => ({
   servicio: "",
   ingresoDirectoServicio: false,
 });
+
+const FILAS_POR_PAGINA = 10;
 
 export default function ControlIngresosPage() {
   const router = useRouter();
@@ -67,6 +76,8 @@ export default function ControlIngresosPage() {
   const [fechaHasta, setFechaHasta] = useState("");
   const [resultadosHistoricos, setResultadosHistoricos] = useState<ControlIngreso[] | null>(null);
   const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [detalleIngreso, setDetalleIngreso] = useState<ControlIngreso | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -213,6 +224,7 @@ export default function ControlIngresosPage() {
       constraints.push(orderBy("creadoEn", "desc"), limit(500));
       const snap = await getDocs(query(collection(db, "control_ingresos"), ...constraints));
       setResultadosHistoricos(snap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
+      setPagina(1);
     } finally {
       setBuscandoHistoricos(false);
     }
@@ -221,6 +233,7 @@ export default function ControlIngresosPage() {
   const limpiarFiltros = () => {
     setBusqueda(""); setFechaDesde(""); setFechaHasta("");
     setResultadosHistoricos(null);
+    setPagina(1);
   };
 
   const lista = (resultadosHistoricos ?? ingresos).filter(i => {
@@ -238,17 +251,21 @@ export default function ControlIngresosPage() {
     }
     return true;
   });
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / FILAS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const inicioPagina = (paginaActual - 1) * FILAS_POR_PAGINA;
+  const registrosPagina = lista.slice(inicioPagina, inicioPagina + FILAS_POR_PAGINA);
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-6">
       {modalInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200">
             <div className={`p-5 flex items-center justify-center ${modalInfo.tipo === "exito" ? "bg-green-500" : "bg-red-500"}`}>
               {modalInfo.tipo === "exito" ? (
-                <CheckCircle2 size={48} className="text-white" />
+                <Icon icon={checkCircle} width={54} className="text-white" />
               ) : (
-                <X size={48} className="text-white" />
+                <Icon icon={closeCircle} width={54} className="text-white" />
               )}
             </div>
             <div className="p-6 text-center space-y-4">
@@ -272,34 +289,81 @@ export default function ControlIngresosPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-teal-50 dark:bg-[#c9a892]/15 rounded-xl flex items-center justify-center border border-teal-200 dark:border-[#c9a892]/45 flex-shrink-0">
-          <ClipboardList size={17} className="text-teal-600 dark:text-[#e7c8b4]" />
+      {detalleIngreso && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onClick={() => setDetalleIngreso(null)}>
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" role="dialog" aria-modal="true" aria-label="Detalle del ingreso" onClick={e => e.stopPropagation()}>
+            <div className="relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-5 py-5 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/40">
+              <button type="button" onClick={() => setDetalleIngreso(null)} className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Cerrar detalle"><Icon icon={closeCircle} width={20} /></button>
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#4f5ee8] text-white shadow-lg shadow-blue-500/20"><Icon icon={documentAdd} width={24} /></div>
+                <div className="min-w-0 pr-8">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Detalle del ingreso</p>
+                  <h2 className="mt-1 font-heading text-lg font-bold text-slate-900 dark:text-slate-100">{detalleIngreso.apellidos}, {detalleIngreso.nombres}</h2>
+                  <span className="mt-2 inline-block rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">Exp. {detalleIngreso.expediente}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-5 p-5 sm:grid-cols-2">
+              <section>
+                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Paciente</h3>
+                <dl className="space-y-2.5 text-sm">
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">DUI</dt><dd className="text-right font-mono text-slate-800 dark:text-slate-200">{detalleIngreso.dui || "—"}</dd></div>
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Edad</dt><dd className="font-medium text-slate-800 dark:text-slate-200">{detalleIngreso.edad != null ? `${detalleIngreso.edad} años` : "—"}</dd></div>
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Género</dt><dd className="font-medium capitalize text-slate-800 dark:text-slate-200">{detalleIngreso.genero ?? "—"}</dd></div>
+                </dl>
+              </section>
+              <section>
+                <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Atención</h3>
+                <dl className="space-y-2.5 text-sm">
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Servicio</dt><dd className="max-w-[65%] text-right font-medium text-slate-800 dark:text-slate-200">{detalleIngreso.servicio}</dd></div>
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Origen</dt><dd><span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${detalleIngreso.ingresoDirectoServicio ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>{detalleIngreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span></dd></div>
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Registro</dt><dd className="text-right font-medium text-slate-800 dark:text-slate-200">{formatFecha(detalleIngreso.creadoEn)}</dd></div>
+                </dl>
+              </section>
+              <section className="border-t border-slate-100 pt-4 sm:col-span-2 dark:border-slate-800">
+                <p className="text-xs text-slate-500">Registrado por <span className="font-medium text-slate-700 dark:text-slate-300">{detalleIngreso.responsableIngresoNombre || "—"}</span></p>
+              </section>
+            </div>
+          </div>
         </div>
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
-            Control de Ingresos
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{ingresos.length} registro(s) de ayer y hoy</p>
+      )}
+
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/70 to-indigo-50/80 px-5 py-5 shadow-sm dark:border-blue-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/40 md:px-6">
+        <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full bg-indigo-200/35 blur-2xl dark:bg-indigo-500/10" />
+        <div className="absolute bottom-0 right-28 h-20 w-20 rounded-full bg-cyan-200/35 blur-xl dark:bg-cyan-500/10" />
+        <div className="relative flex items-center gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#4f5ee8] text-white shadow-lg shadow-blue-500/20">
+              <Ambulance size={25} strokeWidth={2.1} />
+            </div>
+            <div className="min-w-0">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Admisión ESDOMED</p>
+              <h1 className="font-heading text-xl font-bold leading-tight text-slate-900 dark:text-slate-100 md:text-2xl">Control de ingresos</h1>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Registra pacientes y consulta los ingresos recientes en tiempo real</p>
+            </div>
+          </div>
         </div>
       </div>
 
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.45fr)]">
       {/* Form card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-[#c9a892]/25 rounded-2xl shadow-sm dark:shadow-[0_22px_70px_rgba(0,0,0,0.22)] mb-6">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-5">
 
         {/* Card header */}
-        <div className="flex items-center gap-4 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-[#c9a892]/15">
+        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/60 px-5 py-4 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={documentAdd} width={21} /></div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-900 dark:text-slate-100 font-heading">
+            <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">
               {editingId ? "Editar ingreso" : "Nuevo ingreso"}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Responsable: {profile.nombre}</p>
           </div>
         </div>
 
-        <form onSubmit={registrar} className="p-5 space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form onSubmit={registrar} className="space-y-4 p-5">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">
                 Número de expediente <span className="text-red-500">*</span>
@@ -404,7 +468,7 @@ export default function ControlIngresosPage() {
             </div>
           </div>
 
-          <label className="flex items-start gap-2.5 cursor-pointer">
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition-colors hover:border-blue-200 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-800/70 dark:hover:border-blue-900 dark:hover:bg-blue-950/20">
             <input
               type="checkbox"
               checked={form.ingresoDirectoServicio}
@@ -416,19 +480,19 @@ export default function ControlIngresosPage() {
             </span>
           </label>
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button
               type="button"
               onClick={editingId ? cancelEdit : () => setForm(emptyForm())}
               disabled={guardando}
-              className="px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
             >
               {editingId ? "Cancelar" : "Limpiar"}
             </button>
             <button
               type="submit"
               disabled={guardando}
-              className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 dark:bg-[var(--color-institutional-navy)] dark:hover:bg-blue-800 dark:ring-1 dark:ring-[#c9a892]/35 rounded-lg disabled:opacity-50 transition-all active:scale-[0.99]"
+              className="flex-1 rounded-xl bg-[#4f5ee8] py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/25 transition-all hover:bg-[#5b6bf0] active:scale-[0.99] disabled:opacity-50"
             >
               {guardando ? (editingId ? "Actualizando..." : "Registrando...") : (editingId ? "Actualizar ingreso" : "Registrar ingreso")}
             </button>
@@ -437,56 +501,62 @@ export default function ControlIngresosPage() {
       </div>
 
       {/* Lista de registros */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-          {resultadosHistoricos !== null ? `Resultados históricos (${lista.length})` : `Registros (${lista.length})`}
-        </p>
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/60 px-4 py-3.5 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={calendar} width={18} /></div>
+            <div className="min-w-0 flex-1">
+              <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">{resultadosHistoricos !== null ? "Resultados históricos" : "Ingresos de ayer y hoy"}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{lista.length} registro(s) mostrados</p>
+            </div>
+          </div>
 
         {/* Barra de búsqueda y fechas */}
-        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 dark:bg-slate-900/80 rounded-xl border border-slate-200 dark:border-[#c9a892]/20">
+        <div className="flex flex-wrap gap-2">
           <div className="relative flex-1 min-w-[160px]">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Icon icon={magnifer} width={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Expediente o nombre..."
               value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-[#c9a892] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+              onChange={e => { setBusqueda(e.target.value); setPagina(1); }}
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500 shrink-0">Desde</span>
-            <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
+            <DateField value={fechaDesde} onChange={value => { setFechaDesde(value); setPagina(1); }} placeholder="Desde" ariaLabel="Fecha desde" clearable />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-            <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
+            <DateField value={fechaHasta} onChange={value => { setFechaHasta(value); setPagina(1); }} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
           </div>
           {(busqueda || fechaDesde || fechaHasta || resultadosHistoricos !== null) && (
             <button
               onClick={limpiarFiltros}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+              className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:hover:text-slate-100"
             >
-              <X size={12} /> Limpiar
+              <Icon icon={closeCircle} width={15} /> Limpiar
             </button>
           )}
+        </div>
         </div>
 
         {/* La vista en vivo solo cubre ayer y hoy; para fechas anteriores hay que pedirlo explícitamente */}
         {fueraDeRangoVivo && resultadosHistoricos === null && (
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
+          <div className="m-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400">
             <span>Ese rango incluye fechas anteriores a ayer, fuera de la vista en vivo.</span>
             <button
               onClick={buscarHistoricos}
               disabled={buscandoHistoricos}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50 transition-colors shrink-0"
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
             >
-              <Search size={12} /> {buscandoHistoricos ? "Buscando…" : "Buscar históricos"}
+              <Icon icon={magnifer} width={15} /> {buscandoHistoricos ? "Buscando…" : "Buscar históricos"}
             </button>
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="overflow-hidden">
           {lista.length === 0 && (
             <p className="text-sm text-slate-500 py-8 text-center">
               {resultadosHistoricos !== null
@@ -496,55 +566,55 @@ export default function ControlIngresosPage() {
                   : "Sin resultados para los filtros aplicados."}
             </p>
           )}
-          {lista.map(ingreso => (
-            <div
-              key={ingreso.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-[#c9a892]/20 rounded-xl px-4 py-3 flex items-start justify-between gap-3 hover:border-slate-300 dark:hover:border-[#c9a892]/40 transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm font-mono">
-                    Exp. {ingreso.expediente}
-                  </span>
-                  {ingreso.ingresoDirectoServicio ? (
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded">
-                      Directo
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded">
-                      Triage
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">
-                  {ingreso.apellidos}, {ingreso.nombres}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {ingreso.servicio}
-                  {ingreso.edad != null && ` · ${ingreso.edad} años`}
-                  {ingreso.genero && ` · ${ingreso.genero === "masculino" ? "Masculino" : "Femenino"}`}
-                </p>
-              </div>
-              <div className="flex flex-col items-end shrink-0 gap-2">
-                <div className="text-right">
-                  <p className="text-xs text-slate-500">{formatFecha(ingreso.creadoEn)}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{ingreso.responsableIngresoNombre}</p>
-                </div>
-                {profile?.role === "admin" && (
-                  <button
-                    onClick={() => handleEdit(ingreso)}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
-                    title="Editar registro"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                )}
+          {lista.length > 0 && (
+            <>
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="border-y border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
+                  <th className="w-[26%] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4">Expediente</th>
+                  <th className="w-[42%] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4">Paciente</th>
+                  <th className="w-[32%] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4">Atención</th>
+                  {profile?.role === "admin" && <th className="w-11 px-2 py-3" aria-label="Acciones" />}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {registrosPagina.map(ingreso => (
+                  <tr key={ingreso.id} onClick={() => setDetalleIngreso(ingreso)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetalleIngreso(ingreso); } }} tabIndex={0} role="button" aria-label={`Ver detalle del expediente ${ingreso.expediente}`} className="cursor-pointer transition-colors hover:bg-blue-50/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
+                    <td className="px-3 py-3 sm:px-4">
+                      <span className="inline-block max-w-full truncate rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">{ingreso.expediente}</span>
+                      <p className="mt-1 truncate text-[11px] text-slate-500" title={formatFecha(ingreso.creadoEn)}>{formatFecha(ingreso.creadoEn)}</p>
+                    </td>
+                    <td className="px-3 py-3 sm:px-4">
+                      <p className="truncate font-medium text-slate-900 dark:text-slate-100" title={`${ingreso.apellidos}, ${ingreso.nombres}`}>{ingreso.apellidos}, {ingreso.nombres}</p>
+                      <p className="mt-0.5 truncate text-xs text-slate-500">{ingreso.edad != null && `${ingreso.edad} años`}{ingreso.genero && ` · ${ingreso.genero === "masculino" ? "Masculino" : "Femenino"}`}</p>
+                    </td>
+                    <td className="px-3 py-3 sm:px-4">
+                      <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200" title={ingreso.servicio}>{ingreso.servicio}</p>
+                      <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${ingreso.ingresoDirectoServicio ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>{ingreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span>
+                    </td>
+                    {profile?.role === "admin" && (
+                      <td className="px-2 py-3 text-right">
+                        <button onClick={e => { e.stopPropagation(); handleEdit(ingreso); }} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30" title="Editar registro" aria-label="Editar registro"><Icon icon={pen} width={16} /></button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-3 dark:border-slate-800 sm:px-4">
+              <p className="text-xs text-slate-500">Mostrando {inicioPagina + 1}–{Math.min(inicioPagina + FILAS_POR_PAGINA, lista.length)} de {lista.length}</p>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={paginaActual === 1} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">Anterior</button>
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{paginaActual} / {totalPaginas}</span>
+                <button type="button" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900">Siguiente</button>
               </div>
             </div>
-          ))}
+            </>
+          )}
         </div>
       </div>
 
+      </div>
     </div>
   );
 }
