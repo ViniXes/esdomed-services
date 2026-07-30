@@ -2,41 +2,105 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { collection, onSnapshot, orderBy, query, limit, doc, updateDoc, Timestamp } from "@/lib/firestoreMeter";
+import {
+  collection, onSnapshot, orderBy, query, limit, doc, updateDoc, Timestamp,
+  where, getDocs, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData,
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClipboardList, Clock, CheckCircle2, Search, Printer } from "lucide-react";
+import { DateField } from "@/components/ui/DateField";
+import { ClipboardList, Clock, CheckCircle2, Search, Printer, X } from "lucide-react";
 import type { SolicitudAnexo5 } from "@/types";
 import { formatearFechaGeneracionAnexo5 } from "@/lib/anexo5";
 
 type Tab = "cola" | "historial";
 
+// El histórico (1200+ referencias emitidas y creciendo) se consulta bajo
+// demanda: en vivo solo queda la cola de pendientes, que es lo accionable.
+const LIMIT_HISTORICO = 500;
+
+const mapAnexo5 = (d: QueryDocumentSnapshot<DocumentData>): SolicitudAnexo5 => ({
+  id: d.id,
+  ...d.data(),
+  creadoEn: d.data().creadoEn?.toDate ? d.data().creadoEn.toDate() : new Date(d.data().creadoEn),
+}) as SolicitudAnexo5;
+
+const ms = (f: SolicitudAnexo5["creadoEn"]) => new Date(f as unknown as string).getTime();
+
 export default function BandejaAnexo5Page() {
   const { profile } = useAuth();
-  const [solicitudes, setSolicitudes] = useState<SolicitudAnexo5[]>([]);
+  const [cola, setCola] = useState<SolicitudAnexo5[]>([]);
   const [tab, setTab] = useState<Tab>("cola");
   const [busqueda, setBusqueda] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [seleccionado, setSeleccionado] = useState<SolicitudAnexo5 | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Historial: bajo demanda, exige expediente o rango de fechas.
+  const [expBusqueda, setExpBusqueda] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [resultados, setResultados] = useState<SolicitudAnexo5[] | null>(null); // null = aún no se busca
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+
+  // Solo la cola de pendientes en vivo (sin orderBy para no exigir índice
+  // compuesto estado + creadoEn; se ordena en cliente). Antes este listener
+  // bajaba las 400 referencias más recientes en cada apertura.
   useEffect(() => {
-    const q = query(collection(db, "anexo5"), orderBy("creadoEn", "desc"), limit(400));
-    return onSnapshot(q, (snap) => {
-      const lista = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-        creadoEn: d.data().creadoEn?.toDate ? d.data().creadoEn.toDate() : new Date(d.data().creadoEn),
-      })) as SolicitudAnexo5[];
-      setSolicitudes(lista);
-      setLoading(false);
-    });
+    const q = query(collection(db, "anexo5"), where("estado", "==", "pendiente"));
+    return onSnapshot(
+      q,
+      (snap) => {
+        setCola(snap.docs.map(mapAnexo5).sort((a, b) => ms(b.creadoEn) - ms(a.creadoEn)));
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
   }, []);
 
-  const cola = solicitudes.filter((s) => s.estado === "pendiente");
-  const historial = solicitudes.filter((s) => s.estado === "emitido");
+  const sinCriterio = !expBusqueda.trim() && !fechaDesde && !fechaHasta;
 
-  const listToDisplay = (tab === "cola" ? cola : historial).filter(s => {
+  // Búsqueda del historial: una sola lectura puntual, no un listener.
+  const buscar = async () => {
+    const exp = expBusqueda.trim();
+    if (sinCriterio) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: SolicitudAnexo5[];
+      if (exp) {
+        // Por expediente exacto: todas las referencias de ese paciente. Sin
+        // orderBy para no exigir índice compuesto; el rango se afina en cliente.
+        const snap = await getDocs(query(collection(db, "anexo5"), where("expediente", "==", exp)));
+        docs = snap.docs.map(mapAnexo5);
+        if (fechaDesde) docs = docs.filter(s => ms(s.creadoEn) >= new Date(fechaDesde + "T00:00:00").getTime());
+        if (fechaHasta) docs = docs.filter(s => ms(s.creadoEn) <= new Date(fechaHasta + "T23:59:59").getTime());
+      } else {
+        // Por rango de fecha de generación (mismo campo en where/orderBy).
+        const constraints: QueryConstraint[] = [];
+        if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+        if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+        constraints.push(orderBy("creadoEn", "desc"), limit(LIMIT_HISTORICO));
+        const snap = await getDocs(query(collection(db, "anexo5"), ...constraints));
+        docs = snap.docs.map(mapAnexo5);
+      }
+      setResultados(docs.sort((a, b) => ms(b.creadoEn) - ms(a.creadoEn)));
+    } catch (e) {
+      setErrorBusqueda(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const limpiarBusqueda = () => {
+    setExpBusqueda(""); setFechaDesde(""); setFechaHasta("");
+    setResultados(null); setErrorBusqueda("");
+  };
+
+  const listToDisplay = (tab === "cola" ? cola : (resultados ?? [])).filter(s => {
     const term = busqueda.toLowerCase();
+    if (!term) return true;
     return (
       s.nombrePaciente.toLowerCase().includes(term) ||
       formatearFechaGeneracionAnexo5(s.creadoEn).toLowerCase().includes(term) ||
@@ -44,11 +108,11 @@ export default function BandejaAnexo5Page() {
     );
   });
 
-  const selectedItem = solicitudes.find((s) => s.id === selectedId) || null;
+  const selectedItem = seleccionado;
 
   const emitirEImprimir = async () => {
     if (!selectedItem?.id || !profile) return;
-    
+
     // Si ya está emitido, solo imprimir
     if (selectedItem.estado === "emitido") {
       window.open(`/dashboard/anexo5/${selectedItem.id}/imprimir`, "_blank");
@@ -62,6 +126,11 @@ export default function BandejaAnexo5Page() {
       emitidoPorNombre: profile.nombre,
       emitidoEn: Timestamp.now(),
     });
+
+    // Al emitirla sale de la cola en vivo: se conserva la selección en local
+    // para que la previsualización siga en pantalla (con "Reimprimir").
+    setSeleccionado({ ...selectedItem, estado: "emitido", emitidoPorNombre: profile.nombre });
+    setResultados(prev => prev?.map(s => s.id === selectedItem.id ? { ...s, estado: "emitido" } : s) ?? prev);
 
     // Abrir impresión
     window.open(`/dashboard/anexo5/${selectedItem.id}/imprimir`, "_blank");
@@ -83,7 +152,7 @@ export default function BandejaAnexo5Page() {
         {/* Tabs */}
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
           <button
-            onClick={() => { setTab("cola"); setSelectedId(null); }}
+            onClick={() => { setTab("cola"); setSeleccionado(null); setBusqueda(""); }}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
               tab === "cola" ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
@@ -97,7 +166,7 @@ export default function BandejaAnexo5Page() {
             )}
           </button>
           <button
-            onClick={() => { setTab("historial"); setSelectedId(null); }}
+            onClick={() => { setTab("historial"); setSeleccionado(null); setBusqueda(""); }}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
               tab === "historial" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             }`}
@@ -114,26 +183,78 @@ export default function BandejaAnexo5Page() {
         <div className="w-full md:w-[400px] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm shrink-0">
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-3 shrink-0">
             <h2 className="font-semibold text-slate-800 dark:text-slate-200">
-              Referencias registradas
+              {tab === "cola" ? "Pendientes de emitir" : "Historial de referencias"}
             </h2>
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Buscar por paciente, expediente o fecha..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100"
-              />
-            </div>
-            <p className="text-xs text-slate-500">Haz clic en una fila para ver el comprobante e imprimir.</p>
+
+            {tab === "cola" ? (
+              <>
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Filtrar por paciente, expediente o fecha..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">Haz clic en una fila para ver el comprobante e imprimir. Las ya emitidas están en Historial.</p>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Expediente exacto…"
+                    value={expBusqueda}
+                    onChange={(e) => setExpBusqueda(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscar(); } }}
+                    className="w-full pl-9 pr-3 py-2 text-sm font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Fecha desde" />
+                  <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Fecha hasta" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={buscar}
+                    disabled={buscando || sinCriterio}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Search size={14} /> {buscando ? "Buscando…" : "Buscar"}
+                  </button>
+                  {(expBusqueda || fechaDesde || fechaHasta || resultados !== null) && (
+                    <button
+                      onClick={limpiarBusqueda}
+                      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100"
+                    >
+                      <X size={12} /> Limpiar
+                    </button>
+                  )}
+                </div>
+                {errorBusqueda ? (
+                  <p className="text-xs text-red-600 dark:text-red-400">{errorBusqueda}</p>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Se consulta bajo demanda: indica un expediente o un rango de fechas.
+                    {resultados !== null && ` · ${resultados.length} resultado(s)`}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {loading ? (
+            {(tab === "cola" && loading) || buscando ? (
               <p className="p-5 text-sm text-center text-slate-500">Cargando...</p>
             ) : listToDisplay.length === 0 ? (
-              <p className="p-5 text-sm text-center text-slate-500">No hay referencias en esta vista.</p>
+              <p className="p-5 text-sm text-center text-slate-500">
+                {tab === "cola"
+                  ? (cola.length === 0 ? "No hay referencias pendientes de emitir." : "Sin coincidencias para el filtro.")
+                  : (resultados === null ? "Indica un expediente o un rango de fechas y pulsa Buscar." : "Sin resultados para esa búsqueda.")}
+              </p>
             ) : (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
@@ -146,9 +267,9 @@ export default function BandejaAnexo5Page() {
                   {listToDisplay.map((s) => (
                     <tr
                       key={s.id}
-                      onClick={() => setSelectedId(s.id || null)}
+                      onClick={() => setSeleccionado(s)}
                       className={`cursor-pointer transition-colors ${
-                        selectedId === s.id
+                        seleccionado?.id === s.id
                           ? "bg-blue-50 dark:bg-blue-900/20"
                           : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                       }`}
