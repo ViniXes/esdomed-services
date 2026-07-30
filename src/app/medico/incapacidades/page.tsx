@@ -3,18 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  collection, query, where, onSnapshot, deleteDoc, doc,
-  getDocs, orderBy, limit, type QueryDocumentSnapshot, type DocumentData,
+  collection, query, where, onSnapshot, deleteDoc, doc, Timestamp,
+  getDocs, orderBy, limit, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2, Search, ChevronLeft, ChevronRight, X, User, Users } from "lucide-react";
+import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2, Search, ChevronLeft, ChevronRight, X, User, Users, History, RefreshCw } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 
 type FiltroEstado = EstadoIncapacidad | "todos";
-type Vista = "mias" | "todas";
+type Vista = "mias" | "todas" | "historico";
 
 const FILTROS_ESTADO: { value: FiltroEstado; label: string }[] = [
   { value: "todos",     label: "Todas" },
@@ -22,8 +22,11 @@ const FILTROS_ESTADO: { value: FiltroEstado; label: string }[] = [
   { value: "emitida",   label: "Emitidas" },
 ];
 
-// Tope de la vista pública (lectura puntual de todas las incapacidades).
-const LIMIT_PUBLICO = 400;
+// Topes de seguridad. La vista pública ya viene acotada por fecha (ayer y hoy);
+// el histórico es bajo demanda y siempre exige expediente o rango.
+const LIMIT_VENTANA = 200;
+const LIMIT_HISTORICO = 500;
+const LIMIT_HISTORICO_EXP = 200;
 
 const mapIncapacidad = (d: QueryDocumentSnapshot<DocumentData>): SolicitudIncapacidad => {
   const data = d.data();
@@ -38,6 +41,37 @@ const mapIncapacidad = (d: QueryDocumentSnapshot<DocumentData>): SolicitudIncapa
   } as SolicitudIncapacidad;
 };
 
+const porFecha = (a: SolicitudIncapacidad, b: SolicitudIncapacidad) =>
+  b.creadoEn.getTime() - a.creadoEn.getTime();
+
+const inicioDeAyer = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+// Caché de módulo de la vista pública: sobrevive a la navegación SPA para no
+// releer la ventana cada vez que se alterna de pestaña.
+let cacheTodas: { docs: SolicitudIncapacidad[]; en: Date } | null = null;
+
+// Ventana pública: solo ayer y hoy. `where` y `orderBy` sobre el mismo campo
+// → no exige índice compuesto.
+async function leerVentanaAyerHoy() {
+  const snap = await getDocs(query(
+    collection(db, "incapacidades"),
+    where("creadoEn", ">=", Timestamp.fromDate(inicioDeAyer())),
+    orderBy("creadoEn", "desc"),
+    limit(LIMIT_VENTANA),
+  ));
+  cacheTodas = { docs: snap.docs.map(mapIncapacidad), en: new Date() };
+  return cacheTodas;
+}
+
+const quitarDeCacheTodas = (id: string) => {
+  if (cacheTodas) cacheTodas = { ...cacheTodas, docs: cacheTodas.docs.filter((s) => s.id !== id) };
+};
+
 export default function MedicoIncapacidadesPage() {
   const { user } = useAuth();
   const [vista, setVista] = useState<Vista>("mias");
@@ -50,6 +84,16 @@ export default function MedicoIncapacidadesPage() {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [pagina, setPagina] = useState(1);
+  const [actualizadoEn, setActualizadoEn] = useState<Date | null>(null);
+  const [refrescando, setRefrescando] = useState(false);
+
+  // Histórico: bajo demanda, exige expediente o rango de fechas.
+  const [expHistorico, setExpHistorico] = useState("");
+  const [histDesde, setHistDesde] = useState("");
+  const [histHasta, setHistHasta] = useState("");
+  const [resultados, setResultados] = useState<SolicitudIncapacidad[] | null>(null); // null = aún no se busca
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
 
   const PAGE_SIZE = 5;
 
@@ -57,7 +101,11 @@ export default function MedicoIncapacidadesPage() {
     setEliminandoId(id);
     try {
       await deleteDoc(doc(db, "incapacidades", id));
-      // onSnapshot refresca la lista automáticamente.
+      // "Mías" se refresca sola por el listener; las otras vistas son lecturas
+      // puntuales, así que se quita también de lo mostrado y de la caché.
+      setSolicitudes((prev) => prev.filter((s) => s.id !== id));
+      setResultados((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+      quitarDeCacheTodas(id);
     } catch (e) {
       alert(`No se pudo eliminar: ${e instanceof Error ? e.message : "error"}`);
     } finally {
@@ -68,11 +116,11 @@ export default function MedicoIncapacidadesPage() {
 
   useEffect(() => {
     if (!user) return;
-    const porFecha = (a: SolicitudIncapacidad, b: SolicitudIncapacidad) =>
-      b.creadoEn.getTime() - a.creadoEn.getTime();
+    // El histórico no lee nada al entrar: espera criterio + botón Buscar.
+    if (vista === "historico") return;
 
     if (vista === "mias") {
-      // Vista personal: en vivo, solo las del médico.
+      // Vista personal: en vivo, solo las del médico (acotada por medicoId).
       const q = query(collection(db, "incapacidades"), where("medicoId", "==", user.uid));
       return onSnapshot(q, (s) => {
         setSolicitudes(s.docs.map(mapIncapacidad).sort(porFecha));
@@ -80,13 +128,14 @@ export default function MedicoIncapacidadesPage() {
       });
     }
 
-    // Vista pública: lectura puntual de todas (no abre un listener global por médico).
+    // Vista pública: solo ayer y hoy, lectura puntual (no abre un listener
+    // global por médico) y servida de la caché si ya se leyó en esta sesión.
     let activo = true;
-    const q = query(collection(db, "incapacidades"), orderBy("creadoEn", "desc"), limit(LIMIT_PUBLICO));
-    getDocs(q)
-      .then((s) => {
+    (cacheTodas ? Promise.resolve(cacheTodas) : leerVentanaAyerHoy())
+      .then(({ docs, en }) => {
         if (!activo) return;
-        setSolicitudes(s.docs.map(mapIncapacidad).sort(porFecha));
+        setSolicitudes(docs);
+        setActualizadoEn(en);
         setLoading(false);
       })
       .catch((e) => {
@@ -98,14 +147,79 @@ export default function MedicoIncapacidadesPage() {
     return () => { activo = false; };
   }, [user, vista]);
 
-  const pendientes = solicitudes.filter((s) => s.estado === "pendiente").length;
+  const actualizarTodas = async () => {
+    setRefrescando(true);
+    try {
+      const { docs, en } = await leerVentanaAyerHoy();
+      setSolicitudes(docs);
+      setActualizadoEn(en);
+    } catch (e) {
+      console.error("Error al actualizar incapacidades (vista pública):", e);
+    } finally {
+      setRefrescando(false);
+    }
+  };
+
+  const sinCriterio = !expHistorico.trim() && !histDesde && !histHasta;
+
+  // Búsqueda histórica: una sola lectura puntual, nunca un listener.
+  const buscarHistorico = async () => {
+    const exp = expHistorico.trim();
+    if (sinCriterio) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: SolicitudIncapacidad[];
+      if (exp) {
+        // Por expediente exacto: sin orderBy para no exigir índice compuesto;
+        // el rango, si lo hay, se afina en cliente.
+        const snap = await getDocs(query(
+          collection(db, "incapacidades"),
+          where("pacienteExpediente", "==", exp),
+          limit(LIMIT_HISTORICO_EXP),
+        ));
+        docs = snap.docs.map(mapIncapacidad);
+        if (histDesde) docs = docs.filter((s) => s.creadoEn >= new Date(histDesde + "T00:00:00"));
+        if (histHasta) docs = docs.filter((s) => s.creadoEn <= new Date(histHasta + "T23:59:59"));
+      } else {
+        // Por rango de fecha de solicitud (mismo campo en where/orderBy).
+        const constraints: QueryConstraint[] = [];
+        if (histDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(histDesde + "T00:00:00"))));
+        if (histHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(histHasta + "T23:59:59"))));
+        constraints.push(orderBy("creadoEn", "desc"), limit(LIMIT_HISTORICO));
+        const snap = await getDocs(query(collection(db, "incapacidades"), ...constraints));
+        docs = snap.docs.map(mapIncapacidad);
+      }
+      setResultados(docs.sort(porFecha));
+      setPagina(1);
+    } catch (e) {
+      setErrorBusqueda(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const limpiarHistorico = () => {
+    setExpHistorico(""); setHistDesde(""); setHistHasta("");
+    setResultados(null); setErrorBusqueda(""); setPagina(1);
+  };
+
+  // Lo que se muestra: la ventana en vivo/puntual o los resultados del histórico.
+  const base = useMemo(
+    () => (vista === "historico" ? (resultados ?? []) : solicitudes),
+    [vista, resultados, solicitudes],
+  );
+
+  const pendientes = base.filter((s) => s.estado === "pendiente").length;
+  const emitidas = base.filter((s) => s.estado === "emitida").length;
 
   const filtradas = useMemo(() => {
     const t = busqueda.trim().toLowerCase();
     // Rango por Fecha de alta, en hora local para no correr el día (UTC-6).
     const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
     const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
-    return solicitudes.filter((s) => {
+    return base.filter((s) => {
       if (filtroEstado !== "todos" && s.estado !== filtroEstado) return false;
       if (desde && s.fechaAlta < desde) return false;
       if (hasta && s.fechaAlta > hasta) return false;
@@ -116,7 +230,7 @@ export default function MedicoIncapacidadesPage() {
       )) return false;
       return true;
     });
-  }, [solicitudes, busqueda, filtroEstado, fechaDesde, fechaHasta]);
+  }, [base, busqueda, filtroEstado, fechaDesde, fechaHasta]);
 
   const hayFiltros = busqueda !== "" || filtroEstado !== "todos" || fechaDesde !== "" || fechaHasta !== "";
 
@@ -125,34 +239,40 @@ export default function MedicoIncapacidadesPage() {
   const visibles = filtradas.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-amber-50 dark:bg-amber-950 rounded-xl flex items-center justify-center border border-amber-200 dark:border-amber-900">
-            <FileText size={17} className="text-amber-600 dark:text-amber-400" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
-            Incapacidades
-          </h1>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#243b6b] via-indigo-700 to-blue-700 px-5 py-5 shadow-lg shadow-indigo-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20"><FileText size={24} /></span><div><h1 className="text-xl font-bold text-white md:text-2xl font-heading">Gestión de incapacidades</h1><p className="mt-1 text-sm text-indigo-50/90">Solicite, consulte y dé seguimiento a los certificados de incapacidad.</p></div></div>
+          <Link prefetch={false} href="/medico/incapacidades/nueva" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm transition-colors hover:bg-indigo-50"><Plus size={16} /> Nueva incapacidad</Link>
         </div>
-        <Link prefetch={false}
-          href="/medico/incapacidades/nueva"
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <Plus size={15} /> Nueva solicitud
-        </Link>
+      </section>
+
+      {/* Resumen del alcance mostrado (personal, ayer y hoy, o búsqueda) */}
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white"><FileText size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{base.length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">{vista === "mias" ? "Solicitadas" : vista === "todas" ? "Ayer y hoy" : "Resultados"}</p></div></div>
+        <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-white"><Clock size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{pendientes}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Pendientes</p></div></div>
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white"><CheckCircle2 size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{emitidas}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Emitidas</p></div></div>
       </div>
 
-      {/* Toggle vista: personal vs pública */}
       <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
         {([
-          { value: "mias",  label: "Mías",   icon: User },
-          { value: "todas", label: "Todas",  icon: Users },
+          { value: "mias",      label: "Mías",           icon: User },
+          { value: "todas",     label: "Ayer y hoy",     icon: Users },
+          { value: "historico", label: "Histórico",      icon: History },
         ] as { value: Vista; label: string; icon: typeof User }[]).map((v) => (
           <button
             key={v.value}
-            onClick={() => { if (v.value !== vista) setLoading(true); setVista(v.value); setPagina(1); }}
+            onClick={() => {
+              if (v.value === vista) return;
+              setLoading(v.value !== "historico");
+              setVista(v.value);
+              setPagina(1);
+              // El histórico filtra fechas en el servidor: el rango de alta
+              // (filtro en cliente) se limpia para no ocultar resultados.
+              if (v.value === "historico") { setFechaDesde(""); setFechaHasta(""); }
+            }}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               vista === v.value
                 ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
@@ -172,7 +292,80 @@ export default function MedicoIncapacidadesPage() {
         </div>
       )}
 
-      {!loading && solicitudes.length > 0 && (
+      {/* Alcance de la vista pública: solo ayer y hoy, con refresco manual */}
+      {vista === "todas" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <p className="text-xs text-slate-500">
+            Mostrando las incapacidades solicitadas <span className="font-medium text-slate-600 dark:text-slate-300">ayer y hoy</span>.
+            Para fechas anteriores use la pestaña Histórico.
+            {actualizadoEn && ` · Actualizado ${actualizadoEn.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false })}`}
+          </p>
+          <button
+            onClick={actualizarTodas}
+            disabled={refrescando}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <RefreshCw size={12} className={refrescando ? "animate-spin" : ""} />
+            {refrescando ? "Actualizando…" : "Actualizar"}
+          </button>
+        </div>
+      )}
+
+      {/* Histórico: no lee nada hasta que se da expediente o rango de fechas */}
+      {vista === "historico" && (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-start gap-2">
+            <History size={14} className="mt-0.5 flex-shrink-0 text-slate-400" />
+            <p className="text-xs text-slate-500">
+              Busque por expediente (trae todas las de ese paciente) o por rango de fecha de solicitud.
+              La consulta se hace bajo demanda para no releer toda la colección.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={expHistorico}
+                onChange={(e) => setExpHistorico(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarHistorico(); } }}
+                placeholder="Expediente exacto (ej. 123-25)…"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Solicitud desde</span>
+              <DateField value={histDesde} onChange={setHistDesde} clearable placeholder="Desde" ariaLabel="Solicitud desde" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+              <DateField value={histHasta} onChange={setHistHasta} clearable placeholder="Hasta" ariaLabel="Solicitud hasta" />
+            </div>
+            <button
+              onClick={buscarHistorico}
+              disabled={buscando || sinCriterio}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
+            </button>
+            {(expHistorico || histDesde || histHasta || resultados !== null) && (
+              <button
+                onClick={limpiarHistorico}
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100"
+              >
+                <X size={12} /> Limpiar
+              </button>
+            )}
+          </div>
+          {errorBusqueda && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+              {errorBusqueda}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && base.length > 0 && (
         <>
           {/* Filtros por estado */}
           <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -203,26 +396,31 @@ export default function MedicoIncapacidadesPage() {
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500 shrink-0">Alta desde</span>
-              <DateField
-                value={fechaDesde}
-                onChange={(v) => { setFechaDesde(v); setPagina(1); }}
-                clearable
-                placeholder="Alta desde"
-                ariaLabel="Alta desde"
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-              <DateField
-                value={fechaHasta}
-                onChange={(v) => { setFechaHasta(v); setPagina(1); }}
-                clearable
-                placeholder="Hasta"
-                ariaLabel="Fecha hasta"
-              />
-            </div>
+            {/* El histórico ya filtra por fecha en el servidor: aquí solo texto y estado */}
+            {vista !== "historico" && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500 shrink-0">Alta desde</span>
+                  <DateField
+                    value={fechaDesde}
+                    onChange={(v) => { setFechaDesde(v); setPagina(1); }}
+                    clearable
+                    placeholder="Alta desde"
+                    ariaLabel="Alta desde"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+                  <DateField
+                    value={fechaHasta}
+                    onChange={(v) => { setFechaHasta(v); setPagina(1); }}
+                    clearable
+                    placeholder="Hasta"
+                    ariaLabel="Fecha hasta"
+                  />
+                </div>
+              </>
+            )}
             {hayFiltros && (
               <button
                 onClick={() => { setBusqueda(""); setFiltroEstado("todos"); setFechaDesde(""); setFechaHasta(""); setPagina(1); }}
@@ -235,15 +433,26 @@ export default function MedicoIncapacidadesPage() {
         </>
       )}
 
-      {loading ? (
+      {loading || buscando ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : solicitudes.length === 0 ? (
+      ) : vista === "historico" && resultados === null ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
+          <History size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
+          <p className="text-sm text-slate-500">
+            Indique un expediente o un rango de fechas y pulse Buscar.
+          </p>
+        </div>
+      ) : base.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
           <FileText size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
           <p className="text-sm text-slate-500">
-            {vista === "mias" ? "No has solicitado incapacidades." : "No hay incapacidades registradas."}
+            {vista === "mias"
+              ? "No has solicitado incapacidades."
+              : vista === "todas"
+                ? "No hay incapacidades solicitadas ayer ni hoy."
+                : "Sin resultados para esa búsqueda."}
           </p>
           {vista === "mias" && (
             <Link prefetch={false}
@@ -260,16 +469,17 @@ export default function MedicoIncapacidadesPage() {
           <p className="text-sm text-slate-500">Sin coincidencias para los filtros aplicados.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {visibles.map((s) => {
           const esMia = s.medicoId === user?.uid;
           return (
-            <div
+            <article
               key={s.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-amber-300 dark:hover:border-amber-900 transition-all shadow-sm"
+              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.03] transition-all hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-950/5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800"
             >
+              <span className={`absolute bottom-0 left-0 top-0 w-1 ${s.estado === "emitida" ? "bg-emerald-500" : "bg-amber-400"}`} />
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pl-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <p className="font-semibold text-slate-900 dark:text-slate-100 text-[15px]">
                       {s.pacienteNombre}
@@ -291,7 +501,7 @@ export default function MedicoIncapacidadesPage() {
                     {" · "}
                     Alta {formatFecha(s.fechaAlta)}
                   </p>
-                  {vista === "todas" && (
+                  {vista !== "mias" && (
                     <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 flex-wrap">
                       <User size={11} className="text-slate-400" />
                       {s.medicoNombre}
@@ -345,7 +555,7 @@ export default function MedicoIncapacidadesPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </article>
           );
           })}
 

@@ -9,7 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  ArrowLeft, Search, AlertTriangle, Save, CheckCircle2, User2, Pencil, Ambulance, BedDouble,
+  ArrowLeft, ArrowRight, Search, AlertTriangle, Send, CheckCircle2, User2, Pencil, Ambulance, BedDouble, FileText,
 } from "lucide-react";
 import type { Paciente, SolicitudIncapacidad, AtencionEmergencia } from "@/types";
 import {
@@ -32,6 +32,7 @@ export default function NuevaIncapacidadPage() {
   const [fuente, setFuente] = useState<"hospitalizacion" | "emergencia">("hospitalizacion");
   const [expedienteBusqueda, setExpedienteBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
+  const [etapa, setEtapa] = useState(1);
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [atencion, setAtencion] = useState<AtencionEmergencia | null>(null);
   const [atencionResultados, setAtencionResultados] = useState<AtencionEmergencia[]>([]);
@@ -223,7 +224,7 @@ export default function NuevaIncapacidadPage() {
         doc.medicoServicio = profile.servicio ?? (profile.servicios?.[0] ?? "Emergencia");
         doc.diasIncapacidad = diasNum;
         doc.fechaDesde = Timestamp.fromDate(fAlta);
-        doc.fechaHasta = Timestamp.fromDate(calcularFechaHasta(fAlta, diasNum - 1));
+        doc.fechaHasta = Timestamp.fromDate(calcularFechaHasta(fAlta, diasNum));
         if (atencion.dui)    doc.pacienteDui = atencion.dui;
         if (atencion.genero) doc.pacienteGenero = atencion.genero;
       } else if (paciente) {
@@ -252,26 +253,44 @@ export default function NuevaIncapacidadPage() {
     }
   };
 
+  const puedeVerPrevia = () => {
+    const dias = parseInt(form.diasExtras, 10);
+    return !!form.fechaAlta
+      && !isNaN(dias)
+      && (esEmergencia ? dias >= 1 : dias >= 0)
+      && !!form.diagnosticoEgreso.trim()
+      && !!form.tratamientoAlta.trim();
+  };
+
+  const fechaAltaPrevia = form.fechaAlta ? parseDateInput(form.fechaAlta) : null;
+  const diasPosterioresPrevia = parseInt(form.diasExtras, 10);
+  const diasHospitalizacionPrevia = paciente && fechaAltaPrevia
+    ? calcularDiasHospitalizacion(paciente.fechaIngreso, fechaAltaPrevia)
+    : null;
+  const totalPeriodoPrevia = esEmergencia
+    ? (isNaN(diasPosterioresPrevia) ? null : diasPosterioresPrevia)
+    : (diasHospitalizacionPrevia === null || isNaN(diasPosterioresPrevia) ? null : diasHospitalizacionPrevia + diasPosterioresPrevia);
+
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link prefetch={false}
-          href="/medico/incapacidades"
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
-          aria-label="Volver"
-        >
-          <ArrowLeft size={16} />
-        </Link>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
-          Nueva incapacidad
-        </h1>
-      </div>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#243b6b] via-indigo-700 to-blue-700 px-5 py-5 shadow-lg shadow-indigo-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20"><FileText size={24} /></span><div><h1 className="text-xl font-bold text-white md:text-2xl font-heading">Nueva incapacidad</h1><p className="mt-1 text-sm text-indigo-50/90">Identifique al paciente y complete los datos para enviar la solicitud.</p></div></div>
+          <Link prefetch={false} href="/medico/incapacidades" className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/25 transition-colors hover:bg-white/20"><ArrowLeft size={16} /> Volver</Link>
+        </div>
+        <div className="relative mt-5 grid grid-cols-3 gap-2 sm:max-w-lg">
+          {[{ n: 1, l: "Paciente" }, { n: 2, l: "Datos" }, { n: 3, l: "Vista previa" }].map(({ n, l }) => (
+            <span key={n} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ${n === etapa ? "bg-white/20 text-white ring-1 ring-white/25" : n < etapa ? "bg-white/15 text-white" : "bg-white/10 text-indigo-100"}`}><span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${n < etapa ? "bg-emerald-400 text-emerald-950" : n === etapa ? "bg-white text-indigo-800" : "bg-white/15 text-white"}`}>{n < etapa ? <CheckCircle2 size={12} /> : n}</span><span className="hidden sm:inline">{l}</span></span>
+          ))}
+        </div>
+      </section>
 
       {/* Paso 1: Buscar paciente */}
-      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5">
+      {etapa === 1 && (
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3 font-heading">
-          <User2 size={15} className="text-slate-400" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"><User2 size={15} /></span>
           1. Paciente
         </h3>
 
@@ -314,7 +333,7 @@ export default function NuevaIncapacidadPage() {
           <button
             onClick={buscarPaciente}
             disabled={buscando || !expedienteBusqueda.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors flex-shrink-0"
+            className="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
           >
             <Search size={14} />
             {buscando ? "Buscando..." : "Buscar"}
@@ -329,8 +348,9 @@ export default function NuevaIncapacidadPage() {
         )}
 
         {paciente && (
-          <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 rounded-xl px-4 py-3 mt-3">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400 mb-2">
+          <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-blue-50/70 to-white px-4 py-3 mt-3 dark:border-indigo-800 dark:from-indigo-950/35 dark:via-blue-950/20 dark:to-slate-900">
+            <span className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-indigo-500 to-blue-600" />
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-2">
               <CheckCircle2 size={13} /> Paciente encontrado
             </p>
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -398,6 +418,13 @@ export default function NuevaIncapacidadPage() {
           </div>
         )}
       </section>
+      )}
+
+      {etapa === 1 && (paciente || atencion) && (
+        <button type="button" onClick={() => setEtapa(2)} className="ml-auto flex items-center gap-2 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-700/20 transition-colors hover:bg-indigo-600">
+          Continuar con los datos <ArrowRight size={15} />
+        </button>
+      )}
 
       {/* Advertencia de duplicado: ya hay solicitud(es) de hoy para este paciente */}
       {paciente && duplicadosHoy.length > 0 && (
@@ -435,7 +462,7 @@ export default function NuevaIncapacidadPage() {
       )}
 
       {/* Paso 2: Datos de incapacidad */}
-      {(paciente || atencion) && (
+      {etapa === 2 && (paciente || atencion) && (
         <IncapacidadFormFields
           value={form}
           onChange={setForm}
@@ -444,9 +471,28 @@ export default function NuevaIncapacidadPage() {
         />
       )}
 
+      {etapa === 3 && (paciente || atencion) && (
+        <section className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-blue-50/70 to-white p-5 shadow-sm shadow-indigo-950/5 dark:border-indigo-900/60 dark:from-indigo-950/30 dark:via-blue-950/20 dark:to-slate-900">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700 dark:text-indigo-300">Paso 3 · Vista previa</p>
+          <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Confirma la información antes de enviar</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/70 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Paciente</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{paciente ? nombreCompleto(paciente) : atencion?.pacienteNombre}</p><p className="mt-1 text-xs text-slate-500">Exp. {paciente?.expediente ?? atencion?.expediente} · {paciente?.servicioActual ?? "Emergencia"}</p></div>
+            <div className="rounded-xl border border-white/70 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Datos de egreso</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Alta: {fechaAltaPrevia ? formatFecha(fechaAltaPrevia) : "—"}</p><p className="mt-1 text-xs text-slate-500">Condición de egreso: {form.condicionEgreso === "vivo" ? "Vivo" : "Muerto"}</p></div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <div className="rounded-xl border border-indigo-100 bg-white/70 p-3 dark:border-indigo-900/50 dark:bg-slate-900/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fecha de ingreso</p><p className="mt-1 text-sm font-semibold text-slate-800 dark:text-white">{paciente ? formatFecha(paciente.fechaIngreso) : atencion ? formatFecha(atencion.fechaHoraIngreso) : "—"}</p></div>
+            <div className="rounded-xl border border-indigo-100 bg-white/70 p-3 dark:border-indigo-900/50 dark:bg-slate-900/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fecha de alta</p><p className="mt-1 text-sm font-semibold text-slate-800 dark:text-white">{fechaAltaPrevia ? formatFecha(fechaAltaPrevia) : "—"}</p></div>
+            <div className="rounded-xl border border-indigo-100 bg-white/70 p-3 dark:border-indigo-900/50 dark:bg-slate-900/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Días posteriores</p><p className="mt-1 text-sm font-semibold text-slate-800 dark:text-white">{isNaN(diasPosterioresPrevia) ? "—" : `${diasPosterioresPrevia} días`}</p><p className="mt-0.5 text-[11px] text-slate-500">{esEmergencia ? "Días prescritos" : "Posteriores al alta"}</p></div>
+            <div className="rounded-xl border border-indigo-200 bg-indigo-100/70 p-3 dark:border-indigo-800 dark:bg-indigo-950/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Total del período</p><p className="mt-1 text-lg font-bold text-indigo-900 dark:text-indigo-100">{totalPeriodoPrevia === null ? "—" : `${totalPeriodoPrevia} días`}</p><p className="mt-0.5 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">{esEmergencia ? "Incapacidad indicada" : `${diasHospitalizacionPrevia ?? 0} hosp. + ${isNaN(diasPosterioresPrevia) ? 0 : diasPosterioresPrevia} post-alta`}</p></div>
+          </div>
+          <div className="mt-3 rounded-xl border border-indigo-100 bg-white/70 p-3 text-sm dark:border-indigo-900/50 dark:bg-slate-900/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Diagnóstico de egreso</p><p className="mt-1 text-slate-700 dark:text-slate-200">{form.diagnosticoEgreso}</p><p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Tratamiento al alta</p><p className="mt-1 text-slate-700 dark:text-slate-200">{form.tratamientoAlta}</p></div>
+        </section>
+      )}
+
       {/* Footer */}
-      {(paciente || atencion) && (
+      {etapa >= 2 && (paciente || atencion) && (
         <div>
+          {etapa === 3 && <button type="button" onClick={() => { setConfirmandoDuplicado(false); setEtapa(2); }} className="mb-3 text-sm font-medium text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-indigo-100">← Editar datos de la incapacidad</button>}
           {error && (
             <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400 mb-3">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
@@ -471,19 +517,19 @@ export default function NuevaIncapacidadPage() {
                   disabled={guardando}
                   className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors"
                 >
-                  <Save size={15} />
+                  <Send size={15} />
                   {guardando ? "Enviando..." : "Sí, crear otra"}
                 </button>
               </div>
             </div>
           ) : (
             <button
-              onClick={guardar}
+              onClick={() => etapa === 2 ? (puedeVerPrevia() ? (setError(null), setEtapa(3)) : setError("Completa los campos obligatorios antes de continuar.")) : guardar()}
               disabled={guardando}
-              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-xl disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold text-white bg-indigo-700 hover:bg-indigo-600 rounded-xl disabled:opacity-50 transition-colors"
             >
-              <Save size={15} />
-              {guardando ? "Enviando..." : "Enviar solicitud a ESDOMED"}
+              {etapa === 2 ? <ArrowRight size={15} /> : <Send size={15} />}
+              {etapa === 2 ? "Ver vista previa" : guardando ? "Enviando..." : "Enviar solicitud a ESDOMED"}
             </button>
           )}
         </div>
