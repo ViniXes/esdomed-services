@@ -88,8 +88,8 @@ export default function ReportesSimmowPage() {
         Reportes de errores — Herramienta SIMMOW
       </h1>
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-        Reportes técnicos enviados por el personal — no son reclamos formales. Marque cada uno como confirmado o
-        no es error para cerrar el ciclo que exigen los términos de uso de la herramienta.
+        Reportes técnicos enviados por el personal. Marque cada uno como confirmado o no es error para cerrar el
+        ciclo que exigen los términos de uso de la herramienta.
       </p>
 
       {cargando ? (

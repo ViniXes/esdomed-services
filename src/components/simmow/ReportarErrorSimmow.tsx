@@ -7,8 +7,9 @@ import { crearReporteBugSimmow, type FlujoReporteBug } from "@/lib/simmow/report
 
 /**
  * Canal oficial para reportar un posible error de programación de la
- * herramienta SIMMOW (no un reclamo — ver terminosSimmow.ts sección 5). Botón
- * flotante fijo, visible solo dentro de /dashboard/simmow.
+ * herramienta SIMMOW — un espacio de reporte técnico, no un canal de quejas
+ * (ver terminosSimmow.ts sección 6). Botón flotante fijo, visible solo
+ * dentro de /dashboard/simmow.
  */
 export function ReportarErrorSimmow() {
   const { user, profile } = useAuth();
@@ -62,8 +63,9 @@ export function ReportarErrorSimmow() {
             <div className="flex flex-col items-center gap-2 py-4 text-center">
               <Check className="h-8 w-8 text-green-600" />
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                Reporte enviado — quedó registrado para revisión. Recuerde: esto es un reporte técnico, no un
-                reclamo, y no lo exime de la responsabilidad por datos ya grabados antes de enviarlo.
+                ¡Gracias! Quedó registrado para revisión. Este es un espacio de reporte técnico, así que no aplica
+                a datos que ya se hayan grabado antes de enviarlo — pero ayuda a que se revise y mejore la
+                herramienta.
               </p>
               <button
                 onClick={() => {
@@ -78,8 +80,9 @@ export function ReportarErrorSimmow() {
           ) : (
             <div className="space-y-2">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Use esto solo para un posible error de programación de la herramienta (no un dato mal traído del
-                reporte del SIS, eso se corrige a mano en SIMMOW). Es un reporte técnico, no un reclamo.
+                Use este espacio para un posible error de programación de la herramienta (no para un dato mal
+                traído del reporte del SIS, eso se corrige a mano en SIMMOW). Es un reporte técnico y ayuda a
+                mejorar la herramienta.
               </p>
               <select
                 value={flujo}

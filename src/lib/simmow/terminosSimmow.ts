@@ -13,7 +13,7 @@
 // ============================================================================
 
 /** Versión vigente. Al cambiarla, se vuelve a pedir la aceptación a todos. */
-export const TERMINOS_SIMMOW_VERSION = "1.2";
+export const TERMINOS_SIMMOW_VERSION = "1.4";
 
 /** Fecha de entrada en vigencia de la versión vigente (solo informativa). */
 export const TERMINOS_SIMMOW_FECHA = "29 de julio de 2026";
@@ -89,15 +89,17 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
         "justificación, atenuante ni excusa frente a observaciones, llamados de atención o medidas disciplinarias " +
         "derivadas de errores de digitación propios, salvo que se trate de un error de programación ya reportado y " +
         "confirmado conforme al párrafo anterior.",
+      "Cualquier medida administrativa o disciplinaria derivada de lo anterior se aplica conforme a la normativa " +
+        "institucional del MINSAL y a las leyes de la administración pública aplicables al personal del hospital — " +
+        "no queda al margen de ellas ni las reemplaza.",
     ],
   },
   {
-    titulo: "5. Exclusión expresa de excusas frente a un dato mal digitado",
+    titulo: "5. Qué no exime de responsabilidad por un dato mal digitado",
     parrafos: [
-      "Al aceptar estos términos, usted reconoce expresamente que ninguna de las siguientes circunstancias exime, " +
-        "atenúa ni justifica su responsabilidad personal por un dato mal digitado, mal revisado o mal grabado en " +
-        "SIMMOW, y que la institución puede aplicar las medidas administrativas o disciplinarias que correspondan " +
-        "sin que estas circunstancias constituyan defensa válida:",
+      "Al aceptar estos términos, usted entiende que las siguientes circunstancias, por sí solas, no eximen ni " +
+        "atenúan su responsabilidad personal por un dato mal digitado, mal revisado o mal grabado en SIMMOW, y que " +
+        "la institución puede aplicar las medidas administrativas o disciplinarias que correspondan:",
       "• Que el reporte o documento fuente del SIS haya traído el dato incorrecto — verificar y corregir esa " +
         "información contra el expediente real del paciente antes de grabar es, precisamente, parte de su función.",
       "• Que no haya tenido tiempo suficiente para revisar el código generado — la revisión campo por campo antes " +
@@ -123,16 +125,15 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     ],
   },
   {
-    titulo: "6. Cómo reportar un error de la herramienta (reporte técnico, no un reclamo)",
+    titulo: "6. Cómo reportar un error de la herramienta",
     parrafos: [
       "Si detecta que un campo se llena mal de forma sistemática (no un dato de origen incorrecto, sino un error de " +
-        "la herramienta), repórtelo de inmediato por el canal oficial dispuesto para ello, para que se corrija. " +
+        "la herramienta), repórtelo por el canal oficial dispuesto para ello, para que se pueda revisar y corregir. " +
         "Mientras un error no se reporte por ese canal y se confirme, no se considera responsabilidad de la " +
         "herramienta conforme a las secciones 4 y 5.",
-      "Este canal es exclusivamente un reporte técnico de un posible error de programación — no es un reclamo, " +
-        "queja o solicitud formal de servicio, y su presentación no genera ningún derecho a una respuesta en un " +
-        "plazo determinado ni a que el error, de confirmarse, se corrija de inmediato. Es simplemente la vía para " +
-        "informar lo observado.",
+      "Este canal sirve para informar posibles errores técnicos de programación — es un espacio de reporte, no una " +
+        "solicitud formal de servicio con tiempos de respuesta garantizados. Aun así, cada reporte se toma en cuenta " +
+        "para revisar y, si corresponde, mejorar la herramienta.",
       "Reportar oportunamente es también en su propio interés: es la única vía para que un fallo real de la " +
         "herramienta pueda contar a su favor. Guardarse la observación y usarla después, ya cometido el error, como " +
         "defensa no es una excusa válida conforme a la sección anterior.",
