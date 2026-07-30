@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { SolicitudTraslado } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowRightLeft, Plus, Building2, RefreshCw, Search, X, Pencil, Send, MessageSquare, AlertCircle } from "lucide-react";
+import { ArrowRightLeft, Plus, Building2, RefreshCw, Search, X, Pencil, Send, MessageSquare, AlertCircle, Clock3, FileText } from "lucide-react";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
@@ -116,22 +116,57 @@ export default function MedicoTrasladosPage() {
     return true;
   });
 
-  return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900">
-            <ArrowRightLeft size={17} className="text-blue-600 dark:text-blue-400" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Mis traslados</h1>
-        </div>
-        <Link prefetch={false} href="/medico/traslados/nueva"
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
-          <Plus size={15} /> Nueva solicitud
-        </Link>
-      </div>
+  const pendientes = traslados.filter(t => t.estado === "pendiente").length;
+  const enRevision = traslados.filter(t => t.estado === "en_revision").length;
 
-      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+  return (
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#075d70] via-cyan-700 to-blue-700 px-5 py-5 shadow-lg shadow-cyan-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+              <ArrowRightLeft size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Centro de traslados de cama</h1>
+              <p className="mt-1 max-w-xl text-sm text-cyan-50/90">Cree solicitudes, revise los movimientos clínicos y responda las observaciones de ESDOMED.</p>
+            </div>
+          </div>
+          <Link prefetch={false} href="/medico/traslados/nueva"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-cyan-800 shadow-sm transition-colors hover:bg-cyan-50">
+            <Plus size={16} /> Nueva solicitud
+          </Link>
+        </div>
+      </section>
+
+      <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Seguimiento de movimientos</p>
+            <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Mis solicitudes</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Identifique rápidamente los traslados que requieren seguimiento.</p>
+          </div>
+          <span className="text-xs font-medium text-slate-500">{displayList.length} {displayList.length === 1 ? "resultado" : "resultados"}</span>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="flex items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2.5 dark:border-cyan-900/60 dark:bg-cyan-950/25">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 text-white"><FileText size={16} /></span>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{traslados.length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Enviadas</p></div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-white"><Clock3 size={16} /></span>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{pendientes}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Pendientes</p></div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2.5 dark:border-blue-900/60 dark:bg-blue-950/25">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white"><MessageSquare size={16} /></span>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{enRevision}</p><p className="mt-1 text-[11px] font-medium text-slate-500">En revisión</p></div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
         <div className="relative flex-1 min-w-[180px]">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input type="text" placeholder="Buscar por expediente..." value={busquedaExpediente} onChange={e => setBusquedaExpediente(e.target.value)}
@@ -153,7 +188,8 @@ export default function MedicoTrasladosPage() {
             <X size={12} /> Limpiar
           </button>
         )}
-      </div>
+        </div>
+      </section>
 
       <div className="space-y-3">
         {displayList.length === 0 && (
@@ -166,9 +202,10 @@ export default function MedicoTrasladosPage() {
           const Icon = typeInfo.icon;
 
           return (
-            <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-sm">
+            <article key={t.id} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md hover:shadow-cyan-950/5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-800 md:p-5">
+              <span className={`absolute bottom-0 left-0 top-0 w-1 ${t.estado === "aprobado" ? "bg-emerald-500" : t.estado === "en_revision" ? "bg-blue-500" : t.estado === "rechazado" ? "bg-rose-500" : "bg-amber-400"}`} />
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 pl-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${typeInfo.color}`}>
                       <Icon size={12} /> {typeInfo.label}
@@ -177,24 +214,37 @@ export default function MedicoTrasladosPage() {
                   </div>
 
                   {t.tipoTraslado === "intercambio" ? (
-                    <div className="space-y-1">
-                      <div className="text-sm">
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">Exp. {t.pacienteExpediente}</span>
-                        {t.pacienteNombre && <span className="text-slate-500 ml-1">({t.pacienteNombre})</span>}
-                        <span className="text-xs text-slate-500 ml-2">↔</span>
-                        <span className="font-semibold text-slate-900 dark:text-slate-100 ml-2">Exp. {t.pacienteBExpediente}</span>
-                        {t.pacienteBNombre && <span className="text-slate-500 ml-1">({t.pacienteBNombre})</span>}
+                    <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-center gap-2">
+                      <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-2.5 dark:border-violet-900/60 dark:bg-violet-950/25">
+                        <p className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">Exp. {t.pacienteExpediente}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">{t.pacienteNombre || "Paciente sin nombre"}</p>
+                        <p className="mt-1 text-[11px] font-medium text-violet-700 dark:text-violet-300">{t.servicioOrigen}</p>
                       </div>
-                      <p className="text-xs text-slate-500">Servicios: {t.servicioOrigen} / {t.servicioDestino}</p>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-white shadow-sm shadow-violet-600/25"><RefreshCw size={14} /></span>
+                      <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-2.5 dark:border-violet-900/60 dark:bg-violet-950/25">
+                        <p className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">Exp. {t.pacienteBExpediente}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">{t.pacienteBNombre || "Paciente sin nombre"}</p>
+                        <p className="mt-1 text-[11px] font-medium text-violet-700 dark:text-violet-300">{t.servicioDestino}</p>
+                      </div>
                     </div>
                   ) : (
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">
-                        Exp. {t.pacienteExpediente} {t.pacienteNombre ? `- ${t.pacienteNombre}` : ""}
+                      <p className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        <span className="font-mono">Exp. {t.pacienteExpediente}</span>{t.pacienteNombre ? <span className="ml-1.5 font-medium text-slate-600 dark:text-slate-300">· {t.pacienteNombre}</span> : ""}
                       </p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {t.servicioOrigen} (Cama {t.camaOrigen}) → {t.tipoTraslado === "interno" ? t.servicioOrigen : t.servicioDestino} (Cama {t.camaDestino})
-                      </p>
+                      <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-center gap-2">
+                        <div className="rounded-xl border border-cyan-100 bg-cyan-50/70 p-2.5 dark:border-cyan-900/60 dark:bg-cyan-950/25">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">Origen</p>
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">{t.servicioOrigen}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">Cama {t.camaOrigen}</p>
+                        </div>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm shadow-blue-600/25"><ArrowRightLeft size={15} /></span>
+                        <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-2.5 dark:border-blue-900/60 dark:bg-blue-950/25">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Destino</p>
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-800 dark:text-slate-100">{t.tipoTraslado === "interno" ? t.servicioOrigen : t.servicioDestino}</p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">Cama {t.camaDestino}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -207,7 +257,7 @@ export default function MedicoTrasladosPage() {
                   )}
 
                   {t.notasEsdomed && (
-                    <div className="mt-3 bg-amber-50 dark:bg-amber-950/40 rounded-lg p-3 border border-amber-200 dark:border-amber-900/50">
+                    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/35">
                       <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">Observación de ESDOMED</p>
                       <p className="text-sm text-slate-700 dark:text-slate-300">{t.notasEsdomed}</p>
                     </div>
@@ -223,7 +273,7 @@ export default function MedicoTrasladosPage() {
                   {t.estado === "en_revision" && (
                     <button
                       onClick={() => abrirEdicion(t)}
-                      className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+                      className="mt-3 flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-600/20 transition-colors hover:bg-blue-500"
                     >
                       <Pencil size={12} /> Editar y responder
                     </button>
@@ -231,7 +281,7 @@ export default function MedicoTrasladosPage() {
                 </div>
                 <Badge estado={t.estado} />
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
