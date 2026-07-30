@@ -225,7 +225,13 @@ service cloud.firestore {
     // (ver src/lib/simmow/terminosSimmow.ts). Solo un admin puede marcarlo
     // confirmado/no-es-error; quien lo crea no puede alterar su propio reporte.
     match /reportes_bugs_simmow/{id} {
-      allow read:   if isEsdomed() || isAdmin();
+      // El listado completo (con la descripción, el expediente y ahora las
+      // imágenes adjuntas de cada reporte) es solo para admin: el personal de
+      // ESDOMED reporta el error, pero no tiene por qué ver reportes ajenos ni
+      // el detalle del propio. Sí puede leer SU PROPIO reporte (resource.data.uid
+      // == uid()) para consultar si ya se resolvió — una consulta filtrada por
+      // "uid == su propio uid" es la única forma de listar bajo esta regla.
+      allow read:   if isAdmin() || (isAuth() && resource.data.uid == uid());
       allow create: if (isEsdomed() || isAdmin()) && request.resource.data.uid == uid();
       allow update: if isAdmin();
       allow delete: if isAdmin();
