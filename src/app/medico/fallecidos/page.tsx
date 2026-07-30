@@ -209,6 +209,10 @@ export default function MedicoFallecidosPage() {
         medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
         estado: "pendiente",
         origen: sel.origen,
+        // Nace explícitamente ABIERTO: la bandeja de ESDOMED consulta
+        // `tramiteCerrado == false` en el servidor, y Firestore no devuelve los
+        // documentos donde el campo no existe.
+        tramiteCerrado: false,
         creadoEn: Timestamp.now(),
       };
       if (sel.pacienteId) payload.pacienteId = sel.pacienteId;

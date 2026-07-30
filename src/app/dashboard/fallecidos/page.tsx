@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, updateDoc, Timestamp, where, limit } from "@/lib/firestoreMeter";
+import { useEffect, useMemo, useState } from "react";
+import { collection, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, updateDoc, Timestamp, where, limit, type QueryConstraint } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive, Inbox, History, FileSignature, PenLine } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -26,6 +26,11 @@ const PARENTESCOS = [
 
 type CampoSeguimiento = typeof COLUMNAS_SEGUIMIENTO[number]["key"];
 type ActiveTab = "expediente" | "seguimiento" | "entrega" | "certificado";
+// Bandeja = trámites abiertos (en vivo). Buscar = histórico bajo demanda.
+type Vista = "bandeja" | "buscar";
+
+// Tope de la búsqueda por rango de fechas (el histórico completo nunca se baja).
+const LIMIT_BUSQUEDA = 500;
 
 const selectCls = "w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer shadow-sm disabled:cursor-not-allowed";
 
@@ -68,10 +73,19 @@ function pasosRequeridos(n: NotificacionFallecido) {
 
 export default function DashboardFallecidosPage() {
   const { profile } = useAuth();
-  const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
+  const [vista, setVista] = useState<Vista>("bandeja");
+  // Bandeja en vivo: trámites abiertos + los reabiertos (desbloqueados).
+  const [abiertos, setAbiertos] = useState<NotificacionFallecido[]>([]);
+  const [desbloqueados, setDesbloqueados] = useState<NotificacionFallecido[]>([]);
+  // Búsqueda histórica: lectura puntual, null = aún no se busca.
+  const [resultados, setResultados] = useState<NotificacionFallecido[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  // Filtro de texto en cliente sobre la lista mostrada (no consulta nada).
+  const [filtroTexto, setFiltroTexto] = useState("");
   const [page, setPage] = useState(1);
   const [personal, setPersonal] = useState<UserProfile[]>([]);
   const [personalPsTs, setPersonalPsTs] = useState<UserProfile[]>([]);
@@ -95,17 +109,92 @@ export default function DashboardFallecidosPage() {
   const [aEliminar, setAEliminar] = useState<NotificacionFallecido | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
+  // ── Bandeja en vivo: SOLO lo pendiente de cierre ──────────────────────────
+  // Antes se bajaban las 500 notificaciones más recientes (toda la colección) y
+  // se filtraba en el navegador. Ahora el servidor entrega únicamente los
+  // trámites abiertos; el histórico cerrado se consulta en la pestaña Buscar.
+  // Sin `orderBy` en la consulta (evita el índice compuesto tramiteCerrado +
+  // fecha): el orden se hace en cliente sobre un conjunto pequeño.
   useEffect(() => {
-    const q = query(collection(db, "notificaciones_fallecidos"), orderBy("creadoEn", "desc"), limit(500));
-    const unsub = onSnapshot(q, s =>
-      setNotificaciones(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido)))
+    const u1 = onSnapshot(
+      query(collection(db, "notificaciones_fallecidos"), where("tramiteCerrado", "==", false)),
+      s => setAbiertos(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido))),
+    );
+    // Un trámite cerrado que ESDOMED reabre (desbloqueado) sigue con
+    // tramiteCerrado = true, así que necesita su propio listener para no
+    // desaparecer de la bandeja justo mientras se está corrigiendo.
+    const u2 = onSnapshot(
+      query(collection(db, "notificaciones_fallecidos"), where("tramiteDesbloqueado", "==", true)),
+      s => setDesbloqueados(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido))),
     );
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
       .then(snap => setPersonal(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))));
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["psicologia", "trabajo_social"])))
       .then(snap => setPersonalPsTs(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))));
-    return unsub;
+    return () => { u1(); u2(); };
   }, []);
+
+  // Fuente de datos según la vista: bandeja (dos listeners fusionados y
+  // deduplicados) o los resultados de la búsqueda histórica.
+  const bandeja = useMemo(() => {
+    const m = new Map<string, NotificacionFallecido>();
+    [...abiertos, ...desbloqueados].forEach(n => { if (n.id) m.set(n.id, n); });
+    return [...m.values()].sort(
+      (a, b) => (tsToDate(b.fechaDefuncion)?.getTime() ?? 0) - (tsToDate(a.fechaDefuncion)?.getTime() ?? 0),
+    );
+  }, [abiertos, desbloqueados]);
+
+  const notificaciones = vista === "buscar" ? (resultados ?? []) : bandeja;
+
+  const sinCriterio = !busquedaExpediente.trim() && !fechaDesde && !fechaHasta;
+
+  // Búsqueda del histórico: una sola lectura puntual, nunca un listener.
+  const buscar = async () => {
+    const exp = busquedaExpediente.trim();
+    if (sinCriterio) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: NotificacionFallecido[];
+      if (exp) {
+        // Por expediente exacto: todas las defunciones de ese paciente. Sin
+        // orderBy para no exigir índice compuesto; el rango se afina en cliente.
+        const snap = await getDocs(query(
+          collection(db, "notificaciones_fallecidos"),
+          where("pacienteExpediente", "==", exp),
+        ));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido));
+        if (fechaDesde) docs = docs.filter(n => (tsToDate(n.fechaDefuncion)?.getTime() ?? 0) >= new Date(fechaDesde + "T00:00:00").getTime());
+        if (fechaHasta) docs = docs.filter(n => (tsToDate(n.fechaDefuncion)?.getTime() ?? 0) <= new Date(fechaHasta + "T23:59:59").getTime());
+      } else {
+        // Por rango de FECHA DE DEFUNCIÓN (mismo campo en where y orderBy → sin índice nuevo).
+        const constraints: QueryConstraint[] = [];
+        if (fechaDesde) constraints.push(where("fechaDefuncion", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+        if (fechaHasta) constraints.push(where("fechaDefuncion", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+        constraints.push(orderBy("fechaDefuncion", "desc"), limit(LIMIT_BUSQUEDA));
+        const snap = await getDocs(query(collection(db, "notificaciones_fallecidos"), ...constraints));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido));
+      }
+      setResultados(docs.sort(
+        (a, b) => (tsToDate(b.fechaDefuncion)?.getTime() ?? 0) - (tsToDate(a.fechaDefuncion)?.getTime() ?? 0),
+      ));
+      setPage(1);
+    } catch (e) {
+      setErrorBusqueda(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const limpiarBusqueda = () => {
+    setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta("");
+    setResultados(null); setErrorBusqueda(""); setPage(1);
+  };
+
+  // Tras editar/cerrar desde un resultado de búsqueda (que es una foto, no un
+  // listener) se relee esa misma búsqueda para no dejar datos viejos en pantalla.
+  const refrescarBusqueda = () => { if (vista === "buscar" && resultados !== null) void buscar(); };
 
   // Al abrir el modal para otro registro (o reabrir uno tras cerrarlo), reinicia
   // el formulario de edición. Ajuste de estado en render, no en efecto — patrón
@@ -132,8 +221,11 @@ export default function DashboardFallecidosPage() {
   // días hábiles desde la defunción. Se calcula sobre lo ya cargado (0 lecturas extra).
   // Los privados de libertad quedan en custodia interna: su certificado no se
   // entrega, así que se excluyen del cálculo de vencidos (no generan alerta).
+  // Ojo: se calcula sobre la BANDEJA (trámites abiertos), no sobre lo que se
+  // esté mostrando: un certificado vencido siempre pertenece a un caso abierto,
+  // y así el contador del encabezado no cambia al entrar a Buscar.
   const certDiasHabiles = new Map<string, number>();
-  notificaciones.forEach(n => {
+  bandeja.forEach(n => {
     if (n.id && n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad) {
       const fd = tsToDate(n.fechaDefuncion);
       if (fd) certDiasHabiles.set(n.id, diasHabilesTranscurridos(fd));
@@ -148,14 +240,14 @@ export default function DashboardFallecidosPage() {
     : notificaciones.filter(n => n.estado === filtro);
 
   const displayList = filtered
+    // Filtro de texto en cliente sobre lo ya cargado (en Buscar, los criterios
+    // de expediente y fechas ya se aplicaron en el servidor).
     .filter(n => {
-      if (busquedaExpediente && !(n.pacienteExpediente?.toLowerCase() ?? "").includes(busquedaExpediente.toLowerCase())) return false;
-      if (fechaDesde || fechaHasta) {
-        const d = ((n.creadoEn as unknown) as { toDate?: () => Date }).toDate?.() ?? n.creadoEn;
-        if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
-        if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
-      }
-      return true;
+      const t = filtroTexto.trim().toLowerCase();
+      if (!t) return true;
+      return (n.pacienteExpediente?.toLowerCase() ?? "").includes(t)
+        || (n.pacienteNombre?.toLowerCase() ?? "").includes(t)
+        || (n.servicio?.toLowerCase() ?? "").includes(t);
     })
     // Los certificados vencidos suben al tope (sort estable → conserva el orden por fecha dentro de cada grupo).
     .sort((a, b) => Number(esVencido(b)) - Number(esVencido(a)));
@@ -163,7 +255,7 @@ export default function DashboardFallecidosPage() {
   // Paginación (10 por página). Reinicia a la página 1 al cambiar filtros;
   // pageSafe protege contra el snapshot en vivo que encoge la lista.
   const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
-  const filtrosKey = `${filtro}|${busquedaExpediente}|${fechaDesde}|${fechaHasta}`;
+  const filtrosKey = `${vista}|${filtro}|${filtroTexto}`;
   const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
   if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
   const pageSafe = Math.min(page, totalPages);
@@ -185,19 +277,32 @@ export default function DashboardFallecidosPage() {
     } catch (err) {
       console.error("Error sincronizando fallecido con paciente:", err);
     }
+    refrescarBusqueda();
     setSaving(false);
   };
 
   const cerrarTramite = async () => {
     if (!selected?.id || !profile) return;
     setCerrando(true);
-    await updateDoc(doc(db, "notificaciones_fallecidos", selected.id), {
+    const cierre = {
       tramiteCerrado: true,
       tramiteCerradoPor: profile.nombre,
       tramiteCerradoEn: Timestamp.now(),
       tramiteDesbloqueado: false,
       tramiteJustificacion: null,
-    });
+    };
+    await updateDoc(doc(db, "notificaciones_fallecidos", selected.id), cierre);
+    // Al cerrarlo sale de la bandeja en vivo: se refleja el cierre en la copia
+    // local para que el modal abierto no siga mostrándolo como pendiente.
+    setSelected(prev => prev ? {
+      ...prev,
+      tramiteCerrado: true,
+      tramiteCerradoPor: profile.nombre,
+      tramiteCerradoEn: new Date(),
+      tramiteDesbloqueado: false,
+      tramiteJustificacion: undefined,
+    } : prev);
+    refrescarBusqueda();
     setCerrando(false);
   };
 
@@ -210,6 +315,9 @@ export default function DashboardFallecidosPage() {
       tramiteDesbloqueadoEn: Timestamp.now(),
       tramiteJustificacion: justificacion.trim(),
     });
+    // Vuelve a la bandeja mientras se corrige: lo capta el listener de
+    // `tramiteDesbloqueado == true` (el trámite sigue marcado como cerrado).
+    refrescarBusqueda();
     setDesbloqueando(false);
     setJustificacion("");
   };
@@ -230,6 +338,7 @@ export default function DashboardFallecidosPage() {
       data.recibeDePsConfirmadoEn = null;
     }
     await updateDoc(doc(db, "notificaciones_fallecidos", selected.id), data);
+    refrescarBusqueda();
     setUpdatingCell(null);
   };
 
@@ -237,6 +346,7 @@ export default function DashboardFallecidosPage() {
     if (!selected?.id) return;
     setUpdatingCell(campo);
     await updateDoc(doc(db, "notificaciones_fallecidos", selected.id), { [campo]: valor });
+    refrescarBusqueda();
     setUpdatingCell(null);
   };
 
@@ -302,8 +412,10 @@ export default function DashboardFallecidosPage() {
     }
   };
 
-  const pendientes     = notificaciones.filter(n => n.estado === "pendiente").length;
-  const certPendientes = notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad).length;
+  // Contadores del encabezado: siempre sobre la bandeja (trámites abiertos),
+  // para que no cambien al pasar a la búsqueda histórica.
+  const pendientes     = bandeja.filter(n => n.estado === "pendiente").length;
+  const certPendientes = bandeja.filter(n => n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad).length;
   const selectedLive   = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
   const lecturaSel     = selectedLive ? getLecturaConfirmada(selectedLive) : null;
 
@@ -381,6 +493,32 @@ export default function DashboardFallecidosPage() {
         </div>
       </div>
 
+      {/* Vistas: bandeja de trámites abiertos (en vivo) vs histórico (bajo demanda) */}
+      <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+        {([
+          { value: "bandeja", label: "Pendientes de cierre", icon: Inbox },
+          { value: "buscar",  label: "Buscar histórico",     icon: History },
+        ] as { value: Vista; label: string; icon: typeof Inbox }[]).map(v => (
+          <button
+            key={v.value}
+            onClick={() => { if (v.value === vista) return; setVista(v.value); setFiltro("todos"); setFiltroTexto(""); setPage(1); }}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              vista === v.value
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <v.icon size={14} />
+            {v.label}
+            {v.value === "bandeja" && bandeja.length > 0 && (
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+                {bandeja.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-2">
         {[
@@ -401,31 +539,79 @@ export default function DashboardFallecidosPage() {
         <span className="ml-auto text-sm text-slate-500">{displayList.length} registros</span>
       </div>
 
-      <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input type="text" placeholder="Buscar por expediente..." value={busquedaExpediente} onChange={e => setBusquedaExpediente(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
+      {vista === "bandeja" ? (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input type="text" placeholder="Filtrar por expediente, paciente o servicio..." value={filtroTexto} onChange={e => setFiltroTexto(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
+          </div>
+          <p className="text-xs text-slate-500">
+            Solo trámites <span className="font-medium text-slate-600 dark:text-slate-300">pendientes de cierre</span>. Los cerrados se consultan en Buscar histórico.
+          </p>
+          {filtroTexto && (
+            <button onClick={() => setFiltroTexto("")}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
+              <X size={12} /> Limpiar
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Desde" />
+      ) : (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input type="text" placeholder="Expediente exacto…" value={busquedaExpediente}
+                onChange={e => setBusquedaExpediente(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); buscar(); } }}
+                className="w-full pl-8 pr-3 py-1.5 text-sm font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Defunción desde</span>
+              <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Defunción desde" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+              <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Defunción hasta" />
+            </div>
+            <button onClick={buscar} disabled={buscando || sinCriterio}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+              <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
+            </button>
+            {(busquedaExpediente || fechaDesde || fechaHasta || resultados !== null) && (
+              <button onClick={limpiarBusqueda}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
+                <X size={12} /> Limpiar
+              </button>
+            )}
+          </div>
+          {errorBusqueda ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+              {errorBusqueda}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">
+              Consulta bajo demanda: expediente exacto (trae todas sus defunciones) o rango de fecha de defunción. Incluye los trámites ya cerrados.
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Hasta" />
-        </div>
-        {(busquedaExpediente || fechaDesde || fechaHasta) && (
-          <button onClick={() => { setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta(""); }}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
-            <X size={12} /> Limpiar
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Tabla */}
-      {displayList.length === 0 ? (
-        <p className="text-sm text-slate-500 py-10 text-center">Sin notificaciones en este filtro.</p>
+      {buscando ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={22} className="animate-spin text-blue-500" />
+        </div>
+      ) : displayList.length === 0 ? (
+        <p className="text-sm text-slate-500 py-10 text-center">
+          {vista === "buscar"
+            ? (resultados === null
+                ? "Indica un expediente o un rango de fechas y pulsa Buscar."
+                : "Sin resultados para esa búsqueda.")
+            : (bandeja.length === 0
+                ? "No hay trámites pendientes de cierre."
+                : "Sin notificaciones en este filtro.")}
+        </p>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -458,7 +644,26 @@ export default function DashboardFallecidosPage() {
                         Dr. {n.medicoNombre}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge estado={n.estado} />
+                        <div className="space-y-1.5">
+                          <Badge estado={n.estado} />
+                          {/* Tipo de certificado de defunción: digital (SIMMOW) o manual (libreta) */}
+                          {n.tipoCertificado === "digital" ? (
+                            <span title="Certificado de defunción digital (SIMMOW)"
+                              className="flex w-fit items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-400">
+                              <FileSignature size={10} /> Digital
+                            </span>
+                          ) : n.tipoCertificado === "manual" ? (
+                            <span title="Certificado de defunción manual (llenado a mano)"
+                              className="flex w-fit items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-400">
+                              <PenLine size={10} /> Manual
+                            </span>
+                          ) : (
+                            <span title="Falta indicar si el certificado es digital o manual (pestaña Certificado)"
+                              className="flex w-fit items-center gap-1 rounded-md border border-dashed border-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 dark:border-slate-600">
+                              Cert. sin definir
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-1.5">

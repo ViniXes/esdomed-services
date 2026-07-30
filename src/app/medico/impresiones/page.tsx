@@ -1,25 +1,45 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { collection, query, where, onSnapshot, addDoc, Timestamp } from "@/lib/firestoreMeter";
+import {
+  collection, query, where, onSnapshot, addDoc, Timestamp,
+  getDocs, orderBy, limit, type QueryConstraint,
+} from "@/lib/firestoreMeter";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudImpresion } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { Printer, Plus, Upload, X, Search } from "lucide-react";
+import { Printer, Plus, Upload, X, Search, Clock, History } from "lucide-react";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
+
+// Ventana en vivo: las últimas solicitudes del médico. Lo anterior se busca
+// bajo demanda (la colección crece ~60 solicitudes/día entre todos).
+const RECIENTES_LIMIT = 30;
+const LIMIT_HISTORICO = 500;
+
+type Vista = "recientes" | "buscar";
+
+const ms = (ts: unknown) => (ts as { toDate?: () => Date })?.toDate?.()?.getTime() ?? 0;
+const porFecha = (a: SolicitudImpresion, b: SolicitudImpresion) => ms(b.creadoEn) - ms(a.creadoEn);
 
 export default function MedicoImpresionesPage() {
   const { user, profile } = useAuth();
   const [solicitudes, setSolicitudes] = useState<SolicitudImpresion[]>([]);
+  const [vista, setVista] = useState<Vista>("recientes");
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  // Búsqueda histórica (bajo demanda, siempre acotada al propio médico).
+  const [expBusqueda, setExpBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  
+  const [resultados, setResultados] = useState<SolicitudImpresion[] | null>(null); // null = aún no se busca
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+
   const [pacienteExpediente, setPacienteExpediente] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [copias, setCopias] = useState("1");
@@ -29,19 +49,64 @@ export default function MedicoImpresionesPage() {
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // En vivo, pero solo las últimas RECIENTES_LIMIT del médico: antes se
+  // escuchaba TODO su historial (un médico con años de uso pagaba más de mil
+  // lecturas cada vez que abría la pantalla).
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "solicitudes_impresion"), where("medicoId", "==", user.uid));
+    const q = query(
+      collection(db, "solicitudes_impresion"),
+      where("medicoId", "==", user.uid),
+      orderBy("creadoEn", "desc"),
+      limit(RECIENTES_LIMIT),
+    );
     return onSnapshot(q, s => {
-      const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion));
-      docs.sort((a, b) => {
-        const at = (a.creadoEn as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
-        const bt = (b.creadoEn as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
-        return bt - at;
-      });
-      setSolicitudes(docs);
+      setSolicitudes(s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion)));
     });
   }, [user]);
+
+  const sinCriterio = !expBusqueda.trim() && !fechaDesde && !fechaHasta;
+
+  // Búsqueda histórica: una sola lectura puntual, nunca un listener.
+  const buscar = async () => {
+    if (!user || sinCriterio) return;
+    const exp = expBusqueda.trim();
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      let docs: SolicitudImpresion[];
+      if (exp) {
+        // Solo igualdades (medicoId + expediente): sin orderBy para no exigir
+        // índice compuesto; el rango, si lo hay, se afina en cliente.
+        const snap = await getDocs(query(
+          collection(db, "solicitudes_impresion"),
+          where("medicoId", "==", user.uid),
+          where("pacienteExpediente", "==", exp),
+        ));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion));
+        if (fechaDesde) docs = docs.filter(s => ms(s.creadoEn) >= new Date(fechaDesde + "T00:00:00").getTime());
+        if (fechaHasta) docs = docs.filter(s => ms(s.creadoEn) <= new Date(fechaHasta + "T23:59:59").getTime());
+      } else {
+        const constraints: QueryConstraint[] = [where("medicoId", "==", user.uid)];
+        if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+        if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+        constraints.push(orderBy("creadoEn", "desc"), limit(LIMIT_HISTORICO));
+        const snap = await getDocs(query(collection(db, "solicitudes_impresion"), ...constraints));
+        docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudImpresion));
+      }
+      setResultados(docs.sort(porFecha));
+    } catch (e) {
+      setErrorBusqueda(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const limpiarBusqueda = () => {
+    setExpBusqueda(""); setFechaDesde(""); setFechaHasta("");
+    setResultados(null); setErrorBusqueda("");
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -112,8 +177,9 @@ export default function MedicoImpresionesPage() {
         creadoEn: Timestamp.now(),
       });
       
-      setShowForm(false); 
-      setFiles([]); 
+      setShowForm(false);
+      setVista("recientes"); // la nueva solicitud vive en la ventana en vivo
+      setFiles([]);
       setPacienteExpediente("");
       setDescripcion(""); 
       setCopias("1");
@@ -129,14 +195,12 @@ export default function MedicoImpresionesPage() {
     }
   };
 
-  const displayList = solicitudes.filter(s => {
-    if (busquedaExpediente && !(s.pacienteExpediente?.toLowerCase() ?? "").includes(busquedaExpediente.toLowerCase())) return false;
-    if (fechaDesde || fechaHasta) {
-      const d = ((s.creadoEn as unknown) as { toDate?: () => Date }).toDate?.() ?? s.creadoEn;
-      if (fechaDesde && d < new Date(fechaDesde + "T00:00:00")) return false;
-      if (fechaHasta && d > new Date(fechaHasta + "T23:59:59")) return false;
-    }
-    return true;
+  const base = vista === "buscar" ? (resultados ?? []) : solicitudes;
+  const displayList = base.filter(s => {
+    if (vista !== "recientes" || !busquedaExpediente) return true;
+    const t = busquedaExpediente.toLowerCase();
+    return (s.pacienteExpediente?.toLowerCase() ?? "").includes(t)
+      || (s.descripcion?.toLowerCase() ?? "").includes(t);
   });
 
   const formatFecha = (ts: unknown) => {
@@ -226,32 +290,101 @@ export default function MedicoImpresionesPage() {
         </form>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input type="text" placeholder="Buscar por expediente..." value={busquedaExpediente} onChange={e => setBusquedaExpediente(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Desde" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Hasta" />
-        </div>
-        {(busquedaExpediente || fechaDesde || fechaHasta) && (
-          <button onClick={() => { setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta(""); }}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
-            <X size={12} /> Limpiar
+      {/* Vistas: ventana reciente en vivo vs búsqueda histórica bajo demanda */}
+      <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4">
+        {([
+          { value: "recientes", label: "Recientes", icon: Clock },
+          { value: "buscar",    label: "Buscar anteriores", icon: History },
+        ] as { value: Vista; label: string; icon: typeof Clock }[]).map(v => (
+          <button
+            key={v.value}
+            onClick={() => setVista(v.value)}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              vista === v.value
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <v.icon size={14} />
+            {v.label}
           </button>
-        )}
+        ))}
       </div>
 
+      {vista === "recientes" ? (
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input type="text" placeholder="Filtrar por expediente o descripción..." value={busquedaExpediente} onChange={e => setBusquedaExpediente(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
+          </div>
+          <p className="text-xs text-slate-500">
+            Tus últimas {RECIENTES_LIMIT} solicitudes · para anteriores usa <span className="font-medium text-slate-600 dark:text-slate-300">Buscar anteriores</span>
+          </p>
+          {busquedaExpediente && (
+            <button onClick={() => setBusquedaExpediente("")}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
+              <X size={12} /> Limpiar
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-start gap-2">
+            <History size={14} className="mt-0.5 shrink-0 text-slate-400" />
+            <p className="text-xs text-slate-500">
+              Busca entre tus solicitudes anteriores por expediente exacto o por rango de fechas. La consulta se hace bajo demanda para no releer todo tu historial.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input type="text" placeholder="Expediente exacto…" value={expBusqueda}
+                onChange={e => setExpBusqueda(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); buscar(); } }}
+                className="w-full pl-8 pr-3 py-1.5 text-sm font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Desde</span>
+              <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Desde" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 shrink-0">Hasta</span>
+              <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Hasta" />
+            </div>
+            <button onClick={buscar} disabled={buscando || sinCriterio}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+              <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
+            </button>
+            {(expBusqueda || fechaDesde || fechaHasta || resultados !== null) && (
+              <button onClick={limpiarBusqueda}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
+                <X size={12} /> Limpiar
+              </button>
+            )}
+          </div>
+          {errorBusqueda && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+              {errorBusqueda}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {displayList.length === 0 && (
+        {buscando ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : displayList.length === 0 && (
           <p className="text-sm text-slate-500 py-10 text-center">
-            {solicitudes.length === 0 ? "No has enviado solicitudes de impresión." : "Sin resultados para los filtros aplicados."}
+            {vista === "buscar"
+              ? (resultados === null
+                  ? "Indica un expediente o un rango de fechas y pulsa Buscar."
+                  : "Sin resultados para esa búsqueda.")
+              : (solicitudes.length === 0
+                  ? "No has enviado solicitudes de impresión."
+                  : "Sin resultados para el filtro aplicado.")}
           </p>
         )}
         {displayList.map(s => (
