@@ -4,7 +4,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -18,6 +18,8 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Tono de icono usado en la variante médica. */
+  tone?: "blue" | "indigo" | "cyan" | "teal" | "emerald" | "rose" | "violet" | "amber";
   exact?: boolean;
   badge?: number;
   /** Encabezado de sección. Los ítems consecutivos con el mismo grupo se muestran juntos. */
@@ -29,6 +31,8 @@ export interface NavItem {
 interface SidebarProps {
   navItems: NavItem[];
   roleLabel: string;
+  /** Estilo visual reservado para la navegación del portal médico. */
+  variant?: "default" | "medical";
   /** Para perfiles con menús extensos, inicia todas las secciones cerradas. */
   collapseGroupsInitially?: boolean;
   /** Habilita el control de escritorio para ocultar el panel lateral. */
@@ -61,38 +65,67 @@ const ACTIVE_CLS =
   "bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 shadow-sm shadow-blue-100 dark:bg-[var(--color-institutional-navy)] dark:text-white dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15";
 const IDLE_CLS =
   "text-slate-600 dark:text-slate-300 hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white";
+const MEDICAL_ICON_TONE: Record<NonNullable<NavItem["tone"]>, string> = {
+  blue: "text-blue-500 group-hover:text-blue-600 dark:text-blue-300",
+  indigo: "text-indigo-500 group-hover:text-indigo-600 dark:text-indigo-300",
+  cyan: "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-300",
+  teal: "text-teal-600 group-hover:text-teal-700 dark:text-teal-300",
+  emerald: "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300",
+  rose: "text-rose-500 group-hover:text-rose-600 dark:text-rose-300",
+  violet: "text-violet-500 group-hover:text-violet-600 dark:text-violet-300",
+  amber: "text-amber-600 group-hover:text-amber-700 dark:text-amber-300",
+};
 
 function NavLink({
-  item, active, onNavigate, nested = false,
+  item, active, onNavigate, nested = false, variant = "default",
 }: {
   item: NavItem;
   active: boolean;
   onNavigate?: () => void;
   nested?: boolean;
+  variant?: SidebarProps["variant"];
 }) {
   const { href, label, icon: Icon, badge } = item;
+  const medical = variant === "medical";
+  const activeClass = medical
+    ? "bg-gradient-to-r from-cyan-50/80 to-blue-50/70 text-blue-700 ring-1 ring-blue-100/90 dark:from-cyan-950/55 dark:to-blue-950/40 dark:text-cyan-50 dark:ring-cyan-800/70"
+    : ACTIVE_CLS;
+  const idleClass = medical
+    ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
+    : IDLE_CLS;
   return (
     <Link prefetch={false}
       href={href}
       onClick={onNavigate}
-      className={`flex items-center gap-3 rounded-xl font-medium transition-all duration-150 ${
+      className={`group relative flex items-center gap-3 rounded-xl font-medium transition-all duration-150 ${
         nested ? "px-3 py-2 text-[13px]" : "px-3 py-2.5 text-sm"
-      } ${active ? ACTIVE_CLS : IDLE_CLS}`}
+      } ${active ? activeClass : idleClass}`}
     >
-      <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+      {medical && active && <span className="absolute left-0 h-5 w-0.5 rounded-r-full bg-cyan-600 dark:bg-cyan-400" />}
+      <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
+        medical && active
+          ? "text-blue-600 dark:text-cyan-300"
+          : medical
+            ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
+            : ""
+      }`}>
+        <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} />
+      </span>
       <span className="flex-1">{label}</span>
       <Badge count={badge ?? 0} />
+      {medical && active && <ChevronRight size={15} strokeWidth={2.25} className="flex-shrink-0 text-blue-500" />}
     </Link>
   );
 }
 
 /** Ítem con submenú: navega a su propia ruta y despliega los hijos con la flecha. */
 function NavExpandable({
-  item, isActive, onNavigate,
+  item, isActive, onNavigate, variant = "default",
 }: {
   item: NavItem;
   isActive: (item: NavItem) => boolean;
   onNavigate?: () => void;
+  variant?: SidebarProps["variant"];
 }) {
   const { href, label, icon: Icon, children = [] } = item;
   const childActive = children.some(isActive);
@@ -101,12 +134,28 @@ function NavExpandable({
   // la preferencia manual del usuario. Sin efectos para no romper la regla de lint.
   const [openManual, setOpenManual] = useState<boolean | null>(null);
   const open = openManual ?? childActive;
+  const medical = variant === "medical";
+  const activeClass = medical
+    ? "bg-gradient-to-r from-cyan-50/80 to-blue-50/70 text-blue-700 ring-1 ring-blue-100/90 dark:from-cyan-950/55 dark:to-blue-950/40 dark:text-cyan-50 dark:ring-cyan-800/70"
+    : ACTIVE_CLS;
+  const idleClass = medical
+    ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
+    : IDLE_CLS;
 
   return (
     <div>
-      <div className={`flex items-center rounded-xl transition-all duration-150 ${active ? ACTIVE_CLS : IDLE_CLS}`}>
+      <div className={`group relative flex items-center rounded-xl transition-all duration-150 ${active ? activeClass : idleClass}`}>
+        {medical && active && <span className="absolute left-0 h-5 w-0.5 rounded-r-full bg-cyan-600 dark:bg-cyan-400" />}
         <Link prefetch={false} href={href} onClick={onNavigate} className="flex items-center gap-3 pl-3 pr-1 py-2.5 text-sm font-medium flex-1 min-w-0">
-          <Icon size={16} strokeWidth={active ? 2.5 : 2} className="flex-shrink-0" />
+          <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
+            medical && active
+              ? "text-blue-600 dark:text-cyan-300"
+              : medical
+                ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
+                : ""
+          }`}>
+            <Icon size={16} strokeWidth={active ? 2.5 : 2} />
+          </span>
           <span className="flex-1 truncate">{label}</span>
         </Link>
         <button
@@ -122,7 +171,7 @@ function NavExpandable({
       {open && (
         <div className="mt-0.5 ml-5 pl-2 border-l border-slate-200 dark:border-[#c9a892]/25 space-y-0.5">
           {children.map((c) => (
-            <NavLink key={c.href} item={c} active={isActive(c)} onNavigate={onNavigate} nested />
+            <NavLink key={c.href} item={c} active={isActive(c)} onNavigate={onNavigate} nested variant={variant} />
           ))}
         </div>
       )}
@@ -143,11 +192,16 @@ function SidebarBody({
   onChangePassword,
   onLogout,
   onCollapseDesktopPanel,
+  variant,
 }: SidebarBodyProps) {
+  const medical = variant === "medical";
+  const medicalFooterAction = medical
+    ? "text-slate-500 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-400 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-200"
+    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80";
   const renderItem = (item: NavItem) =>
     item.children?.length
-      ? <NavExpandable key={item.href} item={item} isActive={isActive} onNavigate={onNavigate} />
-      : <NavLink key={item.href} item={item} active={isActive(item)} onNavigate={onNavigate} />;
+      ? <NavExpandable key={item.href} item={item} isActive={isActive} onNavigate={onNavigate} variant={variant} />
+      : <NavLink key={item.href} item={item} active={isActive(item)} onNavigate={onNavigate} variant={variant} />;
 
   // Ítems sin grupo (p. ej. Inicio) arriba; el resto agrupado por sección colapsable.
   const sinGrupo = navItems.filter((i) => !i.group);
@@ -155,15 +209,15 @@ function SidebarBody({
   for (const i of navItems) if (i.group && !grupos.includes(i.group)) grupos.push(i.group);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[var(--color-institutional-dark)] border-r border-slate-200 dark:border-[#c9a892]/25 text-slate-700 dark:text-white">
-      <div className="px-4 pt-5 pb-4 border-b border-slate-200 dark:border-[#c9a892]/20 flex flex-col items-center gap-3">
-        <div className="h-20 flex items-center justify-center">
+    <div className={`flex h-full flex-col border-r text-slate-700 dark:text-white ${medical ? "border-slate-200 bg-white dark:border-cyan-950 dark:bg-slate-950" : "border-slate-200 bg-white dark:border-[#c9a892]/25 dark:bg-[var(--color-institutional-dark)]"}`}>
+      <div className={`flex flex-col items-center gap-3 border-b px-4 pt-5 pb-4 ${medical ? "border-blue-100 bg-gradient-to-b from-white to-cyan-50/45 dark:border-cyan-950 dark:from-slate-950 dark:to-cyan-950/25" : "border-slate-200 dark:border-[#c9a892]/20"}`}>
+        <div className={`${medical ? "h-16" : "h-20"} flex items-center justify-center`}>
           <Image
             src={SIDEBAR_LOGO_LIGHT_SRC}
             alt="Hospital Nacional El Salvador"
             width={150}
             height={150}
-            className="h-20 w-auto object-contain opacity-80 brightness-0 dark:hidden"
+            className={`${medical ? "h-16" : "h-20"} w-auto object-contain opacity-80 brightness-0 dark:hidden`}
             priority
           />
           <Image
@@ -171,12 +225,12 @@ function SidebarBody({
             alt="Hospital Nacional El Salvador"
             width={150}
             height={150}
-            className="hidden h-20 w-auto object-contain dark:block"
+            className={`hidden ${medical ? "h-16" : "h-20"} w-auto object-contain dark:block`}
             priority
           />
         </div>
         <div className="flex items-center gap-2.5 w-full">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-institutional-navy)] dark:bg-[var(--color-institutional-warm)] flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${medical ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-600/25 dark:from-cyan-400 dark:to-blue-400" : "bg-[var(--color-institutional-navy)] dark:bg-[var(--color-institutional-warm)]"}`}>
             <span className="text-white dark:text-[var(--color-institutional-dark)] text-[10px] font-bold tracking-wide">ES</span>
           </div>
           <div className="min-w-0">
@@ -190,7 +244,7 @@ function SidebarBody({
         </div>
       </div>
 
-      <nav className="flex-1 min-h-0 px-2 py-3 space-y-0.5 overflow-y-auto">
+      <nav className={`flex-1 min-h-0 overflow-y-auto px-2 py-3 ${medical ? "space-y-1" : "space-y-0.5"}`}>
         {sinGrupo.map(renderItem)}
 
         {grupos.map((group) => {
@@ -198,11 +252,11 @@ function SidebarBody({
           const isCollapsed = isGroupCollapsed(group);
           const groupBadge = items.reduce((s, i) => s + (i.badge ?? 0), 0);
           return (
-            <div key={group} className="pt-1.5 space-y-0.5">
+            <div key={group} className={`space-y-0.5 ${medical ? "pt-3 first:pt-0" : "pt-1.5"}`}>
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className="w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892]/70 hover:text-[#2f48aa] dark:hover:text-[#f0ece8] hover:bg-[#1c1e4d]/5 dark:hover:bg-slate-800/70 transition-colors"
+                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${medical ? "text-slate-400 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-500 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-300" : "text-[#1c1e4d] dark:text-[#c9a892]/70 hover:text-[#2f48aa] dark:hover:text-[#f0ece8] hover:bg-[#1c1e4d]/5 dark:hover:bg-slate-800/70"}`}
               >
                 <ChevronDown
                   size={12}
@@ -217,7 +271,7 @@ function SidebarBody({
         })}
       </nav>
 
-      <div className="px-2 pb-4 pt-2 border-t border-slate-200 dark:border-[#c9a892]/20 space-y-1">
+      <div className={`px-2 pb-4 pt-2 border-t space-y-1 ${medical ? "border-blue-100 dark:border-cyan-950" : "border-slate-200 dark:border-[#c9a892]/20"}`}>
         {profile?.tipoMedico ? (
           <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400">
             {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · {profile.servicios?.length ?? 0} unidades
@@ -229,14 +283,14 @@ function SidebarBody({
         )}
         <button
           onClick={toggle}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 transition-all"
+          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${medicalFooterAction}`}
         >
           {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
         <button
           onClick={onChangePassword}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 transition-all"
+          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${medicalFooterAction}`}
         >
           <KeyRound size={16} />
           Cambiar contrasena
@@ -252,7 +306,7 @@ function SidebarBody({
           <button
             type="button"
             onClick={onCollapseDesktopPanel}
-            className="hidden md:flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 transition-all"
+            className={`hidden md:flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${medicalFooterAction}`}
           >
             <PanelLeftClose size={16} />
             Ocultar panel
@@ -266,6 +320,7 @@ function SidebarBody({
 export function Sidebar({
   navItems,
   roleLabel,
+  variant = "default",
   collapseGroupsInitially = false,
   allowDesktopPanelCollapse = false,
 }: SidebarProps) {
@@ -285,6 +340,8 @@ export function Sidebar({
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
+  // Compensa la escala del 90% en el portal médico sin modificar los demás roles.
+  const desktopSidebarWidth = variant === "medical" ? "w-[17rem]" : "w-60";
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -383,6 +440,7 @@ export function Sidebar({
     },
     onLogout: handleLogout,
     onCollapseDesktopPanel: allowDesktopPanelCollapse ? toggleDesktopPanel : undefined,
+    variant,
   };
 
   return (
@@ -452,11 +510,11 @@ export function Sidebar({
 
       <aside
         className={`hidden md:block relative flex-shrink-0 transition-[width] duration-300 ease-out ${
-          allowDesktopPanelCollapse && desktopPanelCollapsed ? "w-0" : "w-60"
+          allowDesktopPanelCollapse && desktopPanelCollapsed ? "w-0" : desktopSidebarWidth
         }`}
         aria-label="Navegación principal"
       >
-        <div className={`h-screen sticky top-0 w-60 transition-all duration-300 ease-out ${
+        <div className={`h-screen sticky top-0 ${desktopSidebarWidth} transition-all duration-300 ease-out ${
           allowDesktopPanelCollapse && desktopPanelCollapsed
             ? "-translate-x-full opacity-0 pointer-events-none"
             : "translate-x-0 opacity-100"
