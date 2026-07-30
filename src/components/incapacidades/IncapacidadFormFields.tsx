@@ -48,7 +48,7 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergenci
     : null;
 
   const fechaHasta = emergencia
-    ? (fAlta && diasValido && diasNum >= 1 ? calcularFechaHasta(fAlta, diasNum - 1) : null)
+    ? (fAlta && diasValido && diasNum >= 1 ? calcularFechaHasta(fAlta, diasNum) : null)
     : (fAlta && diasValido && !altaAntesDqIngreso ? calcularFechaHasta(fAlta, diasNum) : null);
 
   const diasTotal = emergencia
@@ -126,7 +126,7 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergenci
             </p>
             {emergencia
               ? (fAlta && diasValido && diasNum >= 1 && (
-                  <p className="text-[10px] text-slate-400 mt-0.5">Inicio + {diasNum - 1} días</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Inicio + {diasNum} días</p>
                 ))
               : (fAlta && !altaAntesDqIngreso && diasValido && (
                   <p className="text-[10px] text-slate-400 mt-0.5">Alta + {diasNum} días</p>
