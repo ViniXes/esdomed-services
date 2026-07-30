@@ -113,6 +113,25 @@ export default function ReportesSimmowPage() {
                 </span>
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap mb-2">{r.descripcion}</p>
+
+              {r.imagenes.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {r.imagenes.map((img) => (
+                    <a
+                      key={img.url}
+                      href={img.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 hover:opacity-80 transition-opacity"
+                      title={img.nombre}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={img.nombre} className="w-full h-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
+
               <p className="text-xs text-slate-400 mb-3">
                 {r.fecha ? r.fecha.toLocaleString("es-SV") : "—"}
                 {r.resueltoPor && ` · Resuelto por ${r.resueltoPor}`}
