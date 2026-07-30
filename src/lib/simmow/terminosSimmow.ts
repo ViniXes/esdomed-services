@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // Aviso específico de esta herramienta (generador de código de llenado para
 // SIMMOW, flujos Atención Hospitalaria y Atención Ambulatoria), adicional a
-// los términos generales del portal (ver src/lib/terminos.ts) — se piden los
+// los términos generales del Sistema ESDOMED Services (ver src/lib/terminos.ts) — se piden los
 // dos, uno no reemplaza al otro. Aplica a los roles que operan SIMMOW
 // (esdomed, asistente_esdomed y admin).
 //
@@ -13,7 +13,7 @@
 // ============================================================================
 
 /** Versión vigente. Al cambiarla, se vuelve a pedir la aceptación a todos. */
-export const TERMINOS_SIMMOW_VERSION = "1.4";
+export const TERMINOS_SIMMOW_VERSION = "1.5";
 
 /** Fecha de entrada en vigencia de la versión vigente (solo informativa). */
 export const TERMINOS_SIMMOW_FECHA = "29 de julio de 2026";
@@ -24,11 +24,11 @@ export interface SeccionTerminos {
 }
 
 export const TERMINOS_SIMMOW_INTRO =
-  "Esta sección del portal es una herramienta de apoyo para el llenado de los formularios de SIMMOW " +
-  "(Ingreso/Edición de Egreso e Ingreso/Edición de Consulta Curativa / Atención Preventiva). Su objetivo principal " +
-  "es mejorar la calidad de la digitación de ESDOMED en SIMMOW, reduciendo errores de transcripción — la agilidad " +
-  "en el llenado es un beneficio adicional, no el propósito principal. Antes de usarla, lea y acepte las siguientes " +
-  "condiciones, adicionales a los términos generales del portal que ya aceptó.";
+  "Esta sección del Sistema ESDOMED Services es una herramienta de apoyo para el llenado de los formularios de " +
+  "SIMMOW (Ingreso/Edición de Egreso e Ingreso/Edición de Consulta Curativa / Atención Preventiva). Su objetivo " +
+  "principal es mejorar la calidad de la digitación de ESDOMED en SIMMOW, reduciendo errores de transcripción — " +
+  "la agilidad en el llenado es un beneficio adicional, no el propósito principal. Antes de usarla, lea y acepte " +
+  "las siguientes condiciones, adicionales a los términos generales del sistema que ya aceptó.";
 
 export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
   {
@@ -143,8 +143,8 @@ export const TERMINOS_SIMMOW_SECCIONES: SeccionTerminos[] = [
     titulo: "7. Confidencialidad de la información",
     parrafos: [
       "Los documentos y reportes que se suben a esta herramienta contienen datos personales y datos de salud de " +
-        "pacientes. Su tratamiento sigue sujeto al deber de confidencialidad y a los términos generales del portal ya " +
-        "aceptados — esta sección no los sustituye, los complementa.",
+        "pacientes. Su tratamiento sigue sujeto al deber de confidencialidad y a los términos generales del sistema " +
+        "ya aceptados — esta sección no los sustituye, los complementa.",
     ],
   },
   {
