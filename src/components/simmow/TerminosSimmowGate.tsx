@@ -18,7 +18,7 @@ const ROLES_SIMMOW = ["esdomed", "asistente_esdomed", "admin"];
 /**
  * Pantalla bloqueante adicional a TerminosGate, específica de la herramienta
  * SIMMOW — se monta dentro de /dashboard/simmow y exige aceptar sus propios
- * términos (independientes de los generales del portal) antes de dejar ver el
+ * términos (independientes de los generales del sistema) antes de dejar ver el
  * contenido de la página. Solo aplica a los roles que operan SIMMOW.
  */
 export function TerminosSimmowGate() {
@@ -36,7 +36,7 @@ export function TerminosSimmowGate() {
   }, [user?.uid]);
 
   const rolAplica = !!profile && ROLES_SIMMOW.includes(profile.role);
-  // Los términos generales del portal se piden primero (TerminosGate ya los
+  // Los términos generales del sistema se piden primero (TerminosGate ya los
   // bloquea con su propia pantalla); este aviso adicional solo debe aparecer
   // una vez que esos ya se aceptaron, para no mostrar dos pantallas a la vez.
   const yaAceptoGenerales = profile?.terminosAceptados?.version === TERMINOS_VERSION;
