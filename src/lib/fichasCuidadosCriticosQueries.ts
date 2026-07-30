@@ -200,6 +200,14 @@ export async function consultarFichasCuidadosCriticos(
 // sale de esta pantalla, el listener de Firestore se mantiene vivo a nivel de
 // módulo — no se desuscribe al desmontar el componente — y se comparte entre
 // todos los que pidan la misma clave (mismo conjunto de servicios).
+//
+// Se filtra ademas por estado == "activo": servicioActual NO se limpia al dar
+// de alta a un paciente (sigue apuntando a su ultimo servicio), asi que sin
+// este filtro la lista acumula para siempre a todo el que alguna vez paso por
+// el servicio, no solo a los internados ahora — cada vez mas documentos leidos
+// en cada apertura de esta pantalla. Buscar un expediente historico para
+// reabrir una ficha vieja sigue funcionando aparte, por la busqueda directa en
+// fichas_cuidados_criticos (ver medico/cuidados-criticos/page.tsx).
 interface SuscripcionPacientes {
   pacientes: Paciente[];
   listeners: Set<(pacientes: Paciente[]) => void>;
@@ -217,7 +225,11 @@ export function suscribirPacientesCuidadosCriticos(
     sub = { pacientes: [], listeners: new Set() };
     suscripcionesPacientes.set(clave, sub);
     onSnapshot(
-      query(collection(db, "pacientes"), where("servicioActual", "in", serviciosParaConsulta(servicios))),
+      query(
+        collection(db, "pacientes"),
+        where("servicioActual", "in", serviciosParaConsulta(servicios)),
+        where("estado", "==", "activo"),
+      ),
       snap => {
         const pacientes = snap.docs.map(item => ({ id: item.id, ...item.data() } as Paciente));
         const actual = suscripcionesPacientes.get(clave);
