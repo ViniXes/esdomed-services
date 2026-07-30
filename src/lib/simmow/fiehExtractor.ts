@@ -181,18 +181,30 @@ function referidoRetornoSeguimientoPorCheckbox(
     etiquetaEstablecimiento.item,
     /^Recomendaciones:/i
   );
+  // buscarItem devuelve como `item` el ÚLTIMO ítem consumido al matchear
+  // /Nombre\s+establecimiento:/i, que es el ítem "establecimiento:" (no
+  // "Nombre"). leerCeldaMultilinea recorta por la X de ESE ítem, así que
+  // "Nombre" (más a la izquierda) queda fuera de `celda` — solo
+  // "establecimiento:" sigue presente al inicio. El .replace() de abajo
+  // buscaba "Nombre establecimiento:" completo y nunca matcheaba, dejando
+  // "establecimiento: " pegado como prefijo del valor.
   const nombreEstablecimiento = limpiarNombreEstablecimiento(
-    celda.replace(/Nombre\s+establecimiento:\s*/i, "")
+    celda.replace(/^(?:Nombre\s+)?establecimiento:\s*/i, "")
   );
   if (!nombreEstablecimiento) return vacio;
 
-  const marcadas = checkboxesEnLinea(
+  // No se filtra por el texto de opción de la casilla ("Referencia"/"Retorno"):
+  // ambas etiquetas terminan en la palabra suelta "a" ("Referencia a" / "Retorno
+  // a"), y asociarOpciones() en pdfEngine.ts le asigna a cada casilla el ítem de
+  // texto más cercano a su izquierda — que en este layout es justo esa "a", no
+  // "Referencia" ni "Retorno". Filtrar por opcion.includes("referencia"/"retorno")
+  // nunca matcheaba, así que una casilla realmente marcada se leía como si nada
+  // estuviera marcado. Como el propio comentario de arriba dice, cuál de las dos
+  // esté marcada no decide el destino — basta con que haya alguna marcada.
+  const hayMarca = checkboxesEnLinea(
     etiquetaEstablecimiento.pagina,
     etiquetaEstablecimiento.item.y
-  )
-    .filter((cb) => cb.marcado)
-    .map((cb) => sinAcentos(cb.opcion).toLowerCase());
-  const hayMarca = marcadas.some((op) => op.includes("referencia") || op.includes("retorno"));
+  ).some((cb) => cb.marcado);
   if (!hayMarca) return vacio;
 
   if (circunstanciaAltaValor === "2") {
@@ -249,21 +261,37 @@ function extraerReferidoDelEstablecimientoPorCoordenadas(doc: DocumentoExtraido)
  * Variante actual de la plantilla del FIEH (confirmada en varios documentos
  * reales): la etiqueta ya NO se parte en "Nombre del" / "establecimiento" —
  * viene junta como "Nombre del establecimiento" (a veces en un solo ítem, a
- * veces repartida palabra por palabra), con el valor a la derecha en la
- * MISMA línea, y "(referido de:)" como nota suelta en la línea de abajo (no
- * es parte del valor, se ignora).
+ * veces repartida palabra por palabra), y "(referido" queda pegado en la
+ * MISMA línea justo antes de donde empezaría el valor — no es una nota
+ * suelta de una línea de abajo como se pensaba antes. El resto de la
+ * etiqueta, "de:)", se envuelve solo a la línea de abajo. Cuando el campo
+ * SÍ trae un establecimiento, ese valor queda intercalado entre "(referido"
+ * y "de:)" (en esa misma línea, después de "(referido"), así que tomar todo
+ * lo que sigue a la etiqueta sin filtrar arrastraba "(referido" como si
+ * fuera parte del valor — y cuando el campo está vacío, "(referido" o "de:)"
+ * quedaban solos y se leían como si fueran el valor. Se leen ambas líneas
+ * (la de la etiqueta y la que envuelve debajo) y se descartan explícitamente
+ * los fragmentos que son parte de la propia etiqueta.
  */
 function extraerReferidoDelEstablecimientoEtiquetaCompleta(doc: DocumentoExtraido): string {
   const etiqueta = buscarItem(doc, /^Nombre\s+del\s+establecimiento$/i);
   if (!etiqueta) return "";
 
-  const valor = etiqueta.pagina.items
-    .filter(
-      (it) =>
-        Math.abs(it.y - etiqueta.item.y) <= 5 &&
-        it.x >= etiqueta.item.x + etiqueta.item.w - 2
-    )
-    .sort((a, b) => a.x - b.x)
+  const esFragmentoEtiqueta = (s: string) =>
+    /^\(?referido$/i.test(s.trim()) || /^de:?\)?$/i.test(s.trim()) || s.trim() === ")";
+
+  const lineaEtiqueta = etiqueta.pagina.items.filter(
+    (it) =>
+      Math.abs(it.y - etiqueta.item.y) <= 5 &&
+      it.x >= etiqueta.item.x + etiqueta.item.w - 2
+  );
+  const lineaEnvuelta = etiqueta.pagina.items.filter(
+    (it) => it.y < etiqueta.item.y - 2 && etiqueta.item.y - it.y <= 15
+  );
+
+  const valor = [...lineaEtiqueta, ...lineaEnvuelta]
+    .filter((it) => !esFragmentoEtiqueta(it.str))
+    .sort((a, b) => b.y - a.y || a.x - b.x)
     .map((it) => it.str)
     .join(" ");
 
@@ -954,12 +982,25 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   // "Tipo de afiliación:" a veces se parte en dos líneas visuales en el PDF
   // ("Tipo de" ... "afiliación:"), quedando el valor entre ambas mitades. El
   // segundo tramo de la etiqueta se hace opcional para cubrir ambos casos.
+  //
+  // "No. Afiliación:" tiene el mismo problema pero al revés: cuando "Tipo
+  // documento: ... Identidad" se envuelve, la palabra "Identidad" se lleva
+  // consigo a "Afiliación:" a la línea de abajo, dejando en la línea de
+  // arriba "No. <VALOR>" solo — es decir, el propio VALOR numérico queda
+  // ANTES de su etiqueta, no después. Antes se exigía "No.? Afiliación:"
+  // pegado antes de capturar, así que ese envoltorio rompía la búsqueda
+  // entera (nunca encontraba "Afiliación:" inmediatamente después de "No.")
+  // y tipo Y número quedaban vacíos los dos. Ahora "Afiliación:" es opcional
+  // después de "No.", igual que ya se hacía con "Tipo de".
   datos.TIPO_AFILIACION = buscar(
     plano,
-    /Tipo\s+de\s+(?:afiliaci[oó]n:?\s*)?(.*?)\s*No\.?\s*Afiliaci[oó]n:/i
+    /Tipo\s+de\s+(?:afiliaci[oó]n:?\s*)?(.*?)\s*No\.?\s/i
   );
   datos.NUM_AFILIACION = soloNumeros(
-    buscar(plano, /No\.?\s*Afiliaci[oó]n:\s*([A-Z0-9\-/]+)/i)
+    buscar(
+      plano,
+      /Tipo\s+de\s+(?:afiliaci[oó]n:?\s*)?.*?\s*No\.?\s*(?:Afiliaci[oó]n:?\s*)?([A-Z0-9\-/]+)/i
+    )
   );
   datos.TIPO_AFILIACION_VALOR = tipoAfiliacionValor(datos.TIPO_AFILIACION);
 
