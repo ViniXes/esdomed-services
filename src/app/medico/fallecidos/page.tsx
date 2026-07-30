@@ -13,7 +13,7 @@ import { toDate } from "@/lib/pacientes/helpers";
 import { condicionEgreso, CONDICION_LABEL } from "@/lib/emergencia/helpers";
 import {
   HeartPulse, Plus, CheckCircle2, AlertCircle, X,
-  Search, Loader2, BedDouble, Ambulance,
+  Search, Loader2, BedDouble, Ambulance, ClipboardCheck, Clock3, FileText, ChevronRight, Info,
 } from "lucide-react";
 
 // Origen del fallecido: paciente hospitalizado (activo) o atención de emergencia.
@@ -234,6 +234,9 @@ export default function MedicoFallecidosPage() {
     return true;
   });
 
+  const pendientes = notificaciones.filter(n => n.estado === "pendiente").length;
+  const confirmadas = notificaciones.filter(n => n.estado === "confirmado").length;
+
   const formatFecha = (ts: unknown) => {
     if (!ts) return "—";
     const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
@@ -241,46 +244,105 @@ export default function MedicoFallecidosPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900">
-            <HeartPulse size={17} className="text-rose-600 dark:text-rose-400" />
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      {/* Encabezado de tarea: deja claro qué se hará y a quién se notificará. */}
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a2430] via-[#713246] to-[#91435a] px-5 py-5 shadow-lg shadow-rose-950/20 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+              <HeartPulse size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Notificar defunción</h1>
+              <p className="mt-1 max-w-xl text-sm text-rose-50/90">Identifique al paciente, confirme los datos clínicos y envíe el aviso a ESDOMED.</p>
+            </div>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Notificaciones de fallecido</h1>
+          <button
+            onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-all ${
+              showForm
+                ? "bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20"
+                : "bg-white text-rose-900 hover:bg-rose-50"
+            }`}
+          >
+            {showForm ? <><X size={16} /> Cerrar registro</> : <><Plus size={16} /> Nueva notificación</>}
+          </button>
         </div>
-        <button
-          onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {showForm ? "Cancelar" : <><Plus size={15} /> Nueva notificación</>}
-        </button>
-      </div>
+      </section>
 
       {/* Formulario */}
       {showForm && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 md:p-6 mb-5 space-y-5">
+        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-6">
+          <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+            <aside className="rounded-2xl border border-cyan-100 bg-gradient-to-b from-cyan-50/80 via-white to-white p-4 dark:border-cyan-900/60 dark:from-cyan-950/30 dark:via-slate-900 dark:to-slate-900">
+              <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Flujo guiado</p>
+              <ol className="space-y-4">
+                <li className="flex gap-3">
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${sel ? "bg-emerald-500 text-white" : "bg-cyan-600 text-white"}`}>{sel ? <CheckCircle2 size={15} /> : "1"}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Identificar</p>
+                    <p className="mt-0.5 text-xs leading-4 text-slate-500">Busque por expediente y seleccione al paciente.</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${sel && fechaDefuncion && !errorFecha ? "bg-emerald-500 text-white" : sel ? "bg-cyan-600 text-white" : "bg-slate-100 text-slate-400 dark:bg-slate-800"}`}>{sel && fechaDefuncion && !errorFecha ? <CheckCircle2 size={15} /> : "2"}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Verificar datos</p>
+                    <p className="mt-0.5 text-xs leading-4 text-slate-500">Confirme fecha, hora y causa clínica.</p>
+                  </div>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-xs font-bold text-rose-600 ring-1 ring-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:ring-rose-900">3</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notificar</p>
+                    <p className="mt-0.5 text-xs leading-4 text-slate-500">El aviso se enviará directamente a ESDOMED.</p>
+                  </div>
+                </li>
+              </ol>
+              <div className="mt-5 rounded-xl border border-cyan-100 bg-white/80 p-3 text-xs leading-4 text-slate-500 dark:border-cyan-900/60 dark:bg-slate-900/70 dark:text-slate-400">
+                <Info size={14} className="mb-1.5 text-cyan-600 dark:text-cyan-300" />
+                Verifique el expediente antes de enviar: la notificación quedará registrada en el historial.
+              </div>
+            </aside>
+
+            <div className="min-w-0 space-y-6">
 
           {/* Paso 1: Buscar paciente */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Identificar al paciente</p>
+            <div className="flex items-center gap-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">1</span>
+              <div>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Identificar al paciente</p>
+                <p className="text-xs text-slate-500">Elija el origen y busque el número de expediente.</p>
+              </div>
+            </div>
 
             {!sel && (
-              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5 w-fit">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {([
-                  { v: "activo", l: "Hospitalización", icon: BedDouble },
-                  { v: "emergencia", l: "Emergencia", icon: Ambulance },
-                ] as { v: FuenteFallecido; l: string; icon: typeof BedDouble }[]).map(({ v, l, icon: Icon }) => (
+                  { v: "activo", l: "Hospitalización", d: "Paciente ingresado en un servicio", icon: BedDouble },
+                  { v: "emergencia", l: "Emergencia", d: "Atención sin ingreso hospitalario", icon: Ambulance },
+                ] as { v: FuenteFallecido; l: string; d: string; icon: typeof BedDouble }[]).map(({ v, l, d, icon: Icon }) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => cambiarFuente(v)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      fuente === v ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400"
+                    className={`group relative flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                      fuente === v
+                        ? "border-cyan-300 bg-cyan-50 text-cyan-900 shadow-sm shadow-cyan-950/5 dark:border-cyan-700 dark:bg-cyan-950/35 dark:text-cyan-100"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-cyan-800"
                     }`}
                   >
-                    <Icon size={13} /> {l}
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${fuente === v ? "bg-cyan-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-cyan-100 group-hover:text-cyan-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-cyan-950"}`}>
+                      <Icon size={18} />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold">{l}</span>
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">{d}</span>
+                    </span>
+                    {fuente === v && <CheckCircle2 size={16} className="ml-auto shrink-0 text-cyan-600 dark:text-cyan-300" />}
                   </button>
                 ))}
               </div>
@@ -293,20 +355,20 @@ export default function MedicoFallecidosPage() {
                     Para quien falleció en emergencia sin haber ingresado a un servicio. Se toma de las atenciones de emergencia importadas.
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-700 dark:bg-slate-800/50 sm:flex sm:gap-2">
                   <input
                     type="text"
                     value={expBusqueda}
                     onChange={e => { setExpBusqueda(e.target.value); setErrorBusqueda(""); }}
                     onKeyDown={e => e.key === "Enter" && buscar()}
                     placeholder="Número de expediente (ej: 1234-26)"
-                    className={inputCls}
+                    className={`${inputCls} bg-white dark:bg-slate-900`}
                   />
                   <button
                     type="button"
                     onClick={buscar}
                     disabled={buscando || !expBusqueda.trim()}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 dark:disabled:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-all disabled:cursor-not-allowed whitespace-nowrap"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-cyan-600 disabled:cursor-not-allowed disabled:bg-cyan-500 dark:disabled:bg-cyan-800 sm:mt-0 sm:w-auto"
                   >
                     {buscando ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
                     Buscar
@@ -367,11 +429,14 @@ export default function MedicoFallecidosPage() {
               </>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-start gap-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4">
-                  <CheckCircle2 size={18} className="text-rose-500 dark:text-rose-400 mt-0.5 shrink-0" />
+                <div className="relative overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/80 to-white p-4 dark:border-cyan-800 dark:from-cyan-950/40 dark:via-blue-950/20 dark:to-slate-900">
+                  <div className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-cyan-500 to-blue-600" />
+                  <div className="flex items-start gap-3 pl-1">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-sm shadow-cyan-600/30"><CheckCircle2 size={19} /></span>
                   <div className="flex-1 min-w-0">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">Paciente seleccionado</p>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{sel.nombre}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Exp. {sel.expediente}</p>
+                    <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">Expediente {sel.expediente}</p>
                     <div className="mt-2 flex items-center gap-2 text-sm">
                       {sel.origen === "emergencia" ? (
                         <>
@@ -392,13 +457,14 @@ export default function MedicoFallecidosPage() {
                       )}
                     </div>
                   </div>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setPaciente(null); setAtencion(null); setExpBusqueda(""); }}
-                  className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline transition-colors"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-cyan-700 transition-colors hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-100"
                 >
-                  Buscar otro expediente
+                  Buscar otro expediente <ChevronRight size={13} />
                 </button>
               </div>
             )}
@@ -406,10 +472,16 @@ export default function MedicoFallecidosPage() {
 
           {/* Paso 2: Detalles de la defunción */}
           {sel && (
-            <form onSubmit={handleSubmit} className="space-y-4 border-t border-slate-200 dark:border-slate-800 pt-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Datos de la defunción</p>
+            <form onSubmit={handleSubmit} className="space-y-5 border-t border-slate-200 pt-6 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white">2</span>
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Verificar datos de la defunción</p>
+                  <p className="text-xs text-slate-500">La fecha y hora son obligatorias; la causa clínica es opcional.</p>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/35 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">
                     Fecha y hora de defunción <span className="text-red-500">*</span>
@@ -442,20 +514,57 @@ export default function MedicoFallecidosPage() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={saving || !fechaDefuncion || !!errorFecha}
-                className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50 transition-all active:scale-[0.99]"
-              >
-                {saving ? "Enviando..." : "Enviar notificación de fallecido"}
-              </button>
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/75 p-4 dark:border-rose-900/70 dark:bg-rose-950/25">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/60 dark:text-rose-300"><HeartPulse size={18} /></span>
+                  <div>
+                    <p className="text-sm font-bold text-rose-900 dark:text-rose-100">Paso 3 · Enviar notificación</p>
+                    <p className="mt-0.5 text-xs leading-5 text-rose-700/90 dark:text-rose-200/80">Revise el paciente y la fecha antes de continuar. El aviso quedará disponible para el equipo ESDOMED.</p>
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={saving || !fechaDefuncion || !!errorFecha}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-600/25 transition-all hover:bg-rose-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? <Loader2 size={17} className="animate-spin" /> : <ClipboardCheck size={17} />}
+                  {saving ? "Enviando notificación..." : "Enviar notificación a ESDOMED"}
+                </button>
+              </div>
             </form>
           )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+      {/* Historial y filtros: los estados visibles evitan abrir registros para saber qué requiere seguimiento. */}
+      <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Seguimiento</p>
+            <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Mis notificaciones</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Consulte el estado de los avisos enviados.</p>
+          </div>
+          <span className="text-xs font-medium text-slate-500">{displayList.length} {displayList.length === 1 ? "resultado" : "resultados"}</span>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="flex items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2.5 dark:border-cyan-900/60 dark:bg-cyan-950/25">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 text-white"><FileText size={16} /></span>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{notificaciones.length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Enviadas</p></div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-white"><Clock3 size={16} /></span>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{pendientes}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Pendientes</p></div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white"><CheckCircle2 size={16} /></span>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{confirmadas}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Confirmadas</p></div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
         <div className="relative flex-1 min-w-[180px]">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
@@ -484,10 +593,11 @@ export default function MedicoFallecidosPage() {
             <X size={12} /> Limpiar
           </button>
         )}
-      </div>
+        </div>
+      </section>
 
       {/* Lista */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {displayList.length === 0 && !showForm && (
           <p className="text-sm text-slate-500 py-10 text-center">
             {notificaciones.length === 0
@@ -498,12 +608,13 @@ export default function MedicoFallecidosPage() {
         {displayList.map(n => (
           <div
             key={n.id}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-rose-200 dark:hover:border-rose-900 transition-all"
+            className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md hover:shadow-cyan-950/5 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-800"
           >
+            <span className={`absolute bottom-0 left-0 top-0 w-1 ${n.estado === "confirmado" ? "bg-emerald-500" : "bg-amber-400"}`} />
             <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 dark:text-slate-100 text-sm">{n.pacienteNombre}</p>
-                <p className="text-xs text-slate-500 mt-0.5">Exp. {n.pacienteExpediente}</p>
+              <div className="min-w-0 pl-1">
+                <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{n.pacienteNombre}</p>
+                <p className="font-mono font-medium text-xs text-slate-500 mt-0.5">Exp. {n.pacienteExpediente}</p>
                 <p className="text-xs text-slate-500 mt-1">{n.servicio} · Cama {n.cama}</p>
                 <p className="text-xs text-slate-500 mt-0.5">Defunción: {formatFecha(n.fechaDefuncion)}</p>
                 {n.causaMuerte && (

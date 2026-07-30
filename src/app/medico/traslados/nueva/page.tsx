@@ -170,21 +170,38 @@ export default function NuevaTrasladoPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <button onClick={() => router.back()}
-          className="flex items-center gap-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-sm transition-colors">
-          <ChevronLeft size={16} /> Volver
-        </button>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#075d70] via-cyan-700 to-blue-700 px-5 py-5 shadow-lg shadow-cyan-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm"><ArrowRightLeft size={24} className="text-white" /></div>
+              <div>
+                <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Nueva solicitud de traslado</h1>
+                <p className="mt-1 max-w-xl text-sm text-cyan-50/90">Complete cada paso para registrar un movimiento clínico con la información correcta.</p>
+              </div>
+            </div>
+            <button onClick={() => router.back()} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/25 transition-colors hover:bg-white/20">
+              <ChevronLeft size={16} /> Volver
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2">
-          {[1, 2, 3, 4].map(s => (
-            <div key={s} className={`h-2 rounded-full transition-all duration-300 ${s === step ? "w-8 bg-blue-600" : s < step ? "w-4 bg-blue-300 dark:bg-blue-800" : "w-4 bg-slate-200 dark:bg-slate-800"}`} />
-          ))}
+          <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { n: 1, l: "Tipo" }, { n: 2, l: "Paciente" }, { n: 3, l: "Destino" }, { n: 4, l: "Confirmar" },
+            ].map(({ n, l }) => (
+              <li key={n} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors ${n === step ? "bg-white/20 text-white ring-1 ring-white/25" : n < step ? "bg-white/10 text-cyan-50" : "text-cyan-100/75"}`}>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${n < step ? "bg-emerald-400 text-emerald-950" : n === step ? "bg-white text-cyan-800" : "bg-white/15 text-white"}`}>{n < step ? <CheckCircle2 size={14} /> : n}</span>
+                <span className="text-xs font-semibold">{l}</span>
+              </li>
+            ))}
+          </ol>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 md:p-8 shadow-sm">
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-8">
 
         {/* Paso 1: Tipo de Traslado */}
         {step === 1 && (
@@ -199,6 +216,7 @@ export default function NuevaTrasladoPage() {
                 selected={tipoTraslado === "servicio_cama"}
                 onClick={() => handleTipoChange("servicio_cama")}
                 icon={<Building2 size={24} />}
+                tone="blue"
                 title="Servicio a Servicio"
                 desc="Traslado a otro servicio médico diferente."
               />
@@ -206,6 +224,7 @@ export default function NuevaTrasladoPage() {
                 selected={tipoTraslado === "interno"}
                 onClick={() => handleTipoChange("interno")}
                 icon={<ArrowRightLeft size={24} />}
+                tone="cyan"
                 title="Traslado Interno"
                 desc="Movimiento dentro del mismo servicio médico."
               />
@@ -213,6 +232,7 @@ export default function NuevaTrasladoPage() {
                 selected={tipoTraslado === "intercambio"}
                 onClick={() => handleTipoChange("intercambio")}
                 icon={<RefreshCw size={24} />}
+                tone="violet"
                 title="Intercambio de Camas"
                 desc="Dos pacientes intercambian sus camas actuales."
               />
@@ -253,7 +273,11 @@ export default function NuevaTrasladoPage() {
               </div>
             </Section>
 
-            <div className="h-px bg-slate-200 dark:bg-slate-800" />
+            <div className="flex items-center gap-3 py-1" aria-hidden="true">
+              <span className="h-px flex-1 bg-cyan-100 dark:bg-cyan-900/60" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm shadow-blue-600/25"><ArrowRight size={16} /></span>
+              <span className="h-px flex-1 bg-blue-100 dark:bg-blue-900/60" />
+            </div>
 
             <Section title="Destino">
               <div className="grid grid-cols-2 gap-3">
@@ -323,8 +347,8 @@ export default function NuevaTrasladoPage() {
 
             {/* Preview del intercambio */}
             {pacienteA && pacienteB && (
-              <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-5 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Vista previa del intercambio</p>
+              <div className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-5 dark:border-violet-900/60 dark:bg-violet-950/20">
+                <p className="text-xs font-semibold uppercase tracking-widest text-violet-700 dark:text-violet-300">Vista previa del intercambio</p>
 
                 <SwapRow
                   nombre={`${pacienteA.apellidos}, ${pacienteA.nombres}`}
@@ -359,8 +383,8 @@ export default function NuevaTrasladoPage() {
               placeholder="Describe el motivo del traslado aquí..." />
 
             {/* Resumen */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Resumen de la Solicitud</h3>
+            <div className="rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/70 to-white p-4 dark:border-cyan-900/60 dark:from-cyan-950/30 dark:via-blue-950/20 dark:to-slate-900">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">Resumen de la solicitud</h3>
 
               <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
                 <div className="flex gap-2">
@@ -401,7 +425,7 @@ export default function NuevaTrasladoPage() {
         )}
 
         {/* Controles de Navegación */}
-        <div className="mt-8 flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-6">
+        <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6 dark:border-slate-800">
           <button
             type="button"
             onClick={prevStep}
@@ -415,7 +439,7 @@ export default function NuevaTrasladoPage() {
               type="button"
               onClick={nextStep}
               disabled={!canGoNext()}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 dark:disabled:bg-blue-800 text-white text-sm font-semibold rounded-xl transition-all disabled:cursor-not-allowed">
+              className="flex items-center gap-2 rounded-xl bg-cyan-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-cyan-700/20 transition-all hover:bg-cyan-600 disabled:cursor-not-allowed disabled:bg-cyan-500 dark:disabled:bg-cyan-800">
               Siguiente <ArrowRight size={16} />
             </button>
           ) : (
@@ -423,8 +447,8 @@ export default function NuevaTrasladoPage() {
               type="button"
               onClick={handleSubmit}
               disabled={!canGoNext() || saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-500 disabled:bg-green-400 dark:disabled:bg-green-800 text-white text-sm font-semibold rounded-xl transition-all disabled:cursor-not-allowed">
-              {saving ? "Enviando..." : "Confirmar y Enviar"}
+              className="flex items-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-700/20 transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-500 dark:disabled:bg-blue-800">
+              {saving ? "Enviando..." : "Confirmar y enviar"}
             </button>
           )}
         </div>
@@ -496,9 +520,12 @@ function BuscadorPaciente({
   if (pacienteSeleccionado) {
     return (
       <div className="space-y-3">
-        <div className="flex items-start gap-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-5">
-          <CheckCircle2 size={20} className="text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+        <div className="relative overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/80 to-white p-5 dark:border-cyan-800 dark:from-cyan-950/40 dark:via-blue-950/20 dark:to-slate-900">
+          <span className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-cyan-500 to-blue-600" />
+          <div className="flex items-start gap-3 pl-1">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-sm shadow-cyan-600/25"><CheckCircle2 size={19} /></span>
           <div className="flex-1 min-w-0">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">Paciente seleccionado</p>
             <p className="font-semibold text-slate-900 dark:text-slate-100">{pacienteSeleccionado.apellidos}, {pacienteSeleccionado.nombres}</p>
             <p className="text-xs text-slate-500 mt-0.5">Exp. {pacienteSeleccionado.expediente}</p>
             <div className="mt-3 flex items-center gap-2 text-sm">
@@ -512,13 +539,14 @@ function BuscadorPaciente({
               </span>
             </div>
           </div>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={onClear}
-          className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 underline transition-colors">
-          Buscar otro expediente
+          className="inline-flex items-center gap-1 text-xs font-medium text-cyan-700 transition-colors hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-100">
+          Buscar otro expediente <ArrowRight size={13} />
         </button>
       </div>
     );
@@ -526,20 +554,20 @@ function BuscadorPaciente({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-700 dark:bg-slate-800/50 sm:flex sm:gap-2">
         <input
           type="text"
           value={exp}
           onChange={e => { setExp(e.target.value); setError(""); }}
           onKeyDown={e => e.key === "Enter" && buscar()}
           placeholder="Número de expediente (ej: 1-24)"
-          className={inputCls}
+          className={`${inputCls} bg-white dark:bg-slate-900`}
         />
         <button
           type="button"
           onClick={buscar}
           disabled={buscando || !exp.trim()}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 dark:disabled:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-all disabled:cursor-not-allowed whitespace-nowrap">
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-cyan-600 disabled:cursor-not-allowed disabled:bg-cyan-500 dark:disabled:bg-cyan-800 sm:mt-0 sm:w-auto">
           {buscando ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
           Buscar
         </button>
@@ -578,17 +606,17 @@ function SwapRow({ nombre, expediente, servicio, camaOrigen, camaDestino }: {
   camaOrigen?: string; camaDestino?: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 rounded-xl border border-violet-100 bg-white/75 p-3 dark:border-violet-900/50 dark:bg-slate-900/50">
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate">{nombre}</p>
         <p className="text-xs text-slate-500">Exp. {expediente} · {servicio}</p>
       </div>
       <div className="flex items-center gap-2 shrink-0 text-sm">
-        <span className="font-semibold text-slate-700 dark:text-slate-300">
+        <span className="rounded-lg bg-slate-100 px-2 py-1 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
           {camaOrigen ? `Cama ${camaOrigen}` : <span className="text-amber-500">Sin cama</span>}
         </span>
-        <ArrowRightCircle size={16} className="text-blue-500 shrink-0" />
-        <span className="font-semibold text-blue-700 dark:text-blue-300">
+        <ArrowRightCircle size={16} className="shrink-0 text-violet-600 dark:text-violet-300" />
+        <span className="rounded-lg bg-violet-100 px-2 py-1 font-semibold text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
           {camaDestino ? `Cama ${camaDestino}` : <span className="text-amber-500">Sin cama</span>}
         </span>
       </div>
@@ -598,21 +626,35 @@ function SwapRow({ nombre, expediente, servicio, camaOrigen, camaDestino }: {
 
 // ─── Componentes de UI compartidos ───────────────────────────────────────────
 
-function TypeCard({ selected, onClick, icon, title, desc }: {
+function TypeCard({ selected, onClick, icon, title, desc, tone }: {
   selected: boolean; onClick: () => void; icon: React.ReactNode; title: string; desc: string;
+  tone: "blue" | "cyan" | "violet";
 }) {
+  const toneClasses = {
+    blue: selected
+      ? "border-blue-500 bg-blue-50 text-blue-800 shadow-sm shadow-blue-950/5 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-200"
+      : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800",
+    cyan: selected
+      ? "border-cyan-500 bg-cyan-50 text-cyan-800 shadow-sm shadow-cyan-950/5 dark:border-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-200"
+      : "border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-cyan-800",
+    violet: selected
+      ? "border-violet-500 bg-violet-50 text-violet-800 shadow-sm shadow-violet-950/5 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-200"
+      : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-violet-800",
+  };
+  const iconClasses = {
+    blue: selected ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300",
+    cyan: selected ? "bg-cyan-600 text-white" : "bg-cyan-50 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-300",
+    violet: selected ? "bg-violet-600 text-white" : "bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300",
+  };
   return (
     <div onClick={onClick}
-      className={`cursor-pointer rounded-2xl border-2 p-5 transition-all duration-200 flex flex-col gap-3
-        ${selected
-          ? "border-blue-600 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
-          : "border-slate-200 dark:border-slate-700 bg-transparent hover:border-blue-300 dark:hover:border-blue-800/50 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
-      <div className={`${selected ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500"}`}>
+      className={`cursor-pointer rounded-2xl border p-5 transition-all duration-200 flex flex-col gap-3 hover:-translate-y-0.5 ${toneClasses[tone]}`}>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${iconClasses[tone]}`}>
         {icon}
       </div>
       <div>
         <h3 className="font-semibold text-sm mb-1">{title}</h3>
-        <p className={`text-xs ${selected ? "text-blue-600/80 dark:text-blue-400/80" : "text-slate-500"}`}>{desc}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{desc}</p>
       </div>
     </div>
   );
@@ -620,8 +662,8 @@ function TypeCard({ selected, onClick, icon, title, desc }: {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">{title}</p>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/35">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">{title}</p>
       <div className="space-y-3">{children}</div>
     </div>
   );
