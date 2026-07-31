@@ -231,14 +231,18 @@ export default function SimmowPage() {
   const [fechaTemp2Amb, setFechaTemp2Amb] = useState("");
   const [errorFechaAmb, setErrorFechaAmb] = useState<string | null>(null);
 
-  // Temporalmente solo admin mientras está en pruebas (ver dashboard/layout.tsx).
+  // Mismos roles que pueden ver el enlace en dashboard/layout.tsx (esdomed,
+  // asistente_esdomed y admin) — el resto de roles no debe poder abrir la
+  // página aunque escriba la URL directamente.
+  const puedeVerSimmow = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+
   useEffect(() => {
-    if (!loading && profile && profile.role !== "admin") {
+    if (!loading && profile && !puedeVerSimmow) {
       router.replace("/dashboard");
     }
-  }, [loading, profile, router]);
+  }, [loading, profile, puedeVerSimmow, router]);
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || !puedeVerSimmow) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />

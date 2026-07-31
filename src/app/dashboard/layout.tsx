@@ -85,9 +85,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verBusquedaTelefono = esAdmin;
   const verCuidadosCriticos = puedeVerModuloCuidadosCriticos(profile);
   const verReportes = esEsdomed || esAdmin;
-  // Temporalmente solo admin mientras está en pruebas, para no confundir al
-  // personal de ESDOMED con una herramienta todavía no lista para uso real.
-  const verSimmow = esAdmin;
+  const verSimmow = esEsdomed || esAdmin;
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
   const verAprobacionTramites = esAdmin || esAsistente;
