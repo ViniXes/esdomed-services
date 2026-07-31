@@ -85,7 +85,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verBusquedaTelefono = esAdmin;
   const verCuidadosCriticos = puedeVerModuloCuidadosCriticos(profile);
   const verReportes = esEsdomed || esAdmin;
-  const verSimmow = esEsdomed || esAdmin;
+  // SIMMOW, a diferencia del resto de módulos ESDOMED de arriba, es solo para
+  // el rol esdomed puntual + admin — NO para asistente_esdomed (pedido
+  // explícito del usuario, no sigue el agrupamiento esEsdomed habitual).
+  const verSimmow = profile?.role === "esdomed" || esAdmin;
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
   const verAprobacionTramites = esAdmin || esAsistente;
