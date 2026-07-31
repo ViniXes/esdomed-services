@@ -92,7 +92,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verHorario = esEsdomed || esAdmin;
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
   const verAprobacionTramites = esAdmin || esAsistente;
-  const verProductividad = esAdmin;
+  const verProductividad = esEsdomed || esAdmin;
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
