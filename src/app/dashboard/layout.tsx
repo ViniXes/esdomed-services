@@ -40,18 +40,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
-import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
+import { esJefeCuidadosCriticos, puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
+import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
   const { pendientes } = useNotificaciones();
   const router = useRouter();
+  const esJefeMedicinaCritica = esJefeCuidadosCriticos(profile);
 
   useEffect(() => {
     if (
       !loading &&
       (!profile ||
-        profile.role === "medico" ||
+        (profile.role === "medico" && !esJefeMedicinaCritica) ||
         profile.role === "psicologia" ||
         profile.role === "enfermeria" ||
         profile.role === "transporte" ||
@@ -62,10 +64,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ) {
       router.replace("/login");
     }
-  }, [loading, profile, router]);
+  }, [esJefeMedicinaCritica, loading, profile, router]);
 
   const roleLabel =
-    profile?.role === "trabajo_social"
+    esJefeMedicinaCritica && profile?.tipoMedico
+      ? TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]
+      : profile?.role === "trabajo_social"
       ? "Trabajo Social"
       : profile?.role === "admin"
         ? "Administración"
@@ -106,7 +110,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const navItems: NavItem[] = [
     // Trabajo Social no usa el inicio (panel de ESDOMED); entra directo a sus vistas.
-    ...(!esTS
+    ...(!esTS && !esJefeMedicinaCritica
       ? [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }]
       : []),
 
@@ -133,6 +137,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verPacientes
       ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
+      : []),
+    ...(esJefeMedicinaCritica
+      ? [{ href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA }]
       : []),
     ...(verCuidadosCriticos
       ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA, exact: true }]

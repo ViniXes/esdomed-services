@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, ArrowRightLeft, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText } from "lucide-react";
+import { Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
@@ -39,11 +39,13 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
     if (!loading && profile?.role !== "medico") router.replace("/login");
   }, [loading, profile, router]);
 
+  const esJefeUciUcin = profile?.tipoMedico === "jefe_uci_ucin";
   const navItems: NavItem[] = profile?.tipoMedico
     ? [
         baseNavItems[0],
         { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, exact: true, tone: "rose" },
         { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2, tone: "teal" },
+        ...(esJefeUciUcin ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, tone: "blue" as const }] : []),
         ...baseNavItems.slice(1),
       ]
     : baseNavItems;

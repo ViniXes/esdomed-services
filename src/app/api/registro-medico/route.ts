@@ -9,7 +9,7 @@ import type { TipoMedicoCuidadosCriticos } from "@/types";
 const PENDIENTES = "registros_medicos_pendientes";
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
-  return value === "uci" || value === "ucin" || value === "uci_ucin";
+  return value === "uci" || value === "ucin" || value === "uci_ucin" || value === "jefe_uci_ucin";
 }
 
 // Endpoint PÚBLICO de autoregistro de médicos. No crea el documento en `usuarios`

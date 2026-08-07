@@ -20,6 +20,7 @@ export const TIPO_MEDICO_CRITICO_LABEL: Record<TipoMedicoCuidadosCriticos, strin
   uci: "Médico UCI",
   ucin: "Médico UCIN",
   uci_ucin: "Médico UCI/UCIN",
+  jefe_uci_ucin: "Jefe UCI/UCIN",
 };
 
 export const TIPO_ATENCION_CRITICA_LABEL: Record<TipoAtencionCuidadosCriticos, string> = {
@@ -42,8 +43,12 @@ export const TIPOS_ATENCION_CRITICA = Object.entries(TIPO_ATENCION_CRITICA_LABEL
 export function serviciosPorTipoMedico(tipo?: TipoMedicoCuidadosCriticos | null): string[] {
   if (tipo === "uci") return [...SERVICIOS_UCI];
   if (tipo === "ucin") return [...SERVICIOS_UCIN];
-  if (tipo === "uci_ucin") return [...SERVICIOS_UCI, ...SERVICIOS_UCIN];
+  if (tipoMedicoCubreUciYUcin(tipo)) return [...SERVICIOS_UCI, ...SERVICIOS_UCIN];
   return [];
+}
+
+export function tipoMedicoCubreUciYUcin(tipo?: TipoMedicoCuidadosCriticos | null) {
+  return tipo === "uci_ucin" || tipo === "jefe_uci_ucin";
 }
 
 export function tipoUnidadPorServicio(servicio?: string | null): "uci" | "ucin" | null {

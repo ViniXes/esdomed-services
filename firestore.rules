@@ -35,14 +35,17 @@ service cloud.firestore {
     }
     function isMedicoCuidadosCriticos() {
       return isMedico()
-        && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin', 'uci_ucin'];
+        && get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico in ['uci', 'ucin', 'uci_ucin', 'jefe_uci_ucin'];
     }
     function tipoMedicoCritico() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.tipoMedico;
     }
+    function isJefeCuidadosCriticos() {
+      return isMedico() && tipoMedicoCritico() == 'jefe_uci_ucin';
+    }
     function puedeRegistrarTipoUnidad(tipoUnidad) {
       return tipoMedicoCritico() == tipoUnidad
-        || (tipoMedicoCritico() == 'uci_ucin' && tipoUnidad in ['uci', 'ucin']);
+        || (tipoMedicoCritico() in ['uci_ucin', 'jefe_uci_ucin'] && tipoUnidad in ['uci', 'ucin']);
     }
     function serviciosAsignados() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.servicios;
@@ -183,7 +186,7 @@ service cloud.firestore {
     // Configuracion mensual usada para indicadores UCI/UCIN.
     // No se deriva de camas clinicas porque el dato estadistico puede cambiar por periodo.
     match /config_indicadores_cuidados_criticos/{id} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isJefeCuidadosCriticos();
       allow create, update, delete: if isAdmin();
     }
 

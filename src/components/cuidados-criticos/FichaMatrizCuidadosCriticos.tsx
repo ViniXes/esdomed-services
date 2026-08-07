@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
-import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { cargarCIE10 } from "@/lib/cie10";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
@@ -391,7 +391,7 @@ function ServicioCriticoCombobox({
       opciones={opciones}
       disabled={disabled}
       placeholder="Escribe o elige la unidad UCI / UCIN..."
-      emptyText={`Sin coincidencias. Elige una unidad asignada a ${tipoMedico === "uci" ? "Medico UCI" : tipoMedico === "ucin" ? "Medico UCIN" : "Medico UCI/UCIN"}.`}
+      emptyText={`Sin coincidencias. Elige una unidad asignada a ${TIPO_MEDICO_CRITICO_LABEL[tipoMedico]}.`}
       onChange={onChange}
     />
   );

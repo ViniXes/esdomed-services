@@ -10,9 +10,11 @@ import {
   consultarFichasCuidadosCriticos,
   eliminarFichaDeCache,
   getFichasCuidadosCriticosCache,
+  queryFichasServicios,
   queryFichasTodas,
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
+import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
@@ -74,7 +76,8 @@ export default function CuidadosCriticosDashboardPage() {
 
   const puedeVer = puedeVerModuloCuidadosCriticos(profile);
   const anioConsulta = new Date().getFullYear();
-  const claveConsulta = `dashboard-cuidados-criticos:${anioConsulta}`;
+  const serviciosConsulta = profile?.role === "admin" ? [] : serviciosPorTipoMedico(profile?.tipoMedico);
+  const claveConsulta = `dashboard-cuidados-criticos:${anioConsulta}:${profile?.role ?? "sin-rol"}:${profile?.tipoMedico ?? "sin-tipo"}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => cacheInicial?.fichas ?? []);
   const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
@@ -92,7 +95,10 @@ export default function CuidadosCriticosDashboardPage() {
     if (!puedeVer || consultando) return;
     setConsultando(true);
     try {
-      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasTodas()]);
+      const consultas = profile?.role === "admin"
+        ? [queryFichasTodas()]
+        : [queryFichasServicios(serviciosConsulta)];
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, consultas);
       const docs = [...resultado.fichas].sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
       setFichas(docs);
       setConsultadoEn(resultado.consultadoEn);

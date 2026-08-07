@@ -22,7 +22,7 @@ const VALID_ROLES = new Set<UserRole>([
 ]);
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
-  return value === "uci" || value === "ucin" || value === "uci_ucin";
+  return value === "uci" || value === "ucin" || value === "uci_ucin" || value === "jefe_uci_ucin";
 }
 
 // Roles del personal ESDOMED que llevan código de marcación y puesto en el plan.

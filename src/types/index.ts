@@ -4,7 +4,7 @@ export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_soc
 // ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.
 export const ISBM_ROLES: UserRole[] = ["isbm_tecnico", "isbm_supervisor", "isbm_jefe"];
 export const esRolIsbm = (role?: UserRole) => !!role && ISBM_ROLES.includes(role);
-export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin";
+export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin" | "jefe_uci_ucin";
 
 export interface UserProfile {
   uid: string;
