@@ -109,6 +109,10 @@ export default function ControlIngresosPage() {
     );
   }
 
+  // Editar está abierto a todo el personal ESDOMED (operativo y asistentes) y admin;
+  // las reglas de Firestore ya permiten el update a estos mismos roles.
+  const puedeEditar = profile.role === "esdomed" || profile.role === "asistente_esdomed" || profile.role === "admin";
+
   const set =
     (field: string) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -574,7 +578,7 @@ export default function ControlIngresosPage() {
                   <th className="w-[26%] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4">Expediente</th>
                   <th className="w-[42%] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4">Paciente</th>
                   <th className="w-[32%] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4">Atención</th>
-                  {profile?.role === "admin" && <th className="w-11 px-2 py-3" aria-label="Acciones" />}
+                  {puedeEditar && <th className="w-11 px-2 py-3" aria-label="Acciones" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -592,7 +596,7 @@ export default function ControlIngresosPage() {
                       <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200" title={ingreso.servicio}>{ingreso.servicio}</p>
                       <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${ingreso.ingresoDirectoServicio ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>{ingreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span>
                     </td>
-                    {profile?.role === "admin" && (
+                    {puedeEditar && (
                       <td className="px-2 py-3 text-right">
                         <button onClick={e => { e.stopPropagation(); handleEdit(ingreso); }} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30" title="Editar registro" aria-label="Editar registro"><Icon icon={pen} width={16} /></button>
                       </td>
