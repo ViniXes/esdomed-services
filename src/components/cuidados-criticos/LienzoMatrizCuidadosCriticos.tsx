@@ -7,7 +7,7 @@ import { doc, deleteDoc, serverTimestamp, updateDoc } from "@/lib/firestoreMeter
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
-import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, VALOR_NO_REGISTRADO, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, VALOR_NO_REGISTRADO, valorComoTexto, valorNumericoEnteroComoTexto, type CampoMatrizCuidadosCriticos, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 interface Props {
@@ -82,7 +82,7 @@ export function LienzoMatrizCuidadosCriticos({
       setExportando(true);
       const XLSX = await import("xlsx");
       const registros = filasFiltradas.map(fila =>
-        Object.fromEntries(campos.map(campo => [campo.label, valorCampo(fila, campo.key)]))
+        Object.fromEntries(campos.map(campo => [campo.label, valorCampo(fila, campo)]))
       );
       const hoja = XLSX.utils.json_to_sheet(registros);
       hoja["!cols"] = campos.map(campo => ({ wch: Math.min(Math.max(campo.label.length + 2, 14), 38) }));
@@ -195,7 +195,7 @@ export function LienzoMatrizCuidadosCriticos({
                   </td>
                 )}
                 {campos.map((campo, campoIndex) => {
-                  const valor = valorCampo(fila, campo.key);
+                  const valor = valorCampo(fila, campo);
                   const href = campo.key === "registro" ? expedienteHref?.(fila) : undefined;
                   const expedientePendiente = href && fichaPendienteCierreCuidadosCriticos(fila);
                   const esPrimera = campoIndex === 0;
@@ -651,9 +651,10 @@ function AccionesMedico({
   );
 }
 
-function valorCampo(fila: FichaCuidadosCriticos, key: string) {
+function valorCampo(fila: FichaCuidadosCriticos, campo: CampoMatrizCuidadosCriticos) {
+  const key = campo.key;
   const directo = valorComoTexto(fila.datos?.[key]);
-  if (directo) return directo;
+  if (directo) return campo.tipo === "number" ? valorNumericoEnteroComoTexto(directo) : directo;
   if (key === "registro") return fila.pacienteExpediente;
   if (key === "nombres") return fila.pacienteNombre.split(",").slice(1).join(",").trim();
   if (key === "apellidos") return fila.pacienteNombre.split(",")[0]?.trim() ?? "";
@@ -661,7 +662,7 @@ function valorCampo(fila: FichaCuidadosCriticos, key: string) {
 }
 
 function textoBusquedaFila(fila: FichaCuidadosCriticos, campos: ReturnType<typeof camposMatrizPorTipo>) {
-  const valores = campos.map(campo => valorCampo(fila, campo.key));
+  const valores = campos.map(campo => valorCampo(fila, campo));
   valores.push(fila.pacienteExpediente, fila.pacienteNombre, fila.servicio, fila.cama ?? "");
   return normalizarBusqueda(valores.join(" "));
 }

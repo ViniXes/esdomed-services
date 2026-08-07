@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import { cargarCIE10 } from "@/lib/cie10";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   aplicarCalculosBasicos,
@@ -15,6 +16,7 @@ import {
   gruposMatrizPorTipo,
   rangoFechaParaMes,
   VALOR_NO_REGISTRADO,
+  valorNumericoEnteroComoTexto,
   valorComoTexto,
   type CampoMatrizCuidadosCriticos,
   type DatosMatrizCuidadosCriticos,
@@ -34,6 +36,7 @@ interface Props {
 
 const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-800";
 const CIE10_TEXT_SEPARATOR = " - ";
+type MensajeFormulario = { tipo: "success" | "error"; texto: string };
 
 function diagnosticoDesdeTexto(value: string): DiagnosticoCIE {
   const text = value.trim();
@@ -49,12 +52,41 @@ function textoDesdeDiagnostico(value: DiagnosticoCIE) {
   return descripcion;
 }
 
+async function normalizarDiagnosticosCIE10(datos: DatosMatrizCuidadosCriticos, campos: CampoMatrizCuidadosCriticos[]) {
+  const camposCie10 = campos.filter(campo => campo.tipo === "cie10");
+  if (camposCie10.length === 0) return { datos, invalidos: [] as string[] };
+
+  const catalogo = await cargarCIE10();
+  const porCodigo = new Map(catalogo.map(entrada => [entrada.code.toUpperCase(), entrada]));
+  const normalizados: DatosMatrizCuidadosCriticos = { ...datos };
+  const invalidos: string[] = [];
+
+  camposCie10.forEach(campo => {
+    const texto = valorComoTexto(datos[campo.key]).trim();
+    if (!texto || texto === VALOR_NO_REGISTRADO) return;
+
+    const diagnostico = diagnosticoDesdeTexto(texto);
+    const entrada = diagnostico.codigo ? porCodigo.get(diagnostico.codigo.toUpperCase()) : null;
+    if (!entrada) {
+      invalidos.push(campo.label);
+      return;
+    }
+
+    normalizados[campo.key] = textoDesdeDiagnostico({
+      codigo: entrada.code,
+      descripcion: entrada.description,
+    });
+  });
+
+  return { datos: normalizados, invalidos };
+}
+
 export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, numeroEstancia, datosGuardados, saving, onSave }: Props) {
   const grupos = useMemo(() => gruposMatrizPorTipo(tipo), [tipo]);
   const datosAutomaticos = useMemo(() => datosAutomaticosPaciente(paciente), [paciente]);
   const [paso, setPaso] = useState(0);
   const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosAutomaticos, ...datosGuardados }));
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<MensajeFormulario | null>(null);
   const datosCalculados = aplicarCalculosBasicos({ ...datosAutomaticos, ...datos });
   const datosParaPorcentaje = datosGuardados ? aplicarValoresPorDefectoMatriz(datosCalculados, tipo) : datosCalculados;
   const camposBloqueados = camposBloqueadosPorPaciente(paciente);
@@ -76,10 +108,20 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
   const porcentaje = Math.round((completados / todosLosCampos.length) * 100);
 
   const guardar = async () => {
-    setMessage("");
+    setMessage(null);
+    const { datos: datosValidados, invalidos } = await normalizarDiagnosticosCIE10(datosCalculados, todosLosCampos);
+    if (invalidos.length > 0) {
+      setMessage({
+        tipo: "error",
+        texto: `Selecciona un diagnostico CIE-10 valido en: ${invalidos.slice(0, 4).join(", ")}${invalidos.length > 4 ? ` y ${invalidos.length - 4} mas` : ""}.`,
+      });
+      return;
+    }
+
     try {
-      await onSave(datosCalculados);
-      setMessage(`Parte ${paso + 1} guardada correctamente.`);
+      await onSave(datosValidados);
+      setDatos(datosValidados);
+      setMessage({ tipo: "success", texto: `Parte ${paso + 1} guardada correctamente.` });
     } catch {
       // La pantalla principal muestra el motivo específico del error.
     }
@@ -162,7 +204,12 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
               <ChevronLeft size={16} /> Parte anterior
             </button>
             <div className="flex flex-wrap items-center gap-3">
-              {message && <span className="inline-flex items-center gap-1.5 text-sm text-green-700 dark:text-green-400"><CheckCircle2 size={16} />{message}</span>}
+              {message && (
+                <span className={`inline-flex items-center gap-1.5 text-sm ${message.tipo === "error" ? "text-rose-700 dark:text-rose-300" : "text-green-700 dark:text-green-400"}`}>
+                  {message.tipo === "error" ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+                  {message.texto}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={guardar}
@@ -205,7 +252,9 @@ function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, des
     ? editandoNumero ? "" : "0"
     : text === VALOR_NO_REGISTRADO && (campo.tipo === "date" || campo.tipo === "time")
       ? ""
-      : text;
+      : esNumero && !editandoNumero
+        ? valorNumericoEnteroComoTexto(text)
+        : text;
   const selectValue = text || VALOR_NO_REGISTRADO;
   const automatico = campo.automatico || bloqueado;
   const esFechaIngreso = campo.key === "fecha_ingreso_al_servicio" && campo.tipo === "date";
@@ -264,10 +313,10 @@ function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, des
       ) : (
         <input
           type={esNumero ? "text" : campo.tipo}
-          inputMode={esNumero ? "decimal" : undefined}
+          inputMode={esNumero ? "numeric" : undefined}
           min={esNumero ? 0 : rangoFechaIngreso?.min}
           max={rangoFechaIngreso?.max}
-          step={esNumero ? "any" : undefined}
+          step={esNumero ? "1" : undefined}
           value={inputValue}
           disabled={automatico}
           onFocus={event => {
@@ -278,7 +327,8 @@ function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, des
           onBlur={event => {
             if (esNumero) {
               setEditandoNumero(false);
-              if (!event.currentTarget.value.trim()) onChange("0");
+              const valorIngresado = event.currentTarget.value.trim();
+              onChange(valorIngresado ? valorNumericoEnteroComoTexto(valorIngresado) : "0");
               return;
             }
             if (!rangoFechaIngreso || !event.currentTarget.value) return;
