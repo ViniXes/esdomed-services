@@ -457,6 +457,19 @@ export function esValorRegistrado(value: unknown) {
   return texto !== "" && texto !== VALOR_NO_REGISTRADO;
 }
 
+function numeroEnteroMatriz(value: unknown) {
+  const texto = valorComoTexto(value).trim().replace(",", ".");
+  if (!texto || texto === VALOR_NO_REGISTRADO) return null;
+  const numero = Number(texto);
+  if (!Number.isFinite(numero)) return null;
+  return Math.max(0, Math.round(numero));
+}
+
+export function valorNumericoEnteroComoTexto(value: unknown) {
+  const entero = numeroEnteroMatriz(value);
+  return entero === null ? valorComoTexto(value) : String(entero);
+}
+
 function fechaComoInput(value: unknown) {
   if (!value) return "";
   const date = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
@@ -552,7 +565,12 @@ function fechaActualInput() {
 export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCriticos, tipo: TipoMedicoCuidadosCriticos): DatosMatrizCuidadosCriticos {
   const resultado = { ...datos };
   for (const campo of camposMatrizPorTipo(tipo)) {
-    if (esValorRegistrado(resultado[campo.key])) continue;
+    if (esValorRegistrado(resultado[campo.key])) {
+      if (campo.tipo === "number") {
+        resultado[campo.key] = numeroEnteroMatriz(resultado[campo.key]) ?? 0;
+      }
+      continue;
+    }
     resultado[campo.key] = campo.tipo === "number" ? 0 : VALOR_NO_REGISTRADO;
   }
   return resultado;

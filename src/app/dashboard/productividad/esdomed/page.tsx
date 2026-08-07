@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { collection, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import {
   BadgeCheck,
@@ -191,7 +192,20 @@ async function fetchHojaDrive(hoja: HojaDrive, mes: string, token: string, roste
 }
 
 export default function ProductividadEsdomedPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, profile, loading: authLoading } = useAuth();
+  // Mismos roles que ven el enlace en dashboard/layout.tsx (esdomed +
+  // asistente_esdomed + admin) — la página no tenía guard propio, dependía
+  // solo del enlace del menú estando oculto.
+  const puedeVer =
+    profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+
+  useEffect(() => {
+    if (!authLoading && profile && !puedeVer) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, profile, puedeVer, router]);
+
   const [mes, setMes] = useState(mesActualStr());
   const [personal, setPersonal] = useState<string[]>([]);
   const [carpetasDrive, setCarpetasDrive] = useState<Map<string, number>>(new Map());
@@ -362,6 +376,14 @@ export default function ProductividadEsdomedPage() {
     actualizacionesDrive,
     consentimientosDrive,
   ]);
+
+  if (!profile || !puedeVer) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
 
   const exportarExcel = async () => {
     setExportando(true);

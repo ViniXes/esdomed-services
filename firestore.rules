@@ -231,8 +231,10 @@ service cloud.firestore {
       // el detalle del propio. Sí puede leer SU PROPIO reporte (resource.data.uid
       // == uid()) para consultar si ya se resolvió — una consulta filtrada por
       // "uid == su propio uid" es la única forma de listar bajo esta regla.
+      // create: SIMMOW es solo para el rol esdomed puntual + admin (no
+      // asistente_esdomed), a diferencia de isEsdomed() que sí lo agrupa.
       allow read:   if isAdmin() || (isAuth() && resource.data.uid == uid());
-      allow create: if (isEsdomed() || isAdmin()) && request.resource.data.uid == uid();
+      allow create: if (getRole() == 'esdomed' || isAdmin()) && request.resource.data.uid == uid();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

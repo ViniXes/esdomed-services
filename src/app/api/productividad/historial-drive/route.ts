@@ -43,8 +43,11 @@ function parseFechaSheet(texto: string): Date | null {
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
+const ROLES_PERMITIDOS = ["esdomed", "asistente_esdomed", "admin"];
+
 export async function GET(req: NextRequest) {
-  if ((await getCallerRole(req)) !== "admin") {
+  const rol = await getCallerRole(req);
+  if (!rol || !ROLES_PERMITIDOS.includes(rol)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

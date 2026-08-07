@@ -610,7 +610,7 @@ function numeroConfig(value: unknown) {
 function numero(value: unknown) {
   const texto = valorComoTexto(value).replace("%", "").replace(",", ".").trim();
   const parsed = Number(texto);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
 }
 
 function numeroVista(value: number) {
