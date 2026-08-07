@@ -11,6 +11,7 @@ import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
+  queryFichasServicios,
   queryFichasTodas,
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
@@ -125,7 +126,8 @@ export default function IndicadoresCuidadosCriticosPage() {
 
   const puedeVer = puedeVerIndicadoresCuidadosCriticos(profile);
   const esAdmin = profile?.role === "admin";
-  const claveConsulta = `indicadores-cuidados-criticos:${anio}`;
+  const serviciosConsulta = profile?.role === "admin" ? [] : serviciosPorTipoMedico(profile?.tipoMedico);
+  const claveConsulta = `indicadores-cuidados-criticos:${anio}:${profile?.role ?? "sin-rol"}:${profile?.tipoMedico ?? "sin-tipo"}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => cacheInicial?.fichas ?? []);
   const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
@@ -144,9 +146,10 @@ export default function IndicadoresCuidadosCriticosPage() {
     if (!puedeVer || consultando) return;
     setConsultando(true);
     try {
-      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [
-        queryFichasTodas(),
-      ]);
+      const consultas = profile?.role === "admin"
+        ? [queryFichasTodas()]
+        : [queryFichasServicios(serviciosConsulta)];
+      const resultado = await consultarFichasCuidadosCriticos(claveConsulta, consultas);
       const docs = [...resultado.fichas].sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
       setFichas(docs);
       setConsultadoEn(resultado.consultadoEn);

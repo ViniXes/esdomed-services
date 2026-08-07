@@ -38,7 +38,7 @@ function puedeTenerJvpm(role: string | undefined) {
 }
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
-  return value === "uci" || value === "ucin" || value === "uci_ucin";
+  return value === "uci" || value === "ucin" || value === "uci_ucin" || value === "jefe_uci_ucin";
 }
 
 async function getCaller(req: NextRequest): Promise<{ uid: string; role: string } | null> {
