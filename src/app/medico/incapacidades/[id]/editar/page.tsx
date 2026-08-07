@@ -155,6 +155,12 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         condicionEgreso: form.condicionEgreso,
         recomendaciones: form.recomendaciones.trim() || null,
         seguimiento: form.seguimiento.trim() || null,
+        // La edición del médico redefine los días: si ESDOMED los había
+        // corregido, esa corrección deja de aplicar y se limpia su rastro.
+        diasMedicoOriginal: null,
+        diasCorregidosPor: null,
+        diasCorregidosEn: null,
+        diasAclaracion: null,
       };
 
       await updateDoc(doc(db, "incapacidades", incapacidad.id), update);

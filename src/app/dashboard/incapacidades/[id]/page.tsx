@@ -47,6 +47,12 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   const [aclaracionIngreso, setAclaracionIngreso] = useState("");
   const [guardandoIngreso, setGuardandoIngreso] = useState(false);
 
+  // Corrección ESDOMED de los días que otorgó el médico (solo esta incapacidad).
+  const [editandoDias, setEditandoDias] = useState(false);
+  const [diasEdit, setDiasEdit] = useState("");
+  const [aclaracionDias, setAclaracionDias] = useState("");
+  const [guardandoDias, setGuardandoDias] = useState(false);
+
   const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
   const puedeEliminar = esEsdomed;
 
@@ -70,6 +76,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
         fechaExpedicion: toDate(data.fechaExpedicion),
         fechaIngresoCorregida: toDate(data.fechaIngresoCorregida),
         fechaIngresoCorregidaEn: toDate(data.fechaIngresoCorregidaEn),
+        diasCorregidosEn: toDate(data.diasCorregidosEn),
       } as SolicitudIncapacidad;
       setIncapacidad(inc);
       setInstitucion(inc.institucionProvisional ?? "");
@@ -140,6 +147,10 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   // En emergencia no hay estancia: los días son solo los prescritos y no
   // dependen de la fecha de ingreso, así que la corrección no recalcula nada.
   const esEmergenciaInc = incapacidad.origen === "emergencia";
+
+  // Días que otorgó el médico: los adicionales post-alta en hospitalización;
+  // en emergencia el total prescrito. Es el número que ESDOMED puede corregir.
+  const diasMedicoActuales = esEmergenciaInc ? incapacidad.diasIncapacidad : diasAdicionales;
 
   const emitir = async () => {
     if (!profile || !incapacidad.id) return;
@@ -245,6 +256,67 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
     }
   };
 
+  // ── Corrección de días del médico (ESDOMED) ──
+  const abrirEditarDias = () => {
+    setDiasEdit(String(diasMedicoActuales));
+    setAclaracionDias(incapacidad.diasAclaracion ?? "");
+    setEditandoDias(true);
+  };
+
+  const guardarDias = async () => {
+    if (!incapacidad.id || !profile || diasEdit === "" || !aclaracionDias.trim()) return;
+    const nuevos = Number(diasEdit);
+    if (!Number.isInteger(nuevos) || nuevos < (esEmergenciaInc ? 1 : 0)) return;
+    setError(null);
+    setGuardandoDias(true);
+    try {
+      // El total y fechaHasta se ajustan por la diferencia de días; la parte de
+      // hospitalización (derivada de ingreso→alta) queda intacta.
+      const delta = nuevos - diasMedicoActuales;
+      const nuevaHasta = new Date(incapacidad.fechaHasta);
+      nuevaHasta.setDate(nuevaHasta.getDate() + delta);
+      const update: Record<string, unknown> = {
+        diasIncapacidad: incapacidad.diasIncapacidad + delta,
+        fechaHasta: Timestamp.fromDate(nuevaHasta),
+        diasCorregidosPor: profile.nombre,
+        diasCorregidosEn: Timestamp.now(),
+        diasAclaracion: aclaracionDias.trim(),
+      };
+      // El valor original del médico se conserva desde la primera corrección.
+      if (incapacidad.diasMedicoOriginal == null) update.diasMedicoOriginal = diasMedicoActuales;
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), update);
+      setEditandoDias(false);
+    } catch (e) {
+      setError(`Error al corregir los días: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoDias(false);
+    }
+  };
+
+  const quitarCorreccionDias = async () => {
+    if (!incapacidad.id || incapacidad.diasMedicoOriginal == null) return;
+    setError(null);
+    setGuardandoDias(true);
+    try {
+      const delta = incapacidad.diasMedicoOriginal - diasMedicoActuales;
+      const nuevaHasta = new Date(incapacidad.fechaHasta);
+      nuevaHasta.setDate(nuevaHasta.getDate() + delta);
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+        diasIncapacidad: incapacidad.diasIncapacidad + delta,
+        fechaHasta: Timestamp.fromDate(nuevaHasta),
+        diasMedicoOriginal: null,
+        diasCorregidosPor: null,
+        diasCorregidosEn: null,
+        diasAclaracion: null,
+      });
+      setEditandoDias(false);
+    } catch (e) {
+      setError(`Error al quitar la corrección: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoDias(false);
+    }
+  };
+
   const eliminar = async () => {
     if (!incapacidad.id) return;
     setEliminando(true);
@@ -263,6 +335,18 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   // Validación en vivo de la fecha corregida: la estancia no puede ser negativa.
   const fechaIngresoEditInvalida = !esEmergenciaInc && editandoIngreso && !!fechaIngresoEdit &&
     altaAntesDelIngreso(incapacidad.fechaAlta, new Date(fechaIngresoEdit + "T00:00:00"));
+
+  // Validación en vivo de los días corregidos + vista previa del resultado.
+  const diasEditNum = Number(diasEdit);
+  const diasEditInvalido = editandoDias && diasEdit !== "" &&
+    (!Number.isInteger(diasEditNum) || diasEditNum < (esEmergenciaInc ? 1 : 0));
+  const diasEditDelta = diasEditNum - diasMedicoActuales;
+  const hastaPreview = (() => {
+    if (!editandoDias || diasEdit === "" || diasEditInvalido || diasEditDelta === 0) return null;
+    const d = new Date(incapacidad.fechaHasta);
+    d.setDate(d.getDate() + diasEditDelta);
+    return d;
+  })();
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
@@ -464,7 +548,100 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
         <p className="mt-3 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
           <span className="font-semibold text-slate-700 dark:text-slate-300">{incapacidad.diasIncapacidad} días en total</span>
           {" = "}{diasHospitalizacion} de hospitalización + <span className="font-semibold text-slate-700 dark:text-slate-300">{diasAdicionales} adicionales</span> que otorgó el médico.
+          {esEsdomed && !editandoDias && (
+            <button
+              onClick={abrirEditarDias}
+              className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline align-baseline"
+            >
+              <Pencil size={10} /> Corregir días
+            </button>
+          )}
         </p>
+
+        {/* Corrección de días vigente (badge + aclaración, no se imprime) */}
+        {incapacidad.diasMedicoOriginal != null && !editandoDias && (
+          <div className="mt-2 text-[11px] text-slate-700 dark:text-slate-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-lg px-2.5 py-1.5">
+            <p className="font-semibold text-amber-700 dark:text-amber-400">
+              Días corregidos por {incapacidad.diasCorregidosPor ?? "ESDOMED"}
+              {" · "}el médico otorgó {incapacidad.diasMedicoOriginal} {incapacidad.diasMedicoOriginal === 1 ? "día" : "días"}
+              {esEmergenciaInc ? "" : " adicionales"}.
+            </p>
+            {incapacidad.diasAclaracion && (
+              <p className="mt-1"><span className="font-semibold">Aclaración:</span> {incapacidad.diasAclaracion}</p>
+            )}
+          </div>
+        )}
+
+        {/* Editor de corrección de días (ESDOMED) */}
+        {editandoDias && (
+          <div className="mt-2 space-y-2 bg-amber-50/50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-3">
+            <label className="block text-[11px] font-medium text-slate-500">
+              {esEmergenciaInc ? "Días de incapacidad prescritos" : "Días adicionales otorgados por el médico"}{" "}
+              <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="number"
+              min={esEmergenciaInc ? 1 : 0}
+              step={1}
+              value={diasEdit}
+              onChange={e => setDiasEdit(e.target.value)}
+              className="w-28 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {diasEditInvalido && (
+              <p className="text-[11px] text-red-600 dark:text-red-400">
+                Debe ser un número entero de {esEmergenciaInc ? 1 : 0} o más.
+              </p>
+            )}
+            <p className="text-[11px] text-slate-400">
+              {esEmergenciaInc
+                ? "Al guardar se recalculan el total de días y la fecha “Hasta” de la constancia."
+                : "Al guardar se recalculan el total de días y la fecha “Hasta”; los días de hospitalización no cambian (salen de las fechas de ingreso y alta)."}
+            </p>
+            {hastaPreview && (
+              <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                Quedará: <span className="font-semibold">{incapacidad.diasIncapacidad + diasEditDelta} días en total</span>
+                {", hasta el "}{formatFecha(hastaPreview)}.
+              </p>
+            )}
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                Aclaración de la corrección <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                value={aclaracionDias}
+                onChange={e => setAclaracionDias(e.target.value)}
+                rows={2}
+                placeholder="Ej. Los días otorgados no coinciden con lo indicado por el servicio..."
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={guardarDias}
+                disabled={guardandoDias || diasEdit === "" || !aclaracionDias.trim() || diasEditInvalido}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {guardandoDias ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={() => setEditandoDias(false)}
+                disabled={guardandoDias}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              {incapacidad.diasMedicoOriginal != null && (
+                <button
+                  onClick={quitarCorreccionDias}
+                  disabled={guardandoDias}
+                  className="px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Quitar corrección
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
           <BlockRow label="Diagnóstico de egreso" value={incapacidad.diagnosticoEgreso} />
           <BlockRow label="Tratamiento al alta" value={incapacidad.tratamientoAlta} />

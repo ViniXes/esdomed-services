@@ -447,6 +447,17 @@ export interface SolicitudIncapacidad {
   // Aclaración obligatoria al corregir: por qué se cambió la fecha. Solo se
   // muestra en la vista ESDOMED; no se imprime en la constancia.
   fechaIngresoAclaracion?: string;
+
+  // ── Corrección ESDOMED: días otorgados por el médico ──
+  // Corrige los días post-alta que otorgó el médico (en emergencia, el total
+  // prescrito). Al guardar se recalculan diasIncapacidad y fechaHasta; el valor
+  // original del médico se conserva para mostrarlo y poder revertir.
+  diasMedicoOriginal?: number;
+  diasCorregidosPor?: string;   // nombre del ESDOMED que corrigió
+  diasCorregidosEn?: Date;
+  // Aclaración obligatoria al corregir: por qué se cambiaron los días. Solo se
+  // muestra en la vista ESDOMED; no se imprime en la constancia.
+  diasAclaracion?: string;
 }
 
 // ============================================================================
