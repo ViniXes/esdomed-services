@@ -54,6 +54,28 @@ function textoDesdeDiagnostico(value: DiagnosticoCIE) {
   return descripcion;
 }
 
+function valorRegistrado(value: unknown) {
+  const text = valorComoTexto(value).trim();
+  return Boolean(text) && text !== VALOR_NO_REGISTRADO;
+}
+
+function fusionarDatosAutomaticos(
+  automaticos: DatosMatrizCuidadosCriticos,
+  guardados?: DatosMatrizCuidadosCriticos,
+): DatosMatrizCuidadosCriticos {
+  const datos = { ...automaticos, ...guardados };
+
+  // En pacientes fallecidos estos campos estan bloqueados y deben prevalecer
+  // desde el expediente hospitalario, aunque la ficha vieja tenga "No registrado".
+  (["fecha_de_muerte", "hora_de_muerte", "alta"] as const).forEach((key) => {
+    if (valorRegistrado(automaticos[key]) && !valorRegistrado(datos[key])) {
+      datos[key] = automaticos[key];
+    }
+  });
+
+  return datos;
+}
+
 async function normalizarDiagnosticosCIE10(datos: DatosMatrizCuidadosCriticos, campos: CampoMatrizCuidadosCriticos[]) {
   const camposCie10 = campos.filter(campo => campo.tipo === "cie10");
   if (camposCie10.length === 0) return { datos, invalidos: [] as string[] };
@@ -86,10 +108,11 @@ async function normalizarDiagnosticosCIE10(datos: DatosMatrizCuidadosCriticos, c
 export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, numeroEstancia, datosGuardados, saving, onSave }: Props) {
   const grupos = useMemo(() => gruposMatrizPorTipo(tipo), [tipo]);
   const datosAutomaticos = useMemo(() => datosAutomaticosPaciente(paciente), [paciente]);
+  const datosIniciales = useMemo(() => fusionarDatosAutomaticos(datosAutomaticos, datosGuardados), [datosAutomaticos, datosGuardados]);
   const [paso, setPaso] = useState(0);
-  const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => ({ ...datosAutomaticos, ...datosGuardados }));
+  const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => datosIniciales);
   const [message, setMessage] = useState<MensajeFormulario | null>(null);
-  const datosCalculados = aplicarCalculosBasicos({ ...datosAutomaticos, ...datos });
+  const datosCalculados = aplicarCalculosBasicos(fusionarDatosAutomaticos(datosAutomaticos, datos));
   const datosParaPorcentaje = datosGuardados ? aplicarValoresPorDefectoMatriz(datosCalculados, tipo) : datosCalculados;
   const camposBloqueados = camposBloqueadosPorPaciente(paciente);
   const camposPendientesCierre = useMemo(
