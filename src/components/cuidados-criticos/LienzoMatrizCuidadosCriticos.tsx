@@ -162,7 +162,9 @@ export function LienzoMatrizCuidadosCriticos({
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
               {mostrarAcciones && (
-                <th className="sticky left-0 z-20 w-10 bg-white px-1 py-2 dark:bg-slate-900" aria-hidden="true" />
+                <th className="sticky left-0 z-20 min-w-28 border-l border-t border-r border-slate-200 bg-slate-100 px-2 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  Acción
+                </th>
               )}
               {campos.map((campo, campoIndex) => {
                 const esPrimera = campoIndex === 0;
@@ -186,7 +188,7 @@ export function LienzoMatrizCuidadosCriticos({
               return (
               <tr key={fila.id ?? `fila-${inicio + index}`}>
                 {mostrarAcciones && (
-                  <td className="sticky left-0 z-10 w-10 bg-white px-1 py-2 align-top dark:bg-slate-900">
+                  <td className="sticky left-0 z-10 min-w-28 border-l border-r border-t border-slate-200 bg-white px-2 py-2 align-top dark:border-slate-700 dark:bg-slate-900">
                     {profile?.role === "admin" ? (
                       <AccionesAdmin ficha={fila} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
                     ) : profile?.role === "medico" ? (
@@ -405,13 +407,14 @@ function AccionesAdmin({
         type="button"
         onClick={() => setModal(pendiente ? "revisar" : "confirmar")}
         title={pendiente ? `Solicitud de eliminación pendiente: ${solicitud?.motivo}` : "Eliminar ficha"}
-        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-colors ${
+        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors ${
           pendiente
-            ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
-            : "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
+            ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300"
+            : "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300"
         }`}
       >
-        <Trash2 size={7} />
+        <Trash2 size={12} />
+        {pendiente ? "Revisar" : "Eliminar"}
       </button>
 
       {modal !== "cerrado" && (
@@ -529,7 +532,14 @@ function AccionesMedico({
   const [error, setError] = useState<string | null>(null);
 
   if (ficha.creadoPorId !== uid) {
-    return <span className="inline-block h-3.5 w-3.5 shrink-0" aria-hidden="true" />;
+    return (
+      <span
+        title="Solo el usuario que creó este registro puede solicitar su eliminación."
+        className="inline-flex rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-400 dark:border-slate-700 dark:text-slate-500"
+      >
+        No aplica
+      </span>
+    );
   }
 
   const solicitud = ficha.solicitudEliminacion;
@@ -589,13 +599,14 @@ function AccionesMedico({
               ? `Solicitud anterior rechazada${solicitud?.notaRechazo ? `: ${solicitud.notaRechazo}` : ""}. Click para volver a solicitar.`
               : "Solicitar eliminación"
         }
-        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-colors ${
+        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed ${
           pendiente
-            ? "text-amber-600 dark:text-amber-400"
-            : "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
+            ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300"
+            : "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300"
         }`}
       >
-        <Trash2 size={7} />
+        <Trash2 size={12} />
+        {pendiente ? "Pendiente" : "Solicitar"}
       </button>
 
       {abierto && (
