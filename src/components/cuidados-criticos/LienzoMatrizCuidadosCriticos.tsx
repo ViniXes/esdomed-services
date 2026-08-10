@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Download, Loader2, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { doc, deleteDoc, serverTimestamp, updateDoc } from "@/lib/firestoreMeter";
+import { collection, doc, serverTimestamp, updateDoc, writeBatch } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
@@ -349,11 +349,31 @@ function AccionesAdmin({
   };
 
   const eliminar = async () => {
-    if (!ficha.id) return;
+    if (!ficha.id || !user || !profile) return;
     setProcesando(true);
     setError(null);
     try {
-      await deleteDoc(doc(db, "fichas_cuidados_criticos", ficha.id));
+      const batch = writeBatch(db);
+      const historialRef = doc(collection(db, "historial_eliminaciones_cuidados_criticos"));
+      const fichaRef = doc(db, "fichas_cuidados_criticos", ficha.id);
+      batch.set(historialRef, {
+        fichaId: ficha.id,
+        tipoUnidad: ficha.tipoUnidad,
+        pacienteId: ficha.pacienteId,
+        pacienteExpediente: ficha.pacienteExpediente,
+        pacienteNombre: ficha.pacienteNombre,
+        servicio: ficha.servicio,
+        cama: ficha.cama ?? "",
+        estadoEstancia: ficha.estadoEstancia ?? "",
+        solicitudEliminacion: ficha.solicitudEliminacion ?? null,
+        origen: pendiente ? "solicitud_medico" : "eliminacion_directa_admin",
+        fichaSnapshot: ficha,
+        eliminadoPorId: user.uid,
+        eliminadoPorNombre: profile.nombre,
+        eliminadoEn: serverTimestamp(),
+      });
+      batch.delete(fichaRef);
+      await batch.commit();
       onEliminada?.(ficha.id);
       cerrar();
     } catch (e) {

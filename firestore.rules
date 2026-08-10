@@ -185,6 +185,25 @@ service cloud.firestore {
     // ─── Traslados ────────────────────────────────────────────────────────────
     // Configuracion mensual usada para indicadores UCI/UCIN.
     // No se deriva de camas clinicas porque el dato estadistico puede cambiar por periodo.
+    match /historial_eliminaciones_cuidados_criticos/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+                    && request.resource.data.keys().hasAll([
+                      'fichaId',
+                      'pacienteExpediente',
+                      'pacienteNombre',
+                      'servicio',
+                      'fichaSnapshot',
+                      'eliminadoPorId',
+                      'eliminadoPorNombre',
+                      'eliminadoEn'
+                    ])
+                    && request.resource.data.eliminadoPorId == uid()
+                    && request.resource.data.eliminadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
+                    && request.resource.data.eliminadoEn == request.time;
+      allow update, delete: if false;
+    }
+
     match /config_indicadores_cuidados_criticos/{id} {
       allow read: if isAdmin() || isJefeCuidadosCriticos();
       allow create, update, delete: if isAdmin();
