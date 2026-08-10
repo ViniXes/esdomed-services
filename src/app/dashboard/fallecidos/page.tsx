@@ -641,7 +641,11 @@ export default function DashboardFallecidosPage() {
                         <p className="text-xs text-slate-500 mt-0.5">† {formatFechaHora(n.fechaDefuncion)}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
-                        Dr. {n.medicoNombre}
+                        <p>Dr. {n.medicoNombre}</p>
+                        {/* Hora en que el médico envió la notificación (no la de defunción) */}
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                          Reportado {formatFechaHora(n.creadoEn)}
+                        </p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="space-y-1.5">
@@ -859,9 +863,8 @@ export default function DashboardFallecidosPage() {
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-x-6 gap-y-3">
                     <InfoCell label="Fecha y hora de defunción" value={formatFechaHora(selectedLive.fechaDefuncion)} />
                     <InfoCell label="Servicio" value={selectedLive.servicio} />
-                    <div className="col-span-2">
-                      <InfoCell label="Notificado por" value={`Dr. ${selectedLive.medicoNombre}`} />
-                    </div>
+                    <InfoCell label="Notificado por" value={`Dr. ${selectedLive.medicoNombre}`} />
+                    <InfoCell label="Hora del reporte" value={formatFechaHora(selectedLive.creadoEn)} />
                     {selectedLive.causaMuerte && (
                       <div className="col-span-2">
                         <InfoCell label="Causa de muerte" value={selectedLive.causaMuerte} />
