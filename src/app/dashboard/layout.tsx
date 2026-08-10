@@ -138,7 +138,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verPacientes
       ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
       : []),
-    ...(esJefeMedicinaCritica
+    ...((esAdmin || esJefeMedicinaCritica)
       ? [{ href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA }]
       : []),
     ...(verCuidadosCriticos

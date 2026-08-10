@@ -28,7 +28,7 @@ import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
 import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
-import type { FichaCuidadosCriticos, Paciente } from "@/types";
+import type { FichaCuidadosCriticos, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
 const NUEVA_ESTANCIA = "nueva";
 const inputCls = "w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
@@ -84,7 +84,10 @@ function limpiarFichaUrl() {
 
 export default function CuidadosCriticosMedicoPage() {
   const { user, profile } = useAuth();
-  const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
+  const tipoMedicoActivo: TipoMedicoCuidadosCriticos | null = profile?.role === "admin"
+    ? "uci_ucin"
+    : profile?.tipoMedico ?? null;
+  const servicios = useMemo(() => tipoMedicoActivo ? serviciosPorTipoMedico(tipoMedicoActivo) : [], [tipoMedicoActivo]);
   const claveConsultaFichas = `medico-cuidados-criticos:${servicios.join("|")}`;
   const cacheInicialFichas = getFichasCuidadosCriticosCache(claveConsultaFichas);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
@@ -111,14 +114,14 @@ export default function CuidadosCriticosMedicoPage() {
   }, []);
 
   useEffect(() => {
-    if (!profile?.tipoMedico || servicios.length === 0) return;
+    if (!tipoMedicoActivo || servicios.length === 0) return;
     const clave = `medico-cuidados-criticos-pacientes:${servicios.join("|")}`;
     return suscribirPacientesCuidadosCriticos(clave, servicios, docs => {
       const ordenados = [...docs]
         .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || a.servicioActual.localeCompare(b.servicioActual) || (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
       setPacientes(ordenados);
     });
-  }, [profile?.tipoMedico, servicios]);
+  }, [tipoMedicoActivo, servicios]);
 
   useEffect(() => {
     const cache = getFichasCuidadosCriticosCache(claveConsultaFichas);
@@ -129,7 +132,7 @@ export default function CuidadosCriticosMedicoPage() {
   }, [claveConsultaFichas, servicios]);
 
   const consultarFichasBase = async () => {
-    if (!profile?.tipoMedico || servicios.length === 0 || consultandoFichas) return;
+    if (!tipoMedicoActivo || servicios.length === 0 || consultandoFichas) return;
     setConsultandoFichas(true);
     try {
       const resultado = await consultarFichasCuidadosCriticos(claveConsultaFichas, [
@@ -279,7 +282,7 @@ export default function CuidadosCriticosMedicoPage() {
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
   const tipoFormulario = tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
-    ?? profile?.tipoMedico
+    ?? tipoMedicoActivo
     ?? "uci";
   const numeroEstancia = fichaSeleccionada
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
@@ -374,21 +377,22 @@ export default function CuidadosCriticosMedicoPage() {
   };
 
   const guardarFicha = async (datos: DatosMatrizCuidadosCriticos) => {
-    if (!user || !profile?.tipoMedico || !selected?.id) return;
+    if (!user || !tipoMedicoActivo || !selected?.id) return;
+    const nombreUsuario = profile?.nombre ?? user.email ?? "Usuario";
     if (!esValorRegistrado(datos.fecha_ingreso_al_servicio)) {
       const message = "Registra primero la FECHA INGRESO AL SERVICIO correspondiente a este registro UCI/UCIN.";
       setError(message);
       throw new Error(message);
     }
     const especialidad = valorComoTexto(datos.especialidad).trim();
-    if (!serviciosPorTipoMedico(profile.tipoMedico).includes(especialidad)) {
+    if (!servicios.includes(especialidad)) {
       const message = "Selecciona una ESPECIALIDAD valida de las unidades asignadas a tu rol.";
       setError(message);
       throw new Error(message);
     }
     const tipoRegistroGuardar = tipoUnidadPorServicio(especialidad)
       ?? tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected.servicioActual)
-      ?? (profile.tipoMedico === "ucin" ? "ucin" : "uci");
+      ?? (tipoMedicoActivo === "ucin" ? "ucin" : "uci");
     const servicioFicha = especialidad || selected.servicioActual;
 
     setSaving(true);
@@ -424,7 +428,7 @@ export default function CuidadosCriticosMedicoPage() {
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
           actualizadoPorId: user.uid,
-          actualizadoPorNombre: profile.nombre,
+          actualizadoPorNombre: nombreUsuario,
           actualizadoEn: serverTimestamp(),
         });
         upsertFichaLocal({
@@ -435,7 +439,7 @@ export default function CuidadosCriticosMedicoPage() {
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
           actualizadoPorId: user.uid,
-          actualizadoPorNombre: profile.nombre,
+          actualizadoPorNombre: nombreUsuario,
           actualizadoEn: fechaLocal,
         });
       } else {
@@ -449,10 +453,10 @@ export default function CuidadosCriticosMedicoPage() {
           cama: selected.camaActual ?? "",
           datos: datosParaGuardar,
           creadoPorId: user.uid,
-          creadoPorNombre: profile.nombre,
+          creadoPorNombre: nombreUsuario,
           creadoEn: serverTimestamp(),
           actualizadoPorId: user.uid,
-          actualizadoPorNombre: profile.nombre,
+          actualizadoPorNombre: nombreUsuario,
           actualizadoEn: serverTimestamp(),
         };
         const creada = await addDoc(collection(db, "fichas_cuidados_criticos"), fichaNueva);
@@ -473,7 +477,7 @@ export default function CuidadosCriticosMedicoPage() {
     }
   };
 
-  if (!profile?.tipoMedico) {
+  if (!tipoMedicoActivo) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
@@ -496,7 +500,7 @@ export default function CuidadosCriticosMedicoPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-slate-100">Matriz de cuidados críticos</h1>
-            <p className="text-xs text-slate-500">{TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · Una fila por cada estancia en UCI / UCIN</p>
+            <p className="text-xs text-slate-500">{TIPO_MEDICO_CRITICO_LABEL[tipoMedicoActivo]} · Una fila por cada estancia en UCI / UCIN</p>
           </div>
         </div>
       </header>
@@ -542,7 +546,7 @@ export default function CuidadosCriticosMedicoPage() {
             </select>
           </div>
           <p className="mt-2 text-[11px] text-slate-400">
-            Mostrando solo pacientes de las unidades asignadas a {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]}.
+            Mostrando solo pacientes de las unidades asignadas a {TIPO_MEDICO_CRITICO_LABEL[tipoMedicoActivo]}.
           </p>
         </div>
         <div className="grid max-h-64 gap-2 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
