@@ -7,7 +7,7 @@ import { doc, deleteDoc, serverTimestamp, updateDoc } from "@/lib/firestoreMeter
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
-import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, VALOR_NO_REGISTRADO, valorComoTexto, valorNumericoEnteroComoTexto, type CampoMatrizCuidadosCriticos, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, normalizarValorSiNo, VALOR_NO_REGISTRADO, valorComoTexto, valorNumericoEnteroComoTexto, type CampoMatrizCuidadosCriticos, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 interface Props {
@@ -664,6 +664,7 @@ function AccionesMedico({
 
 function valorCampo(fila: FichaCuidadosCriticos, campo: CampoMatrizCuidadosCriticos) {
   const key = campo.key;
+  if (campo.tipo === "yesno") return normalizarValorSiNo(fila.datos?.[key]);
   const directo = valorComoTexto(fila.datos?.[key]);
   if (directo) return campo.tipo === "number" ? valorNumericoEnteroComoTexto(directo) : directo;
   if (key === "registro") return fila.pacienteExpediente;

@@ -471,6 +471,32 @@ export function valorNumericoEnteroComoTexto(value: unknown) {
   return entero === null ? valorComoTexto(value) : String(entero);
 }
 
+function tokenSiNo(value: unknown) {
+  return valorComoTexto(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+export function normalizarValorSiNo(value: unknown) {
+  const token = tokenSiNo(value);
+  if (!token || token === tokenSiNo(VALOR_NO_REGISTRADO)) return VALOR_NO_REGISTRADO;
+  if (["SI", "S", "YES", "TRUE", "1"].includes(token)) return "SI";
+  if (["NO", "N", "ON", "FALSE", "0"].includes(token)) return "NO";
+  return VALOR_NO_REGISTRADO;
+}
+
+export function normalizarDatosSiNoMatriz(datos: DatosMatrizCuidadosCriticos, campos: CampoMatrizCuidadosCriticos[]) {
+  const resultado = { ...datos };
+  for (const campo of campos) {
+    if (campo.tipo === "yesno") {
+      resultado[campo.key] = normalizarValorSiNo(resultado[campo.key]);
+    }
+  }
+  return resultado;
+}
+
 function fechaComoInput(value: unknown) {
   if (!value) return "";
   const date = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
@@ -569,6 +595,8 @@ export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCritico
     if (esValorRegistrado(resultado[campo.key])) {
       if (campo.tipo === "number") {
         resultado[campo.key] = numeroEnteroMatriz(resultado[campo.key]) ?? 0;
+      } else if (campo.tipo === "yesno") {
+        resultado[campo.key] = normalizarValorSiNo(resultado[campo.key]);
       }
       continue;
     }

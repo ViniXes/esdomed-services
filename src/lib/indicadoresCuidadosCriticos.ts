@@ -1,6 +1,6 @@
 import type { ConfigIndicadoresCuidadosCriticos, FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
-import { esValorRegistrado, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
+import { esValorRegistrado, normalizarValorSiNo, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 
 export const MESES_INDICADORES = [
   "ENERO",
@@ -618,7 +618,7 @@ function numeroVista(value: number) {
 }
 
 function si(value: unknown) {
-  return valorComoTexto(value).trim().toUpperCase() === "SI";
+  return normalizarValorSiNo(value) === "SI";
 }
 
 function cuentaSi(fichas: FichaCuidadosCriticos[], key: string) {

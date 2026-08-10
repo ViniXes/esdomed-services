@@ -14,6 +14,8 @@ import {
   camposPendientesCierreCuidadosCriticos,
   datosAutomaticosPaciente,
   gruposMatrizPorTipo,
+  normalizarDatosSiNoMatriz,
+  normalizarValorSiNo,
   rangoFechaParaMes,
   VALOR_NO_REGISTRADO,
   valorNumericoEnteroComoTexto,
@@ -109,7 +111,8 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
 
   const guardar = async () => {
     setMessage(null);
-    const { datos: datosValidados, invalidos } = await normalizarDiagnosticosCIE10(datosCalculados, todosLosCampos);
+    const datosSiNoNormalizados = normalizarDatosSiNoMatriz(datosCalculados, todosLosCampos);
+    const { datos: datosValidados, invalidos } = await normalizarDiagnosticosCIE10(datosSiNoNormalizados, todosLosCampos);
     if (invalidos.length > 0) {
       setMessage({
         tipo: "error",
@@ -243,7 +246,7 @@ function normalizarBusquedaCatalogo(value: string): string {
 }
 
 function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, destacarEgreso, pendienteCierre, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; mesSeleccionado?: string; bloqueado?: boolean; destacarEgreso?: boolean; pendienteCierre?: boolean; onChange: (value: string) => void }) {
-  const text = valorComoTexto(valor);
+  const text = campo.tipo === "yesno" ? normalizarValorSiNo(valor) : valorComoTexto(valor);
   const [editandoNumero, setEditandoNumero] = useState(false);
   const esNumero = campo.tipo === "number";
   const campoEgreso = destacarEgreso && CAMPOS_CIERRE_CUIDADOS_CRITICOS.has(campo.key);
