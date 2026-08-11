@@ -5,7 +5,7 @@ import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Trash2, Users }
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
-import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import {
   actualizarFichaEnCache,
   consultarFichasCuidadosCriticos,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
-import type { FichaCuidadosCriticos } from "@/types";
+import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
 type CierreFiltro = "todos" | "pendientes" | "cerrados";
@@ -85,7 +85,10 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [hasta, setHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
 
-  const servicios = useMemo(() => profile?.servicios ?? [], [profile?.servicios]);
+  const tipoMedicoActivo: TipoMedicoCuidadosCriticos | null = profile?.role === "admin"
+    ? "uci_ucin"
+    : profile?.tipoMedico ?? null;
+  const servicios = useMemo(() => tipoMedicoActivo ? serviciosPorTipoMedico(tipoMedicoActivo) : [], [tipoMedicoActivo]);
   const claveConsulta = `medico-registros-cuidados:${servicios.join("|")}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
@@ -101,7 +104,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   }, [claveConsulta, servicios]);
 
   const consultarFichas = async () => {
-    if (!profile?.tipoMedico || servicios.length === 0 || consultando) return;
+    if (!tipoMedicoActivo || servicios.length === 0 || consultando) return;
     setConsultando(true);
     try {
       const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasServicios(servicios)]);
@@ -138,7 +141,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     actualizarFichaEnCache(claveConsulta, ficha);
   };
 
-  if (!profile?.tipoMedico) {
+  if (!tipoMedicoActivo) {
     return (
       <div className="p-6">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
@@ -157,7 +160,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         <div>
           <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-slate-100">Mis registros UCI / UCIN</h1>
           <p className="text-xs text-slate-500">
-            {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} - Vista consolidada de las estancias registradas en tus unidades.
+            {TIPO_MEDICO_CRITICO_LABEL[tipoMedicoActivo]} - Vista consolidada de las estancias registradas en tus unidades.
           </p>
         </div>
       </header>
@@ -249,7 +252,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <LienzoMatrizCuidadosCriticos
-          tipo={profile.tipoMedico}
+          tipo={tipoMedicoActivo}
           fichas={fichasFiltradas}
           expedienteHref={ficha => ficha.id ? `/medico/cuidados-criticos?ficha=${ficha.id}` : undefined}
           onFichaActualizada={manejarFichaActualizada}

@@ -33,6 +33,7 @@ interface Props {
   numeroEstancia: number;
   datosGuardados?: DatosMatrizCuidadosCriticos;
   saving: boolean;
+  puedeEditarAutomaticos?: boolean;
   onSave: (datos: DatosMatrizCuidadosCriticos) => Promise<void>;
 }
 
@@ -105,7 +106,7 @@ async function normalizarDiagnosticosCIE10(datos: DatosMatrizCuidadosCriticos, c
   return { datos: normalizados, invalidos };
 }
 
-export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, numeroEstancia, datosGuardados, saving, onSave }: Props) {
+export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, numeroEstancia, datosGuardados, saving, puedeEditarAutomaticos = false, onSave }: Props) {
   const grupos = useMemo(() => gruposMatrizPorTipo(tipo), [tipo]);
   const datosAutomaticos = useMemo(() => datosAutomaticosPaciente(paciente), [paciente]);
   const datosIniciales = useMemo(() => fusionarDatosAutomaticos(datosAutomaticos, datosGuardados), [datosAutomaticos, datosGuardados]);
@@ -213,6 +214,7 @@ export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, 
                 valor={datosCalculados[campo.key]}
                 mesSeleccionado={valorComoTexto(datosCalculados.mes)}
                 bloqueado={camposBloqueados.has(campo.key)}
+                puedeEditarAutomaticos={puedeEditarAutomaticos}
                 destacarEgreso={Boolean(datosGuardados)}
                 pendienteCierre={Boolean(datosGuardados) && camposPendientesCierre.has(campo.key)}
                 onChange={value => setDatos(actual => ({ ...actual, [campo.key]: value }))}
@@ -268,7 +270,7 @@ function normalizarBusquedaCatalogo(value: string): string {
     .trim();
 }
 
-function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, destacarEgreso, pendienteCierre, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; mesSeleccionado?: string; bloqueado?: boolean; destacarEgreso?: boolean; pendienteCierre?: boolean; onChange: (value: string) => void }) {
+function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, puedeEditarAutomaticos, destacarEgreso, pendienteCierre, onChange }: { campo: CampoMatrizCuidadosCriticos; tipoMedico: TipoMedicoCuidadosCriticos; valor: unknown; mesSeleccionado?: string; bloqueado?: boolean; puedeEditarAutomaticos?: boolean; destacarEgreso?: boolean; pendienteCierre?: boolean; onChange: (value: string) => void }) {
   const text = campo.tipo === "yesno" ? normalizarValorSiNo(valor) : valorComoTexto(valor);
   const [editandoNumero, setEditandoNumero] = useState(false);
   const esNumero = campo.tipo === "number";
@@ -282,7 +284,8 @@ function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, des
         ? valorNumericoEnteroComoTexto(text)
         : text;
   const selectValue = text || VALOR_NO_REGISTRADO;
-  const automatico = campo.automatico || bloqueado;
+  const automatico = !puedeEditarAutomaticos && (campo.automatico || bloqueado);
+  const esAutomaticoEditable = puedeEditarAutomaticos && (campo.automatico || bloqueado);
   const esFechaIngreso = campo.key === "fecha_ingreso_al_servicio" && campo.tipo === "date";
   const anioReferencia = /^\d{4}-\d{2}-\d{2}$/.test(inputValue) ? Number(inputValue.slice(0, 4)) : new Date().getFullYear();
   const rangoFechaIngreso = esFechaIngreso && mesSeleccionado ? rangoFechaParaMes(mesSeleccionado, anioReferencia) : null;
@@ -290,6 +293,7 @@ function CampoMatriz({ campo, tipoMedico, valor, mesSeleccionado, bloqueado, des
     <label className={`${campo.tipo === "textarea" ? "md:col-span-2 xl:col-span-3" : ""} ${campoEgreso ? `rounded-xl border p-2 ${pendienteCierre || cierreSinDato ? "border-rose-300/80 bg-rose-50/60 dark:border-rose-700/80 dark:bg-rose-950/25" : "border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/60 dark:bg-emerald-950/20"}` : ""}`}>
       <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
         {campo.label}
+        {esAutomaticoEditable && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">ADMIN</span>}
         {automatico && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800">AUTOMÁTICO</span>}
       </span>
       {rangoFechaIngreso && (

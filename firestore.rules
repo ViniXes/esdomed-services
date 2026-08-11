@@ -138,7 +138,7 @@ service cloud.firestore {
       allow read: if isAdmin()
                   || (isMedicoCuidadosCriticos()
                       && resource.data.servicio in serviciosAsignados());
-      allow create: if isMedicoCuidadosCriticos()
+      allow create: if (isAdmin() || isMedicoCuidadosCriticos())
                     && request.resource.data.keys().hasOnly([
                       'tipoUnidad',
                       'estadoEstancia',
@@ -155,9 +155,9 @@ service cloud.firestore {
                       'actualizadoPorNombre',
                       'actualizadoEn'
                     ])
-                    && puedeRegistrarTipoUnidad(request.resource.data.tipoUnidad)
+                    && (isAdmin() || puedeRegistrarTipoUnidad(request.resource.data.tipoUnidad))
                     && request.resource.data.estadoEstancia in ['activa', 'egresada']
-                    && request.resource.data.servicio in serviciosAsignados()
+                    && (isAdmin() || request.resource.data.servicio in serviciosAsignados())
                     && request.resource.data.creadoPorId == uid()
                     && request.resource.data.creadoPorNombre == get(/databases/$(database)/documents/usuarios/$(uid())).data.nombre
                     && request.resource.data.actualizadoPorId == uid()

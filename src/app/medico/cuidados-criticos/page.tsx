@@ -687,6 +687,7 @@ export default function CuidadosCriticosMedicoPage() {
           numeroEstancia={numeroEstancia}
           datosGuardados={fichaSeleccionada?.datos}
           saving={saving}
+          puedeEditarAutomaticos={profile?.role === "admin"}
           onSave={guardarFicha}
         />
       ) : (
