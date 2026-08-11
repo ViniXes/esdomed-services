@@ -18,6 +18,17 @@ import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types"
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
 type CierreFiltro = "todos" | "pendientes" | "cerrados";
+type FiltrosPersistidos = {
+  servicio?: string;
+  periodo?: PeriodoFiltro;
+  cierre?: CierreFiltro;
+  mes?: string;
+  desde?: string;
+  hasta?: string;
+  busqueda?: string;
+};
+
+const FILTROS_STORAGE_KEY = "cuidados-criticos:mis-registros:filtros:v1";
 
 const MESES = [
   "ENERO",
@@ -35,6 +46,34 @@ const MESES = [
 ];
 
 const inputCls = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+
+function esPeriodoFiltro(value: unknown): value is PeriodoFiltro {
+  return value === "todos" || value === "mes" || value === "rango";
+}
+
+function esCierreFiltro(value: unknown): value is CierreFiltro {
+  return value === "todos" || value === "pendientes" || value === "cerrados";
+}
+
+function leerFiltrosPersistidos(): FiltrosPersistidos {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(FILTROS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<FiltrosPersistidos>;
+    return {
+      servicio: typeof parsed.servicio === "string" ? parsed.servicio : undefined,
+      periodo: esPeriodoFiltro(parsed.periodo) ? parsed.periodo : undefined,
+      cierre: esCierreFiltro(parsed.cierre) ? parsed.cierre : undefined,
+      mes: typeof parsed.mes === "string" && MESES.includes(parsed.mes) ? parsed.mes : undefined,
+      desde: typeof parsed.desde === "string" ? parsed.desde : undefined,
+      hasta: typeof parsed.hasta === "string" ? parsed.hasta : undefined,
+      busqueda: typeof parsed.busqueda === "string" ? parsed.busqueda : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
 
 function fechaIngresoFicha(ficha: FichaCuidadosCriticos) {
   if (!esValorRegistrado(ficha.datos?.fecha_ingreso_al_servicio)) return null;
@@ -77,13 +116,14 @@ function ordenarFichas(fichas: FichaCuidadosCriticos[]) {
 
 export default function RegistrosCuidadosCriticosMedicoPage() {
   const { profile } = useAuth();
-  const [servicio, setServicio] = useState("todos");
-  const [periodo, setPeriodo] = useState<PeriodoFiltro>("mes");
-  const [cierre, setCierre] = useState<CierreFiltro>("todos");
-  const [mes, setMes] = useState(MESES[new Date().getMonth()]);
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
-  const [busqueda, setBusqueda] = useState("");
+  const [filtrosIniciales] = useState<FiltrosPersistidos>(() => leerFiltrosPersistidos());
+  const [servicio, setServicio] = useState(filtrosIniciales.servicio ?? "todos");
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>(filtrosIniciales.periodo ?? "mes");
+  const [cierre, setCierre] = useState<CierreFiltro>(filtrosIniciales.cierre ?? "todos");
+  const [mes, setMes] = useState(filtrosIniciales.mes ?? MESES[new Date().getMonth()]);
+  const [desde, setDesde] = useState(filtrosIniciales.desde ?? "");
+  const [hasta, setHasta] = useState(filtrosIniciales.hasta ?? "");
+  const [busqueda, setBusqueda] = useState(filtrosIniciales.busqueda ?? "");
 
   const tipoMedicoActivo: TipoMedicoCuidadosCriticos | null = profile?.role === "admin"
     ? "uci_ucin"
@@ -94,6 +134,24 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
   const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
   const [consultando, setConsultando] = useState(false);
+
+  useEffect(() => {
+    if (servicio === "todos" || servicios.length === 0 || servicios.includes(servicio)) return;
+    setServicio("todos");
+  }, [servicio, servicios]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(FILTROS_STORAGE_KEY, JSON.stringify({
+      servicio,
+      periodo,
+      cierre,
+      mes,
+      desde,
+      hasta,
+      busqueda,
+    } satisfies FiltrosPersistidos));
+  }, [busqueda, cierre, desde, hasta, mes, periodo, servicio]);
 
   useEffect(() => {
     const cache = getFichasCuidadosCriticosCache(claveConsulta);
