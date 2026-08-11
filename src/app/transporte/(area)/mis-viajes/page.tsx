@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, updateDoc, where, writeBatch,
+  arrayUnion, collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, updateDoc, where, writeBatch,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,23 +11,15 @@ import {
   CHECKLIST_ITEMS, ESTADO_VIAJE_COLOR, ESTADO_VIAJE_LABEL, NIVELES_COMBUSTIBLE, type NivelCombustible,
 } from "@/lib/transporte/catalogos";
 import {
+  ahoraHHMM, eventoViaje, fmtFecha, hoyStr, validarKmEntrada, validarKmSalida,
+} from "@/lib/transporte/helpers";
+import {
   AlertTriangle, Bus, CheckCircle2, ClipboardCheck, Flag, Loader2, MapPin, Phone, Play, UserRound, X,
 } from "lucide-react";
 
 const inputCls =
   "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 const labelCls = "block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5";
-
-const hoyStr = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, "0")}-${`${d.getDate()}`.padStart(2, "0")}`;
-};
-const ahoraHHMM = () => new Date().toTimeString().slice(0, 5);
-const fmtFecha = (f?: string) => {
-  if (!f) return "—";
-  const [y, m, d] = f.split("-");
-  return y && m && d ? `${d}/${m}/${y}` : f;
-};
 
 export default function MisViajesPage() {
   const { profile } = useAuth();
@@ -81,6 +73,16 @@ export default function MisViajesPage() {
   // (docId determinístico vehículo+fecha+motorista), pasa directo al kilometraje.
   const iniciarRuta = async (v: ViajeTransporte) => {
     if (!profile || !v.vehiculoId) return;
+    // Un vehículo no puede ir a dos misiones a la vez: si el motorista dejó otro
+    // viaje abierto con el mismo carro, primero tiene que cerrarlo.
+    const abierto = activos.find((x) => x.estado === "en_ruta" && x.vehiculoId === v.vehiculoId && x.folio !== v.folio);
+    if (abierto) {
+      setToast({
+        tipo: "error",
+        msg: `${v.vehiculoNombre ?? "El vehículo"} ya va en ruta en el viaje ${abierto.folio}. Ciérralo primero.`,
+      });
+      return;
+    }
     setVerificando(v.folio);
     try {
       const id = `${v.vehiculoId}_${hoyStr()}_${profile.uid}`;
@@ -207,17 +209,19 @@ export default function MisViajesPage() {
       )}
 
       {/* Modal: kilometraje de salida */}
-      {viajeSalida && (
+      {viajeSalida && profile && (
         <ModalKm
           titulo="Salida"
           viaje={viajeSalida}
           onCerrar={() => setViajeSalida(null)}
           onConfirmar={async (km) => {
+            const hora = ahoraHHMM();
             try {
               await updateDoc(doc(db, "viajes_transporte", viajeSalida.folio), {
                 estado: "en_ruta",
-                horaSalida: ahoraHHMM(),
+                horaSalida: hora,
                 kmSalida: km,
+                historial: arrayUnion(eventoViaje("en_ruta", profile, `Salida ${hora} · km ${km}`)),
                 actualizadoEn: Timestamp.now(),
               });
               setToast({ tipo: "success", msg: "Ruta iniciada — buen viaje" });
@@ -231,7 +235,7 @@ export default function MisViajesPage() {
       )}
 
       {/* Modal: kilometraje de entrada */}
-      {viajeEntrada && (
+      {viajeEntrada && profile && (
         <ModalKm
           titulo="Entrada"
           viaje={viajeEntrada}
@@ -239,13 +243,15 @@ export default function MisViajesPage() {
           onCerrar={() => setViajeEntrada(null)}
           onConfirmar={async (km) => {
             const v = viajeEntrada;
+            const hora = ahoraHHMM();
             try {
               const batch = writeBatch(db);
               batch.update(doc(db, "viajes_transporte", v.folio), {
                 estado: "finalizado",
-                horaEntrada: ahoraHHMM(),
+                horaEntrada: hora,
                 kmEntrada: km,
                 kmRecorrido: v.kmSalida != null ? km - v.kmSalida : null,
+                historial: arrayUnion(eventoViaje("finalizado", profile, `Entrada ${hora} · km ${km}`)),
                 actualizadoEn: Timestamp.now(),
               });
               // El odómetro del vehículo queda al día (prellena el próximo viaje).
@@ -313,6 +319,11 @@ function ModalChecklist({
         nivelCombustible: nivel,
         kilometraje: km ? Number(km) : undefined,
         observaciones: observaciones.trim() || undefined,
+        // Novedades: lo que quedó en NO viaja aparte para que el jefe lo vea en
+        // su bandeja sin tener que abrir checklist por checklist.
+        tieneFallas: conFallas.length > 0,
+        itemsEnNo: conFallas.map((i) => i.id),
+        atendido: false,
         creadoEn: Timestamp.now() as unknown as Date,
       };
       const payload = Object.fromEntries(Object.entries(datos).filter(([, v]) => v !== undefined));
@@ -433,17 +444,19 @@ function ModalKm({
 }) {
   const [km, setKm] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [kmVehiculo, setKmVehiculo] = useState<number | undefined>(undefined);
   const [cargandoPrefill, setCargandoPrefill] = useState(() => titulo === "Salida" && !!viaje.vehiculoId);
 
   // El odómetro actual del vehículo prellena el km de salida (consistencia:
-  // el cierre del viaje anterior dejó el vehículo al día).
+  // el cierre del viaje anterior dejó el vehículo al día) y además es el piso
+  // que valida la captura.
   useEffect(() => {
     if (titulo !== "Salida" || !viaje.vehiculoId) return;
     const t = setTimeout(async () => {
       try {
         const snap = await getDoc(doc(db, "vehiculos_transporte", viaje.vehiculoId!));
         const kmActual = snap.exists() ? (snap.data().kmActual as number | undefined) : undefined;
-        if (kmActual != null) setKm(String(kmActual));
+        if (kmActual != null) { setKmVehiculo(kmActual); setKm(String(kmActual)); }
       } catch { /* prellenado opcional */ } finally {
         setCargandoPrefill(false);
       }
@@ -452,7 +465,8 @@ function ModalKm({
   }, [titulo, viaje.vehiculoId]);
 
   const n = Number(km);
-  const valido = km !== "" && Number.isFinite(n) && n >= 0 && (minimo == null || n >= minimo);
+  const validacion = titulo === "Salida" ? validarKmSalida(n, kmVehiculo) : validarKmEntrada(n, minimo);
+  const valido = km !== "" && !validacion.error;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
@@ -479,8 +493,14 @@ function ModalKm({
               disabled={cargandoPrefill}
               className={inputCls + " text-lg font-bold tabular-nums"}
             />
-            {minimo != null && km !== "" && n < minimo && (
-              <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1.5">Debe ser mayor o igual al km de salida ({minimo}).</p>
+            {km !== "" && validacion.error && (
+              <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1.5">{validacion.error}</p>
+            )}
+            {km !== "" && !validacion.error && validacion.aviso && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">{validacion.aviso}</p>
+            )}
+            {titulo === "Salida" && kmVehiculo != null && !validacion.error && (
+              <p className="text-[11px] text-slate-500 mt-1.5">Último odómetro registrado: {kmVehiculo.toLocaleString("es-SV")} km</p>
             )}
             {minimo != null && valido && (
               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5">Recorrido: {n - minimo} km</p>

@@ -1379,8 +1379,34 @@ export interface ViajeTransporte {
   kmEntrada?: number;
   kmRecorrido?: number;        // kmEntrada - kmSalida (calculado al finalizar)
 
+  // Origen del registro: "publico" = formulario de folio; "interno" = lo levantó
+  // el jefe desde el tablero (viaje por orden verbal, emergencia, mandado).
+  origen?: "publico" | "interno";
+  registradoPorNombre?: string; // solo en los internos
+
+  // Bitácora de auditoría del viaje: quién hizo qué y cuándo. Se agrega con
+  // arrayUnion en cada acción; nunca se reescribe.
+  historial?: EventoViajeTransporte[];
+
   creadoEn: Date;
   actualizadoEn?: Date;
+}
+
+// Una línea de la bitácora de auditoría de un viaje.
+export interface EventoViajeTransporte {
+  en: Date;
+  accion:
+    | "creado"
+    | "asignado"
+    | "rechazado"
+    | "cancelado"
+    | "en_ruta"
+    | "finalizado"
+    | "cerrado_por_jefe"
+    | "corregido";
+  porId: string;
+  porNombre: string;
+  detalle?: string;            // texto libre: motivo, valores corregidos, aviso de conflicto…
 }
 
 // Checklist diario del vehículo (requisito para iniciar ruta).
@@ -1397,6 +1423,16 @@ export interface ChecklistVehiculo {
   kilometraje?: number;
   observaciones?: string;
   creadoEn: Date;
+
+  // Novedades: derivados de `items` al guardar para que el jefe pueda consultar
+  // las fallas sin leer todos los checklists (consulta por igualdad, sin índice).
+  tieneFallas?: boolean;
+  itemsEnNo?: string[];        // ids del catálogo que quedaron en NO
+  atendido?: boolean;          // el jefe ya revisó la novedad
+  atendidoPorId?: string;
+  atendidoPorNombre?: string;
+  atendidoEn?: Date;
+  notaAtencion?: string;       // qué se hizo con la falla
 }
 
 // ============================================================================

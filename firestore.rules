@@ -500,28 +500,39 @@ service cloud.firestore {
         && request.resource.data.destinoTexto.size() <= 300
         && request.resource.data.fechaNecesita is string
         && request.resource.data.horaNecesita is string;
-      // Jefe/admin gestionan; el motorista solo toca viajes asignados a él.
+      // Jefe/admin gestionan. El motorista solo toca los viajes asignados a él y
+      // únicamente los campos de ejecución: no puede reasignarse, cambiar de
+      // vehículo ni reescribir la solicitud.
       allow update: if isTransporte() || isAdmin()
-        || (isMotorista() && resource.data.motoristaId == uid());
+        || (isMotorista()
+            && resource.data.motoristaId == uid()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                 'estado', 'horaSalida', 'kmSalida', 'horaEntrada', 'kmEntrada',
+                 'kmRecorrido', 'historial', 'actualizadoEn'
+               ])
+            && request.resource.data.estado in ['en_ruta', 'finalizado']);
       allow delete: if isAdmin();
     }
 
     match /vehiculos_transporte/{id} {
       allow read:   if isTransporte() || isMotorista() || isAdmin();
       allow create: if isTransporte() || isAdmin();
-      // El motorista actualiza el kilometraje del vehículo al cerrar un viaje.
-      allow update: if isTransporte() || isMotorista() || isAdmin();
+      // El motorista solo pone al día el odómetro al cerrar un viaje.
+      allow update: if isTransporte() || isAdmin()
+        || (isMotorista()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kmActual', 'actualizadoEn']));
       allow delete: if isAdmin();
     }
 
-    // Checklist diario por vehículo (requisito para iniciar ruta); cada motorista
-    // crea y corrige solo los propios.
+    // Checklist diario por vehículo (requisito para iniciar ruta): cada motorista
+    // crea y corrige solo los propios; el jefe de transporte además marca las
+    // novedades como atendidas.
     match /checklists_vehiculo/{id} {
       allow read:   if isTransporte() || isMotorista() || isAdmin();
       allow create: if (isTransporte() || isMotorista() || isAdmin())
         && request.resource.data.motoristaId == uid();
-      allow update: if isAdmin()
-        || ((isTransporte() || isMotorista()) && resource.data.motoristaId == uid());
+      allow update: if isTransporte() || isAdmin()
+        || (isMotorista() && resource.data.motoristaId == uid());
       allow delete: if isAdmin();
     }
 

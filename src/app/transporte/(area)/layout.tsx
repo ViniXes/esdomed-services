@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bus, ExternalLink, LayoutDashboard, Truck } from "lucide-react";
+import { Bus, ClipboardCheck, ExternalLink, LayoutDashboard, Truck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 
@@ -27,6 +27,7 @@ export default function TransporteLayout({ children }: { children: React.ReactNo
     ? [{ href: "/transporte/mis-viajes", label: "Mis viajes", icon: Bus }]
     : [
         { href: "/transporte", label: "Tablero", icon: LayoutDashboard, exact: true },
+        { href: "/transporte/novedades", label: "Novedades", icon: ClipboardCheck },
         { href: "/transporte/vehiculos", label: "Vehículos", icon: Truck },
         { href: "/transporte/solicitar", label: "Formulario público", icon: ExternalLink },
       ];
