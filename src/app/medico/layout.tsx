@@ -36,21 +36,23 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && profile?.role !== "medico") router.replace("/login");
+    if (!loading && profile?.role !== "medico" && profile?.role !== "admin") router.replace("/login");
   }, [loading, profile, router]);
 
+  const esAdmin = profile?.role === "admin";
+  const tipoMedicoNavegacion = esAdmin ? "uci_ucin" : profile?.tipoMedico;
   const esJefeUciUcin = profile?.tipoMedico === "jefe_uci_ucin";
-  const navItems: NavItem[] = profile?.tipoMedico
+  const navItems: NavItem[] = tipoMedicoNavegacion
     ? [
         baseNavItems[0],
         { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, exact: true, tone: "rose" },
         { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2, tone: "teal" },
-        ...(esJefeUciUcin ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, tone: "blue" as const }] : []),
-        ...baseNavItems.slice(1),
+        ...((esAdmin || esJefeUciUcin) ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, tone: "blue" as const }] : []),
+        ...(esAdmin ? [] : baseNavItems.slice(1)),
       ]
     : baseNavItems;
-  const roleLabel = profile?.tipoMedico
-    ? TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]
+  const roleLabel = tipoMedicoNavegacion
+    ? TIPO_MEDICO_CRITICO_LABEL[tipoMedicoNavegacion]
     : "Portal Médico";
 
   return (

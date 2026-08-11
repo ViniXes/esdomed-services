@@ -26,7 +26,7 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1.5";
 export default function EgresoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(true);
@@ -226,6 +226,19 @@ export default function EgresoPage({ params }: { params: Promise<{ id: string }>
       };
 
       await updateDoc(doc(db, "pacientes", paciente.id), update);
+
+      try {
+        const token = user ? await user.getIdToken() : null;
+        if (token) {
+          const res = await fetch(`/api/esdomed/pacientes/${paciente.id}/cerrar-ficha-critica-egreso`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+      } catch (err) {
+        console.error("Error cerrando ficha UCI/UCIN por egreso hospitalario:", err);
+      }
 
       // Solo al registrar el egreso por primera vez: anular las tarjetas de visita
       // activas (conserva el historial; solo deja de estar "activa"). Al editar un

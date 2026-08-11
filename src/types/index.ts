@@ -138,6 +138,24 @@ export interface FichaCuidadosCriticos {
   solicitudEliminacion?: SolicitudEliminacionFicha;
 }
 
+export interface HistorialEliminacionCuidadosCriticos {
+  id?: string;
+  fichaId: string;
+  tipoUnidad: TipoMedicoCuidadosCriticos;
+  pacienteId: string;
+  pacienteExpediente: string;
+  pacienteNombre: string;
+  servicio: string;
+  cama?: string;
+  estadoEstancia?: "activa" | "egresada" | "";
+  solicitudEliminacion?: SolicitudEliminacionFicha | null;
+  origen: "solicitud_medico" | "eliminacion_directa_admin";
+  fichaSnapshot: FichaCuidadosCriticos;
+  eliminadoPorId: string;
+  eliminadoPorNombre: string;
+  eliminadoEn: Date;
+}
+
 export interface ConfigIndicadoresCuidadosCriticos {
   id?: string;
   servicio: string;

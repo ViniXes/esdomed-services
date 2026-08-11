@@ -5,6 +5,8 @@ import { Activity, AlertCircle, FileSpreadsheet, Trash2, Users } from "lucide-re
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
+import { collection, getDocs, limit, orderBy, query } from "@/lib/firestoreMeter";
+import { db } from "@/lib/firebase";
 import {
   actualizarFichaEnCache,
   consultarFichasCuidadosCriticos,
@@ -16,7 +18,7 @@ import {
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
-import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
+import type { FichaCuidadosCriticos, HistorialEliminacionCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type Filtro = "todos" | TipoMedicoCuidadosCriticos;
 type FiltroCierre = "todos" | "pendientes" | "cerrados";
@@ -73,6 +75,9 @@ export default function CuidadosCriticosDashboardPage() {
   const [filtroMes, setFiltroMes] = useState<FiltroMes>(() => new Date().getMonth() + 1);
   const [filtroCierre, setFiltroCierre] = useState<FiltroCierre>("todos");
   const [soloSolicitudes, setSoloSolicitudes] = useState(false);
+  const [verHistorial, setVerHistorial] = useState(false);
+  const [historial, setHistorial] = useState<HistorialEliminacionCuidadosCriticos[]>([]);
+  const [consultandoHistorial, setConsultandoHistorial] = useState(false);
 
   const puedeVer = puedeVerModuloCuidadosCriticos(profile);
   const anioConsulta = new Date().getFullYear();
@@ -137,6 +142,27 @@ export default function CuidadosCriticosDashboardPage() {
     });
   };
 
+  const consultarHistorial = async () => {
+    if (profile?.role !== "admin" || consultandoHistorial) return;
+    setConsultandoHistorial(true);
+    try {
+      const snap = await getDocs(query(
+        collection(db, "historial_eliminaciones_cuidados_criticos"),
+        orderBy("eliminadoEn", "desc"),
+        limit(30),
+      ));
+      setHistorial(snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as HistorialEliminacionCuidadosCriticos)));
+    } finally {
+      setConsultandoHistorial(false);
+    }
+  };
+
+  const alternarHistorial = () => {
+    const siguiente = !verHistorial;
+    setVerHistorial(siguiente);
+    if (siguiente && historial.length === 0) void consultarHistorial();
+  };
+
   const manejarFichaEliminada = (id: string) => {
     setFichas(prev => prev.filter(item => item.id !== id));
     eliminarFichaDeCache(claveConsulta, id);
@@ -190,6 +216,74 @@ export default function CuidadosCriticosDashboardPage() {
           activo={soloSolicitudes}
         />
       </div>
+      {profile?.role === "admin" && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={alternarHistorial}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+              verHistorial
+                ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+                : "border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-amber-900 dark:hover:text-amber-300"
+            }`}
+          >
+            <Trash2 size={14} />
+            Historial de eliminaciones
+          </button>
+        </div>
+      )}
+      {verHistorial && profile?.role === "admin" && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-heading font-bold text-amber-900 dark:text-amber-200">Historial de eliminaciones UCI/UCIN</h2>
+              <p className="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80">Ultimos 30 registros eliminados por administracion.</p>
+            </div>
+            <button
+              type="button"
+              onClick={consultarHistorial}
+              disabled={consultandoHistorial}
+              className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950"
+            >
+              {consultandoHistorial ? "Consultando..." : "Actualizar"}
+            </button>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-amber-200 bg-white dark:border-amber-900 dark:bg-slate-950">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+                <tr>
+                  <th className="px-3 py-2">Fecha</th>
+                  <th className="px-3 py-2">Expediente</th>
+                  <th className="px-3 py-2">Paciente</th>
+                  <th className="px-3 py-2">Servicio</th>
+                  <th className="px-3 py-2">Solicitado por</th>
+                  <th className="px-3 py-2">Eliminado por</th>
+                  <th className="px-3 py-2">Motivo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
+                {historial.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-4 text-center text-slate-500">
+                      {consultandoHistorial ? "Cargando historial..." : "Sin eliminaciones registradas desde la activacion de esta bitacora."}
+                    </td>
+                  </tr>
+                ) : historial.map(item => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2">{toDate(item.eliminadoEn)?.toLocaleString("es-SV") ?? "No registrado"}</td>
+                    <td className="px-3 py-2 font-mono">{item.pacienteExpediente}</td>
+                    <td className="px-3 py-2">{item.pacienteNombre}</td>
+                    <td className="px-3 py-2">{item.servicio}</td>
+                    <td className="px-3 py-2">{item.solicitudEliminacion?.solicitadoPorNombre ?? "Eliminacion directa"}</td>
+                    <td className="px-3 py-2">{item.eliminadoPorNombre}</td>
+                    <td className="px-3 py-2">{item.solicitudEliminacion?.motivo ?? "Eliminacion directa por administrador"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       {soloSolicitudes && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
           Mostrando solo fichas con solicitud de eliminación pendiente. Activa <strong>&quot;Eliminar&quot;</strong> en la tabla para ver el ícono y revisarla.
