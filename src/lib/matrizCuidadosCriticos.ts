@@ -22,13 +22,12 @@ export interface GrupoMatrizCuidadosCriticos {
 type ValorMatriz = string | number;
 export type DatosMatrizCuidadosCriticos = Record<string, ValorMatriz>;
 export const VALOR_NO_REGISTRADO = "No registrado";
-export const CAMPOS_CIERRE_CUIDADOS_CRITICOS = new Set(["fecha_egreso_del_servicio", "alta", "fecha_de_muerte", "hora_de_muerte"]);
+export const CAMPOS_CIERRE_CUIDADOS_CRITICOS = new Set(["fecha_egreso_del_servicio", "alta", "fecha_de_muerte"]);
 
 const LABELS_CIERRE_CUIDADOS_CRITICOS: Record<string, string> = {
   fecha_egreso_del_servicio: "FECHA EGRESO DEL SERVICIO",
   alta: "ALTA",
   fecha_de_muerte: "FECHA DE MUERTE",
-  hora_de_muerte: "HORA DE MUERTE",
 };
 
 const CAMPOS_SI_NO = new Set([
@@ -268,7 +267,6 @@ export const GRUPOS_MATRIZ_CUIDADOS_CRITICOS: GrupoMatrizCuidadosCriticos[] = [
       "FECHA EGRESO DEL SERVICIO",
       "DIAS EN SERVICIO",
       "FECHA DE MUERTE",
-      "HORA DE MUERTE",
       "MUERTE > 48 HORAS",
       "ALTA",
       "DIAGNOSTICOS DE INGRESO 1",
@@ -504,13 +502,6 @@ function fechaComoInput(value: unknown) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function horaComoInput(value: unknown) {
-  if (!value) return "";
-  const date = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
-  if (Number.isNaN(date.getTime())) return "";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
 function calcularEdad(value: unknown) {
   if (!value) return "";
   const nacimiento = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
@@ -541,7 +532,6 @@ export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidado
     fecha_ingreso_al_servicio: fechaActualInput(),
     ...(fallecido ? {
       fecha_de_muerte: fechaComoInput(paciente.fechaEgreso),
-      hora_de_muerte: horaComoInput(paciente.fechaEgreso),
       alta: "FALLECIDO",
     } : {}),
   };
@@ -549,7 +539,7 @@ export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidado
 
 export function camposBloqueadosPorPaciente(paciente: Paciente) {
   return paciente.estado === "alta_fallecido"
-    ? new Set(["fecha_de_muerte", "hora_de_muerte", "alta"])
+    ? new Set(["fecha_de_muerte", "alta"])
     : new Set<string>();
 }
 
@@ -566,14 +556,13 @@ export function aplicarCalculosBasicos(datos: DatosMatrizCuidadosCriticos): Dato
   const egreso = esValorRegistrado(resultado.fecha_egreso_del_servicio) ? valorComoTexto(resultado.fecha_egreso_del_servicio) : "";
   const muerte = esValorRegistrado(resultado.fecha_de_muerte) ? valorComoTexto(resultado.fecha_de_muerte) : "";
   const horaIngreso = esValorRegistrado(resultado.hora_ingreso_al_servicio) ? valorComoTexto(resultado.hora_ingreso_al_servicio) : "";
-  const horaMuerte = esValorRegistrado(resultado.hora_de_muerte) ? valorComoTexto(resultado.hora_de_muerte) : "";
   const muerte48Registrada = esValorRegistrado(resultado.muerte_48_horas);
 
   resultado.dias_en_servicio = ingreso ? diferenciaDias(ingreso, egreso || fechaActualInput()) : "";
-  if (!muerte48Registrada && ingreso && horaIngreso && muerte && horaMuerte) {
-    const fechaIngreso = new Date(`${ingreso}T${horaIngreso}:00`);
-    const fechaMuerte = new Date(`${muerte}T${horaMuerte}:00`);
-    if (fechaMuerte.getTime() - fechaIngreso.getTime() > 172_800_000) {
+  if (!muerte48Registrada && ingreso && muerte) {
+    const fechaIngreso = new Date(`${ingreso}T${horaIngreso || "00:00"}:00`);
+    const fechaMuerte = new Date(`${muerte}T00:00:00`);
+    if (!Number.isNaN(fechaIngreso.getTime()) && !Number.isNaN(fechaMuerte.getTime()) && fechaMuerte.getTime() - fechaIngreso.getTime() > 172_800_000) {
       resultado.muerte_48_horas = "SI";
     }
   }
@@ -610,7 +599,6 @@ export function camposPendientesCierreCuidadosCriticos(datos?: DatosMatrizCuidad
   const alta = valorComoTexto(datos?.alta).trim().toUpperCase();
   if (alta === "FALLECIDO") {
     if (!esValorRegistrado(datos?.fecha_de_muerte)) pendientes.push("fecha_de_muerte");
-    if (!esValorRegistrado(datos?.hora_de_muerte)) pendientes.push("hora_de_muerte");
   }
   return pendientes.map(key => ({ key, label: LABELS_CIERRE_CUIDADOS_CRITICOS[key] ?? key }));
 }
