@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, ShieldAlert, X } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -52,6 +52,11 @@ const CONFIG: Record<
     icon: Inbox,
     borderColor: "border-l-teal-500",
     iconColor: "text-teal-400",
+  },
+  conapina: {
+    icon: ShieldAlert,
+    borderColor: "border-l-amber-500",
+    iconColor: "text-amber-400",
   },
 };
 

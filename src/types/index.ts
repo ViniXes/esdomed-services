@@ -232,6 +232,93 @@ export interface TrasladoExterno {
   notasEsdomed?: string;          // observación opcional al confirmar
 }
 
+// ============================================================================
+// Notificación CONAPINA / FGR — violencia o accidente de tránsito
+// ============================================================================
+// El médico detecta un paciente activo cuyo diagnóstico corresponde a un hecho
+// de violencia o de tránsito y lo notifica; Psicología lo recibe en su bandeja
+// y acusa de recibido. Colección: notificaciones_conapina_fgr.
+// El diagnóstico se toma del catálogo CIE-10; la nota cubre el caso en que el
+// médico no encuentre el código exacto (uno de los dos es obligatorio).
+
+// El flujo tiene TRES tiempos, no dos: el médico notifica (pendiente) →
+// Psicología recibe el caso (confirmado) → Psicología da el aviso a CONAPINA
+// y/o la Fiscalía y lo asienta (avisado). El registro que audita el MINSAL es
+// el tercero; "confirmado" sin pasar a "avisado" es justo lo que se puede
+// escapar, por eso la bandeja lo cuenta aparte.
+export type EstadoNotificacionConapinaFgr = "pendiente" | "confirmado" | "avisado" | "anulado";
+export type TipoCasoConapinaFgr = "violencia" | "accidente_transito" | "intento_suicida";
+export type InstanciaAviso = "conapina" | "fiscalia" | "ambos";
+export type CondicionPacienteAviso = "vivo" | "fallecido";
+
+// Oficio de egreso escaneado. Se adjunta al caso ya avisado.
+export interface OficioEgreso {
+  url: string;
+  nombre: string;
+  subidoPorNombre: string;
+  subidoEn: Date;
+}
+
+export interface NotificacionConapinaFgr {
+  id?: string;
+  medicoId: string;
+  medicoNombre: string;
+  medicoServicio: string;
+  medicoJvpm?: string;
+
+  pacienteId?: string;            // doc id en /pacientes
+  pacienteNombre: string;
+  pacienteExpediente: string;
+  // Edad al momento de notificar (snapshot). Menor de 18 → también CONAPINA.
+  pacienteEdad?: number | null;
+  servicio: string;
+  cama?: string;
+
+  tipoCaso: TipoCasoConapinaFgr;
+  // Cuándo ocurrió (o se detectó) el hecho. NO se acota por la fecha de ingreso:
+  // en violencia y tránsito el hecho es anterior al ingreso casi siempre.
+  fechaHecho: Date;
+  diagnostico?: DiagnosticoCIE | null;  // lesión / diagnóstico clínico (S, T…)
+  // Causa externa CIE-10 (V01–V99 tránsito, T74 / X85–Y09 agresiones). Va aparte
+  // porque el diagnóstico principal suele ser la lesión, no el hecho.
+  causaExterna?: DiagnosticoCIE | null;
+  nota?: string | null;                 // detalle libre / diagnóstico sin código
+
+  estado: EstadoNotificacionConapinaFgr;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+
+  revisadoPor?: string;           // uid de Psicología que la dio por recibida
+  revisadoPorNombre?: string;
+  revisadoEn?: Date;
+  notasPsicologia?: string | null;  // observación opcional al confirmar
+
+  // ── 3er tiempo: el aviso externo que da Psicología ────────────────────────
+  // Estas son las columnas del registro que audita el MINSAL. OJO: quien
+  // "recibió el aviso" es la persona de CONAPINA / la Fiscalía, NO la psicóloga
+  // que abrió el caso aquí (esa es revisadoPorNombre).
+  avisoInstancia?: InstanciaAviso;
+  avisoFecha?: Date;              // día en que se dio el aviso
+  avisoRecibidoPor?: string;      // nombre de quien lo recibió en la instancia
+  avisoLugar?: string;            // sede / lugar donde se dio
+  avisoObservacion?: string | null;
+  // Condición del paciente al momento del aviso (es lo que consta en el acta;
+  // por eso se congela aquí y no se lee del expediente después).
+  condicionPaciente?: CondicionPacienteAviso;
+  avisoRegistradoPor?: string;
+  avisoRegistradoPorNombre?: string;
+  avisoRegistradoEn?: Date;
+
+  // Oficios de egreso escaneados (se adjuntan una vez avisado el caso).
+  oficios?: OficioEgreso[];
+
+  // Anulación por el propio médico (solo mientras nadie la haya recibido).
+  anuladoPor?: string;
+  anuladoPorNombre?: string;
+  anuladoEn?: Date;
+  motivoAnulacion?: string;
+}
+
 export type EstadoFallecido = "pendiente" | "confirmado";
 
 export interface NotificacionFallecido {

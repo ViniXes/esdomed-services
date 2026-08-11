@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, HeartPulse, Inbox, LogOut, LogIn, UserSearch } from "lucide-react";
+import { Clock, HeartPulse, Inbox, LogOut, LogIn, UserSearch, ShieldAlert, Activity } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -17,6 +17,9 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
     if (!loading && profile?.role !== "psicologia") router.replace("/login");
   }, [loading, profile, router]);
 
+  // Grupo del comité de género y violencia (lo que audita el MINSAL).
+  const G_LESIONES = "Lesiones intencionales";
+
   const navItems: NavItem[] = [
     { href: "/psicologia/buscar-paciente",   label: "Buscar Paciente",   icon: UserSearch },
     { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },
@@ -24,6 +27,8 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
     { href: "/psicologia/altas-vivos",       label: "Verificación de Altas", icon: LogIn },
     { href: "/psicologia/fallecidos",        label: "Fallecidos",        icon: HeartPulse, badge: pendientes.fallecidos },
     { href: "/psicologia/recepciones",       label: "Recepciones",       icon: Inbox,      badge: pendientes.recepciones },
+    { href: "/psicologia/conapina-fgr",      label: "Avisos CONAPINA / FGR", icon: ShieldAlert, badge: pendientes.conapina, group: G_LESIONES },
+    { href: "/psicologia/lesiones-ingresos", label: "Ingresos por lesión",   icon: Activity,    group: G_LESIONES },
   ];
 
   return (

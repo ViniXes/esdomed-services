@@ -19,7 +19,7 @@ import type { NotificacionFallecido } from "@/types";
 
 export type TipoNotif =
   | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
-  | "incapacidad" | "anexo5" | "impresion" | "recepcion";
+  | "incapacidad" | "anexo5" | "impresion" | "recepcion" | "conapina";
 
 export interface NotifToast {
   id: string;
@@ -37,6 +37,7 @@ interface Pendientes {
   anexo5: number;
   impresiones: number;
   recepciones: number;
+  conapina: number;
   total: number;
 }
 
@@ -47,7 +48,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -63,7 +64,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
 
   const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
-    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0,
+    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0,
   });
   const [toasts, setToasts] = useState<NotifToast[]>([]);
 
@@ -215,9 +216,64 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [revisaFallecidos, addToast, setCount]);
 
+  // ── Psicología: notificaciones CONAPINA/FGR pendientes de acuse ──
+  // Contador por agregación (no lee documentos) + 1 listener del más reciente
+  // para el toast, igual que las fuentes de ESDOMED.
+  const knownConapina = useRef<string | null>(null);
+  useEffect(() => {
+    if (!esPsicologia) return;
+    let activo = true;
+    knownConapina.current = null;
+
+    // Al badge le toca todo lo que sigue pendiente de acción de Psicología:
+    // lo que aún no recibe MÁS lo recibido que todavía no se avisó a CONAPINA
+    // o la Fiscalía (ese es justo el caso que se puede escapar sin avisar).
+    const porEstado = (estado: string) =>
+      query(collection(db, "notificaciones_conapina_fgr"), where("estado", "==", estado));
+    const contar = async () => {
+      try {
+        const [pend, sinAvisar] = await Promise.all([
+          getCountFromServer(porEstado("pendiente")),
+          getCountFromServer(porEstado("confirmado")),
+        ]);
+        if (activo) setCount("conapina", pend.data().count + sinAvisar.data().count);
+      } catch { /* el conteo no es crítico */ }
+    };
+    contar();
+    const onFocus = () => contar();
+    window.addEventListener("focus", onFocus);
+    const iv = window.setInterval(contar, POLL_MS);
+
+    const unsub = onSnapshot(
+      query(collection(db, "notificaciones_conapina_fgr"), orderBy("creadoEn", "desc"), limit(1)),
+      snap => {
+        const d0 = snap.docs[0];
+        if (!d0) return;
+        if (knownConapina.current === null) { knownConapina.current = d0.id; return; }
+        if (d0.id !== knownConapina.current) {
+          knownConapina.current = d0.id;
+          const d = d0.data();
+          addToast({
+            tipo: "conapina",
+            titulo: "Nueva notificación CONAPINA/FGR",
+            mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}`,
+          });
+          contar();
+        }
+      },
+    );
+
+    return () => {
+      activo = false;
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(iv);
+      unsub();
+    };
+  }, [esPsicologia, addToast, setCount]);
+
   const pendientes: Pendientes = {
     ...counts,
-    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones,
+    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina,
   };
 
   return (
