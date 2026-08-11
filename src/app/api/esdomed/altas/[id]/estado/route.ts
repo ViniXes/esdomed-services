@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { cerrarFichasCriticasActivasPorEgresoPaciente } from "@/lib/server/cerrarFichaCritica";
 import type { MotivoObservacionAlta } from "@/types";
 
 const MOTIVOS = new Set<MotivoObservacionAlta>([
@@ -55,6 +56,7 @@ async function desactivarPacienteDelAlta(
     if (!q.empty) { ref = q.docs[0].ref; data = q.docs[0].data(); }
   }
   if (!ref) return; // ya egresado o no existe en la base de pacientes
+  const fechaEgreso = new Date();
 
   await ref.update({
     estado: nuevoEstado,
@@ -65,10 +67,20 @@ async function desactivarPacienteDelAlta(
     // el paciente aparezca en la pestaña "Alta vivo" (filtrada por fechaEgreso) sin
     // tener que buscarlo en "Todos". El formulario de egreso la precarga y la puede
     // ajustar al valor confirmado cuando ESDOMED complete el egreso.
-    fechaEgreso: FieldValue.serverTimestamp(),
+    fechaEgreso: Timestamp.fromDate(fechaEgreso),
     notificacionAltaId: notificacionId,
     actualizadoEn: FieldValue.serverTimestamp(),
     actualizadoPor: caller.uid,
+  });
+
+  await cerrarFichasCriticasActivasPorEgresoPaciente({
+    pacienteId: ref.id,
+    expediente: String(data?.expediente ?? noti.pacienteExpediente ?? ""),
+    estadoPaciente: nuevoEstado,
+    fechaEgreso,
+    caller,
+    fuente: "notificacion_alta_efectiva",
+    referenciaId: notificacionId,
   });
 
   // Anular las tarjetas de visita activas del expediente (igual que en el egreso

@@ -72,7 +72,7 @@ function pasosRequeridos(n: NotificacionFallecido) {
 }
 
 export default function DashboardFallecidosPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [vista, setVista] = useState<Vista>("bandeja");
   // Bandeja en vivo: trámites abiertos + los reabiertos (desbloqueados).
   const [abiertos, setAbiertos] = useState<NotificacionFallecido[]>([]);
@@ -273,7 +273,8 @@ export default function DashboardFallecidosPage() {
     });
     // Propagar al módulo Pacientes si el expediente existe y está activo
     try {
-      await marcarPacienteFallecido(selected);
+      const token = user ? await user.getIdToken() : null;
+      await marcarPacienteFallecido(selected, token);
     } catch (err) {
       console.error("Error sincronizando fallecido con paciente:", err);
     }
@@ -1402,7 +1403,16 @@ function FamiliarInput({ label, value, onChange, placeholder, className = "", di
 // Sincronización con módulo de Pacientes
 // ────────────────────────────────────────────────────────────────────────────
 
-async function marcarPacienteFallecido(n: NotificacionFallecido) {
+async function cerrarFichaCriticaPorEgresoPaciente(pacienteId: string, token?: string | null) {
+  if (!token) return;
+  const res = await fetch(`/api/esdomed/pacientes/${pacienteId}/cerrar-ficha-critica-egreso`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`No se pudo cerrar ficha UCI/UCIN (${res.status})`);
+}
+
+async function marcarPacienteFallecido(n: NotificacionFallecido, token?: string | null) {
   if (!n.pacienteExpediente) return;
   const q = query(
     collection(db, "pacientes"),
@@ -1428,4 +1438,6 @@ async function marcarPacienteFallecido(n: NotificacionFallecido) {
     medicoEgresoJvpm: n.medicoJvpm || null,
     actualizadoEn: Timestamp.now(),
   });
+
+  await cerrarFichaCriticaPorEgresoPaciente(pacRef.id, token);
 }
