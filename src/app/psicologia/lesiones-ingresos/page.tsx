@@ -1,35 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { collection, query, where, orderBy, limit, getDocs, Timestamp } from "@/lib/firestoreMeter";
+import {
+  collection, query, where, orderBy, limit, getDocs, setDoc, doc, serverTimestamp, Timestamp,
+} from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { calcularEdad, toDate, ESTADO_LABEL as ESTADO_PACIENTE_LABEL, ESTADO_BADGE } from "@/lib/pacientes/helpers";
 import {
-  TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP, clasificarIngreso, esMenorDeEdad,
+  TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP, analizarIngreso, esMenorDeEdad,
+  GRUPOS_LESION, GRUPO_LESION_LABEL, type AnalisisIngreso, type GrupoLesion,
 } from "@/lib/conapinaFgr";
 import {
   ShieldAlert, Car, HeartCrack, Search, X, Download, AlertTriangle, CheckCircle2,
-  Activity, ChevronLeft, ChevronRight, Info, Loader2,
+  Activity, ChevronLeft, ChevronRight, Info, Loader2, CircleSlash, Sparkle, ClipboardCheck,
 } from "lucide-react";
-import type { Paciente, TipoCasoConapinaFgr, NotificacionConapinaFgr } from "@/types";
+import type {
+  Paciente, TipoCasoConapinaFgr, NotificacionConapinaFgr, RevisionLesion, ResultadoRevisionLesion,
+} from "@/types";
 
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
 
-// Techo de lectura por consulta. El rango es del usuario, así que hay que
+// Techo de lectura por consulta. El rango lo elige el usuario, así que hay que
 // acotarlo: sin esto un rango de un año podría leer decenas de miles de docs.
 const MAX_INGRESOS = 2000;
 const MAX_AVISOS = 1000;
 const PAGE_SIZE = 20;
 
+type FiltroRevision = "todos" | "pendiente" | "corresponde" | "no_corresponde" | "sin_aviso";
+
 const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap";
+const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 interface Fila {
   paciente: Paciente;
-  categoria: TipoCasoConapinaFgr;
-  codigo: string;
-  origen: string;
+  analisis: AnalisisIngreso;
   tieneAviso: boolean;
+  revision: RevisionLesion | null;
 }
 
 const primerDiaDelMes = () => {
@@ -44,10 +52,12 @@ const hoyISO = () => {
 };
 
 export default function LesionesIngresosPage() {
+  const { profile } = useAuth();
+
   const [fechaDesde, setFechaDesde] = useState(primerDiaDelMes());
   const [fechaHasta, setFechaHasta] = useState(hoyISO());
-  const [tipo, setTipo] = useState<TipoCasoConapinaFgr | "todos">("todos");
-  const [soloSinAviso, setSoloSinAviso] = useState(false);
+  const [grupo, setGrupo] = useState<GrupoLesion | "todos">("todos");
+  const [filtro, setFiltro] = useState<FiltroRevision>("todos");
 
   const [filas, setFilas] = useState<Fila[] | null>(null);   // null = aún no se busca
   const [leidos, setLeidos] = useState(0);
@@ -56,6 +66,14 @@ export default function LesionesIngresosPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [exportando, setExportando] = useState(false);
+
+  // Modal de revisión
+  const [revisando, setRevisando] = useState<Fila | null>(null);
+  const [resultado, setResultado] = useState<ResultadoRevisionLesion | "">("");
+  const [categoria, setCategoria] = useState<TipoCasoConapinaFgr | "">("");
+  const [observacion, setObservacion] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [errGuardar, setErrGuardar] = useState<string | null>(null);
 
   const buscar = async () => {
     if (!fechaDesde || !fechaHasta) {
@@ -69,42 +87,54 @@ export default function LesionesIngresosPage() {
       const hasta = Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"));
 
       // Rango y orden sobre el MISMO campo → no exige índice compuesto.
-      const snap = await getDocs(query(
-        collection(db, "pacientes"),
-        where("fechaIngreso", ">=", desde),
-        where("fechaIngreso", "<=", hasta),
-        orderBy("fechaIngreso", "desc"),
-        limit(MAX_INGRESOS),
-      ));
-      const pacientes = snap.docs.map(d => ({ id: d.id, ...d.data() } as Paciente));
+      const [snapPacientes, snapAvisos, snapRevisiones] = await Promise.all([
+        getDocs(query(
+          collection(db, "pacientes"),
+          where("fechaIngreso", ">=", desde),
+          where("fechaIngreso", "<=", hasta),
+          orderBy("fechaIngreso", "desc"),
+          limit(MAX_INGRESOS),
+        )),
+        // Los avisos del periodo, sin techo superior: el aviso del médico
+        // siempre es posterior al ingreso.
+        getDocs(query(
+          collection(db, "notificaciones_conapina_fgr"),
+          where("creadoEn", ">=", desde),
+          orderBy("creadoEn", "desc"),
+          limit(MAX_AVISOS),
+        )),
+        getDocs(query(
+          collection(db, "revisiones_lesiones"),
+          where("fechaIngreso", ">=", desde),
+          where("fechaIngreso", "<=", hasta),
+          orderBy("fechaIngreso", "desc"),
+          limit(MAX_INGRESOS),
+        )),
+      ]);
+
+      const pacientes = snapPacientes.docs.map(d => ({ id: d.id, ...d.data() } as Paciente));
       setLeidos(pacientes.length);
       setTope(pacientes.length >= MAX_INGRESOS);
 
-      // Avisos del periodo para el cruce. Se buscan desde el inicio del rango
-      // sin techo superior: el aviso siempre es posterior al ingreso.
-      const avisosSnap = await getDocs(query(
-        collection(db, "notificaciones_conapina_fgr"),
-        where("creadoEn", ">=", desde),
-        orderBy("creadoEn", "desc"),
-        limit(MAX_AVISOS),
-      ));
       const conAviso = new Set(
-        avisosSnap.docs
+        snapAvisos.docs
           .map(d => d.data() as NotificacionConapinaFgr)
           .filter(n => n.estado !== "anulado")
           .map(n => (n.pacienteExpediente ?? "").trim().toLowerCase()),
       );
+      const revisiones = new Map<string, RevisionLesion>(
+        snapRevisiones.docs.map(d => [d.id, { id: d.id, ...d.data() } as RevisionLesion]),
+      );
 
       const encontradas: Fila[] = [];
       for (const p of pacientes) {
-        const clas = clasificarIngreso(p);
-        if (!clas) continue;
+        const analisis = analizarIngreso(p);
+        if (!analisis) continue;
         encontradas.push({
           paciente: p,
-          categoria: clas.categoria,
-          codigo: clas.codigo,
-          origen: clas.origen,
+          analisis,
           tieneAviso: conAviso.has((p.expediente ?? "").trim().toLowerCase()),
+          revision: revisiones.get(p.id ?? "") ?? null,
         });
       }
       setFilas(encontradas);
@@ -118,12 +148,15 @@ export default function LesionesIngresosPage() {
   };
 
   const displayList = (filas ?? []).filter(f => {
-    if (tipo !== "todos" && f.categoria !== tipo) return false;
-    if (soloSinAviso && f.tieneAviso) return false;
+    if (grupo !== "todos" && f.analisis.grupo !== grupo) return false;
+    if (filtro === "pendiente" && f.revision) return false;
+    if (filtro === "corresponde" && f.revision?.resultado !== "corresponde") return false;
+    if (filtro === "no_corresponde" && f.revision?.resultado !== "no_corresponde") return false;
+    if (filtro === "sin_aviso" && !(f.revision?.resultado === "corresponde" && !f.tieneAviso)) return false;
     return true;
   });
 
-  const filtrosKey = `${tipo}|${soloSinAviso}`;
+  const filtrosKey = `${grupo}|${filtro}`;
   const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
   if (filtrosPrevios !== filtrosKey) {
     setFiltrosPrevios(filtrosKey);
@@ -134,11 +167,59 @@ export default function LesionesIngresosPage() {
   const paginaActual = Math.min(page, totalPaginas);
   const paginados = displayList.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
-  const porCategoria = (c: TipoCasoConapinaFgr) => (filas ?? []).filter(f => f.categoria === c).length;
-  const sinAviso = (filas ?? []).filter(f => !f.tieneAviso).length;
+  const todas = filas ?? [];
+  const pendientes = todas.filter(f => !f.revision).length;
+  const corresponden = todas.filter(f => f.revision?.resultado === "corresponde").length;
+  const noCorresponden = todas.filter(f => f.revision?.resultado === "no_corresponde").length;
+  // El hueco que importa: se determinó que sí es un caso pero el médico nunca
+  // lo notificó, así que no está en la bandeja de avisos.
+  const correspondenSinAviso = todas.filter(f => f.revision?.resultado === "corresponde" && !f.tieneAviso).length;
 
   const formatFecha = (d?: Date | null) =>
     d ? d.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+  const abrirRevision = (f: Fila) => {
+    setRevisando(f);
+    setResultado(f.revision?.resultado ?? "");
+    setCategoria(f.revision?.categoria ?? f.analisis.sugerida ?? "");
+    setObservacion(f.revision?.observacion ?? "");
+    setErrGuardar(null);
+  };
+
+  const puedeGuardar = !!resultado && (resultado === "no_corresponde" || !!categoria);
+
+  const guardarRevision = async () => {
+    if (!revisando?.paciente.id || !profile || !puedeGuardar) return;
+    setGuardando(true);
+    setErrGuardar(null);
+    const p = revisando.paciente;
+    try {
+      const datos = {
+        pacienteId: p.id!,
+        expediente: p.expediente ?? "",
+        pacienteNombre: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
+        fechaIngreso: p.fechaIngreso,
+        resultado,
+        categoria: resultado === "corresponde" ? categoria : null,
+        observacion: observacion.trim() || null,
+        revisadoPor: profile.uid,
+        revisadoPorNombre: profile.nombre,
+        // Las reglas exigen revisadoEn == request.time: la revisión no se antedata.
+        revisadoEn: serverTimestamp(),
+      };
+      // El id del documento es el id del INGRESO: revisar dos veces sobrescribe
+      // en vez de duplicar, y dos ingresos del mismo expediente van separados.
+      await setDoc(doc(db, "revisiones_lesiones", p.id!), datos);
+
+      const local: RevisionLesion = { ...datos, id: p.id!, revisadoEn: new Date() } as RevisionLesion;
+      setFilas(prev => prev?.map(f => (f.paciente.id === p.id ? { ...f, revision: local } : f)) ?? prev);
+      setRevisando(null);
+    } catch (e) {
+      setErrGuardar(e instanceof Error ? e.message : "No se pudo guardar la revisión.");
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   const exportar = async () => {
     setExportando(true);
@@ -151,25 +232,37 @@ export default function LesionesIngresosPage() {
           PACIENTE: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
           EDAD: calcularEdad(toDate(p.fechaNacimiento)) ?? "",
           "FECHA DE INGRESO": formatFecha(toDate(p.fechaIngreso)),
-          "SERVICIO DE INGRESO": p.servicioIngreso ?? "",
-          "SERVICIO ACTUAL": p.servicioActual ?? "",
-          "TIPO DE LESION": TIPO_CASO_LABEL[f.categoria],
-          "CODIGO CIE-10": f.codigo,
-          "TOMADO DE": f.origen,
+          "SERVICIO": p.servicioActual || p.servicioIngreso || "",
+          "GRUPO CIE-10": GRUPO_LESION_LABEL[f.analisis.grupo],
+          "CODIGO CIE-10": f.analisis.codigo,
+          DIAGNOSTICO: f.analisis.descripcion,
+          "TOMADO DE": f.analisis.origen,
           "ESTADO DEL PACIENTE": ESTADO_PACIENTE_LABEL[p.estado] ?? p.estado ?? "",
+          REVISION: f.revision ? (f.revision.resultado === "corresponde" ? "Corresponde" : "No corresponde") : "Pendiente",
+          "TIPO DE CASO": f.revision?.categoria ? TIPO_CASO_LABEL[f.revision.categoria] : "",
+          "OBSERVACION": f.revision?.observacion ?? "",
+          "REVISADO POR": f.revision?.revisadoPorNombre ?? "",
           "TIENE AVISO CONAPINA/FGR": f.tieneAviso ? "SI" : "NO",
         };
       });
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Ingresos lesiones");
-      XLSX.writeFile(wb, `ingresos_lesiones_intencionales_${fechaDesde}_a_${fechaHasta}.xlsx`);
+      XLSX.writeFile(wb, `ingresos_lesiones_${fechaDesde}_a_${fechaHasta}.xlsx`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo exportar.");
     } finally {
       setExportando(false);
     }
   };
+
+  const FILTROS: { label: string; value: FiltroRevision; n?: number }[] = [
+    { label: "Todos", value: "todos" },
+    { label: "Por revisar", value: "pendiente", n: pendientes },
+    { label: "Corresponden", value: "corresponde", n: corresponden },
+    { label: "No corresponden", value: "no_corresponde", n: noCorresponden },
+    { label: "Falta el aviso", value: "sin_aviso", n: correspondenSinAviso },
+  ];
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
@@ -179,7 +272,7 @@ export default function LesionesIngresosPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Ingresos por lesiones intencionales</h1>
-          <p className="mt-0.5 text-xs text-slate-500">Expedientes con diagnóstico de accidente de tránsito, intento suicida o violencia</p>
+          <p className="mt-0.5 text-xs text-slate-500">Tamizaje de expedientes con diagnóstico de lesión, para revisar caso por caso</p>
         </div>
       </div>
 
@@ -187,9 +280,10 @@ export default function LesionesIngresosPage() {
       <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
         <div className="mb-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Periodo de ingreso</p>
-          <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Buscar ingresos</h2>
+          <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Buscar ingresos con lesión</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Se leen los ingresos del rango y se clasifican por CIE-10 en el navegador. La búsqueda es bajo demanda.
+            La lista es de <strong>candidatos</strong>: todo ingreso con diagnóstico de traumatismo, intoxicación o causa
+            externa. Revise cada uno para decidir si el hecho fue accidente de tránsito, violencia o autoinfligido.
           </p>
         </div>
 
@@ -225,59 +319,48 @@ export default function LesionesIngresosPage() {
         {filas !== null && (
           <>
             <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
-              {TIPOS_CASO.map(t => {
-                const Icono = ICONO_CASO[t];
-                return (
-                  <div key={t} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800/40">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-600 text-white"><Icono size={16} /></span>
-                    <div className="min-w-0">
-                      <p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{porCategoria(t)}</p>
-                      <p className="mt-1 truncate text-[11px] font-medium text-slate-500">{TIPO_CASO_LABEL[t]}</p>
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white"><AlertTriangle size={16} /></span>
-                <div className="min-w-0">
-                  <p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{sinAviso}</p>
-                  <p className="mt-1 truncate text-[11px] font-medium text-slate-500">Sin aviso registrado</p>
-                </div>
-              </div>
+              <Tile n={todas.length} label="Candidatos" icon={Activity} tone="cyan" />
+              <Tile n={pendientes} label="Por revisar" icon={ClipboardCheck} tone="amber" />
+              <Tile n={corresponden} label="Corresponden" icon={CheckCircle2} tone="emerald" />
+              <Tile n={correspondenSinAviso} label="Falta el aviso del médico" icon={AlertTriangle} tone="rose" />
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {(["todos", ...TIPOS_CASO] as const).map(t => (
-                <button key={t} onClick={() => setTipo(t)}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    tipo === t
-                      ? "bg-blue-600 text-white"
+              {FILTROS.map(f => (
+                <button key={f.value} onClick={() => setFiltro(f.value)}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    filtro === f.value
+                      ? f.value === "sin_aviso" ? "bg-rose-600 text-white" : "bg-blue-600 text-white"
                       : "border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
                   }`}>
-                  {t === "todos" ? "Todos" : TIPO_CASO_LABEL[t]}
+                  {f.label}
+                  {typeof f.n === "number" && f.n > 0 && (
+                    <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${filtro === f.value ? "bg-white/25" : "bg-slate-200 dark:bg-slate-700"}`}>{f.n}</span>
+                  )}
                 </button>
               ))}
-              <button onClick={() => setSoloSinAviso(v => !v)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  soloSinAviso
-                    ? "bg-amber-700 text-white"
-                    : "border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
-                }`}>
-                <AlertTriangle size={13} /> Solo sin aviso
-              </button>
-              {soloSinAviso && (
-                <button onClick={() => setSoloSinAviso(false)}
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100">
-                  <X size={12} /> Quitar
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-400">Grupo CIE-10:</span>
+              {(["todos", ...GRUPOS_LESION] as const).map(g => (
+                <button key={g} onClick={() => setGrupo(g)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    grupo === g
+                      ? "bg-slate-700 text-white dark:bg-slate-600"
+                      : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  }`}>
+                  {g === "todos" ? "Todos" : GRUPO_LESION_LABEL[g]}
                 </button>
-              )}
+              ))}
             </div>
 
             <p className="mt-3 flex items-start gap-1.5 text-xs leading-5 text-slate-500">
               <Info size={13} className="mt-0.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-              Se revisaron {leidos} ingresos del periodo y {displayList.length} corresponden a lesiones intencionales.
-              La clasificación depende de cómo esté codificado el expediente: si un atropello quedó registrado solo como
-              &quot;fractura&quot; sin causa externa, no aparecerá aquí.
+              Se revisaron {leidos} ingresos del periodo y {todas.length} tienen diagnóstico de lesión.
+              La causa externa se define hasta el egreso, por eso el tamizaje va por el diagnóstico y hay que
+              investigar cada caso. Un ingreso marcado &quot;Corresponde&quot; que no tenga aviso significa que el
+              médico no lo notificó.
               {tope && <strong className="ml-1 text-amber-700 dark:text-amber-400">Se alcanzó el tope de {MAX_INGRESOS} ingresos: acorta el rango para no perder registros.</strong>}
             </p>
           </>
@@ -296,9 +379,9 @@ export default function LesionesIngresosPage() {
                   <th className={thCls}>Edad</th>
                   <th className={thCls}>Ingreso</th>
                   <th className={thCls}>Servicio</th>
-                  <th className={thCls}>Tipo de lesión</th>
-                  <th className={thCls}>CIE-10</th>
+                  <th className={thCls}>Diagnóstico</th>
                   <th className={thCls}>Estado</th>
+                  <th className={thCls}>Revisión</th>
                   <th className={thCls}>Aviso</th>
                 </tr>
               </thead>
@@ -306,9 +389,12 @@ export default function LesionesIngresosPage() {
                 {paginados.map(f => {
                   const p = f.paciente;
                   const edad = calcularEdad(toDate(p.fechaNacimiento));
-                  const Icono = ICONO_CASO[f.categoria];
+                  const cat = f.revision?.categoria;
+                  const Icono = cat ? ICONO_CASO[cat] : null;
+                  const faltaAviso = f.revision?.resultado === "corresponde" && !f.tieneAviso;
                   return (
-                    <tr key={p.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                    <tr key={p.id} onClick={() => abrirRevision(f)}
+                      className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 ${faltaAviso ? "bg-rose-50/50 dark:bg-rose-950/20" : ""}`}>
                       <td className="px-3 py-2.5 font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{p.expediente}</td>
                       <td className="px-3 py-2.5 font-medium text-slate-900 dark:text-slate-100">{p.apellidos}, {p.nombres}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
@@ -325,14 +411,14 @@ export default function LesionesIngresosPage() {
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{formatFecha(toDate(p.fechaIngreso))}</td>
                       <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">{p.servicioActual || p.servicioIngreso || "—"}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[f.categoria]}`}>
-                          <Icono size={11} /> {TIPO_CASO_LABEL[f.categoria]}
+                      <td className="max-w-[280px] px-3 py-2.5">
+                        <span className="flex items-baseline gap-1.5">
+                          <span className="shrink-0 font-mono text-[11px] font-semibold text-blue-700 dark:text-blue-300">{f.analisis.codigo}</span>
+                          <span className="line-clamp-2 text-xs text-slate-700 dark:text-slate-300">{f.analisis.descripcion}</span>
                         </span>
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <span className="font-mono text-[11px] font-semibold text-blue-700 dark:text-blue-300">{f.codigo}</span>
-                        <span className="mt-0.5 block text-[11px] text-slate-400">{f.origen}</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-400">
+                          {GRUPO_LESION_LABEL[f.analisis.grupo]} · {f.analisis.origen}
+                        </span>
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${ESTADO_BADGE[p.estado] ?? ""}`}>
@@ -340,14 +426,37 @@ export default function LesionesIngresosPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
+                        {!f.revision ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                            <ClipboardCheck size={12} /> Por revisar
+                            {f.analisis.sugerida && (
+                              <span title={`Sugerido por el código ${f.analisis.codigo}`}
+                                className="ml-1 inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-100 px-1 py-px text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800">
+                                <Sparkle size={9} /> {TIPO_CASO_LABEL[f.analisis.sugerida]}
+                              </span>
+                            )}
+                          </span>
+                        ) : f.revision.resultado === "no_corresponde" ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                            <CircleSlash size={12} /> No corresponde
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cat ? TIPO_CASO_CHIP[cat] : ""}`}>
+                            {Icono && <Icono size={11} />} {cat ? TIPO_CASO_LABEL[cat] : "Corresponde"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
                         {f.tieneAviso ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                             <CheckCircle2 size={12} /> Notificado
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
-                            <AlertTriangle size={11} /> Sin aviso
+                        ) : faltaAviso ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                            <AlertTriangle size={11} /> Falta el aviso
                           </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
                     </tr>
@@ -359,13 +468,13 @@ export default function LesionesIngresosPage() {
 
           {paginados.length === 0 && (
             <p className="py-12 text-center text-sm text-slate-500">
-              No se encontraron ingresos por lesiones intencionales con estos criterios.
+              No hay ingresos con lesión para estos criterios.
             </p>
           )}
 
           {totalPaginas > 1 && (
             <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/50">
-              <span className="text-xs text-slate-500">Página {paginaActual} de {totalPaginas}</span>
+              <span className="text-xs text-slate-500">{displayList.length} registros · página {paginaActual} de {totalPaginas}</span>
               <div className="flex items-center gap-1.5">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={paginaActual === 1}
                   className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100"
@@ -384,10 +493,156 @@ export default function LesionesIngresosPage() {
       )}
 
       {filas === null && !buscando && (
-        <p className="py-12 text-center text-sm text-slate-400">
-          Elige el periodo de ingreso y pulsa Buscar.
-        </p>
+        <p className="py-12 text-center text-sm text-slate-400">Elige el periodo de ingreso y pulsa Buscar.</p>
       )}
+
+      {/* Modal de revisión */}
+      {revisando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 font-heading">
+                <ClipboardCheck size={16} className="text-cyan-500" /> Revisar ingreso
+              </h2>
+              <button onClick={() => setRevisando(null)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"><X size={16} /></button>
+            </div>
+
+            <div className="space-y-4 p-5 text-sm">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  {revisando.paciente.apellidos}, {revisando.paciente.nombres}
+                </p>
+                <p className="mt-0.5 font-mono text-xs text-slate-500">Exp. {revisando.paciente.expediente}</p>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Ingreso {formatFecha(toDate(revisando.paciente.fechaIngreso))} · {revisando.paciente.servicioActual || revisando.paciente.servicioIngreso || "—"}
+                </p>
+                <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{revisando.analisis.origen}</p>
+                  <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">
+                    <span className="font-mono font-semibold text-blue-700 dark:text-blue-300">{revisando.analisis.codigo}</span> · {revisando.analisis.descripcion}
+                  </p>
+                </div>
+                {!revisando.tieneAviso && (
+                  <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                    Este expediente no tiene aviso registrado por ningún médico.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-medium text-slate-500">
+                  ¿El hecho corresponde a un caso notificable? <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setResultado("corresponde")}
+                    className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all ${
+                      resultado === "corresponde"
+                        ? "border-emerald-500 bg-emerald-600 text-white"
+                        : "border-slate-300 bg-white text-slate-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    }`}>
+                    Sí, corresponde
+                  </button>
+                  <button type="button" onClick={() => { setResultado("no_corresponde"); setCategoria(""); }}
+                    className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-all ${
+                      resultado === "no_corresponde"
+                        ? "border-slate-500 bg-slate-600 text-white"
+                        : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    }`}>
+                    No corresponde
+                  </button>
+                </div>
+              </div>
+
+              {resultado === "corresponde" && (
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-slate-500">Tipo de caso <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {TIPOS_CASO.map(t => {
+                      const Icono = ICONO_CASO[t];
+                      return (
+                        <button key={t} type="button" onClick={() => setCategoria(t)}
+                          className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-semibold transition-all ${
+                            categoria === t
+                              ? "border-amber-500 bg-amber-600 text-white"
+                              : "border-slate-300 bg-white text-slate-600 hover:border-amber-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                          }`}>
+                          <Icono size={13} /> {TIPO_CASO_LABEL[t]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {revisando.analisis.sugerida && (
+                    <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500">
+                      <Sparkle size={12} className="mt-0.5 shrink-0 text-amber-500" />
+                      El código {revisando.analisis.codigo} sugiere {TIPO_CASO_LABEL[revisando.analisis.sugerida]}.
+                    </p>
+                  )}
+                  {!revisando.tieneAviso && (
+                    <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs leading-5 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                      Si corresponde, el caso debería estar en la bandeja de avisos. Al guardar quedará marcado como
+                      &quot;Falta el aviso&quot; para reclamárselo al médico.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-500">Observación (opcional)</label>
+                <textarea value={observacion} onChange={e => setObservacion(e.target.value)} rows={3}
+                  placeholder="Qué se investigó y en qué se basó la decisión..." className={`${inputCls} resize-none`} />
+              </div>
+
+              {revisando.revision && (
+                <p className="text-xs text-slate-400">
+                  Revisado antes por {revisando.revision.revisadoPorNombre}. Guardar sobrescribe la revisión.
+                </p>
+              )}
+
+              {errGuardar && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span className="text-xs">{errGuardar}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+              <button onClick={() => setRevisando(null)} disabled={guardando}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                Cancelar
+              </button>
+              <button onClick={guardarRevision} disabled={guardando || !puedeGuardar}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">
+                <ClipboardCheck size={14} /> {guardando ? "Guardando..." : "Guardar revisión"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TONOS = {
+  cyan: { borde: "border-cyan-100 dark:border-cyan-900/60", fondo: "bg-cyan-50/70 dark:bg-cyan-950/25", icono: "bg-cyan-600" },
+  amber: { borde: "border-amber-100 dark:border-amber-900/60", fondo: "bg-amber-50/70 dark:bg-amber-950/25", icono: "bg-amber-500" },
+  emerald: { borde: "border-emerald-100 dark:border-emerald-900/60", fondo: "bg-emerald-50/70 dark:bg-emerald-950/25", icono: "bg-emerald-500" },
+  rose: { borde: "border-rose-100 dark:border-rose-900/60", fondo: "bg-rose-50/70 dark:bg-rose-950/25", icono: "bg-rose-500" },
+} as const;
+
+function Tile({ n, label, icon: Icono, tone }: {
+  n: number; label: string; icon: React.ElementType; tone: keyof typeof TONOS;
+}) {
+  const t = TONOS[tone];
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${t.borde} ${t.fondo}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${t.icono}`}><Icono size={16} /></span>
+      <div className="min-w-0">
+        <p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{n}</p>
+        <p className="mt-1 truncate text-[11px] font-medium text-slate-500">{label}</p>
+      </div>
     </div>
   );
 }

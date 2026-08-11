@@ -319,6 +319,33 @@ export interface NotificacionConapinaFgr {
   motivoAnulacion?: string;
 }
 
+// ============================================================================
+// Revisión de un ingreso candidato a lesión intencional
+// ============================================================================
+// El tamizaje por CIE-10 solo produce CANDIDATOS (todo traumatismo o
+// intoxicación entra). Psicología investiga cada uno y decide si el hecho fue
+// accidente de tránsito, violencia o autoinfligido; si no lo fue, lo marca "no
+// corresponde" y deja de aparecer como pendiente.
+// Colección: revisiones_lesiones, con el id del INGRESO (docId de pacientes)
+// como id del documento, para que un mismo expediente con dos ingresos se
+// revise por separado.
+
+export type ResultadoRevisionLesion = "corresponde" | "no_corresponde";
+
+export interface RevisionLesion {
+  id?: string;              // = pacienteId (docId del ingreso)
+  pacienteId: string;
+  expediente: string;
+  pacienteNombre: string;
+  fechaIngreso: Date;       // se copia para poder consultar por rango
+  resultado: ResultadoRevisionLesion;
+  categoria?: TipoCasoConapinaFgr | null;  // solo si corresponde
+  observacion?: string | null;
+  revisadoPor: string;
+  revisadoPorNombre: string;
+  revisadoEn: Date;
+}
+
 export type EstadoFallecido = "pendiente" | "confirmado";
 
 export interface NotificacionFallecido {

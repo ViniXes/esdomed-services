@@ -112,25 +112,89 @@ export const CAUSA_EXTERNA_AVISO: Record<TipoCasoConapinaFgr, string> = {
   intento_suicida: "Para un intento suicida se esperaría un código X60–X84.",
 };
 
-// Clasifica un expediente por sus diagnósticos, en orden de especificidad: la
-// causa externa manda sobre el diagnóstico clínico, porque el diagnóstico suele
-// ser la lesión (fractura, trauma) y no el hecho que la produjo.
-export function clasificarIngreso(p: {
+// ── Candidatos a lesión intencional ─────────────────────────────────────────
+// La causa externa NO se registra al ingresar: se define bien hasta el egreso.
+// Por eso el tamizaje de ingresos no puede depender de ella. Se echa una red
+// más amplia por el DIAGNÓSTICO (capítulo XIX: traumatismos, intoxicaciones y
+// demás consecuencias de causas externas) y luego Psicología investiga caso por
+// caso si el hecho fue accidente, violencia o autoinfligido. Los que no lo sean
+// se marcan "no corresponde" y salen de la lista.
+export type GrupoLesion = "maltrato" | "causa_externa" | "traumatismo" | "intoxicacion" | "otras_consecuencias";
+
+export const GRUPO_LESION_LABEL: Record<GrupoLesion, string> = {
+  maltrato: "Maltrato / denuncia",
+  causa_externa: "Causa externa",
+  traumatismo: "Traumatismo",
+  intoxicacion: "Intoxicación / envenenamiento",
+  otras_consecuencias: "Otras consecuencias",
+};
+
+export const GRUPOS_LESION: GrupoLesion[] = [
+  "maltrato", "causa_externa", "traumatismo", "intoxicacion", "otras_consecuencias",
+];
+
+const normalizarCie = (codigo?: string) => (codigo ?? "").replace(/\./g, "").toUpperCase();
+
+export function grupoLesion(codigo?: string): GrupoLesion | null {
+  const c = normalizarCie(codigo);
+  if (!c) return null;
+  // Primero los que ya nombran el hecho: T74 cae dentro del rango T66–T98, así
+  // que si no se evalúa antes quedaría como "otras consecuencias".
+  if (/^T74/.test(c) || /^Z04/.test(c)) return "maltrato";
+  if (/^[VWXY]\d/.test(c)) return "causa_externa";
+  if (/^S\d/.test(c)) return "traumatismo";                          // S00–S99
+  if (/^T(0\d|1[0-4])/.test(c)) return "traumatismo";                // T00–T14
+  if (/^T(3[6-9]|[45]\d|6[0-5])/.test(c)) return "intoxicacion";     // T36–T65
+  if (/^T(1[5-9]|2\d|3[0-5]|6[6-9]|7\d|8\d|9[0-8])/.test(c)) return "otras_consecuencias";
+  return null;
+}
+
+export interface AnalisisIngreso {
+  grupo: GrupoLesion;
+  codigo: string;
+  descripcion: string;
+  origen: string;
+  // Categoría propuesta cuando el propio código ya nombra el hecho (V, X6x…).
+  // Es solo una sugerencia: la decisión la toma Psicología al revisar.
+  sugerida: TipoCasoConapinaFgr | null;
+}
+
+// Revisa TODOS los diagnósticos del expediente, no solo el de ingreso: la causa
+// externa y el diagnóstico de egreso aparecen después y son los que mejor
+// nombran el hecho.
+export function analizarIngreso(p: {
   causaExterna?: DiagnosticoCIE | null;
   diagnosticoIngreso?: DiagnosticoCIE | null;
   ultimoDiagnostico?: DiagnosticoCIE | null;
-}): { categoria: TipoCasoConapinaFgr; codigo: string; origen: string } | null {
+  diagnosticoEgreso?: DiagnosticoCIE | null;
+  diagnosticosComplementarios?: DiagnosticoCIE[] | null;
+}): AnalisisIngreso | null {
   const fuentes: { d?: DiagnosticoCIE | null; origen: string }[] = [
     { d: p.causaExterna, origen: "Causa externa" },
+    { d: p.diagnosticoEgreso, origen: "Diagnóstico de egreso" },
     { d: p.diagnosticoIngreso, origen: "Diagnóstico de ingreso" },
     { d: p.ultimoDiagnostico, origen: "Último diagnóstico" },
-  ];
+    ...(p.diagnosticosComplementarios ?? []).map(d => ({ d, origen: "Diagnóstico complementario" })),
+  ].filter(f => !!f.d?.codigo);
+
+  // La sugerencia puede venir de cualquier código, aunque el grupo lo defina otro.
+  let sugerida: TipoCasoConapinaFgr | null = null;
+  for (const { d } of fuentes) {
+    const c = clasificarLesion(d?.codigo);
+    if (c) { sugerida = c; break; }
+  }
+
   for (const { d, origen } of fuentes) {
-    const categoria = clasificarLesion(d?.codigo);
-    if (categoria) return { categoria, codigo: d!.codigo, origen };
+    const grupo = grupoLesion(d?.codigo);
+    if (grupo) return { grupo, codigo: d!.codigo, descripcion: d!.descripcion, origen, sugerida };
   }
   return null;
 }
+
+export const RESULTADO_REVISION_LABEL = {
+  corresponde: "Corresponde",
+  no_corresponde: "No corresponde",
+} as const;
 
 // ── Fecha del hecho ─────────────────────────────────────────────────────────
 // No se acota por la fecha de ingreso a propósito: el hecho casi siempre es

@@ -313,6 +313,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Revisión de ingresos candidatos a lesión intencional ─────────────────
+    // Tamizaje del comité: Psicología marca si un ingreso con diagnóstico de
+    // lesión corresponde o no a un caso notificable. Mismo criterio de acceso
+    // que los avisos: es dato sensible, no se abre a todo el staff.
+    match /revisiones_lesiones/{id} {
+      allow read:   if isAuth() && (isPsicologia() || isAdmin());
+      allow create, update:
+                    if isPsicologia()
+                    && request.resource.data.revisadoPor == uid()
+                    && request.resource.data.revisadoEn == request.time
+                    && request.resource.data.resultado in ['corresponde', 'no_corresponde'];
+      allow delete: if isAdmin();
+    }
+
     // ─── Notificaciones de fallecidos ─────────────────────────────────────────
     // Delete: ESDOMED puede eliminar notificaciones duplicadas, pero NO las de
     // trámite cerrado (esas solo el admin, previa revisión).
