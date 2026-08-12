@@ -11,18 +11,39 @@ import { DateField } from "@/components/ui/DateField";
 import {
   ShieldAlert, Car, HeartCrack, Clock3, Search, X, StickyNote, ChevronLeft, ChevronRight,
   FileText, CheckCircle2, AlertCircle, AlertTriangle, Copy, Ban, Landmark, Inbox,
-  LayoutList, Download, Upload, Paperclip, Loader2,
+  LayoutList, Download, Upload, Paperclip, Loader2, Baby, Scale,
 } from "lucide-react";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP,
   ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad, duplicadosDeExpediente,
-  INSTANCIA_LABEL, CONDICION_LABEL,
+  INSTANCIA_LABEL, INSTANCIA_CHIP, CONDICION_LABEL,
 } from "@/lib/conapinaFgr";
 import type {
-  NotificacionConapinaFgr, EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, OficioEgreso,
+  NotificacionConapinaFgr, EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, OficioEgreso, InstanciaAviso,
 } from "@/types";
 
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
+
+// Icono por instancia, igual que ICONO_CASO: CONAPINA protege a la niñez, la FGR
+// es la vía penal, y "Ambos" dibuja los dos juntos.
+const ICONO_INSTANCIA: Record<InstanciaAviso, React.ElementType | null> = {
+  conapina: Baby,
+  fiscalia: Scale,
+  ambos: null,
+};
+
+// Chip de instancia con su icono. Se usa igual en la tabla y en el detalle.
+function ChipInstancia({ instancia, size = 10 }: { instancia: InstanciaAviso; size?: number }) {
+  const Icono = ICONO_INSTANCIA[instancia];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${INSTANCIA_CHIP[instancia]}`}>
+      {Icono
+        ? <Icono size={size} />
+        : <span className="flex items-center gap-px"><Baby size={size} /><Scale size={size} /></span>}
+      {INSTANCIA_LABEL[instancia]}
+    </span>
+  );
+}
 
 const FILTROS: { label: string; value: EstadoNotificacionConapinaFgr | "todos" }[] = [
   { label: "Todas", value: "todos" },
@@ -504,11 +525,9 @@ export default function ComiteConapinaFgrPage() {
                     {vista === "registro" ? (
                       <>
                         <td className="px-3 py-2.5 whitespace-nowrap">
-                          {n.avisoInstancia ? (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
-                              <Landmark size={10} /> {INSTANCIA_LABEL[n.avisoInstancia]}
-                            </span>
-                          ) : <span className="text-xs text-amber-600 dark:text-amber-400">Sin avisar</span>}
+                          {n.avisoInstancia
+                            ? <ChipInstancia instancia={n.avisoInstancia} />
+                            : <span className="text-xs text-amber-600 dark:text-amber-400">Sin avisar</span>}
                         </td>
                         <td className="px-3 py-2.5 text-xs text-slate-700 dark:text-slate-300">{n.avisoRecibidoPor || <span className="text-slate-400">—</span>}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{n.avisoFecha ? formatFecha(n.avisoFecha) : <span className="text-slate-400">—</span>}</td>
@@ -574,186 +593,206 @@ export default function ComiteConapinaFgrPage() {
         )}
       </div>
 
-      {/* Detalle */}
+      {/* Detalle: dos columnas — a la izquierda lo que notificó el médico, a la
+          derecha el aviso que dio y lo que le toca hacer al comité. */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 font-heading">
-                <ShieldAlert size={16} className="text-amber-500" />
-                Aviso CONAPINA / FGR
-              </h2>
-              <button onClick={cerrar} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"><X size={16} /></button>
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 rounded-t-2xl border-b border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 font-heading">
+                  <ShieldAlert size={16} className="shrink-0 text-amber-500" />
+                  <span className="truncate">{selected.pacienteNombre || "Aviso CONAPINA / FGR"}</span>
+                </h2>
+                <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="font-mono">Exp. {selected.pacienteExpediente}</span>
+                  <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${ESTADO_CHIP[selected.estado]}`}>
+                    {ESTADO_LABEL[selected.estado]}
+                  </span>
+                </p>
+              </div>
+              <button onClick={cerrar} aria-label="Cerrar"
+                className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X size={16} />
+              </button>
             </div>
 
-            <div className="space-y-4 p-5 text-sm">
-              {/* Paciente */}
-              <div className="relative overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/80 to-white p-4 dark:border-cyan-800 dark:from-cyan-950/40 dark:via-blue-950/20 dark:to-slate-900">
-                <div className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-cyan-500 to-blue-600" />
-                <div className="pl-1">
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">Paciente</p>
-                  <p className="font-semibold text-slate-900 dark:text-slate-100">{selected.pacienteNombre || "No especificado"}</p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    <p className="font-mono text-xs font-medium text-slate-600 dark:text-slate-300">Exp. {selected.pacienteExpediente}</p>
-                    {typeof selected.pacienteEdad === "number" ? (
-                      <span className="text-xs text-slate-500">· {selected.pacienteEdad} años</span>
-                    ) : (
-                      <span className="text-xs text-amber-700 dark:text-amber-400">· edad no registrada en el expediente</span>
-                    )}
-                    {esMenorDeEdad(selected.pacienteEdad) && (
-                      <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
-                        Menor de edad · corresponde CONAPINA
-                      </span>
-                    )}
+            <div className="grid gap-5 p-5 text-sm md:grid-cols-2">
+              {/* Columna izquierda: lo que notificó el médico */}
+              <div className="space-y-4">
+                <div className="relative overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/80 to-white p-4 dark:border-cyan-800 dark:from-cyan-950/40 dark:via-blue-950/20 dark:to-slate-900">
+                  <div className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-cyan-500 to-blue-600" />
+                  <div className="pl-1">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">Paciente</p>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">{selected.pacienteNombre || "No especificado"}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <p className="font-mono text-xs font-medium text-slate-600 dark:text-slate-300">Exp. {selected.pacienteExpediente}</p>
+                      {typeof selected.pacienteEdad === "number" ? (
+                        <span className="text-xs text-slate-500">· {selected.pacienteEdad} años</span>
+                      ) : (
+                        <span className="text-xs text-amber-700 dark:text-amber-400">· edad no registrada en el expediente</span>
+                      )}
+                      {esMenorDeEdad(selected.pacienteEdad) && (
+                        <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
+                          Menor de edad · corresponde CONAPINA
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      {selected.servicio || "—"}{selected.cama ? ` · Cama ${selected.cama}` : ""}
+                    </p>
                   </div>
-                  <p className="mt-1.5 text-xs text-slate-500">
-                    {selected.servicio || "—"}{selected.cama ? ` · Cama ${selected.cama}` : ""}
-                  </p>
                 </div>
+
+                {otrasDelExpediente.length > 0 && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
+                    <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="min-w-0 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                      <p className="font-semibold">Este expediente tiene {otrasDelExpediente.length} notificación(es) más.</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {otrasDelExpediente.slice(0, 4).map(o => (
+                          <li key={o.id}>
+                            · {TIPO_CASO_LABEL[o.tipoCaso]} — {o.fechaHecho ? `hecho del ${formatFecha(o.fechaHecho)}` : "sin fecha del hecho"}, notificó {o.medicoNombre} ({ESTADO_LABEL[o.estado]})
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-1">Verifique si es el mismo caso antes de avisar dos veces.</p>
+                    </div>
+                  </div>
+                )}
+
+                <section className="space-y-1.5">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">El caso</p>
+                  <Row label="Motivo" value={
+                    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[selected.tipoCaso]}`}>
+                      {TIPO_CASO_LABEL[selected.tipoCaso]}
+                    </span>
+                  } />
+                  <Row label="Fecha del hecho" value={selected.fechaHecho ? formatFecha(selected.fechaHecho) : <span className="text-slate-400">No registrada</span>} />
+                  <Row label="Diagnóstico" value={
+                    selected.diagnostico?.codigo
+                      ? <span><span className="mr-1.5 font-mono text-xs font-semibold text-blue-700 dark:text-blue-300">{selected.diagnostico.codigo}</span>{selected.diagnostico.descripcion}</span>
+                      : <span className="text-slate-400">Sin código CIE-10</span>
+                  } />
+                  <Row label="Causa externa" value={
+                    selected.causaExterna?.codigo
+                      ? <span><span className="mr-1.5 font-mono text-xs font-semibold text-blue-700 dark:text-blue-300">{selected.causaExterna.codigo}</span>{selected.causaExterna.descripcion}</span>
+                      : <span className="text-slate-400">No indicada</span>
+                  } />
+                  <Row label="Notificó" value={`Dr. ${selected.medicoNombre}${selected.medicoJvpm ? ` · JVPM ${selected.medicoJvpm}` : ""}`} />
+                  <Row label="Enviada" value={formatFechaHora(selected.creadoEn)} />
+                </section>
+
+                {selected.nota && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-slate-500">Nota del médico</p>
+                    <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{selected.nota}</p>
+                  </div>
+                )}
               </div>
 
-              {otrasDelExpediente.length > 0 && (
-                <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
-                  <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <div className="min-w-0 text-xs leading-5 text-amber-800 dark:text-amber-200">
-                    <p className="font-semibold">Este expediente tiene {otrasDelExpediente.length} notificación(es) más.</p>
-                    <ul className="mt-1 space-y-0.5">
-                      {otrasDelExpediente.slice(0, 4).map(o => (
-                        <li key={o.id}>
-                          · {TIPO_CASO_LABEL[o.tipoCaso]} — {o.fechaHecho ? `hecho del ${formatFecha(o.fechaHecho)}` : "sin fecha del hecho"}, notificó {o.medicoNombre} ({ESTADO_LABEL[o.estado]})
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1">Verifique si es el mismo caso antes de avisar dos veces.</p>
-                  </div>
-                </div>
-              )}
-
-              <Row label="Motivo" value={
-                <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[selected.tipoCaso]}`}>
-                  {TIPO_CASO_LABEL[selected.tipoCaso]}
-                </span>
-              } />
-              <Row label="Fecha del hecho" value={selected.fechaHecho ? formatFecha(selected.fechaHecho) : <span className="text-slate-400">No registrada</span>} />
-              <Row label="Diagnóstico" value={
-                selected.diagnostico?.codigo
-                  ? <span><span className="mr-1.5 font-mono text-xs font-semibold text-blue-700 dark:text-blue-300">{selected.diagnostico.codigo}</span>{selected.diagnostico.descripcion}</span>
-                  : <span className="text-slate-400">Sin código CIE-10</span>
-              } />
-              <Row label="Causa externa" value={
-                selected.causaExterna?.codigo
-                  ? <span><span className="mr-1.5 font-mono text-xs font-semibold text-blue-700 dark:text-blue-300">{selected.causaExterna.codigo}</span>{selected.causaExterna.descripcion}</span>
-                  : <span className="text-slate-400">No indicada</span>
-              } />
-              {selected.nota && (
-                <div>
-                  <p className="mb-1.5 text-xs font-medium text-slate-500">Nota del médico</p>
-                  <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{selected.nota}</p>
-                </div>
-              )}
-              <Row label="Notificó" value={`Dr. ${selected.medicoNombre}${selected.medicoJvpm ? ` · JVPM ${selected.medicoJvpm}` : ""}`} />
-              <Row label="Enviada" value={formatFechaHora(selected.creadoEn)} />
-              <Row label="Estado" value={
-                <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${ESTADO_CHIP[selected.estado]}`}>
-                  {ESTADO_LABEL[selected.estado]}
-                </span>
-              } />
-              {selected.revisadoPorNombre && (
-                <Row label="Recibida por" value={`${selected.revisadoPorNombre}${selected.revisadoEn ? ` · ${formatFechaHora(selected.revisadoEn)}` : ""}`} />
-              )}
-
-              {selected.estado === "anulado" && (
-                <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-                  <Ban size={15} className="mt-0.5 shrink-0 text-slate-400" />
-                  <div className="text-xs leading-5 text-slate-600 dark:text-slate-400">
-                    <p className="font-semibold">Anulada por el médico · {formatFechaHora(selected.anuladoEn)}</p>
-                    {selected.motivoAnulacion && <p className="mt-0.5 whitespace-pre-wrap">{selected.motivoAnulacion}</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* Constancia del aviso: la declara el médico al notificar. Aquí es
-                  solo lectura — es lo que el comité verifica antes de recibir y
-                  lo que alimenta el registro que audita el MINSAL. */}
-              {selected.avisoInstancia && selected.estado !== "anulado" && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-                  <p className="mb-2 flex items-center gap-1.5 text-sm font-bold text-emerald-900 dark:text-emerald-100">
-                    <Landmark size={15} /> Aviso notificado en {INSTANCIA_LABEL[selected.avisoInstancia]}
-                  </p>
-                  <div className="space-y-1.5">
-                    <Row label="Recibió" value={selected.avisoRecibidoPor || "—"} />
-                    <Row label="Fecha" value={formatFecha(selected.avisoFecha)} />
-                    <Row label="Lugar/sede" value={selected.avisoLugar || "—"} />
-                    <Row label="Condición" value={selected.condicionPaciente ? CONDICION_LABEL[selected.condicionPaciente] : "—"} />
-                    {selected.avisoObservacion && <Row label="Observación" value={selected.avisoObservacion} />}
-                  </div>
-                  <p className="mt-2.5 text-[11px] leading-4 text-emerald-800/80 dark:text-emerald-200/70">
-                    Lo declaró el médico al notificar. Si algo no cuadra, anótelo en la observación al recibir.
-                  </p>
-                </div>
-              )}
-
-              {/* 2º tiempo */}
-              {selected.estado === "pendiente" && (
-                <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/25">
-                  <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Recibir el caso</p>
-                  <p className="mt-0.5 text-xs leading-5 text-blue-800/90 dark:text-blue-200/80">
-                    Al recibirlo queda registrado que el comité lo tomó. Es la única acción pendiente: el aviso ya lo dio el médico.
-                  </p>
-                  <label className="mb-1.5 mt-3 block text-xs font-medium text-slate-500">Observación para el médico (opcional)</label>
-                  <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
-                    placeholder="Notas para el médico..." className={`${inputCls} resize-none bg-white dark:bg-slate-900`} />
-                </div>
-              )}
-              {selected.estado !== "pendiente" && selected.notasComite && (
-                <div>
-                  <p className="mb-1.5 text-xs font-medium text-slate-500">Observación del comité</p>
-                  <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{selected.notasComite}</p>
-                </div>
-              )}
-
-              {/* Oficios de egreso: se adjuntan al caso ya recibido. */}
-              {selected.estado === "confirmado" && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/35">
-                  <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-100">
-                    <Paperclip size={15} /> Oficios de egreso
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">Escaneos del oficio de egreso del paciente (PDF o imagen, máx. {MAX_OFICIOS}).</p>
-
-                  {!!selected.oficios?.length && (
-                    <ul className="mt-3 space-y-1.5">
-                      {selected.oficios.map((o, i) => (
-                        <li key={`${o.url}-${i}`}>
-                          <a href={o.url} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition-colors hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-800">
-                            <FileText size={13} className="shrink-0 text-slate-400" />
-                            <span className="min-w-0 flex-1 truncate">{o.nombre}</span>
-                            <span className="shrink-0 text-[11px] text-slate-400">{formatFecha(o.subidoEn)}</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {progreso !== null && (
-                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                      <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progreso}%` }} />
+              {/* Columna derecha: el aviso dado y la gestión del comité */}
+              <div className="space-y-4">
+                {selected.avisoInstancia && selected.estado !== "anulado" && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+                    <p className="mb-2 flex flex-wrap items-center gap-2 text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                      <Landmark size={15} /> Aviso notificado en
+                      <ChipInstancia instancia={selected.avisoInstancia} size={11} />
+                    </p>
+                    <div className="space-y-1.5">
+                      <Row label="Recibió" value={selected.avisoRecibidoPor || "—"} />
+                      <Row label="Fecha" value={formatFecha(selected.avisoFecha)} />
+                      <Row label="Lugar/sede" value={selected.avisoLugar || "—"} />
+                      <Row label="Condición" value={selected.condicionPaciente ? CONDICION_LABEL[selected.condicionPaciente] : "—"} />
+                      {selected.avisoObservacion && <Row label="Observación" value={selected.avisoObservacion} />}
                     </div>
-                  )}
+                    <p className="mt-2.5 text-[11px] leading-4 text-emerald-800/80 dark:text-emerald-200/70">
+                      Lo declaró el médico al notificar. Si algo no cuadra, anótelo en la observación al recibir.
+                    </p>
+                  </div>
+                )}
 
-                  <input ref={fileRef} type="file" multiple accept="application/pdf,image/*"
-                    onChange={subirOficios} className="hidden" />
-                  <button onClick={() => fileRef.current?.click()}
-                    disabled={subiendo || (selected.oficios?.length ?? 0) >= MAX_OFICIOS}
-                    className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                    {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                    {subiendo ? `Subiendo ${progreso ?? 0}%` : "Subir oficio"}
-                  </button>
-                </div>
-              )}
+                {selected.estado === "anulado" && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                    <Ban size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                    <div className="text-xs leading-5 text-slate-600 dark:text-slate-400">
+                      <p className="font-semibold">Anulada por el médico · {formatFechaHora(selected.anuladoEn)}</p>
+                      {selected.motivoAnulacion && <p className="mt-0.5 whitespace-pre-wrap">{selected.motivoAnulacion}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2º tiempo */}
+                {selected.estado === "pendiente" && (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/25">
+                    <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Recibir el caso</p>
+                    <p className="mt-0.5 text-xs leading-5 text-blue-800/90 dark:text-blue-200/80">
+                      Al recibirlo queda registrado que el comité lo tomó. Es la única acción pendiente: el aviso ya lo dio el médico.
+                    </p>
+                    <label className="mb-1.5 mt-3 block text-xs font-medium text-slate-500">Observación para el médico (opcional)</label>
+                    <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}
+                      placeholder="Notas para el médico..." className={`${inputCls} resize-none bg-white dark:bg-slate-900`} />
+                  </div>
+                )}
+
+                {selected.estado !== "pendiente" && (
+                  <section className="space-y-1.5">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Recepción</p>
+                    {selected.revisadoPorNombre
+                      ? <Row label="Recibida por" value={`${selected.revisadoPorNombre}${selected.revisadoEn ? ` · ${formatFechaHora(selected.revisadoEn)}` : ""}`} />
+                      : <p className="text-xs text-slate-500">Sin registro de recepción.</p>}
+                    {selected.notasComite && (
+                      <div className="pt-1">
+                        <p className="mb-1.5 text-xs font-medium text-slate-500">Observación del comité</p>
+                        <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{selected.notasComite}</p>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {/* Oficios de egreso: se adjuntan al caso ya recibido. */}
+                {selected.estado === "confirmado" && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/35">
+                    <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-100">
+                      <Paperclip size={15} /> Oficios de egreso
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">Escaneos del oficio de egreso del paciente (PDF o imagen, máx. {MAX_OFICIOS}).</p>
+
+                    {!!selected.oficios?.length && (
+                      <ul className="mt-3 space-y-1.5">
+                        {selected.oficios.map((o, i) => (
+                          <li key={`${o.url}-${i}`}>
+                            <a href={o.url} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition-colors hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-emerald-800">
+                              <FileText size={13} className="shrink-0 text-slate-400" />
+                              <span className="min-w-0 flex-1 truncate">{o.nombre}</span>
+                              <span className="shrink-0 text-[11px] text-slate-400">{formatFecha(o.subidoEn)}</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {progreso !== null && (
+                      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progreso}%` }} />
+                      </div>
+                    )}
+
+                    <input ref={fileRef} type="file" multiple accept="application/pdf,image/*"
+                      onChange={subirOficios} className="hidden" />
+                    <button onClick={() => fileRef.current?.click()}
+                      disabled={subiendo || (selected.oficios?.length ?? 0) >= MAX_OFICIOS}
+                      className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                      {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                      {subiendo ? `Subiendo ${progreso ?? 0}%` : "Subir oficio"}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {errAccion && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 md:col-span-2 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
                   <AlertCircle size={14} className="mt-0.5 shrink-0" />
                   <span className="text-xs">{errAccion}</span>
                 </div>
@@ -762,10 +801,16 @@ export default function ComiteConapinaFgrPage() {
 
             <div className="flex flex-wrap justify-end gap-2 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
               {selected.estado === "pendiente" ? (
-                <button onClick={confirmar} disabled={saving}
-                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">
-                  <CheckCircle2 size={14} /> {saving ? "Guardando..." : "Recibir el caso"}
-                </button>
+                <>
+                  <button onClick={cerrar} disabled={saving}
+                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                    Cancelar
+                  </button>
+                  <button onClick={confirmar} disabled={saving}
+                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">
+                    <CheckCircle2 size={14} /> {saving ? "Guardando..." : "Recibir el caso"}
+                  </button>
+                </>
               ) : (
                 <button onClick={cerrar}
                   className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">

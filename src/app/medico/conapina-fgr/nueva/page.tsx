@@ -13,7 +13,7 @@ import {
 } from "@/lib/pacientes/helpers";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_AYUDA, esMenorDeEdad,
-  INSTANCIAS, INSTANCIA_LABEL, NOTA_MIN_SIN_CIE, NOTA_MAX,
+  INSTANCIAS, INSTANCIA_LABEL, INSTANCIA_CHIP, NOTA_MIN_SIN_CIE, NOTA_MAX,
   causaExternaCoincide, CAUSA_EXTERNA_AVISO, validarFechaHecho, validarFechaAviso,
   duplicadosDeExpediente, AVISO_RECIBIDO_POR_MIN, AVISO_LUGAR_MIN,
 } from "@/lib/conapinaFgr";
@@ -644,7 +644,14 @@ export default function NuevaNotificacionConapinaFgrPage() {
 
               <div className="space-y-2 px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800 dark:text-amber-300">El aviso que usted dio</p>
-                <Dato label="Instancia" valor={avisoInstancia ? INSTANCIA_LABEL[avisoInstancia] : "—"} />
+                <Dato label="Instancia" valor={avisoInstancia ? (
+                  <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${INSTANCIA_CHIP[avisoInstancia]}`}>
+                    {avisoInstancia === "ambos"
+                      ? <span className="flex items-center gap-px"><Baby size={10} /><Scale size={10} /></span>
+                      : avisoInstancia === "conapina" ? <Baby size={10} /> : <Scale size={10} />}
+                    {INSTANCIA_LABEL[avisoInstancia]}
+                  </span>
+                ) : "—"} />
                 <Dato label="Fecha" valor={avisoFecha ? formatDia(new Date(avisoFecha + "T00:00:00")) : "—"} />
                 <Dato label="Recibió" valor={avisoRecibidoPor.trim() || "—"} />
                 <Dato label="Lugar / sede" valor={avisoLugar.trim() || "—"} />

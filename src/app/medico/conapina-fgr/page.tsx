@@ -9,19 +9,41 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import {
-  TIPO_CASO_LABEL, TIPO_CASO_CHIP, ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad, INSTANCIA_LABEL,
+  TIPO_CASO_LABEL, TIPO_CASO_CHIP, ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad,
+  INSTANCIA_LABEL, INSTANCIA_CHIP,
 } from "@/lib/conapinaFgr";
 import {
   ShieldAlert, Plus, X, CheckCircle2, AlertCircle, Search, ChevronLeft, ChevronRight,
-  Car, HeartCrack, Clock3, FileText, StickyNote, Ban, Landmark,
+  Car, HeartCrack, Clock3, FileText, StickyNote, Ban, Landmark, Baby, Scale,
 } from "lucide-react";
-import type { NotificacionConapinaFgr } from "@/types";
+import type { NotificacionConapinaFgr, InstanciaAviso } from "@/types";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
 const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap";
 
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
+
+// Icono por instancia, igual que ICONO_CASO: CONAPINA protege a la niñez, la FGR
+// es la vía penal, y "Ambos" dibuja los dos juntos.
+const ICONO_INSTANCIA: Record<InstanciaAviso, React.ElementType | null> = {
+  conapina: Baby,
+  fiscalia: Scale,
+  ambos: null,
+};
+
+// Chip de instancia con su icono. Se usa igual en la tabla y en el detalle.
+function ChipInstancia({ instancia, size = 10 }: { instancia: InstanciaAviso; size?: number }) {
+  const Icono = ICONO_INSTANCIA[instancia];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${INSTANCIA_CHIP[instancia]}`}>
+      {Icono
+        ? <Icono size={size} />
+        : <span className="flex items-center gap-px"><Baby size={size} /><Scale size={size} /></span>}
+      {INSTANCIA_LABEL[instancia]}
+    </span>
+  );
+}
 const MOTIVO_ANULACION_MIN = 10;
 const PAGE_SIZE = 15;
 
@@ -257,7 +279,7 @@ export default function MedicoConapinaFgrPage() {
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{formatDia(n.fechaHecho)}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
-                      {n.avisoInstancia ? INSTANCIA_LABEL[n.avisoInstancia] : "—"}
+                      {n.avisoInstancia ? <ChipInstancia instancia={n.avisoInstancia} /> : "—"}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{formatDia(n.creadoEn)}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
@@ -378,8 +400,9 @@ export default function MedicoConapinaFgrPage() {
               <div className="space-y-4">
                 {detalle.avisoInstancia && detalle.estado !== "anulado" && (
                   <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                      <Landmark size={12} /> Aviso dado a {INSTANCIA_LABEL[detalle.avisoInstancia]}
+                    <p className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                      <Landmark size={12} /> Aviso dado a
+                      <ChipInstancia instancia={detalle.avisoInstancia} />
                     </p>
                     <div className="space-y-2">
                       <Dato label="Fecha" valor={formatDia(detalle.avisoFecha)} />

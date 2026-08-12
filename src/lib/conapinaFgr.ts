@@ -58,6 +58,20 @@ export const INSTANCIA_LABEL: Record<InstanciaAviso, string> = {
 
 export const INSTANCIAS: InstanciaAviso[] = ["conapina", "fiscalia", "ambos"];
 
+// Un color por instancia: son datos distintos y deben distinguirse de un
+// vistazo en las tablas. Violeta para CONAPINA (el mismo del chip "Menor de
+// edad", que es justo cuando corresponde), azul para la vía penal de la FGR y
+// teal para "Ambos". Ninguno choca con los chips de estado (ámbar/verde) ni con
+// los de motivo (rosa/ámbar/índigo), que conviven en la misma fila.
+export const INSTANCIA_CHIP: Record<InstanciaAviso, string> = {
+  conapina:
+    "text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-900/50 border-violet-200 dark:border-violet-800",
+  fiscalia:
+    "text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 border-blue-200 dark:border-blue-800",
+  ambos:
+    "text-teal-700 dark:text-teal-300 bg-teal-100 dark:bg-teal-900/50 border-teal-200 dark:border-teal-800",
+};
+
 export const CONDICION_LABEL: Record<CondicionPacienteAviso, string> = {
   vivo: "Vivo",
   fallecido: "Fallecido",
