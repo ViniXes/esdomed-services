@@ -81,7 +81,7 @@ export default function MedicoConapinaFgrPage() {
   const sugerenciaCausa = paciente?.causaExterna?.codigo ? paciente.causaExterna : null;
 
   // Duplicados: se resuelve contra las notificaciones que ya están en memoria
-  // (las del propio médico), sin lecturas extra. Psicología ve los cruzados
+  // (las del propio médico), sin lecturas extra. El comité ve los cruzados
   // entre médicos, que aquí no se pueden consultar por reglas.
   const duplicados = paciente ? duplicadosDeExpediente(notificaciones, paciente.expediente) : [];
 
@@ -246,7 +246,7 @@ export default function MedicoConapinaFgrPage() {
 
   const porRecibir = notificaciones.filter(n => n.estado === "pendiente").length;
   // Para el médico "recibidas" incluye las ya avisadas: desde su lado el caso
-  // dejó de estar en el aire en cuanto Psicología lo tomó.
+  // dejó de estar en el aire en cuanto el comité lo tomó.
   const recibidas = notificaciones.filter(n => n.estado === "confirmado" || n.estado === "avisado").length;
 
   return (
@@ -263,7 +263,7 @@ export default function MedicoConapinaFgrPage() {
             <div>
               <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Notificación CONAPINA / FGR</h1>
               <p className="mt-1 max-w-xl text-sm text-amber-50/90">
-                Reporte los casos de violencia o accidente de tránsito: el aviso llega a Psicología para su gestión.
+                Reporte los casos de violencia o accidente de tránsito: el aviso llega al Comité de Lesiones Intencionales para su gestión.
               </p>
             </div>
           </div>
@@ -311,13 +311,13 @@ export default function MedicoConapinaFgrPage() {
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-xs font-bold text-amber-700 ring-1 ring-amber-100 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-900">3</span>
                   <div>
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notificar</p>
-                    <p className="mt-0.5 text-xs leading-4 text-slate-500">El aviso se enviará directamente a Psicología.</p>
+                    <p className="mt-0.5 text-xs leading-4 text-slate-500">El aviso se enviará directamente al comité.</p>
                   </div>
                 </li>
               </ol>
               <div className="mt-5 rounded-xl border border-cyan-100 bg-white/80 p-3 text-xs leading-4 text-slate-500 dark:border-cyan-900/60 dark:bg-slate-900/70 dark:text-slate-400">
                 <Info size={14} className="mb-1.5 text-cyan-600 dark:text-cyan-300" />
-                Si el paciente es menor de edad, el caso también corresponde a CONAPINA. Psicología define a qué instancia se remite.
+                Si el paciente es menor de edad, el caso también corresponde a CONAPINA. El comité define a qué instancia se remite.
               </div>
             </aside>
 
@@ -371,13 +371,13 @@ export default function MedicoConapinaFgrPage() {
                       <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
                         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
                         <p className="text-xs leading-5 text-amber-800 dark:text-amber-200">
-                          El expediente no tiene fecha de nacimiento registrada, así que Psicología no podrá ver si el
+                          El expediente no tiene fecha de nacimiento registrada, así que el comité no podrá ver si el
                           paciente es menor de edad. Puede notificar igual, pero conviene completar el dato en el expediente.
                         </p>
                       </div>
                     )}
 
-                    {/* Duplicados propios (los de otros médicos los detecta Psicología). */}
+                    {/* Duplicados propios (los de otros médicos los detecta el comité). */}
                     {duplicados.length > 0 && (
                       <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
                         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -537,7 +537,7 @@ export default function MedicoConapinaFgrPage() {
                       <div>
                         <p className="text-sm font-bold text-amber-900 dark:text-amber-100">Paso 3 · Enviar notificación</p>
                         <p className="mt-0.5 text-xs leading-5 text-amber-800/90 dark:text-amber-200/80">
-                          Revise el paciente y el diagnóstico antes de continuar. El aviso quedará disponible para Psicología.
+                          Revise el paciente y el diagnóstico antes de continuar. El aviso quedará disponible para el comité.
                         </p>
                       </div>
                     </div>
@@ -563,7 +563,7 @@ export default function MedicoConapinaFgrPage() {
                         ? "Enviando notificación..."
                         : avisoInactivo
                           ? "Enviar de todos modos"
-                          : "Enviar notificación a Psicología"}
+                          : "Enviar notificación al comité"}
                     </button>
                   </div>
                 </form>
@@ -579,7 +579,7 @@ export default function MedicoConapinaFgrPage() {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Seguimiento</p>
             <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Mis notificaciones</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Consulte el estado de los avisos enviados a Psicología.</p>
+            <p className="mt-0.5 text-xs text-slate-500">Consulte el estado de los avisos enviados al comité.</p>
           </div>
           <span className="text-xs font-medium text-slate-500">{displayList.length} {displayList.length === 1 ? "resultado" : "resultados"}</span>
         </div>
@@ -704,10 +704,10 @@ export default function MedicoConapinaFgrPage() {
                     </div>
                   )}
 
-                  {n.notasPsicologia && (
+                  {n.notasComite && (
                     <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/35">
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Observación de Psicología</p>
-                      <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{n.notasPsicologia}</p>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Observación del comité</p>
+                      <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{n.notasComite}</p>
                     </div>
                   )}
 
@@ -808,7 +808,7 @@ export default function MedicoConapinaFgrPage() {
                     El caso del paciente{" "}
                     <span className="font-semibold text-slate-700 dark:text-slate-300">{modal.nombre}</span>{" "}
                     (Exp. <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{modal.expediente}</span>)
-                    fue enviado correctamente a Psicología.
+                    fue enviado correctamente al comité.
                   </p>
                 </div>
                 <button onClick={() => setModal(null)}

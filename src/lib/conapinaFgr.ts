@@ -5,7 +5,7 @@ import type {
 
 // Catálogo y reglas de validación del módulo Lesiones intencionales
 // (avisos CONAPINA / FGR). Vive aparte de los tipos porque lo comparten las
-// tres vistas (médico notifica, bandeja de Psicología, ingresos por lesión) y
+// tres vistas (médico notifica, bandeja del comité, ingresos por lesión) y
 // así las etiquetas, colores y rangos CIE-10 no se duplican.
 
 export const TIPO_CASO_LABEL: Record<TipoCasoConapinaFgr, string> = {
@@ -32,7 +32,7 @@ export const TIPO_CASO_CHIP: Record<TipoCasoConapinaFgr, string> = {
 
 export const TIPOS_CASO: TipoCasoConapinaFgr[] = ["violencia", "accidente_transito", "intento_suicida"];
 
-// Vocabulario del módulo: el estado se lee desde el punto de vista de Psicología
+// Vocabulario del módulo: el estado se lee desde el punto de vista del comité
 // ("por recibir" / "recibida" / "avisada"), no con el genérico
 // Pendiente/Confirmado del componente Badge compartido. Por eso los chips se
 // pintan aquí y no allá.
@@ -68,7 +68,7 @@ export const CONDICION_LABEL: Record<CondicionPacienteAviso, string> = {
 };
 
 // Un paciente menor de edad implica aviso a CONAPINA además de la FGR. NO se
-// decide aquí a qué instancia va el caso (eso lo asienta Psicología en el 3er
+// decide aquí a qué instancia va el caso (eso lo asienta el comité en el 3er
 // tiempo): solo se marca la edad para que la bandeja lo priorice.
 export const esMenorDeEdad = (edad: number | null | undefined) =>
   typeof edad === "number" && edad < 18;
@@ -116,7 +116,7 @@ export const CAUSA_EXTERNA_AVISO: Record<TipoCasoConapinaFgr, string> = {
 // La causa externa NO se registra al ingresar: se define bien hasta el egreso.
 // Por eso el tamizaje de ingresos no puede depender de ella. Se echa una red
 // más amplia por el DIAGNÓSTICO (capítulo XIX: traumatismos, intoxicaciones y
-// demás consecuencias de causas externas) y luego Psicología investiga caso por
+// demás consecuencias de causas externas) y luego el comité investiga caso por
 // caso si el hecho fue accidente, violencia o autoinfligido. Los que no lo sean
 // se marcan "no corresponde" y salen de la lista.
 export type GrupoLesion = "maltrato" | "causa_externa" | "traumatismo" | "intoxicacion" | "otras_consecuencias";
@@ -155,7 +155,7 @@ export interface AnalisisIngreso {
   descripcion: string;
   origen: string;
   // Categoría propuesta cuando el propio código ya nombra el hecho (V, X6x…).
-  // Es solo una sugerencia: la decisión la toma Psicología al revisar.
+  // Es solo una sugerencia: la decisión la toma el comité al revisar.
   sugerida: TipoCasoConapinaFgr | null;
 }
 
@@ -230,8 +230,8 @@ export function validarFechaAviso(valor: string, fechaHecho?: Date | null): stri
 
 // ── Duplicados ──────────────────────────────────────────────────────────────
 // Se resuelve contra la lista que el cliente ya tiene cargada (0 lecturas
-// extra): del lado del médico son sus propias notificaciones y del lado de
-// Psicología son todas. Las anuladas no cuentan como duplicado.
+// extra): del lado del médico son sus propias notificaciones y del lado
+// del comité son todas. Las anuladas no cuentan como duplicado.
 export function duplicadosDeExpediente(
   lista: NotificacionConapinaFgr[],
   expediente: string,

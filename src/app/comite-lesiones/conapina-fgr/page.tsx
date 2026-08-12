@@ -48,7 +48,7 @@ const hoyISO = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
-export default function PsicologiaConapinaFgrPage() {
+export default function ComiteConapinaFgrPage() {
   const { user, profile } = useAuth();
   const [items, setItems] = useState<NotificacionConapinaFgr[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -183,7 +183,7 @@ export default function PsicologiaConapinaFgrPage() {
 
   const abrir = async (n: NotificacionConapinaFgr) => {
     setSelected(n);
-    setNotas(n.notasPsicologia ?? "");
+    setNotas(n.notasComite ?? "");
     setErrAccion(null);
     setProgreso(null);
     setAvisoInstancia(n.avisoInstancia ?? "");
@@ -195,7 +195,7 @@ export default function PsicologiaConapinaFgrPage() {
     setEditandoAviso(n.estado === "confirmado");
 
     // Solo al abrir un caso listo para avisar se relee el expediente (1 lectura)
-    // para precargar la condición del paciente. La psicóloga puede cambiarla:
+    // para precargar la condición del paciente. Quien registra puede cambiarla:
     // manda lo que consta en el acta, no lo que diga el sistema.
     if (n.estado === "confirmado" && n.pacienteId && !n.condicionPaciente) {
       try {
@@ -220,7 +220,7 @@ export default function PsicologiaConapinaFgrPage() {
     try {
       await updateDoc(doc(db, "notificaciones_conapina_fgr", selected.id), {
         estado: "confirmado",
-        notasPsicologia: notas.trim() || null,
+        notasComite: notas.trim() || null,
         revisadoPor: profile.uid,
         revisadoPorNombre: profile.nombre,
         // serverTimestamp: las reglas exigen revisadoEn == request.time, para que
@@ -760,17 +760,17 @@ export default function PsicologiaConapinaFgrPage() {
                 <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/25">
                   <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Paso 1 · Recibir el caso</p>
                   <p className="mt-0.5 text-xs leading-5 text-blue-800/90 dark:text-blue-200/80">
-                    Al recibirlo se registra que Psicología lo tomó. El aviso a CONAPINA o la Fiscalía se asienta después.
+                    Al recibirlo se registra que el comité lo tomó. El aviso a CONAPINA o la Fiscalía se asienta después.
                   </p>
                   <label className="mb-1.5 mt-3 block text-xs font-medium text-slate-500">Observación para el médico (opcional)</label>
                   <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
                     placeholder="Notas para el médico..." className={`${inputCls} resize-none bg-white dark:bg-slate-900`} />
                 </div>
               )}
-              {selected.estado !== "pendiente" && selected.notasPsicologia && (
+              {selected.estado !== "pendiente" && selected.notasComite && (
                 <div>
-                  <p className="mb-1.5 text-xs font-medium text-slate-500">Observación de Psicología</p>
-                  <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{selected.notasPsicologia}</p>
+                  <p className="mb-1.5 text-xs font-medium text-slate-500">Observación del comité</p>
+                  <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">{selected.notasComite}</p>
                 </div>
               )}
 

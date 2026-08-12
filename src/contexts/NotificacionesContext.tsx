@@ -72,6 +72,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const puedeAltas   = esEsdomed || profile?.role === "trabajo_social";
   const esPsicologia = profile?.role === "psicologia";
   const esTS         = profile?.role === "trabajo_social";
+  const esComiteLesiones = profile?.role === "comite_lesiones";
   // Psicología y Trabajo Social comparten la revisión de fallecidos (confirmar "visto").
   const revisaFallecidos = esPsicologia || esTS;
   const psUid        = profile?.uid;
@@ -216,16 +217,16 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [revisaFallecidos, addToast, setCount]);
 
-  // ── Psicología: notificaciones CONAPINA/FGR pendientes de acuse ──
+  // ── Comité de Lesiones: notificaciones CONAPINA/FGR pendientes de acuse ──
   // Contador por agregación (no lee documentos) + 1 listener del más reciente
   // para el toast, igual que las fuentes de ESDOMED.
   const knownConapina = useRef<string | null>(null);
   useEffect(() => {
-    if (!esPsicologia) return;
+    if (!esComiteLesiones) return;
     let activo = true;
     knownConapina.current = null;
 
-    // Al badge le toca todo lo que sigue pendiente de acción de Psicología:
+    // Al badge le toca todo lo que sigue pendiente de acción del comité:
     // lo que aún no recibe MÁS lo recibido que todavía no se avisó a CONAPINA
     // o la Fiscalía (ese es justo el caso que se puede escapar sin avisar).
     const porEstado = (estado: string) =>
@@ -269,7 +270,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
       window.clearInterval(iv);
       unsub();
     };
-  }, [esPsicologia, addToast, setCount]);
+  }, [esComiteLesiones, addToast, setCount]);
 
   const pendientes: Pendientes = {
     ...counts,

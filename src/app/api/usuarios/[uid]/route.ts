@@ -12,6 +12,7 @@ const VALID_ROLES = new Set<UserRole>([
   "asistente_esdomed",
   "trabajo_social",
   "psicologia",
+  "comite_lesiones",
   "admin",
   "enfermeria",
   "rrhh",

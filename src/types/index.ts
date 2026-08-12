@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
+export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
 
 // Roles del módulo Convenio ISBM (los datos del módulo viven en Supabase;
 // ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.
@@ -236,13 +236,13 @@ export interface TrasladoExterno {
 // Notificación CONAPINA / FGR — violencia o accidente de tránsito
 // ============================================================================
 // El médico detecta un paciente activo cuyo diagnóstico corresponde a un hecho
-// de violencia o de tránsito y lo notifica; Psicología lo recibe en su bandeja
+// de violencia o de tránsito y lo notifica; el comité lo recibe en su bandeja
 // y acusa de recibido. Colección: notificaciones_conapina_fgr.
 // El diagnóstico se toma del catálogo CIE-10; la nota cubre el caso en que el
 // médico no encuentre el código exacto (uno de los dos es obligatorio).
 
 // El flujo tiene TRES tiempos, no dos: el médico notifica (pendiente) →
-// Psicología recibe el caso (confirmado) → Psicología da el aviso a CONAPINA
+// el comité recibe el caso (confirmado) → el comité da el aviso a CONAPINA
 // y/o la Fiscalía y lo asienta (avisado). El registro que audita el MINSAL es
 // el tercero; "confirmado" sin pasar a "avisado" es justo lo que se puede
 // escapar, por eso la bandeja lo cuenta aparte.
@@ -288,12 +288,12 @@ export interface NotificacionConapinaFgr {
   creadoEn: Date;
   actualizadoEn?: Date;
 
-  revisadoPor?: string;           // uid de Psicología que la dio por recibida
+  revisadoPor?: string;           // uid del comité que la dio por recibida
   revisadoPorNombre?: string;
   revisadoEn?: Date;
-  notasPsicologia?: string | null;  // observación opcional al confirmar
+  notasComite?: string | null;  // observación opcional al confirmar
 
-  // ── 3er tiempo: el aviso externo que da Psicología ────────────────────────
+  // ── 3er tiempo: el aviso externo que da el comité ────────────────────────
   // Estas son las columnas del registro que audita el MINSAL. OJO: quien
   // "recibió el aviso" es la persona de CONAPINA / la Fiscalía, NO la psicóloga
   // que abrió el caso aquí (esa es revisadoPorNombre).
@@ -323,7 +323,7 @@ export interface NotificacionConapinaFgr {
 // Revisión de un ingreso candidato a lesión intencional
 // ============================================================================
 // El tamizaje por CIE-10 solo produce CANDIDATOS (todo traumatismo o
-// intoxicación entra). Psicología investiga cada uno y decide si el hecho fue
+// intoxicación entra). el comité investiga cada uno y decide si el hecho fue
 // accidente de tránsito, violencia o autoinfligido; si no lo fue, lo marca "no
 // corresponde" y deja de aparecer como pendiente.
 // Colección: revisiones_lesiones, con el id del INGRESO (docId de pacientes)
