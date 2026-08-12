@@ -14,7 +14,7 @@ import {
 } from "@/lib/conapinaFgr";
 import {
   ShieldAlert, Car, HeartCrack, Search, X, Download, AlertTriangle, CheckCircle2,
-  Activity, ChevronLeft, ChevronRight, Info, Loader2, CircleSlash, Sparkle, ClipboardCheck,
+  Activity, ChevronLeft, ChevronRight, Info, Loader2, CircleSlash, ClipboardCheck,
   RefreshCw,
 } from "lucide-react";
 import type {
@@ -722,8 +722,7 @@ export default function LesionesIngresosPage() {
                     })}
                   </div>
                   {revisando.analisis.sugerida && (
-                    <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500">
-                      <Sparkle size={12} className="mt-0.5 shrink-0 text-amber-500" />
+                    <p className="mt-2 text-xs text-slate-500">
                       El código {revisando.analisis.codigo} sugiere {TIPO_CASO_LABEL[revisando.analisis.sugerida]}.
                     </p>
                   )}
