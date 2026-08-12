@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText } from "lucide-react";
+import { Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
@@ -26,6 +26,7 @@ const baseNavItems: NavItem[] = [
   { href: "/medico/traslados",       label: "Traslados",       icon: ArrowRightLeft, tone: "cyan" },
   { href: "/medico/traslado-externo", label: "Traslado a otro hospital", icon: Building2, tone: "blue" },
   { href: "/medico/fallecidos",      label: "Fallecidos",      icon: HeartPulse, tone: "rose" },
+  { href: "/medico/conapina-fgr",    label: "CONAPINA / FGR",  icon: ShieldAlert, tone: "amber" },
   { href: "/medico/impresiones",     label: "Impresiones",     icon: Printer, tone: "violet" },
   { href: "/medico/incapacidades",   label: "Incapacidades",   icon: FileText, tone: "amber" },
   { href: "/medico/anexo5/nueva",    label: "Anexo 5",         icon: ClipboardList, tone: "emerald" },

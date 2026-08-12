@@ -26,6 +26,18 @@ service firebase.storage {
                    && tamanoValido();
     }
 
+    // Oficios de egreso escaneados de los casos con aviso CONAPINA / FGR. Los
+    // sube el Comité de Lesiones Intencionales; el rol no se puede verificar
+    // aquí (vive en Firestore), así que se aplica el mismo criterio que arriba:
+    // cada quien escribe en su propia carpeta y la URL solo se expone desde el
+    // documento del caso, que sí está protegido por reglas de Firestore.
+    match /oficios_conapina/{userId}/{fileName} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && tamanoValido();
+    }
+
     // Imágenes adjuntas a reportes de errores de la herramienta SIMMOW. El
     // control real de quién ve cada imagen pasa por Firestore (reportes_bugs_simmow
     // solo lo lista completo un admin, o su propio autor) — la URL nunca se

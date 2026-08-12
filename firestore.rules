@@ -20,6 +20,10 @@ service cloud.firestore {
     function isMedico()       { return isAuth() && getRole() == 'medico'; }
     function isAdmin()        { return isAuth() && getRole() == 'admin'; }
     function isPsicologia()   { return isAuth() && getRole() == 'psicologia'; }
+    // Comité de Lesiones Intencionales (comité de género y violencia auditado
+    // por el MINSAL). Dueño de los avisos CONAPINA/FGR y del tamizaje de
+    // ingresos por lesión; antes ese trámite lo llevaba Psicología.
+    function isComiteLesiones() { return isAuth() && getRole() == 'comite_lesiones'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
     function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
@@ -230,6 +234,98 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Notificaciones CONAPINA / FGR ────────────────────────────────────────
+    // Casos de violencia o accidente de tránsito. El médico notifica; el Comité
+    // de Lesiones Intencionales los recibe en su bandeja y los da por recibidos.
+    // Es dato sensible: NO se abre a todo el staff — solo el comité, el admin y
+    // el médico que lo generó. Psicología ya NO tiene acceso: el trámite dejó de
+    // ser suyo cuando se creó el perfil del comité.
+    //
+    // Los campos van SELLADOS: lo clínico (paciente, diagnóstico, causa externa,
+    // nota) Y los datos del aviso externo (instancia, sede, quién lo recibió)
+    // solo se escriben al crear y nadie los puede reescribir después; el acuse
+    // solo lo escribe el comité y solo sobre lo que sigue "pendiente".
+    match /notificaciones_conapina_fgr/{id} {
+      allow read:   if isAuth() && (isComiteLesiones() || isAdmin()
+                                    || (isMedico() && resource.data.medicoId == uid()));
+
+      // Nace siempre a nombre de quien la crea y en estado pendiente: los campos
+      // de recepción, de anulación y los oficios no pueden venir del formulario.
+      //
+      // Los datos del AVISO EXTERNO se exigen aquí porque el médico es quien da
+      // el aviso y los declara al notificar (antes los capturaba el comité en un
+      // tercer tiempo). Son las columnas que audita el MINSAL, así que se validan
+      // en la regla y no solo en el formulario.
+      allow create: if isMedico()
+                    && request.resource.data.medicoId == uid()
+                    && request.resource.data.estado == 'pendiente'
+                    && request.resource.data.creadoEn == request.time
+                    && request.resource.data.avisoInstancia in ['conapina', 'fiscalia', 'ambos']
+                    && request.resource.data.condicionPaciente in ['vivo', 'fallecido']
+                    && request.resource.data.avisoFecha is timestamp
+                    && request.resource.data.avisoRecibidoPor is string
+                    && request.resource.data.avisoRecibidoPor.size() >= 3
+                    && request.resource.data.avisoLugar is string
+                    && request.resource.data.avisoLugar.size() >= 3
+                    && !request.resource.data.keys().hasAny([
+                         'revisadoPor', 'revisadoPorNombre', 'revisadoEn', 'notasComite',
+                         'anuladoPor', 'anuladoPorNombre', 'anuladoEn', 'motivoAnulacion',
+                         'oficios']);
+
+      // El comité solo toca los campos del acuse, solo mientras esté pendiente
+      // (una recibida es inmutable) y el sello lleva su propio uid y la hora del
+      // servidor: no puede confirmar a nombre de otra persona ni antedatar.
+      allow update: if isComiteLesiones()
+                    && resource.data.estado == 'pendiente'
+                    && request.resource.data.estado == 'confirmado'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'estado', 'notasComite', 'revisadoPor', 'revisadoPorNombre',
+                         'revisadoEn', 'actualizadoEn'])
+                    && request.resource.data.revisadoPor == uid()
+                    && request.resource.data.revisadoEn == request.time;
+
+      // Oficios de egreso escaneados: se adjuntan al caso ya recibido. Es lo
+      // único que sigue creciendo después, por eso va en su propia regla y no
+      // toca ningún otro campo. Los datos del aviso NO se pueden reescribir
+      // desde aquí: son del médico y quedan sellados al crear.
+      allow update: if isComiteLesiones()
+                    && resource.data.estado == 'confirmado'
+                    && request.resource.data.estado == 'confirmado'
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['oficios', 'actualizadoEn']);
+
+      // El médico puede anular SU notificación mientras nadie la haya recibido.
+      // Es la única corrección posible: no puede editar el contenido clínico.
+      allow update: if isMedico()
+                    && resource.data.medicoId == uid()
+                    && resource.data.estado == 'pendiente'
+                    && request.resource.data.estado == 'anulado'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'estado', 'anuladoPor', 'anuladoPorNombre', 'anuladoEn',
+                         'motivoAnulacion', 'actualizadoEn'])
+                    && request.resource.data.anuladoPor == uid()
+                    && request.resource.data.anuladoEn == request.time
+                    && request.resource.data.motivoAnulacion is string
+                    && request.resource.data.motivoAnulacion.size() >= 10;
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Revisión de ingresos candidatos a lesión intencional ─────────────────
+    // Tamizaje del Comité de Lesiones Intencionales: marca si un ingreso con
+    // diagnóstico de lesión corresponde o no a un caso notificable. Mismo
+    // criterio de acceso que los avisos: es dato sensible, no se abre al staff.
+    match /revisiones_lesiones/{id} {
+      allow read:   if isAuth() && (isComiteLesiones() || isAdmin());
+      allow create, update:
+                    if isComiteLesiones()
+                    && request.resource.data.revisadoPor == uid()
+                    && request.resource.data.revisadoEn == request.time
+                    && request.resource.data.resultado in ['corresponde', 'no_corresponde'];
+      allow delete: if isAdmin();
+    }
+
     // ─── Notificaciones de fallecidos ─────────────────────────────────────────
     // Delete: ESDOMED puede eliminar notificaciones duplicadas, pero NO las de
     // trámite cerrado (esas solo el admin, previa revisión).
@@ -271,7 +367,10 @@ service cloud.firestore {
 
     // ─── Pacientes ────────────────────────────────────────────────────────────
     match /pacientes/{id} {
-      allow read:   if isStaff() || isMedico() || isEnfermeria() || isIsbm();
+      // El Comité de Lesiones va aparte de isStaff() a propósito: solo necesita
+      // LEER el censo (tamizaje de ingresos por lesión y ficha del caso), no
+      // tiene por qué ver el resto de bandejas que isStaff() abre.
+      allow read:   if isStaff() || isMedico() || isEnfermeria() || isIsbm() || isComiteLesiones();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin();
       allow delete: if isAdmin();
@@ -519,28 +618,39 @@ service cloud.firestore {
         && request.resource.data.destinoTexto.size() <= 300
         && request.resource.data.fechaNecesita is string
         && request.resource.data.horaNecesita is string;
-      // Jefe/admin gestionan; el motorista solo toca viajes asignados a él.
+      // Jefe/admin gestionan. El motorista solo toca los viajes asignados a él y
+      // únicamente los campos de ejecución: no puede reasignarse, cambiar de
+      // vehículo ni reescribir la solicitud.
       allow update: if isTransporte() || isAdmin()
-        || (isMotorista() && resource.data.motoristaId == uid());
+        || (isMotorista()
+            && resource.data.motoristaId == uid()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                 'estado', 'horaSalida', 'kmSalida', 'horaEntrada', 'kmEntrada',
+                 'kmRecorrido', 'historial', 'actualizadoEn'
+               ])
+            && request.resource.data.estado in ['en_ruta', 'finalizado']);
       allow delete: if isAdmin();
     }
 
     match /vehiculos_transporte/{id} {
       allow read:   if isTransporte() || isMotorista() || isAdmin();
       allow create: if isTransporte() || isAdmin();
-      // El motorista actualiza el kilometraje del vehículo al cerrar un viaje.
-      allow update: if isTransporte() || isMotorista() || isAdmin();
+      // El motorista solo pone al día el odómetro al cerrar un viaje.
+      allow update: if isTransporte() || isAdmin()
+        || (isMotorista()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kmActual', 'actualizadoEn']));
       allow delete: if isAdmin();
     }
 
-    // Checklist diario por vehículo (requisito para iniciar ruta); cada motorista
-    // crea y corrige solo los propios.
+    // Checklist diario por vehículo (requisito para iniciar ruta): cada motorista
+    // crea y corrige solo los propios; el jefe de transporte además marca las
+    // novedades como atendidas.
     match /checklists_vehiculo/{id} {
       allow read:   if isTransporte() || isMotorista() || isAdmin();
       allow create: if (isTransporte() || isMotorista() || isAdmin())
         && request.resource.data.motoristaId == uid();
-      allow update: if isAdmin()
-        || ((isTransporte() || isMotorista()) && resource.data.motoristaId == uid());
+      allow update: if isTransporte() || isAdmin()
+        || (isMotorista() && resource.data.motoristaId == uid());
       allow delete: if isAdmin();
     }
 

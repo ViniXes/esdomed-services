@@ -17,6 +17,9 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
     if (!loading && profile?.role !== "psicologia") router.replace("/login");
   }, [loading, profile, router]);
 
+  // Las lesiones intencionales (avisos CONAPINA/FGR e ingresos por lesión) ya
+  // NO viven aquí: son trámite del Comité de Lesiones Intencionales, que tiene
+  // su propio perfil y su propia área en /comite-lesiones.
   const navItems: NavItem[] = [
     { href: "/psicologia/buscar-paciente",   label: "Buscar Paciente",   icon: UserSearch },
     { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },

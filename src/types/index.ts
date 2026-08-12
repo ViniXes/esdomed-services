@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
+export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
 
 // Roles del módulo Convenio ISBM (los datos del módulo viven en Supabase;
 // ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.
@@ -230,6 +230,126 @@ export interface TrasladoExterno {
   revisadoPor?: string;           // uid del personal esdomed que confirmó
   revisadoPorNombre?: string;
   notasEsdomed?: string;          // observación opcional al confirmar
+}
+
+// ============================================================================
+// Notificación CONAPINA / FGR — violencia o accidente de tránsito
+// ============================================================================
+// El médico detecta un paciente activo cuyo diagnóstico corresponde a un hecho
+// de violencia o de tránsito y lo notifica; el comité lo recibe en su bandeja
+// y acusa de recibido. Colección: notificaciones_conapina_fgr.
+// El diagnóstico se toma del catálogo CIE-10; la nota cubre el caso en que el
+// médico no encuentre el código exacto (uno de los dos es obligatorio).
+
+// El flujo tiene DOS tiempos: el médico da el aviso a CONAPINA y/o la Fiscalía
+// y lo registra aquí junto con la notificación (pendiente) → el comité lo recibe
+// para dejarlo asentado (confirmado).
+//
+// Antes eran tres: el médico solo notificaba y era Psicología quien daba el
+// aviso externo y lo asentaba. Se cambió porque quien avisa realmente es el
+// médico tratante, así que los datos del aviso (instancia, sede, persona que lo
+// recibió) se capturan de una vez en su formulario. El comité ya no asienta
+// nada: solo recibe. Por eso el estado "avisado" desapareció.
+export type EstadoNotificacionConapinaFgr = "pendiente" | "confirmado" | "anulado";
+export type TipoCasoConapinaFgr = "violencia" | "accidente_transito" | "intento_suicida";
+export type InstanciaAviso = "conapina" | "fiscalia" | "ambos";
+export type CondicionPacienteAviso = "vivo" | "fallecido";
+
+// Oficio de egreso escaneado. Lo adjunta el comité al caso ya recibido.
+export interface OficioEgreso {
+  url: string;
+  nombre: string;
+  subidoPorNombre: string;
+  subidoEn: Date;
+}
+
+export interface NotificacionConapinaFgr {
+  id?: string;
+  medicoId: string;
+  medicoNombre: string;
+  medicoServicio: string;
+  medicoJvpm?: string;
+
+  pacienteId?: string;            // doc id en /pacientes
+  pacienteNombre: string;
+  pacienteExpediente: string;
+  // Edad al momento de notificar (snapshot). Menor de 18 → también CONAPINA.
+  pacienteEdad?: number | null;
+  // Ubicación del paciente al notificar (snapshot). No se le piden al médico:
+  // se toman del expediente. En una notificación diferida de un ingreso ya
+  // cerrado la cama normalmente viene vacía.
+  servicio: string;
+  cama?: string;
+
+  tipoCaso: TipoCasoConapinaFgr;
+  // Cuándo ocurrió (o se detectó) el hecho. NO se acota por la fecha de ingreso:
+  // en violencia y tránsito el hecho es anterior al ingreso casi siempre.
+  fechaHecho: Date;
+  diagnostico?: DiagnosticoCIE | null;  // lesión / diagnóstico clínico (S, T…)
+  // Causa externa CIE-10 (V01–V99 tránsito, T74 / X85–Y09 agresiones). Va aparte
+  // porque el diagnóstico principal suele ser la lesión, no el hecho.
+  causaExterna?: DiagnosticoCIE | null;
+  nota?: string | null;                 // detalle libre / diagnóstico sin código
+
+  estado: EstadoNotificacionConapinaFgr;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+
+  revisadoPor?: string;           // uid del comité que la dio por recibida
+  revisadoPorNombre?: string;
+  revisadoEn?: Date;
+  notasComite?: string | null;  // observación opcional al confirmar
+
+  // ── El aviso externo, declarado por el médico al notificar ────────────────
+  // Estas son las columnas del registro que audita el MINSAL. OJO: quien
+  // "recibió el aviso" es la persona de CONAPINA / la Fiscalía, NO quien lo
+  // recibe aquí en el portal (esa es revisadoPorNombre, del comité).
+  // Son obligatorias: el formulario del médico no deja enviar sin ellas.
+  avisoInstancia: InstanciaAviso;
+  avisoFecha: Date;               // día en que se dio el aviso
+  avisoRecibidoPor: string;       // nombre de quien lo recibió en la instancia
+  avisoLugar: string;             // sede / lugar donde se dio
+  avisoObservacion?: string | null;
+  // Condición del paciente al momento del aviso. NO se le pregunta al médico:
+  // se deriva del expediente al enviar (el formulario ya lo relee para validar
+  // que siga activo) y queda congelada, porque es lo que consta en el acta.
+  condicionPaciente: CondicionPacienteAviso;
+
+  // Oficios de egreso escaneados (los adjunta el comité al caso ya recibido).
+  oficios?: OficioEgreso[];
+
+  // Anulación por el propio médico (solo mientras nadie la haya recibido).
+  anuladoPor?: string;
+  anuladoPorNombre?: string;
+  anuladoEn?: Date;
+  motivoAnulacion?: string;
+}
+
+// ============================================================================
+// Revisión de un ingreso candidato a lesión intencional
+// ============================================================================
+// El tamizaje por CIE-10 solo produce CANDIDATOS (todo traumatismo o
+// intoxicación entra). el comité investiga cada uno y decide si el hecho fue
+// accidente de tránsito, violencia o autoinfligido; si no lo fue, lo marca "no
+// corresponde" y deja de aparecer como pendiente.
+// Colección: revisiones_lesiones, con el id del INGRESO (docId de pacientes)
+// como id del documento, para que un mismo expediente con dos ingresos se
+// revise por separado.
+
+export type ResultadoRevisionLesion = "corresponde" | "no_corresponde";
+
+export interface RevisionLesion {
+  id?: string;              // = pacienteId (docId del ingreso)
+  pacienteId: string;
+  expediente: string;
+  pacienteNombre: string;
+  fechaIngreso: Date;       // se copia para poder consultar por rango
+  resultado: ResultadoRevisionLesion;
+  categoria?: TipoCasoConapinaFgr | null;  // solo si corresponde
+  observacion?: string | null;
+  revisadoPor: string;
+  revisadoPorNombre: string;
+  revisadoEn: Date;
 }
 
 export type EstadoFallecido = "pendiente" | "confirmado";
@@ -1397,8 +1517,34 @@ export interface ViajeTransporte {
   kmEntrada?: number;
   kmRecorrido?: number;        // kmEntrada - kmSalida (calculado al finalizar)
 
+  // Origen del registro: "publico" = formulario de folio; "interno" = lo levantó
+  // el jefe desde el tablero (viaje por orden verbal, emergencia, mandado).
+  origen?: "publico" | "interno";
+  registradoPorNombre?: string; // solo en los internos
+
+  // Bitácora de auditoría del viaje: quién hizo qué y cuándo. Se agrega con
+  // arrayUnion en cada acción; nunca se reescribe.
+  historial?: EventoViajeTransporte[];
+
   creadoEn: Date;
   actualizadoEn?: Date;
+}
+
+// Una línea de la bitácora de auditoría de un viaje.
+export interface EventoViajeTransporte {
+  en: Date;
+  accion:
+    | "creado"
+    | "asignado"
+    | "rechazado"
+    | "cancelado"
+    | "en_ruta"
+    | "finalizado"
+    | "cerrado_por_jefe"
+    | "corregido";
+  porId: string;
+  porNombre: string;
+  detalle?: string;            // texto libre: motivo, valores corregidos, aviso de conflicto…
 }
 
 // Checklist diario del vehículo (requisito para iniciar ruta).
@@ -1415,6 +1561,16 @@ export interface ChecklistVehiculo {
   kilometraje?: number;
   observaciones?: string;
   creadoEn: Date;
+
+  // Novedades: derivados de `items` al guardar para que el jefe pueda consultar
+  // las fallas sin leer todos los checklists (consulta por igualdad, sin índice).
+  tieneFallas?: boolean;
+  itemsEnNo?: string[];        // ids del catálogo que quedaron en NO
+  atendido?: boolean;          // el jefe ya revisó la novedad
+  atendidoPorId?: string;
+  atendidoPorNombre?: string;
+  atendidoEn?: Date;
+  notaAtencion?: string;       // qué se hizo con la falla
 }
 
 // ============================================================================
