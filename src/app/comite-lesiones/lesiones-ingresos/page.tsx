@@ -581,7 +581,7 @@ export default function LesionesIngresosPage() {
                             {f.analisis.sugerida && (
                               <span title={`Sugerido por el código ${f.analisis.codigo}`}
                                 className="ml-1 inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-100 px-1 py-px text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800">
-                                <Sparkle size={9} /> {TIPO_CASO_LABEL[f.analisis.sugerida]}
+                                {TIPO_CASO_LABEL[f.analisis.sugerida]}
                               </span>
                             )}
                           </span>

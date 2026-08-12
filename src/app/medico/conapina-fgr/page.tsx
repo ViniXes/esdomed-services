@@ -12,15 +12,18 @@ import {
   TIPO_CASO_LABEL, TIPO_CASO_CHIP, ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad, INSTANCIA_LABEL,
 } from "@/lib/conapinaFgr";
 import {
-  ShieldAlert, Plus, X, CheckCircle2, AlertCircle, Search,
+  ShieldAlert, Plus, X, CheckCircle2, AlertCircle, Search, ChevronLeft, ChevronRight,
   Car, HeartCrack, Clock3, FileText, StickyNote, Ban, Landmark,
 } from "lucide-react";
 import type { NotificacionConapinaFgr } from "@/types";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
+const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap";
+
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
 const MOTIVO_ANULACION_MIN = 10;
+const PAGE_SIZE = 15;
 
 // El servidor resuelve creadoEn (serverTimestamp); mientras la escritura está
 // pendiente llega null → esos documentos son los más nuevos, no los más viejos.
@@ -31,6 +34,8 @@ export default function MedicoConapinaFgrPage() {
   const router = useRouter();
 
   const [notificaciones, setNotificaciones] = useState<NotificacionConapinaFgr[]>([]);
+  const [detalle, setDetalle] = useState<NotificacionConapinaFgr | null>(null);
+  const [page, setPage] = useState(1);
 
   // Anulación
   const [anulando, setAnulando] = useState<NotificacionConapinaFgr | null>(null);
@@ -51,6 +56,7 @@ export default function MedicoConapinaFgrPage() {
       const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionConapinaFgr));
       docs.sort((a, b) => msDe(b.creadoEn) - msDe(a.creadoEn));
       setNotificaciones(docs);
+      setDetalle(prev => (prev?.id ? docs.find(d => d.id === prev.id) ?? prev : prev));
     });
   }, [user]);
 
@@ -110,11 +116,23 @@ export default function MedicoConapinaFgrPage() {
     return true;
   });
 
+  // Reinicio de paginación al cambiar los filtros (ajuste de estado en render).
+  const filtrosKey = `${busquedaExpediente}|${fechaDesde}|${fechaHasta}`;
+  const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
+  if (filtrosPrevios !== filtrosKey) {
+    setFiltrosPrevios(filtrosKey);
+    setPage(1);
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
+  const paginaActual = Math.min(page, totalPaginas);
+  const paginados = displayList.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
+
   const porRecibir = notificaciones.filter(n => n.estado === "pendiente").length;
   const recibidas = notificaciones.filter(n => n.estado === "confirmado").length;
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* Encabezado de tarea: deja claro qué se notifica y a quién le llega. */}
       <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a3312] via-amber-700 to-orange-600 px-5 py-5 shadow-lg shadow-amber-950/20 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
@@ -189,133 +207,240 @@ export default function MedicoConapinaFgrPage() {
         </div>
       </section>
 
-      {/* Lista */}
-      <div className="space-y-3">
+      {/* Tabla: lo justo para ubicar el caso; el resto va en el detalle. */}
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50/80 dark:bg-slate-800/50">
+              <tr>
+                <th className={thCls}>Expediente</th>
+                <th className={thCls}>Paciente</th>
+                <th className={thCls}>Motivo</th>
+                <th className={thCls}>Hecho</th>
+                <th className={thCls}>Aviso dado a</th>
+                <th className={thCls}>Enviada</th>
+                <th className={thCls}>Estado</th>
+                <th className={thCls}><span className="sr-only">Detalle</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {paginados.map(n => {
+                const Icono = ICONO_CASO[n.tipoCaso] ?? ShieldAlert;
+                const anulada = n.estado === "anulado";
+                return (
+                  <tr key={n.id} onClick={() => setDetalle(n)}
+                    className={`cursor-pointer transition-colors hover:bg-amber-50/40 dark:hover:bg-slate-800/60 ${anulada ? "opacity-60" : ""}`}>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          n.estado === "confirmado" ? "bg-emerald-500"
+                            : anulada ? "bg-slate-300 dark:bg-slate-600"
+                            : "bg-amber-400"
+                        }`} />
+                        <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{n.pacienteExpediente}</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{n.pacienteNombre}</span>
+                        {esMenorDeEdad(n.pacienteEdad) && (
+                          <span className="rounded border border-violet-200 bg-violet-100 px-1 py-px text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
+                            Menor
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[n.tipoCaso]}`}>
+                        <Icono size={11} /> {TIPO_CASO_LABEL[n.tipoCaso]}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{formatDia(n.fechaHecho)}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
+                      {n.avisoInstancia ? INSTANCIA_LABEL[n.avisoInstancia] : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{formatDia(n.creadoEn)}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${ESTADO_CHIP[n.estado]}`}>
+                        {ESTADO_LABEL[n.estado]}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-right">
+                      <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-cyan-700 dark:text-cyan-300">
+                        Detalle <ChevronRight size={13} />
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
         {displayList.length === 0 && (
-          <p className="text-sm text-slate-500 py-10 text-center">
+          <p className="py-12 text-center text-sm text-slate-500">
             {notificaciones.length === 0
-              ? "No has enviado notificaciones CONAPINA/FGR."
+              ? "Aún no ha enviado notificaciones CONAPINA/FGR."
               : "Sin resultados para los filtros aplicados."}
           </p>
         )}
-        {displayList.map(n => {
-          const Icono = ICONO_CASO[n.tipoCaso] ?? ShieldAlert;
-          const anulada = n.estado === "anulado";
-          return (
-            <article key={n.id}
-              className={`relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] transition-all dark:border-slate-800 dark:bg-slate-900 md:p-5 ${
-                anulada ? "opacity-70" : "hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md hover:shadow-amber-950/5 dark:hover:border-amber-800"
-              }`}>
-              <span className={`absolute bottom-0 left-0 top-0 w-1 ${
-                n.estado === "confirmado" ? "bg-emerald-500"
-                  : anulada ? "bg-slate-300 dark:bg-slate-700"
-                  : "bg-amber-400"
-              }`} />
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 pl-1">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[n.tipoCaso]}`}>
-                      <Icono size={12} /> {TIPO_CASO_LABEL[n.tipoCaso]}
-                    </span>
-                    {esMenorDeEdad(n.pacienteEdad) && (
-                      <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
-                        Menor de edad
-                      </span>
-                    )}
-                    <span className="text-xs font-medium text-slate-400">Enviada {formatFecha(n.creadoEn)}</span>
-                  </div>
 
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{n.pacienteNombre}</p>
-                  <p className="mt-0.5 font-mono text-xs font-medium text-slate-500">Exp. {n.pacienteExpediente}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {n.servicio || "—"}{n.cama ? ` · Cama ${n.cama}` : ""}
-                    {typeof n.pacienteEdad === "number" ? ` · ${n.pacienteEdad} años` : ""}
-                  </p>
-                  {/* Las notificaciones anteriores a este campo no tienen fechaHecho. */}
-                  {n.fechaHecho && <p className="mt-0.5 text-xs text-slate-500">Hecho del {formatDia(n.fechaHecho)}</p>}
-
-                  {(n.diagnostico?.codigo || n.causaExterna?.codigo) && (
-                    <div className="mt-2.5 space-y-1.5 rounded-xl border border-blue-100 bg-blue-50/70 p-2.5 dark:border-blue-900/60 dark:bg-blue-950/25">
-                      {n.diagnostico?.codigo && (
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Diagnóstico</p>
-                          <p className="mt-0.5 text-xs text-slate-800 dark:text-slate-100">
-                            <span className="font-mono font-semibold">{n.diagnostico.codigo}</span> · {n.diagnostico.descripcion}
-                          </p>
-                        </div>
-                      )}
-                      {n.causaExterna?.codigo && (
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Causa externa</p>
-                          <p className="mt-0.5 text-xs text-slate-800 dark:text-slate-100">
-                            <span className="font-mono font-semibold">{n.causaExterna.codigo}</span> · {n.causaExterna.descripcion}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {n.nota && (
-                    <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500">
-                      <StickyNote size={12} className="mt-0.5 shrink-0 text-slate-400" />
-                      <span className="italic whitespace-pre-wrap">{n.nota}</span>
-                    </p>
-                  )}
-
-                  {n.revisadoPorNombre && (
-                    <div className="mt-2">
-                      <span className="rounded border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-400">
-                        Recibido por: {n.revisadoPorNombre}
-                      </span>
-                    </div>
-                  )}
-
-                  {n.notasComite && (
-                    <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/35">
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Observación del comité</p>
-                      <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{n.notasComite}</p>
-                    </div>
-                  )}
-
-                  {/* Constancia del aviso, tal como se declaró al notificar. */}
-                  {n.avisoInstancia && !anulada && (
-                    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-                      <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                        <Landmark size={12} /> Aviso dado a {INSTANCIA_LABEL[n.avisoInstancia]}
-                      </p>
-                      <p className="text-sm text-slate-700 dark:text-slate-300">
-                        {formatDia(n.avisoFecha)}{n.avisoLugar ? ` · ${n.avisoLugar}` : ""}
-                        {n.avisoRecibidoPor ? ` · recibió ${n.avisoRecibidoPor}` : ""}
-                      </p>
-                      {n.avisoObservacion && (
-                        <p className="mt-1 text-xs italic text-slate-500 whitespace-pre-wrap">{n.avisoObservacion}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {anulada && n.motivoAnulacion && (
-                    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-700 dark:bg-slate-800/50">
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Anulada · {formatFecha(n.anuladoEn)}</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{n.motivoAnulacion}</p>
-                    </div>
-                  )}
-
-                  {n.estado === "pendiente" && (
-                    <button
-                      onClick={() => { setAnulando(n); setMotivoAnulacion(""); setErrAnular(null); }}
-                      className="mt-3 flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-rose-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300">
-                      <Ban size={12} /> Anular
-                    </button>
-                  )}
-                </div>
-                <span className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${ESTADO_CHIP[n.estado]}`}>
-                  {ESTADO_LABEL[n.estado]}
-                </span>
-              </div>
-            </article>
-          );
-        })}
+        {totalPaginas > 1 && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/50">
+            <span className="text-xs text-slate-500">{displayList.length} registros · página {paginaActual} de {totalPaginas}</span>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={paginaActual === 1}
+                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100"
+                aria-label="Página anterior">
+                <ChevronLeft size={14} />
+              </button>
+              <button onClick={() => setPage(p => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas}
+                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:text-slate-900 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100"
+                aria-label="Página siguiente">
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Detalle completo */}
+      {detalle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="min-w-0">
+                <h2 className="truncate font-bold text-slate-900 dark:text-slate-100 font-heading">{detalle.pacienteNombre}</h2>
+                <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="font-mono">Exp. {detalle.pacienteExpediente}</span>
+                  {typeof detalle.pacienteEdad === "number" && <span>{detalle.pacienteEdad} años</span>}
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${ESTADO_CHIP[detalle.estado]}`}>
+                    {ESTADO_LABEL[detalle.estado]}
+                  </span>
+                </p>
+              </div>
+              <button onClick={() => setDetalle(null)} aria-label="Cerrar"
+                className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="grid gap-5 p-5 md:grid-cols-2">
+              {/* Columna izquierda: el caso */}
+              <div className="space-y-4">
+                <section>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">El caso</p>
+                  <div className="space-y-2">
+                    <Dato label="Motivo" valor={
+                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[detalle.tipoCaso]}`}>
+                        {TIPO_CASO_LABEL[detalle.tipoCaso]}
+                      </span>
+                    } />
+                    <Dato label="Fecha del hecho" valor={formatDia(detalle.fechaHecho)} />
+                    <Dato label="Ubicación" valor={`${detalle.servicio || "—"}${detalle.cama ? ` · Cama ${detalle.cama}` : ""}`} />
+                    <Dato label="Enviada" valor={formatFecha(detalle.creadoEn)} />
+                  </div>
+                </section>
+
+                {(detalle.diagnostico?.codigo || detalle.causaExterna?.codigo) && (
+                  <section className="space-y-1.5 rounded-xl border border-blue-100 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/25">
+                    {detalle.diagnostico?.codigo && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Diagnóstico</p>
+                        <p className="mt-0.5 text-xs text-slate-800 dark:text-slate-100">
+                          <span className="font-mono font-semibold">{detalle.diagnostico.codigo}</span> · {detalle.diagnostico.descripcion}
+                        </p>
+                      </div>
+                    )}
+                    {detalle.causaExterna?.codigo && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">Causa externa</p>
+                        <p className="mt-0.5 text-xs text-slate-800 dark:text-slate-100">
+                          <span className="font-mono font-semibold">{detalle.causaExterna.codigo}</span> · {detalle.causaExterna.descripcion}
+                        </p>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {detalle.nota && (
+                  <section>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Nota</p>
+                    <p className="flex items-start gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs italic leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+                      <StickyNote size={12} className="mt-0.5 shrink-0 text-slate-400" />
+                      <span className="whitespace-pre-wrap">{detalle.nota}</span>
+                    </p>
+                  </section>
+                )}
+              </div>
+
+              {/* Columna derecha: el aviso y su seguimiento */}
+              <div className="space-y-4">
+                {detalle.avisoInstancia && detalle.estado !== "anulado" && (
+                  <section className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                      <Landmark size={12} /> Aviso dado a {INSTANCIA_LABEL[detalle.avisoInstancia]}
+                    </p>
+                    <div className="space-y-2">
+                      <Dato label="Fecha" valor={formatDia(detalle.avisoFecha)} />
+                      <Dato label="Recibió" valor={detalle.avisoRecibidoPor || "—"} />
+                      <Dato label="Lugar / sede" valor={detalle.avisoLugar || "—"} />
+                      {detalle.avisoObservacion && <Dato label="Observación" valor={<span className="whitespace-pre-wrap italic">{detalle.avisoObservacion}</span>} />}
+                    </div>
+                  </section>
+                )}
+
+                <section>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Seguimiento del comité</p>
+                  {detalle.revisadoPorNombre ? (
+                    <div className="space-y-2">
+                      <Dato label="Recibida por" valor={detalle.revisadoPorNombre} />
+                      <Dato label="Fecha" valor={formatFecha(detalle.revisadoEn)} />
+                    </div>
+                  ) : detalle.estado === "pendiente" ? (
+                    <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                      El comité todavía no la ha recibido. Mientras tanto puede anularla.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500">—</p>
+                  )}
+
+                  {detalle.notasComite && (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/35">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">Observación del comité</p>
+                      <p className="whitespace-pre-wrap text-xs leading-5 text-slate-700 dark:text-slate-300">{detalle.notasComite}</p>
+                    </div>
+                  )}
+                </section>
+
+                {detalle.estado === "anulado" && (
+                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      Anulada · {formatFecha(detalle.anuladoEn)}
+                    </p>
+                    <p className="whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-400">{detalle.motivoAnulacion}</p>
+                  </section>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+              {detalle.estado === "pendiente" && (
+                <button
+                  onClick={() => { setAnulando(detalle); setMotivoAnulacion(""); setErrAnular(null); setDetalle(null); }}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-rose-800 dark:hover:bg-rose-950/40 dark:hover:text-rose-300">
+                  <Ban size={14} /> Anular notificación
+                </button>
+              )}
+              <button onClick={() => setDetalle(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Modal de anulación */}
       {anulando && (
@@ -361,6 +486,15 @@ export default function MedicoConapinaFgrPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <span className="w-28 shrink-0 pt-px text-xs font-medium text-slate-500">{label}</span>
+      <span className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">{valor}</span>
     </div>
   );
 }

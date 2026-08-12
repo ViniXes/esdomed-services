@@ -206,7 +206,7 @@ export default function NuevaNotificacionConapinaFgrPage() {
   const IconoTipo = tipoCaso ? ICONO_CASO[tipoCaso] : null;
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* Encabezado con el recorrido: se ve dónde está y cuánto falta. */}
       <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a3312] via-amber-700 to-orange-600 px-5 py-5 shadow-lg shadow-amber-950/20 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
@@ -424,6 +424,7 @@ export default function NuevaNotificacionConapinaFgrPage() {
                 )}
               </div>
 
+              <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-500">Diagnóstico clínico (CIE-10)</label>
                 <CIE10Combobox value={diagnostico} onChange={setDiagnostico}
@@ -465,6 +466,7 @@ export default function NuevaNotificacionConapinaFgrPage() {
                     {avisoCausaExterna} Revise que el código sea el correcto — puede enviarlo de todos modos.
                   </p>
                 )}
+              </div>
               </div>
 
               <div>
@@ -618,7 +620,8 @@ export default function NuevaNotificacionConapinaFgrPage() {
                 </p>
               </div>
 
-              <div className="space-y-2 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/50">
+              <div className="grid md:grid-cols-2 md:divide-x md:divide-amber-200/70 md:dark:divide-amber-900/50">
+              <div className="space-y-2 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/50 md:border-b-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800 dark:text-amber-300">El caso</p>
                 <Dato label="Motivo" valor={
                   <span className="flex items-center gap-1.5">
@@ -646,6 +649,7 @@ export default function NuevaNotificacionConapinaFgrPage() {
                 <Dato label="Recibió" valor={avisoRecibidoPor.trim() || "—"} />
                 <Dato label="Lugar / sede" valor={avisoLugar.trim() || "—"} />
                 {avisoObservacion.trim() && <Dato label="Observación" valor={avisoObservacion.trim()} />}
+              </div>
               </div>
             </div>
 
