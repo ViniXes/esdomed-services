@@ -241,22 +241,36 @@ service cloud.firestore {
     // el médico que lo generó. Psicología ya NO tiene acceso: el trámite dejó de
     // ser suyo cuando se creó el perfil del comité.
     //
-    // Los campos van SELLADOS: el clínico (paciente, diagnóstico, causa externa,
-    // nota) solo se escribe al crear y nadie lo puede reescribir después; el
-    // acuse solo lo escribe el comité y solo sobre lo que sigue "pendiente".
+    // Los campos van SELLADOS: lo clínico (paciente, diagnóstico, causa externa,
+    // nota) Y los datos del aviso externo (instancia, sede, quién lo recibió)
+    // solo se escriben al crear y nadie los puede reescribir después; el acuse
+    // solo lo escribe el comité y solo sobre lo que sigue "pendiente".
     match /notificaciones_conapina_fgr/{id} {
       allow read:   if isAuth() && (isComiteLesiones() || isAdmin()
                                     || (isMedico() && resource.data.medicoId == uid()));
 
       // Nace siempre a nombre de quien la crea y en estado pendiente: los campos
-      // de recepción y de anulación no pueden venir del formulario.
+      // de recepción, de anulación y los oficios no pueden venir del formulario.
+      //
+      // Los datos del AVISO EXTERNO se exigen aquí porque el médico es quien da
+      // el aviso y los declara al notificar (antes los capturaba el comité en un
+      // tercer tiempo). Son las columnas que audita el MINSAL, así que se validan
+      // en la regla y no solo en el formulario.
       allow create: if isMedico()
                     && request.resource.data.medicoId == uid()
                     && request.resource.data.estado == 'pendiente'
                     && request.resource.data.creadoEn == request.time
+                    && request.resource.data.avisoInstancia in ['conapina', 'fiscalia', 'ambos']
+                    && request.resource.data.condicionPaciente in ['vivo', 'fallecido']
+                    && request.resource.data.avisoFecha is timestamp
+                    && request.resource.data.avisoRecibidoPor is string
+                    && request.resource.data.avisoRecibidoPor.size() >= 3
+                    && request.resource.data.avisoLugar is string
+                    && request.resource.data.avisoLugar.size() >= 3
                     && !request.resource.data.keys().hasAny([
                          'revisadoPor', 'revisadoPorNombre', 'revisadoEn', 'notasComite',
-                         'anuladoPor', 'anuladoPorNombre', 'anuladoEn', 'motivoAnulacion']);
+                         'anuladoPor', 'anuladoPorNombre', 'anuladoEn', 'motivoAnulacion',
+                         'oficios']);
 
       // El comité solo toca los campos del acuse, solo mientras esté pendiente
       // (una recibida es inmutable) y el sello lleva su propio uid y la hora del
@@ -270,34 +284,13 @@ service cloud.firestore {
                     && request.resource.data.revisadoPor == uid()
                     && request.resource.data.revisadoEn == request.time;
 
-      // 3er tiempo: el comité asienta el aviso dado a CONAPINA / la Fiscalía.
-      // Solo sobre un caso ya recibido, y solo los campos del aviso: el
-      // contenido clínico sigue sellado. Se permite corregir un aviso ya
-      // asentado (mismo hasOnly) porque un nombre mal escrito no debería
-      // requerir al admin, pero el sello de autor y hora se vuelve a escribir.
+      // Oficios de egreso escaneados: se adjuntan al caso ya recibido. Es lo
+      // único que sigue creciendo después, por eso va en su propia regla y no
+      // toca ningún otro campo. Los datos del aviso NO se pueden reescribir
+      // desde aquí: son del médico y quedan sellados al crear.
       allow update: if isComiteLesiones()
-                    && resource.data.estado in ['confirmado', 'avisado']
-                    && request.resource.data.estado == 'avisado'
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                         'estado', 'avisoInstancia', 'avisoFecha', 'avisoRecibidoPor',
-                         'avisoLugar', 'avisoObservacion', 'condicionPaciente',
-                         'avisoRegistradoPor', 'avisoRegistradoPorNombre',
-                         'avisoRegistradoEn', 'actualizadoEn'])
-                    && request.resource.data.avisoRegistradoPor == uid()
-                    && request.resource.data.avisoRegistradoEn == request.time
-                    && request.resource.data.avisoInstancia in ['conapina', 'fiscalia', 'ambos']
-                    && request.resource.data.condicionPaciente in ['vivo', 'fallecido']
-                    && request.resource.data.avisoRecibidoPor is string
-                    && request.resource.data.avisoRecibidoPor.size() >= 3
-                    && request.resource.data.avisoLugar is string
-                    && request.resource.data.avisoLugar.size() >= 3;
-
-      // Oficios de egreso escaneados: se adjuntan al caso ya avisado. Es lo
-      // único que sigue creciendo después del aviso, por eso va en su propia
-      // regla y no toca ningún otro campo.
-      allow update: if isComiteLesiones()
-                    && resource.data.estado == 'avisado'
-                    && request.resource.data.estado == 'avisado'
+                    && resource.data.estado == 'confirmado'
+                    && request.resource.data.estado == 'confirmado'
                     && request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['oficios', 'actualizadoEn']);
 

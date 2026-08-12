@@ -226,18 +226,15 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     let activo = true;
     knownConapina.current = null;
 
-    // Al badge le toca todo lo que sigue pendiente de acción del comité:
-    // lo que aún no recibe MÁS lo recibido que todavía no se avisó a CONAPINA
-    // o la Fiscalía (ese es justo el caso que se puede escapar sin avisar).
-    const porEstado = (estado: string) =>
-      query(collection(db, "notificaciones_conapina_fgr"), where("estado", "==", estado));
+    // El comité solo tiene una acción pendiente: recibir el caso. El aviso a
+    // CONAPINA / la Fiscalía ya lo dio el médico y viene declarado en la
+    // notificación, así que una recibida no deja nada por hacer.
     const contar = async () => {
       try {
-        const [pend, sinAvisar] = await Promise.all([
-          getCountFromServer(porEstado("pendiente")),
-          getCountFromServer(porEstado("confirmado")),
-        ]);
-        if (activo) setCount("conapina", pend.data().count + sinAvisar.data().count);
+        const pend = await getCountFromServer(
+          query(collection(db, "notificaciones_conapina_fgr"), where("estado", "==", "pendiente")),
+        );
+        if (activo) setCount("conapina", pend.data().count);
       } catch { /* el conteo no es crítico */ }
     };
     contar();

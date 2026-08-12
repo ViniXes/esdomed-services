@@ -233,19 +233,27 @@ export default function LesionesIngresosPage() {
       // del sub-rango sin volver a leerlos.
       const exacto = fechaDesde === desdeCubierto && fechaHasta === hastaCubierto;
 
-      const conAviso = new Set(
-        snapAvisos.docs
-          .map(d => d.data() as NotificacionConapinaFgr)
-          .filter(n => n.estado !== "anulado")
-          .map(n => (n.pacienteExpediente ?? "").trim().toLowerCase()),
+      // El cruce se hace por INGRESO, no por expediente: un paciente con dos
+      // estancias puede tener aviso de una sola, y marcarlas ambas dejaría
+      // escapar justo el hueco que persigue el comité. Los avisos sin
+      // `pacienteId` (si alguno quedara) caen al cruce viejo por expediente,
+      // para no reclamar un aviso que en realidad sí se dio.
+      const avisos = snapAvisos.docs
+        .map(d => d.data() as NotificacionConapinaFgr)
+        .filter(n => n.estado !== "anulado");
+      const conAvisoPorIngreso = new Set(avisos.map(n => n.pacienteId).filter(Boolean));
+      const conAvisoPorExpediente = new Set(
+        avisos.filter(n => !n.pacienteId).map(n => (n.pacienteExpediente ?? "").trim().toLowerCase()),
       );
+      const tieneAviso = (p: Paciente) =>
+        conAvisoPorIngreso.has(p.id) || conAvisoPorExpediente.has((p.expediente ?? "").trim().toLowerCase());
       const revisiones = new Map<string, RevisionLesion>(
         snapRevisiones.docs.map(d => [d.id, { id: d.id, ...d.data() } as RevisionLesion]),
       );
 
       setFilas(visibles.map(c => ({
         ...c,
-        tieneAviso: conAviso.has((c.paciente.expediente ?? "").trim().toLowerCase()),
+        tieneAviso: tieneAviso(c.paciente),
         revision: revisiones.get(c.paciente.id ?? "") ?? null,
       })));
       setAlcance({

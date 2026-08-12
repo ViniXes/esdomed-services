@@ -5,8 +5,8 @@ import type {
 
 // Catálogo y reglas de validación del módulo Lesiones intencionales
 // (avisos CONAPINA / FGR). Vive aparte de los tipos porque lo comparten las
-// tres vistas (médico notifica, bandeja del comité, ingresos por lesión) y
-// así las etiquetas, colores y rangos CIE-10 no se duplican.
+// tres vistas (médico notifica y declara el aviso, bandeja del comité, ingresos
+// por lesión) y así las etiquetas, colores y rangos CIE-10 no se duplican.
 
 export const TIPO_CASO_LABEL: Record<TipoCasoConapinaFgr, string> = {
   violencia: "Violencia",
@@ -33,13 +33,11 @@ export const TIPO_CASO_CHIP: Record<TipoCasoConapinaFgr, string> = {
 export const TIPOS_CASO: TipoCasoConapinaFgr[] = ["violencia", "accidente_transito", "intento_suicida"];
 
 // Vocabulario del módulo: el estado se lee desde el punto de vista del comité
-// ("por recibir" / "recibida" / "avisada"), no con el genérico
-// Pendiente/Confirmado del componente Badge compartido. Por eso los chips se
-// pintan aquí y no allá.
+// ("por recibir" / "recibida"), no con el genérico Pendiente/Confirmado del
+// componente Badge compartido. Por eso los chips se pintan aquí y no allá.
 export const ESTADO_LABEL: Record<EstadoNotificacionConapinaFgr, string> = {
   pendiente: "Por recibir",
   confirmado: "Recibida",
-  avisado: "Avisada",
   anulado: "Anulada",
 };
 
@@ -47,8 +45,6 @@ export const ESTADO_CHIP: Record<EstadoNotificacionConapinaFgr, string> = {
   pendiente:
     "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900",
   confirmado:
-    "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900",
-  avisado:
     "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900",
   anulado:
     "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700",
@@ -68,8 +64,8 @@ export const CONDICION_LABEL: Record<CondicionPacienteAviso, string> = {
 };
 
 // Un paciente menor de edad implica aviso a CONAPINA además de la FGR. NO se
-// decide aquí a qué instancia va el caso (eso lo asienta el comité en el 3er
-// tiempo): solo se marca la edad para que la bandeja lo priorice.
+// decide aquí a qué instancia va el caso (eso lo declara el médico al avisar):
+// solo se marca la edad para que el formulario y la bandeja lo adviertan.
 export const esMenorDeEdad = (edad: number | null | undefined) =>
   typeof edad === "number" && edad < 18;
 

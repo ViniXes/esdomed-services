@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  collection, query, orderBy, limit, onSnapshot, doc, getDoc, updateDoc, serverTimestamp, Timestamp,
+  collection, query, orderBy, limit, onSnapshot, doc, updateDoc, serverTimestamp, Timestamp,
 } from "@/lib/firestoreMeter";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
@@ -11,17 +11,15 @@ import { DateField } from "@/components/ui/DateField";
 import {
   ShieldAlert, Car, HeartCrack, Clock3, Search, X, StickyNote, ChevronLeft, ChevronRight,
   FileText, CheckCircle2, AlertCircle, AlertTriangle, Copy, Ban, Landmark, Inbox,
-  LayoutList, Download, Upload, Paperclip, Loader2, Pencil,
+  LayoutList, Download, Upload, Paperclip, Loader2,
 } from "lucide-react";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP,
   ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad, duplicadosDeExpediente,
-  INSTANCIAS, INSTANCIA_LABEL, CONDICION_LABEL,
-  AVISO_RECIBIDO_POR_MIN, AVISO_LUGAR_MIN, validarFechaAviso,
+  INSTANCIA_LABEL, CONDICION_LABEL,
 } from "@/lib/conapinaFgr";
 import type {
-  NotificacionConapinaFgr, EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr,
-  InstanciaAviso, CondicionPacienteAviso, OficioEgreso, Paciente,
+  NotificacionConapinaFgr, EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, OficioEgreso,
 } from "@/types";
 
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
@@ -29,8 +27,7 @@ const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_su
 const FILTROS: { label: string; value: EstadoNotificacionConapinaFgr | "todos" }[] = [
   { label: "Todas", value: "todos" },
   { label: "Por recibir", value: "pendiente" },
-  { label: "Sin avisar", value: "confirmado" },
-  { label: "Avisadas", value: "avisado" },
+  { label: "Recibidas", value: "confirmado" },
   { label: "Anuladas", value: "anulado" },
 ];
 
@@ -41,12 +38,6 @@ type Vista = "bandeja" | "registro";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
 const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap";
-
-const hoyISO = () => {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-};
 
 export default function ComiteConapinaFgrPage() {
   const { user, profile } = useAuth();
@@ -66,15 +57,6 @@ export default function ComiteConapinaFgrPage() {
   const [saving, setSaving] = useState(false);
   const [errAccion, setErrAccion] = useState<string | null>(null);
 
-  // ── 3er tiempo: datos del aviso externo ──
-  const [editandoAviso, setEditandoAviso] = useState(false);
-  const [avisoInstancia, setAvisoInstancia] = useState<InstanciaAviso | "">("");
-  const [avisoFecha, setAvisoFecha] = useState("");
-  const [avisoRecibidoPor, setAvisoRecibidoPor] = useState("");
-  const [avisoLugar, setAvisoLugar] = useState("");
-  const [avisoObservacion, setAvisoObservacion] = useState("");
-  const [condicion, setCondicion] = useState<CondicionPacienteAviso>("vivo");
-
   // ── Oficios ──
   const [subiendo, setSubiendo] = useState(false);
   const [progreso, setProgreso] = useState<number | null>(null);
@@ -90,7 +72,7 @@ export default function ComiteConapinaFgrPage() {
       s => {
         const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionConapinaFgr));
         setItems(docs);
-        // El modal debe reflejar el estado nuevo tras confirmar/avisar sin cerrarse.
+        // El modal debe reflejar el estado nuevo tras recibir el caso, sin cerrarse.
         setSelected(prev => (prev?.id ? docs.find(d => d.id === prev.id) ?? prev : prev));
         setCargando(false);
       },
@@ -157,8 +139,7 @@ export default function ComiteConapinaFgrPage() {
   const paginados = displayList.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
   const porRecibir = items.filter(n => n.estado === "pendiente").length;
-  const sinAvisar = items.filter(n => n.estado === "confirmado").length;
-  const avisadas = items.filter(n => n.estado === "avisado").length;
+  const recibidas = items.filter(n => n.estado === "confirmado").length;
 
   // Duplicados entre médicos: aquí sí se ven todos los expedientes, así que este
   // es el único punto donde se puede detectar que dos médicos notificaron el
@@ -171,48 +152,21 @@ export default function ComiteConapinaFgrPage() {
   });
   const vecesNotificado = (exp?: string) => repeticiones.get((exp ?? "").trim().toLowerCase()) ?? 0;
 
-  const resetAviso = () => {
-    setEditandoAviso(false);
-    setAvisoInstancia("");
-    setAvisoFecha("");
-    setAvisoRecibidoPor("");
-    setAvisoLugar("");
-    setAvisoObservacion("");
-    setCondicion("vivo");
-  };
-
-  const abrir = async (n: NotificacionConapinaFgr) => {
+  const abrir = (n: NotificacionConapinaFgr) => {
     setSelected(n);
     setNotas(n.notasComite ?? "");
     setErrAccion(null);
     setProgreso(null);
-    setAvisoInstancia(n.avisoInstancia ?? "");
-    setAvisoFecha(n.avisoFecha ? (aDate(n.avisoFecha)?.toISOString().slice(0, 10) ?? "") : hoyISO());
-    setAvisoRecibidoPor(n.avisoRecibidoPor ?? "");
-    setAvisoLugar(n.avisoLugar ?? "");
-    setAvisoObservacion(n.avisoObservacion ?? "");
-    setCondicion(n.condicionPaciente ?? "vivo");
-    setEditandoAviso(n.estado === "confirmado");
-
-    // Solo al abrir un caso listo para avisar se relee el expediente (1 lectura)
-    // para precargar la condición del paciente. Quien registra puede cambiarla:
-    // manda lo que consta en el acta, no lo que diga el sistema.
-    if (n.estado === "confirmado" && n.pacienteId && !n.condicionPaciente) {
-      try {
-        const snap = await getDoc(doc(db, "pacientes", n.pacienteId));
-        const estado = (snap.data() as Paciente | undefined)?.estado;
-        if (estado) setCondicion(estado === "alta_fallecido" ? "fallecido" : "vivo");
-      } catch { /* la precarga no es crítica */ }
-    }
   };
 
   const cerrar = () => {
     setSelected(null);
     setNotas("");
-    resetAviso();
   };
 
   // ── 2º tiempo: dar por recibida ──
+  // Es la única acción del comité sobre el caso. Los datos del aviso externo los
+  // declara el médico al notificar, así que aquí solo se leen.
   const confirmar = async () => {
     if (!selected?.id || !profile) return;
     setSaving(true);
@@ -228,43 +182,8 @@ export default function ComiteConapinaFgrPage() {
         revisadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp(),
       });
-      setEditandoAviso(true);
-      setAvisoFecha(hoyISO());
     } catch (err) {
       setErrAccion(err instanceof Error ? err.message : "No se pudo confirmar la recepción.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ── 3er tiempo: asentar el aviso dado a CONAPINA / Fiscalía ──
-  const errorFechaAviso = validarFechaAviso(avisoFecha, aDate(selected?.fechaHecho));
-  const puedeGuardarAviso =
-    !!avisoInstancia && !!avisoFecha && !errorFechaAviso
-    && avisoRecibidoPor.trim().length >= AVISO_RECIBIDO_POR_MIN
-    && avisoLugar.trim().length >= AVISO_LUGAR_MIN;
-
-  const guardarAviso = async () => {
-    if (!selected?.id || !profile || !puedeGuardarAviso) return;
-    setSaving(true);
-    setErrAccion(null);
-    try {
-      await updateDoc(doc(db, "notificaciones_conapina_fgr", selected.id), {
-        estado: "avisado",
-        avisoInstancia,
-        avisoFecha: Timestamp.fromDate(new Date(avisoFecha + "T00:00:00")),
-        avisoRecibidoPor: avisoRecibidoPor.trim(),
-        avisoLugar: avisoLugar.trim(),
-        avisoObservacion: avisoObservacion.trim() || null,
-        condicionPaciente: condicion,
-        avisoRegistradoPor: profile.uid,
-        avisoRegistradoPorNombre: profile.nombre,
-        avisoRegistradoEn: serverTimestamp(),
-        actualizadoEn: serverTimestamp(),
-      });
-      setEditandoAviso(false);
-    } catch (err) {
-      setErrAccion(err instanceof Error ? err.message : "No se pudo registrar el aviso.");
     } finally {
       setSaving(false);
     }
@@ -373,10 +292,10 @@ export default function ComiteConapinaFgrPage() {
             <p className="mt-0.5 text-xs text-slate-500">Lesiones intencionales · comité de género y violencia</p>
           </div>
         </div>
-        {sinAvisar > 0 && (
+        {porRecibir > 0 && (
           <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400">
-            <Landmark size={14} />
-            {sinAvisar} sin avisar
+            <Clock3 size={14} />
+            {porRecibir} por recibir
           </div>
         )}
       </div>
@@ -384,7 +303,7 @@ export default function ComiteConapinaFgrPage() {
       {/* Vistas */}
       <div className="mb-4 inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
         {([
-          { v: "bandeja" as const, label: "Bandeja", icon: Inbox, badge: porRecibir + sinAvisar },
+          { v: "bandeja" as const, label: "Bandeja", icon: Inbox, badge: porRecibir },
           { v: "registro" as const, label: "Avisos notificados", icon: LayoutList, badge: 0 },
         ]).map(({ v, label, icon: Icono, badge }) => (
           <button key={v} onClick={() => { setVista(v); setFiltro(v === "registro" ? "todos" : "pendiente"); }}
@@ -420,7 +339,7 @@ export default function ComiteConapinaFgrPage() {
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
               {vista === "bandeja"
-                ? "Reciba el caso y luego asiente el aviso dado a CONAPINA o la Fiscalía."
+                ? "El médico da el aviso y lo declara al notificar. Aquí se recibe el caso para dejarlo registrado."
                 : "Base completa para el comité. El rango de fechas filtra por fecha del aviso."}
             </p>
           </div>
@@ -435,11 +354,10 @@ export default function ComiteConapinaFgrPage() {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="mb-4 grid grid-cols-3 gap-2">
           <Tile n={items.length} label="Notificadas" icon={FileText} tone="cyan" />
           <Tile n={porRecibir} label="Por recibir" icon={Clock3} tone="amber" />
-          <Tile n={sinAvisar} label="Sin avisar" icon={Landmark} tone="blue" />
-          <Tile n={avisadas} label="Avisadas" icon={CheckCircle2} tone="emerald" />
+          <Tile n={recibidas} label="Recibidas" icon={CheckCircle2} tone="emerald" />
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -533,8 +451,7 @@ export default function ComiteConapinaFgrPage() {
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                          n.estado === "avisado" ? "bg-emerald-500"
-                            : n.estado === "confirmado" ? "bg-blue-500"
+                          n.estado === "confirmado" ? "bg-emerald-500"
                             : n.estado === "anulado" ? "bg-slate-300 dark:bg-slate-600"
                             : "bg-amber-400"
                         }`} />
@@ -755,12 +672,33 @@ export default function ComiteConapinaFgrPage() {
                 </div>
               )}
 
+              {/* Constancia del aviso: la declara el médico al notificar. Aquí es
+                  solo lectura — es lo que el comité verifica antes de recibir y
+                  lo que alimenta el registro que audita el MINSAL. */}
+              {selected.avisoInstancia && selected.estado !== "anulado" && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+                  <p className="mb-2 flex items-center gap-1.5 text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                    <Landmark size={15} /> Aviso notificado en {INSTANCIA_LABEL[selected.avisoInstancia]}
+                  </p>
+                  <div className="space-y-1.5">
+                    <Row label="Recibió" value={selected.avisoRecibidoPor || "—"} />
+                    <Row label="Fecha" value={formatFecha(selected.avisoFecha)} />
+                    <Row label="Lugar/sede" value={selected.avisoLugar || "—"} />
+                    <Row label="Condición" value={selected.condicionPaciente ? CONDICION_LABEL[selected.condicionPaciente] : "—"} />
+                    {selected.avisoObservacion && <Row label="Observación" value={selected.avisoObservacion} />}
+                  </div>
+                  <p className="mt-2.5 text-[11px] leading-4 text-emerald-800/80 dark:text-emerald-200/70">
+                    Lo declaró el médico al notificar. Si algo no cuadra, anótelo en la observación al recibir.
+                  </p>
+                </div>
+              )}
+
               {/* 2º tiempo */}
               {selected.estado === "pendiente" && (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/25">
-                  <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Paso 1 · Recibir el caso</p>
+                  <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Recibir el caso</p>
                   <p className="mt-0.5 text-xs leading-5 text-blue-800/90 dark:text-blue-200/80">
-                    Al recibirlo se registra que el comité lo tomó. El aviso a CONAPINA o la Fiscalía se asienta después.
+                    Al recibirlo queda registrado que el comité lo tomó. Es la única acción pendiente: el aviso ya lo dio el médico.
                   </p>
                   <label className="mb-1.5 mt-3 block text-xs font-medium text-slate-500">Observación para el médico (opcional)</label>
                   <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
@@ -774,109 +712,8 @@ export default function ComiteConapinaFgrPage() {
                 </div>
               )}
 
-              {/* 3er tiempo — formulario del aviso externo */}
-              {(selected.estado === "confirmado" || selected.estado === "avisado") && editandoAviso && (
-                <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-                  <div>
-                    <p className="flex items-center gap-1.5 text-sm font-bold text-emerald-900 dark:text-emerald-100">
-                      <Landmark size={15} /> Paso 2 · Asentar el aviso dado
-                    </p>
-                    <p className="mt-0.5 text-xs leading-5 text-emerald-800/90 dark:text-emerald-200/80">
-                      Estos datos son los que audita el MINSAL. Quien recibió el aviso es la persona de la instancia, no de este hospital.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-500">Aviso notificado en <span className="text-red-500">*</span></label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {INSTANCIAS.map(i => (
-                        <button key={i} type="button" onClick={() => setAvisoInstancia(i)}
-                          className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-all ${
-                            avisoInstancia === i
-                              ? "border-emerald-500 bg-emerald-600 text-white"
-                              : "border-slate-300 bg-white text-slate-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                          }`}>
-                          {INSTANCIA_LABEL[i]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-500">Fecha del aviso <span className="text-red-500">*</span></label>
-                      <DateField value={avisoFecha} onChange={setAvisoFecha} ariaLabel="Fecha del aviso" maxDate={new Date()} />
-                      {errorFechaAviso && (
-                        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
-                          <AlertCircle size={13} className="mt-0.5 shrink-0" />{errorFechaAviso}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-500">Condición del paciente <span className="text-red-500">*</span></label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(["vivo", "fallecido"] as CondicionPacienteAviso[]).map(c => (
-                          <button key={c} type="button" onClick={() => setCondicion(c)}
-                            className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-all ${
-                              condicion === c
-                                ? c === "fallecido"
-                                  ? "border-rose-500 bg-rose-600 text-white"
-                                  : "border-emerald-500 bg-emerald-600 text-white"
-                                : "border-slate-300 bg-white text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                            }`}>
-                            {CONDICION_LABEL[c]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-500">Persona que recibió el aviso <span className="text-red-500">*</span></label>
-                      <input type="text" value={avisoRecibidoPor} onChange={e => setAvisoRecibidoPor(e.target.value)}
-                        placeholder="Nombre de quien lo recibió" className={`${inputCls} bg-white dark:bg-slate-900`} />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-slate-500">Lugar / sede <span className="text-red-500">*</span></label>
-                      <input type="text" value={avisoLugar} onChange={e => setAvisoLugar(e.target.value)}
-                        placeholder="Sede u oficina donde se dio" className={`${inputCls} bg-white dark:bg-slate-900`} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-500">Observación (opcional)</label>
-                    <textarea value={avisoObservacion} onChange={e => setAvisoObservacion(e.target.value)} rows={2}
-                      placeholder="Número de acta, referencia u observaciones..." className={`${inputCls} resize-none bg-white dark:bg-slate-900`} />
-                  </div>
-                </div>
-              )}
-
-              {/* 3er tiempo — ya asentado */}
-              {selected.estado === "avisado" && !editandoAviso && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="flex items-center gap-1.5 text-sm font-bold text-emerald-900 dark:text-emerald-100">
-                      <Landmark size={15} /> Aviso notificado en {selected.avisoInstancia ? INSTANCIA_LABEL[selected.avisoInstancia] : "—"}
-                    </p>
-                    <button onClick={() => setEditandoAviso(true)}
-                      className="flex items-center gap-1 text-xs font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300">
-                      <Pencil size={11} /> Corregir
-                    </button>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Row label="Recibió" value={selected.avisoRecibidoPor ?? "—"} />
-                    <Row label="Fecha" value={formatFecha(selected.avisoFecha)} />
-                    <Row label="Lugar/sede" value={selected.avisoLugar ?? "—"} />
-                    <Row label="Condición" value={selected.condicionPaciente ? CONDICION_LABEL[selected.condicionPaciente] : "—"} />
-                    {selected.avisoObservacion && <Row label="Observación" value={selected.avisoObservacion} />}
-                    <Row label="Asentó" value={`${selected.avisoRegistradoPorNombre ?? "—"}${selected.avisoRegistradoEn ? ` · ${formatFechaHora(selected.avisoRegistradoEn)}` : ""}`} />
-                  </div>
-                </div>
-              )}
-
-              {/* Oficios de egreso */}
-              {selected.estado === "avisado" && (
+              {/* Oficios de egreso: se adjuntan al caso ya recibido. */}
+              {selected.estado === "confirmado" && (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/35">
                   <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-100">
                     <Paperclip size={15} /> Oficios de egreso
@@ -929,19 +766,6 @@ export default function ComiteConapinaFgrPage() {
                   className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">
                   <CheckCircle2 size={14} /> {saving ? "Guardando..." : "Recibir el caso"}
                 </button>
-              ) : editandoAviso ? (
-                <>
-                  {selected.estado === "avisado" && (
-                    <button onClick={() => setEditandoAviso(false)} disabled={saving}
-                      className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
-                      Cancelar
-                    </button>
-                  )}
-                  <button onClick={guardarAviso} disabled={saving || !puedeGuardarAviso}
-                    className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50">
-                    <Landmark size={14} /> {saving ? "Guardando..." : "Registrar aviso"}
-                  </button>
-                </>
               ) : (
                 <button onClick={cerrar}
                   className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">

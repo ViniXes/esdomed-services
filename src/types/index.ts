@@ -241,17 +241,21 @@ export interface TrasladoExterno {
 // El diagnóstico se toma del catálogo CIE-10; la nota cubre el caso en que el
 // médico no encuentre el código exacto (uno de los dos es obligatorio).
 
-// El flujo tiene TRES tiempos, no dos: el médico notifica (pendiente) →
-// el comité recibe el caso (confirmado) → el comité da el aviso a CONAPINA
-// y/o la Fiscalía y lo asienta (avisado). El registro que audita el MINSAL es
-// el tercero; "confirmado" sin pasar a "avisado" es justo lo que se puede
-// escapar, por eso la bandeja lo cuenta aparte.
-export type EstadoNotificacionConapinaFgr = "pendiente" | "confirmado" | "avisado" | "anulado";
+// El flujo tiene DOS tiempos: el médico da el aviso a CONAPINA y/o la Fiscalía
+// y lo registra aquí junto con la notificación (pendiente) → el comité lo recibe
+// para dejarlo asentado (confirmado).
+//
+// Antes eran tres: el médico solo notificaba y era Psicología quien daba el
+// aviso externo y lo asentaba. Se cambió porque quien avisa realmente es el
+// médico tratante, así que los datos del aviso (instancia, sede, persona que lo
+// recibió) se capturan de una vez en su formulario. El comité ya no asienta
+// nada: solo recibe. Por eso el estado "avisado" desapareció.
+export type EstadoNotificacionConapinaFgr = "pendiente" | "confirmado" | "anulado";
 export type TipoCasoConapinaFgr = "violencia" | "accidente_transito" | "intento_suicida";
 export type InstanciaAviso = "conapina" | "fiscalia" | "ambos";
 export type CondicionPacienteAviso = "vivo" | "fallecido";
 
-// Oficio de egreso escaneado. Se adjunta al caso ya avisado.
+// Oficio de egreso escaneado. Lo adjunta el comité al caso ya recibido.
 export interface OficioEgreso {
   url: string;
   nombre: string;
@@ -271,6 +275,9 @@ export interface NotificacionConapinaFgr {
   pacienteExpediente: string;
   // Edad al momento de notificar (snapshot). Menor de 18 → también CONAPINA.
   pacienteEdad?: number | null;
+  // Ubicación del paciente al notificar (snapshot). No se le piden al médico:
+  // se toman del expediente. En una notificación diferida de un ingreso ya
+  // cerrado la cama normalmente viene vacía.
   servicio: string;
   cama?: string;
 
@@ -293,23 +300,22 @@ export interface NotificacionConapinaFgr {
   revisadoEn?: Date;
   notasComite?: string | null;  // observación opcional al confirmar
 
-  // ── 3er tiempo: el aviso externo que da el comité ────────────────────────
+  // ── El aviso externo, declarado por el médico al notificar ────────────────
   // Estas son las columnas del registro que audita el MINSAL. OJO: quien
-  // "recibió el aviso" es la persona de CONAPINA / la Fiscalía, NO la psicóloga
-  // que abrió el caso aquí (esa es revisadoPorNombre).
-  avisoInstancia?: InstanciaAviso;
-  avisoFecha?: Date;              // día en que se dio el aviso
-  avisoRecibidoPor?: string;      // nombre de quien lo recibió en la instancia
-  avisoLugar?: string;            // sede / lugar donde se dio
+  // "recibió el aviso" es la persona de CONAPINA / la Fiscalía, NO quien lo
+  // recibe aquí en el portal (esa es revisadoPorNombre, del comité).
+  // Son obligatorias: el formulario del médico no deja enviar sin ellas.
+  avisoInstancia: InstanciaAviso;
+  avisoFecha: Date;               // día en que se dio el aviso
+  avisoRecibidoPor: string;       // nombre de quien lo recibió en la instancia
+  avisoLugar: string;             // sede / lugar donde se dio
   avisoObservacion?: string | null;
-  // Condición del paciente al momento del aviso (es lo que consta en el acta;
-  // por eso se congela aquí y no se lee del expediente después).
-  condicionPaciente?: CondicionPacienteAviso;
-  avisoRegistradoPor?: string;
-  avisoRegistradoPorNombre?: string;
-  avisoRegistradoEn?: Date;
+  // Condición del paciente al momento del aviso. NO se le pregunta al médico:
+  // se deriva del expediente al enviar (el formulario ya lo relee para validar
+  // que siga activo) y queda congelada, porque es lo que consta en el acta.
+  condicionPaciente: CondicionPacienteAviso;
 
-  // Oficios de egreso escaneados (se adjuntan una vez avisado el caso).
+  // Oficios de egreso escaneados (los adjunta el comité al caso ya recibido).
   oficios?: OficioEgreso[];
 
   // Anulación por el propio médico (solo mientras nadie la haya recibido).
