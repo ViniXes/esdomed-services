@@ -646,6 +646,82 @@ interface ServicioIngresoB {
   valor?: string;
 }
 
+/**
+ * "Servicio en la que ingresa" / "Servicio al que ingresa" (Parte B): la
+ * etiqueta SIEMPRE envuelve a una segunda línea en la plantilla del FIEH
+ * ("Servicio en la que" / "ingresa:") — y, como pasa con "Traslado a:" en la
+ * Ruta de Movimiento (ver comentario de extraerUltimoServicioRutaPorCoordenadas),
+ * cuando el valor también es largo (p. ej. "Cirugía Hombres 1") su primera
+ * palabra queda pegada a la primera línea de la etiqueta y el resto a la
+ * segunda. Aplanar todo a texto corrido (lo que hace extraerServicioIngresoParteB)
+ * pierde esa primera palabra: solo sobrevive "Hombres 1" suelto, que cae en
+ * el mapeo por defecto de Medicina Interna en vez de Cirugía. Se resuelve
+ * leyendo por coordenadas: se ubica la etiqueta en sus dos líneas y se junta
+ * todo lo que quede a la derecha de ella en ambas.
+ */
+function extraerServicioIngresoPorCoordenadas(doc: DocumentoExtraido): ServicioIngresoB | null {
+  const UMBRAL_GAP = 12; // pt — separa "etiqueta" de "valor" en la misma línea (el espacio normal entre palabras es de 2-3pt).
+
+  for (const pagina of doc.paginas) {
+    const candidatos = pagina.items.filter(
+      (it) => sinAcentos(it.str).trim().toLowerCase() === "servicio"
+    );
+
+    for (const itemServicio of candidatos) {
+      const y0 = itemServicio.y;
+      const fila0 = pagina.items
+        .filter((it) => Math.abs(it.y - y0) <= 3)
+        .sort((a, b) => a.x - b.x);
+      const idx0 = fila0.indexOf(itemServicio);
+      const siguiente = sinAcentos(fila0[idx0 + 1]?.str || "").trim().toLowerCase();
+      if (siguiente !== "en" && siguiente !== "al") continue; // no es "Servicio en la que"/"Servicio al que"
+
+      const idxQue = fila0.findIndex(
+        (it, i) => i > idx0 && sinAcentos(it.str).trim().toLowerCase() === "que"
+      );
+      if (idxQue < 0) continue;
+
+      const finEtiqueta0 = fila0[idxQue].x + fila0[idxQue].w;
+      const valor0 = fila0.filter((it) => it.x > finEtiqueta0 + UMBRAL_GAP);
+
+      // Segunda línea de la etiqueta ("ingresa:"), a la misma X que "Servicio"
+      // y un poco más abajo — envoltura normal de esta celda de la tabla.
+      const itemIngresa = pagina.items.find(
+        (it) =>
+          /^ingresa:?$/i.test(sinAcentos(it.str).trim()) &&
+          Math.abs(it.x - itemServicio.x) <= 8 &&
+          it.y < y0 &&
+          y0 - it.y <= 25
+      );
+
+      let valor1: typeof fila0 = [];
+      if (itemIngresa) {
+        const y1 = itemIngresa.y;
+        const fila1 = pagina.items
+          .filter((it) => Math.abs(it.y - y1) <= 3)
+          .sort((a, b) => a.x - b.x);
+        const finEtiqueta1 = itemIngresa.x + itemIngresa.w;
+        valor1 = fila1.filter((it) => it.x > finEtiqueta1 + UMBRAL_GAP);
+      }
+
+      const valorTexto = [...valor0, ...valor1]
+        .map((it) => it.str)
+        .join(" ")
+        .trim();
+      if (!valorTexto) continue;
+
+      const servicios = buscarServiciosConocidosEnTexto(valorTexto);
+      if (servicios.length) {
+        return { origen: servicios[0].origen, valor: servicios[0].valor };
+      }
+      const limpio = limpiarServicioFieh(valorTexto);
+      if (limpio) return { origen: limpio };
+    }
+  }
+
+  return null;
+}
+
 function extraerServicioIngresoParteB(texto: string): ServicioIngresoB {
   const plano = texto.replace(/\s+/g, " ").trim();
 
@@ -726,8 +802,10 @@ function extraerServicioHospitalario(doc: DocumentoExtraido, texto: string): Ser
     };
   }
 
-  // Prioridad 2: servicio en la que ingresa (parte B).
-  const ingreso = extraerServicioIngresoParteB(texto);
+  // Prioridad 2: servicio en la que ingresa (parte B). Por coordenadas
+  // primero (evita perder la primera palabra del valor cuando envuelve a
+  // dos líneas junto con la etiqueta); si no se ubica, respaldo por texto.
+  const ingreso = extraerServicioIngresoPorCoordenadas(doc) ?? extraerServicioIngresoParteB(texto);
   return {
     origen: ingreso.origen,
     valor: ingreso.valor ?? (ingreso.origen ? mapearServicioSIMMOW(ingreso.origen) : ""),
