@@ -15,6 +15,7 @@ import {
 import {
   ShieldAlert, Car, HeartCrack, Search, X, Download, AlertTriangle, CheckCircle2,
   Activity, ChevronLeft, ChevronRight, Info, Loader2, CircleSlash, Sparkle, ClipboardCheck,
+  RefreshCw,
 } from "lucide-react";
 import type {
   Paciente, TipoCasoConapinaFgr, NotificacionConapinaFgr, RevisionLesion, ResultadoRevisionLesion,
@@ -29,6 +30,48 @@ const MAX_AVISOS = 1000;
 const PAGE_SIZE = 20;
 
 type FiltroRevision = "todos" | "pendiente" | "corresponde" | "no_corresponde" | "sin_aviso";
+
+// ── Caché del escaneo de ingresos ───────────────────────────────────────────
+// El tamizaje es caro por diseño: hay que leer TODOS los ingresos del periodo
+// para filtrar por diagnóstico en el cliente (la causa externa no existe al
+// ingresar, así que no hay nada acotable en el servidor). Medido sobre datos
+// reales: un mes = ~1,250 ingresos leídos para ~44 candidatos (3.5%).
+//
+// Por eso el escaneo se guarda en una caché de módulo (sobrevive a la
+// navegación SPA, no a un reload) que cubre la UNIÓN de los rangos ya
+// consultados, y cada búsqueda solo lee los días que le falten:
+//   · mismo rango                → 0 lecturas de pacientes
+//   · se corre "Hasta"           → solo los días nuevos del final
+//   · se amplía hacia atrás      → solo los días nuevos del inicio
+//   · rango más corto            → se recorta el escaneo ya hecho
+//   · rango disjunto             → escaneo completo, reemplaza la caché
+// El botón "Actualizar" fuerza el escaneo completo del rango pedido.
+//
+// Los avisos y las revisiones NO se cachean: son decenas de documentos y de
+// ellos depende el cruce "Falta el aviso", que debe verse siempre al día.
+interface Candidato {
+  paciente: Paciente;
+  analisis: AnalisisIngreso;
+}
+
+interface CacheEscaneo {
+  desde: string;
+  hasta: string;          // último día realmente escaneado
+  candidatos: Candidato[];
+  leidos: number;         // ingresos revisados en [desde, hasta]
+  tope: boolean;
+  escaneadoEn: Date;
+}
+
+// La mutación vive a nivel de módulo a propósito: la regla de lint
+// `react-hooks/globals` prohíbe reasignar una variable de módulo desde dentro
+// del componente.
+let cacheEscaneo: CacheEscaneo | null = null;
+const getCacheEscaneo = () => cacheEscaneo;
+const setCacheEscaneo = (c: CacheEscaneo) => { cacheEscaneo = c; };
+
+const inicioDia = (iso: string) => new Date(iso + "T00:00:00");
+const finDia = (iso: string) => new Date(iso + "T23:59:59.999");
 
 const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap";
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -60,8 +103,12 @@ export default function LesionesIngresosPage() {
   const [filtro, setFiltro] = useState<FiltroRevision>("todos");
 
   const [filas, setFilas] = useState<Fila[] | null>(null);   // null = aún no se busca
-  const [leidos, setLeidos] = useState(0);
-  const [tope, setTope] = useState(false);
+  // Alcance de lo que se está mostrando. `leidos` es null cuando la vista se
+  // sirvió de un escaneo más ancho (rango recortado): no se sabe cuántos
+  // ingresos hubo solo en el sub-rango sin volver a leerlos.
+  const [alcance, setAlcance] = useState<{
+    leidos: number | null; tope: boolean; escaneadoEn: Date; desdeCubierto: string; hastaCubierto: string;
+  } | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -75,26 +122,56 @@ export default function LesionesIngresosPage() {
   const [guardando, setGuardando] = useState(false);
   const [errGuardar, setErrGuardar] = useState<string | null>(null);
 
-  const buscar = async () => {
+  const buscar = async (forzar = false) => {
     if (!fechaDesde || !fechaHasta) {
       setError("Elige el rango de fechas de ingreso.");
+      return;
+    }
+    if (fechaHasta < fechaDesde) {
+      setError("La fecha 'Hasta' no puede ser anterior a 'Desde'.");
       return;
     }
     setBuscando(true);
     setError(null);
     try {
-      const desde = Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"));
-      const hasta = Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"));
+      const desde = Timestamp.fromDate(inicioDia(fechaDesde));
+      const hasta = Timestamp.fromDate(finDia(fechaHasta));
+
+      // Qué falta leer de `pacientes`. La caché sirve de base siempre que su
+      // rango solape con el pedido: solo se leen los huecos que le falten (a la
+      // izquierda si se amplía hacia atrás, a la derecha si se corre "Hasta").
+      // Si los rangos son disjuntos no hay nada que reaprovechar y se escanea
+      // de cero.
+      // Un escaneo truncado por el tope NO sirve de base: Firestore devuelve los
+      // más recientes del rango, así que le faltan los días viejos y ampliar
+      // hacia atrás dejaría un hueco invisible en medio.
+      const cache = forzar ? null : getCacheEscaneo();
+      const base = cache && !cache.tope && !(fechaHasta < cache.desde || fechaDesde > cache.hasta) ? cache : null;
 
       // Rango y orden sobre el MISMO campo → no exige índice compuesto.
-      const [snapPacientes, snapAvisos, snapRevisiones] = await Promise.all([
-        getDocs(query(
-          collection(db, "pacientes"),
-          where("fechaIngreso", ">=", desde),
-          where("fechaIngreso", "<=", hasta),
-          orderBy("fechaIngreso", "desc"),
-          limit(MAX_INGRESOS),
-        )),
+      const rango = (
+        ini: Timestamp, opIni: ">=" | ">",
+        fin: Timestamp, opFin: "<=" | "<",
+      ) => query(
+        collection(db, "pacientes"),
+        where("fechaIngreso", opIni, ini),
+        where("fechaIngreso", opFin, fin),
+        orderBy("fechaIngreso", "desc"),
+        limit(MAX_INGRESOS),
+      );
+
+      const huecos: ReturnType<typeof rango>[] = [];
+      if (!base) {
+        huecos.push(rango(desde, ">=", hasta, "<="));
+      } else {
+        // Días anteriores a lo ya escaneado (se amplió hacia atrás).
+        if (fechaDesde < base.desde) huecos.push(rango(desde, ">=", Timestamp.fromDate(inicioDia(base.desde)), "<"));
+        // Días posteriores a lo ya escaneado (se corrió "Hasta").
+        if (fechaHasta > base.hasta) huecos.push(rango(Timestamp.fromDate(finDia(base.hasta)), ">", hasta, "<="));
+      }
+
+      const [snapsPacientes, snapAvisos, snapRevisiones] = await Promise.all([
+        Promise.all(huecos.map(q => getDocs(q))),
         // Los avisos del periodo, sin techo superior: el aviso del médico
         // siempre es posterior al ingreso.
         getDocs(query(
@@ -112,9 +189,49 @@ export default function LesionesIngresosPage() {
         )),
       ]);
 
-      const pacientes = snapPacientes.docs.map(d => ({ id: d.id, ...d.data() } as Paciente));
-      setLeidos(pacientes.length);
-      setTope(pacientes.length >= MAX_INGRESOS);
+      // Candidatos de lo recién leído (solo ingresos con diagnóstico de lesión).
+      const nuevos: Candidato[] = [];
+      let leidosNuevos = 0;
+      let topeNuevo = false;
+      for (const snap of snapsPacientes) {
+        leidosNuevos += snap.size;
+        topeNuevo = topeNuevo || snap.size >= MAX_INGRESOS;
+        for (const d of snap.docs) {
+          const p = { id: d.id, ...d.data() } as Paciente;
+          const analisis = analizarIngreso(p);
+          if (analisis) nuevos.push({ paciente: p, analisis });
+        }
+      }
+
+      // La caché pasa a cubrir la UNIÓN de lo que ya tenía y lo que se pidió.
+      const desdeCubierto = base ? (fechaDesde < base.desde ? fechaDesde : base.desde) : fechaDesde;
+      const hastaCubierto = base ? (fechaHasta > base.hasta ? fechaHasta : base.hasta) : fechaHasta;
+      const candidatos = [...(base?.candidatos ?? []), ...nuevos]
+        .sort((a, b) => (toDate(b.paciente.fechaIngreso)?.getTime() ?? 0) - (toDate(a.paciente.fechaIngreso)?.getTime() ?? 0));
+
+      setCacheEscaneo({
+        desde: desdeCubierto,
+        hasta: hastaCubierto,
+        candidatos,
+        leidos: (base?.leidos ?? 0) + leidosNuevos,
+        tope: (base?.tope ?? false) || topeNuevo,
+        // Si no hubo que leer nada, la hora del escaneo sigue siendo la vieja.
+        escaneadoEn: huecos.length === 0 && base ? base.escaneadoEn : new Date(),
+      });
+      const actualizada = getCacheEscaneo()!;
+
+      // Solo se muestra lo pedido, aunque el escaneo cubra un rango más ancho.
+      const ini = inicioDia(fechaDesde).getTime();
+      const fin = finDia(fechaHasta).getTime();
+      const visibles = candidatos.filter(c => {
+        const t = toDate(c.paciente.fechaIngreso)?.getTime() ?? 0;
+        return t >= ini && t <= fin;
+      });
+
+      // El conteo de ingresos revisados solo aplica si lo escaneado coincide
+      // con lo pedido; si la caché cubre más, no se sabe cuántos hubo dentro
+      // del sub-rango sin volver a leerlos.
+      const exacto = fechaDesde === desdeCubierto && fechaHasta === hastaCubierto;
 
       const conAviso = new Set(
         snapAvisos.docs
@@ -126,22 +243,23 @@ export default function LesionesIngresosPage() {
         snapRevisiones.docs.map(d => [d.id, { id: d.id, ...d.data() } as RevisionLesion]),
       );
 
-      const encontradas: Fila[] = [];
-      for (const p of pacientes) {
-        const analisis = analizarIngreso(p);
-        if (!analisis) continue;
-        encontradas.push({
-          paciente: p,
-          analisis,
-          tieneAviso: conAviso.has((p.expediente ?? "").trim().toLowerCase()),
-          revision: revisiones.get(p.id ?? "") ?? null,
-        });
-      }
-      setFilas(encontradas);
+      setFilas(visibles.map(c => ({
+        ...c,
+        tieneAviso: conAviso.has((c.paciente.expediente ?? "").trim().toLowerCase()),
+        revision: revisiones.get(c.paciente.id ?? "") ?? null,
+      })));
+      setAlcance({
+        leidos: exacto ? actualizada.leidos : null,
+        tope: actualizada.tope,
+        escaneadoEn: actualizada.escaneadoEn,
+        desdeCubierto: actualizada.desde,
+        hastaCubierto: actualizada.hasta,
+      });
       setPage(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
       setFilas([]);
+      setAlcance(null);
     } finally {
       setBuscando(false);
     }
@@ -296,7 +414,7 @@ export default function LesionesIngresosPage() {
             <span className="text-xs text-slate-500 shrink-0">Hasta</span>
             <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Ingreso hasta" maxDate={new Date()} />
           </div>
-          <button onClick={buscar} disabled={buscando}
+          <button onClick={() => buscar()} disabled={buscando}
             className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:opacity-50">
             {buscando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
             {buscando ? "Buscando…" : "Buscar"}
@@ -308,6 +426,27 @@ export default function LesionesIngresosPage() {
             </button>
           )}
         </div>
+
+        {/* Alcance de lo mostrado: hasta dónde llegó el escaneo y cuándo se hizo.
+            "Actualizar" vuelve a leer el periodo completo — necesario porque el
+            diagnóstico de egreso se agrega días después del ingreso y puede
+            convertir en candidato a un ingreso ya escaneado. */}
+        {alcance && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] text-slate-400">
+            <span>
+              Escaneado del{" "}
+              <strong className="font-semibold text-slate-500 dark:text-slate-400">{formatFecha(inicioDia(alcance.desdeCubierto))}</strong>
+              {" al "}
+              <strong className="font-semibold text-slate-500 dark:text-slate-400">{formatFecha(inicioDia(alcance.hastaCubierto))}</strong>
+              {" · "}
+              {alcance.escaneadoEn.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+            <button onClick={() => buscar(true)} disabled={buscando}
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 disabled:opacity-50 dark:text-cyan-300 dark:hover:bg-cyan-950/40">
+              <RefreshCw size={11} className={buscando ? "animate-spin" : ""} /> Actualizar
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
@@ -357,11 +496,13 @@ export default function LesionesIngresosPage() {
 
             <p className="mt-3 flex items-start gap-1.5 text-xs leading-5 text-slate-500">
               <Info size={13} className="mt-0.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-              Se revisaron {leidos} ingresos del periodo y {todas.length} tienen diagnóstico de lesión.
+              {alcance && alcance.leidos !== null
+                ? <>Se revisaron {alcance.leidos} ingresos del periodo y {todas.length} tienen diagnóstico de lesión.{" "}</>
+                : <>{todas.length} ingresos del periodo tienen diagnóstico de lesión.{" "}</>}
               La causa externa se define hasta el egreso, por eso el tamizaje va por el diagnóstico y hay que
               investigar cada caso. Un ingreso marcado &quot;Corresponde&quot; que no tenga aviso significa que el
               médico no lo notificó.
-              {tope && <strong className="ml-1 text-amber-700 dark:text-amber-400">Se alcanzó el tope de {MAX_INGRESOS} ingresos: acorta el rango para no perder registros.</strong>}
+              {alcance?.tope && <strong className="ml-1 text-amber-700 dark:text-amber-400">Se alcanzó el tope de {MAX_INGRESOS} ingresos: acorta el rango para no perder registros.</strong>}
             </p>
           </>
         )}
