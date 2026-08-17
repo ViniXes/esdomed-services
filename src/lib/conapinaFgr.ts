@@ -80,8 +80,55 @@ export const CONDICION_LABEL: Record<CondicionPacienteAviso, string> = {
 // Un paciente menor de edad implica aviso a CONAPINA además de la FGR. NO se
 // decide aquí a qué instancia va el caso (eso lo declara el médico al avisar):
 // solo se marca la edad para que el formulario y la bandeja lo adviertan.
+export const EDAD_ADULTO = 18;
+
 export const esMenorDeEdad = (edad: number | null | undefined) =>
-  typeof edad === "number" && edad < 18;
+  typeof edad === "number" && edad < EDAD_ADULTO;
+
+// ── Informe de ingresos de adolescentes ─────────────────────────────────────
+// Ojo: el corte del informe es 18 años CUMPLIDOS INCLUSIVE (≤ 18), más ancho
+// que la mayoría de edad legal de `esMenorDeEdad` (< 18). Son dos criterios
+// distintos a propósito: aquel decide si el caso va a CONAPINA, este es el
+// universo que el comité revisa.
+export const EDAD_MAX_ADOLESCENTE = 18;
+
+export const esAdolescente = (edad: number | null | undefined) =>
+  typeof edad === "number" && edad >= 0 && edad <= EDAD_MAX_ADOLESCENTE;
+
+// Tramos de la niñez y la adolescencia: la primera infancia y la niñez van
+// juntas (nadie de ese tramo consiente) y la adolescencia se parte en dos
+// porque el trato legal difiere.
+export type GrupoEdadAdolescente = "ninez" | "adolescencia_temprana" | "adolescencia_tardia";
+
+export const GRUPO_EDAD_LABEL: Record<GrupoEdadAdolescente, string> = {
+  ninez: "Niñez (0–9)",
+  adolescencia_temprana: "10–14 años",
+  adolescencia_tardia: "15–18 años",
+};
+
+export const GRUPOS_EDAD_ADOLESCENTE: GrupoEdadAdolescente[] = [
+  "ninez", "adolescencia_temprana", "adolescencia_tardia",
+];
+
+export function grupoEdadAdolescente(edad: number | null | undefined): GrupoEdadAdolescente | null {
+  if (!esAdolescente(edad)) return null;
+  if (edad! < 10) return "ninez";
+  if (edad! < 15) return "adolescencia_temprana";
+  return "adolescencia_tardia";
+}
+
+// Fecha de nacimiento más ANTIGUA que puede tener alguien de 18 años o menos
+// que ingrese en/después de `desdeIngreso`. Sirve para acotar la consulta en el
+// servidor: quien ingresa con 18 o menos nació forzosamente después de este
+// corte, así que filtrar por él no deja fuera ningún caso (solo arrastra de más
+// a los que cumplieron 19 dentro del periodo, que se descartan en el cliente).
+// Se resta un año MÁS que el tope porque el tope es inclusive: alguien de 18
+// años recién cumplidos nació hace 18 años y un día... y hasta hace 19 menos un día.
+export function corteNacimientoAdolescentes(desdeIngreso: Date): Date {
+  const d = new Date(desdeIngreso);
+  d.setFullYear(d.getFullYear() - (EDAD_MAX_ADOLESCENTE + 1));
+  return d;
+}
 
 // ── Validación de la nota ───────────────────────────────────────────────────
 // Cuando no hay código CIE-10, la nota es el ÚNICO dato clínico del caso: exige

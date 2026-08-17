@@ -8,11 +8,20 @@ import {
 // ── Cálculos ────────────────────────────────────────────────────────────────
 
 export function calcularEdad(fechaNacimiento?: Date | null): number | null {
-  if (!fechaNacimiento) return null;
-  const hoy = new Date();
-  let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
-  const m = hoy.getMonth() - fechaNacimiento.getMonth();
-  if (m < 0 || (m === 0 && hoy.getDate() < fechaNacimiento.getDate())) edad--;
+  return calcularEdadEn(fechaNacimiento, new Date());
+}
+
+// Edad cumplida a una fecha dada. Los informes por periodo (p. ej. ingresos de
+// menores de 18) tienen que medir la edad AL INGRESO, no la de hoy: un paciente
+// que ingresó con 17 y ya cumplió 18 sigue siendo un ingreso de adolescente.
+export function calcularEdadEn(
+  fechaNacimiento?: Date | null,
+  referencia?: Date | null,
+): number | null {
+  if (!fechaNacimiento || !referencia) return null;
+  let edad = referencia.getFullYear() - fechaNacimiento.getFullYear();
+  const m = referencia.getMonth() - fechaNacimiento.getMonth();
+  if (m < 0 || (m === 0 && referencia.getDate() < fechaNacimiento.getDate())) edad--;
   return edad >= 0 ? edad : null;
 }
 
