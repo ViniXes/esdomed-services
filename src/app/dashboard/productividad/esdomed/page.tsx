@@ -501,10 +501,10 @@ export default function ProductividadEsdomedPage() {
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[980px] border-collapse text-sm">
+                  <table className="w-full min-w-[840px] border-collapse text-sm sm:min-w-[980px]">
                     <thead>
                       <tr className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                        <th className="sticky left-0 z-10 min-w-[190px] bg-white px-4 py-3 text-left text-[11px] font-bold uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">Nombre</th>
+                        <th className="sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] bg-white px-2 py-3 text-left text-[11px] font-bold uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400 sm:w-auto sm:min-w-[190px] sm:max-w-none sm:px-4">Nombre</th>
                         {COLUMNAS_RESUMEN.map(columna => (
                           <th key={columna.id} className="px-3 py-3 text-center text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
                             <span className="hidden xl:inline">{columna.label}</span>
@@ -516,7 +516,7 @@ export default function ProductividadEsdomedPage() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {resumenPorPersona.map((fila, index) => (
                         <tr key={fila.nombre} className="group hover:bg-blue-50/50 dark:hover:bg-slate-800/70">
-                          <td className={`sticky left-0 z-10 whitespace-nowrap px-4 py-3 font-semibold text-slate-800 transition-colors dark:text-slate-100 ${index % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/70 dark:bg-slate-900"} group-hover:bg-blue-50 dark:group-hover:bg-slate-800`}>
+                          <td title={fila.nombre} className={`sticky left-0 z-10 w-[120px] min-w-[120px] max-w-[120px] whitespace-normal px-2 py-3 text-xs font-semibold leading-tight text-slate-800 transition-colors dark:text-slate-100 sm:w-auto sm:min-w-[190px] sm:max-w-none sm:whitespace-nowrap sm:px-4 sm:text-sm ${index % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/70 dark:bg-slate-900"} group-hover:bg-blue-50 dark:group-hover:bg-slate-800`}>
                             {fila.nombre}
                           </td>
                           {COLUMNAS_RESUMEN.map(columna => (
