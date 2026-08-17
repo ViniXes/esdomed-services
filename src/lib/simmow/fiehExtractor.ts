@@ -647,20 +647,38 @@ interface ServicioIngresoB {
 }
 
 /**
- * "Servicio en la que ingresa" / "Servicio al que ingresa" (Parte B): la
- * etiqueta SIEMPRE envuelve a una segunda línea en la plantilla del FIEH
- * ("Servicio en la que" / "ingresa:") — y, como pasa con "Traslado a:" en la
- * Ruta de Movimiento (ver comentario de extraerUltimoServicioRutaPorCoordenadas),
- * cuando el valor también es largo (p. ej. "Cirugía Hombres 1") su primera
- * palabra queda pegada a la primera línea de la etiqueta y el resto a la
- * segunda. Aplanar todo a texto corrido (lo que hace extraerServicioIngresoParteB)
- * pierde esa primera palabra: solo sobrevive "Hombres 1" suelto, que cae en
- * el mapeo por defecto de Medicina Interna en vez de Cirugía. Se resuelve
- * leyendo por coordenadas: se ubica la etiqueta en sus dos líneas y se junta
- * todo lo que quede a la derecha de ella en ambas.
+ * "Servicio en la que ingresa" / "Servicio al que ingresa" (Parte B). Dos
+ * variantes vistas en FIEH reales, ambas por el mismo motivo (una celda de
+ * tabla envuelve a una segunda línea) y ambas rompían el aplanado a texto
+ * corrido de extraerServicioIngresoParteB:
+ *
+ * 1. La ETIQUETA envuelve ("Servicio en la que" / "ingresa:") y el VALOR
+ *    también es largo (p. ej. "Cirugía Hombres 1"): su primera palabra
+ *    queda pegada a la primera línea de la etiqueta y el resto a la
+ *    segunda. Aplanado a texto, solo sobrevive "Hombres 1" suelto → mapeo
+ *    por defecto a Medicina Interna en vez de Cirugía.
+ * 2. La etiqueta cabe entera en una línea ("Servicio en la que ingresa:")
+ *    pero es el VALOR el que envuelve por su cuenta (p. ej. "Servicio de
+ *    Oncologia" → "Servicio de" en la primera línea, "Oncologia" sola en
+ *    la siguiente, sin ninguna etiqueta ahí). Aplanado a texto, solo
+ *    sobrevive "Servicio de" — sin la última palabra no coincide con
+ *    ningún servicio conocido, y el fuzzy-match de mapearServicioSIMMOW
+ *    termina resolviendo al primer "Servicio de X" del catálogo que
+ *    empiece igual (Cardiología), no al servicio real (Oncología).
+ *
+ * Mismo tipo de bug que ya se resolvió para "Traslado a:" en la Ruta de
+ * Movimiento — se resuelve igual, leyendo por coordenadas: se ubica dónde
+ * termina la etiqueta (en una línea o dos) y se junta todo lo que quede a
+ * la derecha de ella, en esa línea y en la de abajo si la hay.
  */
 function extraerServicioIngresoPorCoordenadas(doc: DocumentoExtraido): ServicioIngresoB | null {
-  const UMBRAL_GAP = 12; // pt — separa "etiqueta" de "valor" en la misma línea (el espacio normal entre palabras es de 2-3pt).
+  // pt — separa "etiqueta" de "valor" en la misma línea. El espacio normal
+  // entre palabras de una misma etiqueta medido en FIEH reales es de
+  // 2-3pt; el salto hacia la columna de valor puede ser tan chico como 9pt
+  // (etiqueta corta que ya trae el valor pegado) o mucho más grande.
+  const UMBRAL_GAP = 6;
+  const LINEA_ABAJO_MIN = 6;
+  const LINEA_ABAJO_MAX = 16;
 
   for (const pagina of doc.paginas) {
     const candidatos = pagina.items.filter(
@@ -681,28 +699,57 @@ function extraerServicioIngresoPorCoordenadas(doc: DocumentoExtraido): ServicioI
       );
       if (idxQue < 0) continue;
 
-      const finEtiqueta0 = fila0[idxQue].x + fila0[idxQue].w;
+      let finEtiqueta0 = fila0[idxQue].x + fila0[idxQue].w;
+      let etiquetaCompleta = false;
+
+      // "ingresa:" puede venir pegado en la misma línea que "...que" (la
+      // etiqueta entera cabe en una línea) — si es así, sigue siendo parte
+      // de la etiqueta, nunca del valor.
+      const posibleIngresa0 = fila0[idxQue + 1];
+      if (
+        posibleIngresa0 &&
+        /^ingresa:?$/i.test(sinAcentos(posibleIngresa0.str).trim()) &&
+        posibleIngresa0.x - finEtiqueta0 <= UMBRAL_GAP
+      ) {
+        finEtiqueta0 = posibleIngresa0.x + posibleIngresa0.w;
+        etiquetaCompleta = true;
+      }
+
       const valor0 = fila0.filter((it) => it.x > finEtiqueta0 + UMBRAL_GAP);
 
-      // Segunda línea de la etiqueta ("ingresa:"), a la misma X que "Servicio"
-      // y un poco más abajo — envoltura normal de esta celda de la tabla.
-      const itemIngresa = pagina.items.find(
-        (it) =>
-          /^ingresa:?$/i.test(sinAcentos(it.str).trim()) &&
-          Math.abs(it.x - itemServicio.x) <= 8 &&
-          it.y < y0 &&
-          y0 - it.y <= 25
-      );
-
+      // Línea inmediatamente debajo (envoltura de la etiqueta y/o del valor
+      // — misma celda de la tabla, una sola línea más abajo).
       let valor1: typeof fila0 = [];
-      if (itemIngresa) {
-        const y1 = itemIngresa.y;
+      const itemsAbajo = pagina.items.filter(
+        (it) => y0 - it.y >= LINEA_ABAJO_MIN && y0 - it.y <= LINEA_ABAJO_MAX
+      );
+      if (itemsAbajo.length) {
+        const y1 = itemsAbajo[0].y;
         const fila1 = pagina.items
           .filter((it) => Math.abs(it.y - y1) <= 3)
           .sort((a, b) => a.x - b.x);
-        const finEtiqueta1 = itemIngresa.x + itemIngresa.w;
-        valor1 = fila1.filter((it) => it.x > finEtiqueta1 + UMBRAL_GAP);
+
+        const itemIngresa1 = fila1.find(
+          (it) => /^ingresa:?$/i.test(sinAcentos(it.str).trim()) && Math.abs(it.x - itemServicio.x) <= 8
+        );
+        if (itemIngresa1) {
+          // Caso 1: la etiqueta envolvió, "ingresa:" está en esta línea.
+          const finEtiqueta1 = itemIngresa1.x + itemIngresa1.w;
+          valor1 = fila1.filter((it) => it.x > finEtiqueta1 + UMBRAL_GAP);
+          etiquetaCompleta = true;
+        } else if (etiquetaCompleta) {
+          // Caso 2: la etiqueta ya terminó arriba — esta línea es solo la
+          // continuación del valor. Se restringe a la columna del valor
+          // (no toda la línea) para no arrastrar texto de otra columna.
+          const xValor = valor0.length ? Math.min(...valor0.map((it) => it.x)) : itemServicio.x;
+          valor1 = fila1.filter((it) => it.x >= xValor - 15);
+        }
       }
+
+      // Sin forma de confirmar dónde termina la etiqueta (ni en esta línea
+      // ni en la de abajo), no es seguro tomar valor0 solo — mejor no
+      // resolver este candidato que arriesgar un valor incompleto.
+      if (!etiquetaCompleta) continue;
 
       const valorTexto = [...valor0, ...valor1]
         .map((it) => it.str)
