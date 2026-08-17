@@ -20,7 +20,7 @@ import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, 
 import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
 import type { NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, SolicitudTraslado } from "@/types";
 
-const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos"] as const;
+const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos", "emergenciasSimmow"] as const;
 type HojaDrive = (typeof HOJAS_DRIVE)[number];
 
 // Cuentas que pueden existir en ESDOMED, pero no forman parte de la evaluación de productividad.
@@ -67,9 +67,10 @@ const COLUMNAS_RESUMEN = [
   { id: "carpetasDrive", label: "Carpetas creadas (Drive)", corto: "Carpetas (Drive)" },
   { id: "actualizacionesDrive", label: "Actualizaciones (Drive)", corto: "Actualiz. (Drive)" },
   { id: "consentimientosDrive", label: "Consentimientos (Drive)", corto: "Consent. (Drive)" },
+  { id: "emergenciasSimmow", label: "Emergencias digitadas SIMMOW", corto: "Emerg. SIMMOW" },
 ] as const;
 
-type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate" | "indigo" | "teal" | "pink";
+type TonoTarjeta = "blue" | "rose" | "amber" | "emerald" | "cyan" | "violet" | "slate" | "indigo" | "teal" | "pink" | "orange";
 
 const tonosTarjeta: Record<TonoTarjeta, { barra: string }> = {
   blue: { barra: "bg-blue-500" },
@@ -82,6 +83,7 @@ const tonosTarjeta: Record<TonoTarjeta, { barra: string }> = {
   indigo: { barra: "bg-indigo-500" },
   teal: { barra: "bg-teal-500" },
   pink: { barra: "bg-pink-500" },
+  orange: { barra: "bg-orange-500" },
 };
 
 const selectCls =
@@ -186,6 +188,7 @@ async function fetchHojaDrive(hoja: HojaDrive, mes: string, token: string, roste
   const data = await res.json() as { registros: { nombre: string; fecha: string }[] };
   for (const registro of data.registros) {
     const nombre = emparejarNombre(registro.nombre, roster);
+    if (!nombre) continue;
     mapa.set(nombre, (mapa.get(nombre) ?? 0) + 1);
   }
   return mapa;
@@ -211,6 +214,7 @@ export default function ProductividadEsdomedPage() {
   const [carpetasDrive, setCarpetasDrive] = useState<Map<string, number>>(new Map());
   const [actualizacionesDrive, setActualizacionesDrive] = useState<Map<string, number>>(new Map());
   const [consentimientosDrive, setConsentimientosDrive] = useState<Map<string, number>>(new Map());
+  const [emergenciasSimmow, setEmergenciasSimmow] = useState<Map<string, number>>(new Map());
   const [controlIngresos, setControlIngresos] = useState<ControlIngreso[]>([]);
   const [fallecidosConfirmados, setFallecidosConfirmados] = useState<NotificacionFallecido[]>([]);
   const [fallecidosCertificado, setFallecidosCertificado] = useState<NotificacionFallecido[]>([]);
@@ -239,17 +243,19 @@ export default function ProductividadEsdomedPage() {
     let cancelado = false;
     user.getIdToken()
       .then(token => Promise.all(HOJAS_DRIVE.map(hoja => fetchHojaDrive(hoja, mes, token, personal))))
-      .then(([carpetas, actualizaciones, consentimientos]) => {
+      .then(([carpetas, actualizaciones, consentimientos, emergencias]) => {
         if (cancelado) return;
         setCarpetasDrive(carpetas);
         setActualizacionesDrive(actualizaciones);
         setConsentimientosDrive(consentimientos);
+        setEmergenciasSimmow(emergencias);
       })
       .catch(() => {
         if (cancelado) return;
         setCarpetasDrive(new Map());
         setActualizacionesDrive(new Map());
         setConsentimientosDrive(new Map());
+        setEmergenciasSimmow(new Map());
       });
     return () => { cancelado = true; };
   }, [user, personal, mes]);
@@ -328,13 +334,13 @@ export default function ProductividadEsdomedPage() {
 
   const nombres = useMemo(() => {
     const set = new Set<string>(personal);
-    for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]) {
+    for (const mapa of [expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive, emergenciasSimmow]) {
       for (const nombre of mapa.keys()) set.add(nombre);
     }
     return Array.from(set)
       .filter(esPersonalEvaluable)
       .sort((a, b) => a.localeCompare(b));
-  }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive]);
+  }, [personal, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive, emergenciasSimmow]);
 
   const totales = {
     expedientesCreados: controlIngresos.length,
@@ -347,6 +353,7 @@ export default function ProductividadEsdomedPage() {
     carpetasDrive: Array.from(carpetasDrive.values()).reduce((a, b) => a + b, 0),
     actualizacionesDrive: Array.from(actualizacionesDrive.values()).reduce((a, b) => a + b, 0),
     consentimientosDrive: Array.from(consentimientosDrive.values()).reduce((a, b) => a + b, 0),
+    emergenciasSimmow: Array.from(emergenciasSimmow.values()).reduce((a, b) => a + b, 0),
   };
 
   const resumenPorPersona = useMemo(() => nombres.map(nombre => {
@@ -361,6 +368,7 @@ export default function ProductividadEsdomedPage() {
       carpetasDrive: carpetasDrive.get(nombre) ?? 0,
       actualizacionesDrive: actualizacionesDrive.get(nombre) ?? 0,
       consentimientosDrive: consentimientosDrive.get(nombre) ?? 0,
+      emergenciasSimmow: emergenciasSimmow.get(nombre) ?? 0,
     };
     return { nombre, valores };
   }), [
@@ -375,6 +383,7 @@ export default function ProductividadEsdomedPage() {
     carpetasDrive,
     actualizacionesDrive,
     consentimientosDrive,
+    emergenciasSimmow,
   ]);
 
   if (!profile || !puedeVer) {
@@ -392,7 +401,7 @@ export default function ProductividadEsdomedPage() {
       const aoa: (string | number)[][] = [
         ["Productividad ESDOMED", mes],
         [],
-        ["Nombre", "Expedientes creados", "Defunciones procesadas", "Certificados entregados", "Altas efectivas", "Documentos de alta entregados", "Altas digitadas SIMMOW", "Traslados procesados", "Carpetas creadas (Drive)", "Actualizaciones (Drive)", "Consentimientos (Drive)"],
+        ["Nombre", "Expedientes creados", "Defunciones procesadas", "Certificados entregados", "Altas efectivas", "Documentos de alta entregados", "Altas digitadas SIMMOW", "Traslados procesados", "Carpetas creadas (Drive)", "Actualizaciones (Drive)", "Consentimientos (Drive)", "Emergencias digitadas SIMMOW"],
         ...nombres.map(nombre => [
           nombre,
           expedientesCreados.get(nombre) ?? 0,
@@ -405,6 +414,7 @@ export default function ProductividadEsdomedPage() {
           carpetasDrive.get(nombre) ?? 0,
           actualizacionesDrive.get(nombre) ?? 0,
           consentimientosDrive.get(nombre) ?? 0,
+          emergenciasSimmow.get(nombre) ?? 0,
         ]),
       ];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -465,7 +475,7 @@ export default function ProductividadEsdomedPage() {
 
           {vista === "resumen" && (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-[repeat(11,minmax(0,1fr))]">
                 <TarjetaTotal label="Expedientes creados" valor={totales.expedientesCreados} tono="blue" />
                 <TarjetaTotal label="Defunciones procesadas" valor={totales.defuncionesProcesadas} tono="rose" />
                 <TarjetaTotal label="Certificados entregados" valor={totales.certificadosEntregados} tono="amber" />
@@ -476,6 +486,7 @@ export default function ProductividadEsdomedPage() {
                 <TarjetaTotal label="Carpetas creadas (Drive)" valor={totales.carpetasDrive} tono="indigo" />
                 <TarjetaTotal label="Actualizaciones (Drive)" valor={totales.actualizacionesDrive} tono="teal" />
                 <TarjetaTotal label="Consentimientos (Drive)" valor={totales.consentimientosDrive} tono="pink" />
+                <TarjetaTotal label="Emergencias digitadas SIMMOW" valor={totales.emergenciasSimmow} tono="orange" />
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -543,6 +554,7 @@ export default function ProductividadEsdomedPage() {
               <GraficoBarras titulo="Altas efectivas por persona" datos={mapaAArray(altasEfectivas)} color="#3b82f6" />
               <GraficoBarras titulo="Traslados procesados por persona" datos={mapaAArray(trasladosProcesados)} color="#8b5cf6" />
               <GraficoBarras titulo="Altas digitadas en SIMMOW por persona" datos={mapaAArray(altasSimmow)} color="#14b8a6" />
+              <GraficoBarras titulo="Emergencias digitadas en SIMMOW por persona" datos={mapaAArray(emergenciasSimmow)} color="#f97316" />
             </div>
           )}
 
