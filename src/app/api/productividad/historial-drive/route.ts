@@ -14,8 +14,8 @@ async function getCallerRole(req: NextRequest): Promise<string | null> {
   }
 }
 
-// Historial de carpetas creadas, actualizaciones y consentimientos informados: se
-// lleva manualmente en Google Sheets (no en el sistema). Solo se usan fecha y
+// Historial de carpetas creadas, actualizaciones, consentimientos y emergencias
+// digitadas en SIMMOW: se lleva manualmente en Google Sheets (no en el sistema). Solo se usan fecha y
 // responsable (columnas A y C); ningun otro dato de la hoja (nombre de paciente,
 // expediente, observaciones) se lee ni se expone.
 const SPREADSHEET_ID = "1kLr1YSeK5Xk9cGjrlcR2u4CKhgeRS4Z0LnhKp3GHsSk";
@@ -24,6 +24,7 @@ const GIDS: Record<string, string> = {
   carpetas: "44016251",
   actualizaciones: "0",
   consentimientos: "262490202",
+  emergenciasSimmow: "438878166",
 };
 
 interface RegistroDrive {
