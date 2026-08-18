@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  addDoc, collection, deleteDoc, deleteField, doc, getDocs, onSnapshot, query, Timestamp, updateDoc, where,
+  collection, deleteField, doc, getDocs, onSnapshot, query, Timestamp, where, writeBatch,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,10 +10,12 @@ import { useServicios } from "@/contexts/ServiciosContext";
 import { getPersona } from "@/lib/pacientes/persona";
 import { DateField } from "@/components/ui/DateField";
 import {
-  ESTADO_PACIENTE_GESTION_LABEL, esTipoVisita, GRUPOS_GESTION_TS, labelTipoGestion,
+  ACCIONES_SEGUIMIENTO, ESTADO_PACIENTE_GESTION_LABEL, esTipoVisita, GRUPOS_GESTION_TS,
+  keyAccionSeguimiento, labelTipoGestion,
   MODALIDAD_GESTION_LABEL, RESULTADO_VISITA_COLOR, RESULTADO_VISITA_LABEL, TIPOS_GESTION_TS,
   type EstadoPacienteGestion, type ModalidadGestion, type ResultadoVisita,
 } from "@/lib/trabajosocial/catalogos";
+import { resumenDiaInc, resumenSeguimientoInc } from "@/lib/trabajosocial/resumenTS";
 import type { EstadoPaciente, GestionTS, Paciente } from "@/types";
 import {
   AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Link2, Loader2,
@@ -29,6 +31,22 @@ const labelCls = "block text-xs font-semibold text-slate-500 uppercase tracking-
 
 // Máximo de gestiones por página en la lista del día.
 const PAGE_SIZE = 10;
+
+// Llaves de las 5 acciones del seguimiento: solo esas suman al total MENSUAL por
+// paciente (los "TOTAL MENSUAL DE …" del Excel). El resumen del DÍA, en cambio,
+// cuenta toda gestión — de él sale la bolsa de expedientes repartibles.
+const ACCION_KEYS = new Set(ACCIONES_SEGUIMIENTO.map((a) => a.key));
+
+// Suma o resta una gestión en los documentos resumen (día + mes).
+function aplicarResumenes(
+  batch: ReturnType<typeof writeBatch>,
+  g: { expediente: string; fecha: string; tipo: string; modalidad?: ModalidadGestion; trabajadoraId: string },
+  delta: 1 | -1,
+) {
+  const key = keyAccionSeguimiento(g);
+  if (ACCION_KEYS.has(key)) resumenSeguimientoInc(batch, g.fecha.slice(0, 7), g.expediente, key, delta);
+  resumenDiaInc(batch, g.fecha, g.expediente, key, g.trabajadoraId, delta);
+}
 
 // ── Utilidades de fecha ─────────────────────────────────────────────────────────
 function fechaStr(d: Date): string {
@@ -96,8 +114,8 @@ export default function GestionesPage() {
   const { profile } = useAuth();
   const { servicios } = useServicios();
 
-  // El expediente puede venir precargado desde el Panorama (deep link ?exp=...);
-  // el efecto de autocompletar rellenará nombre/servicio/estado.
+  // El expediente puede venir precargado por deep link (?exp=...); el efecto de
+  // autocompletar rellenará nombre/servicio/estado.
   const [form, setForm] = useState<FormValue>(() => {
     const base = formVacio(hoyStr());
     if (typeof window !== "undefined") {
@@ -259,7 +277,20 @@ export default function GestionesPage() {
         const cambios = Object.fromEntries(
           Object.entries(base).map(([k, v]) => [k, v === undefined ? deleteField() : v]),
         );
-        await updateDoc(doc(db, "gestiones_ts", editando.id), cambios);
+        const batch = writeBatch(db);
+        batch.update(doc(db, "gestiones_ts", editando.id), cambios);
+        // Si la edición cambió expediente, fecha, tipo o modalidad, los contadores
+        // tienen que MOVERSE: se resta donde estaba y se suma donde queda.
+        const movio =
+          editando.expediente !== base.expediente ||
+          editando.fecha !== base.fecha ||
+          editando.tipo !== base.tipo ||
+          editando.modalidad !== base.modalidad;
+        if (movio) {
+          aplicarResumenes(batch, editando, -1);
+          aplicarResumenes(batch, { ...base, trabajadoraId: editando.trabajadoraId }, 1);
+        }
+        await batch.commit();
         notify("success", "Gestión actualizada");
         setEditando(null);
         setForm(formVacio(form.fecha));
@@ -272,7 +303,10 @@ export default function GestionesPage() {
         };
         // Firestore no acepta `undefined`: limpiar las claves vacías.
         const payload = Object.fromEntries(Object.entries(nuevo).filter(([, v]) => v !== undefined));
-        await addDoc(collection(db, "gestiones_ts"), payload);
+        const batch = writeBatch(db);
+        batch.set(doc(collection(db, "gestiones_ts")), payload);
+        aplicarResumenes(batch, { ...base, trabajadoraId: profile.uid }, 1);
+        await batch.commit();
         notify("success", "Gestión registrada");
         // Mantener la fecha (sesión de captura del mismo día); limpiar el resto.
         setForm(formVacio(form.fecha));
@@ -292,7 +326,10 @@ export default function GestionesPage() {
     if (!g?.id) return;
     setEliminando(true);
     try {
-      await deleteDoc(doc(db, "gestiones_ts", g.id));
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "gestiones_ts", g.id));
+      aplicarResumenes(batch, g, -1);
+      await batch.commit();
       notify("success", "Gestión eliminada");
       setAEliminar(null);
       // Si se eliminó la gestión que estaba en edición, salir del modo edición.

@@ -256,7 +256,7 @@ export default function VisitasPage() {
   // Roster: todos los pacientes activos (fuente de verdad del listado diario) + sus
   // tarjetas. Antes dos listeners en vivo sin límite (censo completo); ahora una
   // lectura puntual (getDocs) bajo demanda — la caché de pacientes es compartida
-  // con Gestiones (panorama/rastreo/seguimiento navegan al mismo censo).
+  // con Gestiones (rastreo/seguimiento navegan al mismo censo).
   const consultarRoster = useCallback(async () => {
     setRosterLoading(true);
     try {
