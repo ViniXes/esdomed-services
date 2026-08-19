@@ -496,7 +496,17 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
     const limFechaHora = medio(colFecha.x, colHora.x);
     const limHoraDe = medio(colHora.x, colDe.x);
     const limDeA = medio(colDe.x, colA.x);
-    const limANombre = colMedico ? medio(colA.x, colMedico.x) : colA.x + 200;
+    // El límite hacia "Nombre" NO puede ser el punto medio: el nombre del
+    // médico siempre empieza pegado a su propio encabezado (a ~4pt a la
+    // izquierda de "Nombre"), pero un valor largo en "Traslado a:" (p. ej.
+    // "Medicina Interna Hombres 1") puede terminar pasado ese punto medio —
+    // se perdía su última palabra ("1"), dejaba de coincidir con ningún
+    // servicio conocido y el traslado se descartaba a favor de uno anterior
+    // (comprobado en vivo: "Medicina Interna Hombres 1" recortada a "...
+    // Hombres" caía de vuelta a "Servicio de Hematologia" del traslado
+    // previo). Se deja el límite bien pegado al nombre del médico en vez de
+    // partir la distancia.
+    const limANombre = colMedico ? colMedico.x - 10 : colA.x + 200;
 
     const notaFinal = pagina.items.find(
       (it) => /^El$/i.test(it.str.trim()) && it.y < yEncabezado
