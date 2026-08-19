@@ -908,7 +908,12 @@ function extraerComplementarios(texto: string): {
     const patron = new RegExp(
       "(?:^|\\s)" +
         letra +
-        "\\s*\\)\\s*([\\s\\S]*?)(?=\\s*(?:" +
+        // El texto de un diagnóstico suele terminar en palabras como
+        // "primaria)" — sin el (?<![A-Za-z]) de abajo, el marcador del
+        // SIGUIENTE segmento ("a)") matchea ahí mismo (la "a" final de
+        // "primaria" + el paréntesis de cierre de la palabra), cortando el
+        // texto antes de llegar al código CIE-10 real y dejándolo vacío.
+        "\\s*\\)\\s*([\\s\\S]*?)(?=\\s*(?:(?<![A-Za-z])" +
         siguienteRegex +
         "|Diagnostico\\s+de\\s+causa\\s+externa|Discapacidad\\s+principal|Procedimientos|Fecha\\s+de\\s+egreso|Condicion|$))",
       "i"
