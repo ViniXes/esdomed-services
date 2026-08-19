@@ -926,10 +926,19 @@ function extraerComplementarios(texto: string): {
     };
   };
 
-  // Orden visual del FIEH: c) = Complementario 1, b) = 2, a) = 3.
-  res.c = extraerSegmento("c", "b\\s*\\)");
-  res.b = extraerSegmento("b", "a\\s*\\)");
-  res.a = extraerSegmento("a", "II\\s*\\)");
+  // El FIEH imprime este bloque en orden visual INVERSO al alfabético:
+  // c) aparece primero (arriba), luego b), y a) al final (abajo) — se ubica
+  // cada uno por su letra literal, no por posición. SIMMOW en cambio numera
+  // los complementarios 1, 2, 3 en orden alfabético normal (a→1, b→2, c→3),
+  // así que lo que el FIEH marca "a)" debe terminar en el complementario 1
+  // de SIMMOW (res.c, que alimenta ese campo — ver DIAG_C_* en extraerFieh),
+  // lo de "c)" en el 3 (res.a), y "b)" se queda en medio en ambos órdenes.
+  const dxC = extraerSegmento("c", "b\\s*\\)");
+  const dxB = extraerSegmento("b", "a\\s*\\)");
+  const dxA = extraerSegmento("a", "II\\s*\\)");
+  res.c = dxA;
+  res.b = dxB;
+  res.a = dxC;
 
   const patronII = new RegExp(
     "(?:^|\\s)II\\s*\\)\\s*([\\s\\S]*?)(?=\\s*(?:II\\s*\\)|Diagnostico\\s+de\\s+causa\\s+externa|Discapacidad\\s+principal|Procedimientos|Fecha\\s+de\\s+egreso|Condicion|$))",
