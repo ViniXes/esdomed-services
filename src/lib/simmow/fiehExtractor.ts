@@ -1010,19 +1010,47 @@ function extraerCausaExternaYCirugias(texto: string): {
     );
 
   // Causa externa
-  const mCausaExterna = plano.match(
+  //
+  // La etiqueta "Diagnóstico de causa externa:" envuelve a una segunda
+  // línea en la plantilla del FIEH ("Diagnóstico de causa" / "externa:"),
+  // con la etiqueta de su propio código ("Código CIE-10:") intercalada en
+  // la primera línea — mismo patrón ya visto y corregido en "Servicio en
+  // la que ingresa". Confirmado contra 15 FIEH reales: en los 15 la
+  // etiqueta se corta exactamente en el mismo punto, aunque ninguno traía
+  // un valor real de causa externa para confirmar el orden texto/código
+  // con un caso lleno — se asume el mismo orden de lectura de arriba hacia
+  // abajo que el resto de la plantilla (código en la primera línea,
+  // "externa:" y el texto en la segunda), y si no matchea así se intenta
+  // el orden "normal" (texto antes que código, como Diagnóstico Principal)
+  // por si acaso.
+  const mCausaExternaEnvuelta = plano.match(
     new RegExp(
-      "Diagnostico\\s+de\\s+causa\\s+externa\\s*:?\\s*([\\s\\S]*?)\\s*" +
+      "Diagnostico\\s+de\\s+causa\\s+" +
         patronCodigoCIE10 +
         "\\s*" +
         cie +
-        "\\s*(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
+        "\\s*externa\\s*:?\\s*([\\s\\S]*?)(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
       "i"
     )
   );
-  if (mCausaExterna) {
-    res.causaExterna.texto = limpiarTextoLocal(mCausaExterna[1]);
-    res.causaExterna.codigo = normalizarCodigoCIE(mCausaExterna[2]);
+  if (mCausaExternaEnvuelta) {
+    res.causaExterna.codigo = normalizarCodigoCIE(mCausaExternaEnvuelta[1]);
+    res.causaExterna.texto = limpiarTextoLocal(mCausaExternaEnvuelta[2]);
+  } else {
+    const mCausaExterna = plano.match(
+      new RegExp(
+        "Diagnostico\\s+de\\s+causa\\s+externa\\s*:?\\s*([\\s\\S]*?)\\s*" +
+          patronCodigoCIE10 +
+          "\\s*" +
+          cie +
+          "\\s*(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
+        "i"
+      )
+    );
+    if (mCausaExterna) {
+      res.causaExterna.texto = limpiarTextoLocal(mCausaExterna[1]);
+      res.causaExterna.codigo = normalizarCodigoCIE(mCausaExterna[2]);
+    }
   }
 
   // Discapacidad principal
