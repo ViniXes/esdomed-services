@@ -444,6 +444,23 @@ function juntarPalabras(items: { str: string; x: number; w: number }[]): string 
  * a:" en ambas líneas de cada fila.
  */
 function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimiento | null {
+  interface Fila {
+    fecha: string;
+    hora: string;
+    colA: string;
+    serial: number;
+    indice: number;
+  }
+  // Cuando el paciente tuvo muchos traslados, la tabla se parte entre dos
+  // (o más) páginas del PDF, repitiendo el encabezado "Fecha Hora Traslado
+  // de: Traslado a:..." en cada página de continuación. Antes se procesaba
+  // solo la PRIMERA página con una tabla válida y se devolvía de inmediato
+  // — así que, sin importar cuántos traslados tuviera el paciente después,
+  // siempre quedaba el primero (el único visible en esa página), nunca el
+  // más reciente. Ahora se juntan las filas de TODAS las páginas antes de
+  // decidir cuál es la más reciente.
+  const todasLasFilas: Fila[] = [];
+
   for (const pagina of doc.paginas) {
     // Puede haber un tercer "traslado" suelto en la nota final de la sección
     // ("...encargada del traslado de paciente"): se descarta agrupando por Y
@@ -499,15 +516,6 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
     }
     lineas.sort((a, b) => b[0].y - a[0].y);
 
-    interface Fila {
-      fecha: string;
-      hora: string;
-      colA: string;
-      serial: number;
-      indice: number;
-    }
-    const filas: Fila[] = [];
-
     for (const linea of lineas) {
       const enFecha = linea.filter((it) => it.x < limFechaHora);
       const enColA = linea.filter((it) => it.x >= limDeA && it.x < limANombre);
@@ -516,39 +524,42 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
         const enHora = linea.filter((it) => it.x >= limFechaHora && it.x < limHoraDe);
         const fecha = juntarPalabras(enFecha);
         const hora = juntarPalabras(enHora);
-        filas.push({
+        todasLasFilas.push({
           fecha,
           hora,
           colA: juntarPalabras(enColA),
           serial: serialFechaHora(fecha, hora),
-          indice: filas.length,
+          indice: todasLasFilas.length,
         });
-      } else if (filas.length && enColA.length) {
-        filas[filas.length - 1].colA += " " + juntarPalabras(enColA);
+      } else if (todasLasFilas.length && enColA.length) {
+        // Continuación de una fila envuelta — puede caer en la misma página
+        // o, si la tabla se partió justo ahí, al inicio de la siguiente
+        // (por eso se sigue acumulando sobre el mismo arreglo entre páginas
+        // en vez de reiniciarlo).
+        todasLasFilas[todasLasFilas.length - 1].colA += " " + juntarPalabras(enColA);
       }
     }
+  }
 
-    if (!filas.length) return null;
+  if (!todasLasFilas.length) return null;
 
-    const orden = [...filas].sort((a, b) =>
-      b.serial !== a.serial ? b.serial - a.serial : b.indice - a.indice
-    );
+  const orden = [...todasLasFilas].sort((a, b) =>
+    b.serial !== a.serial ? b.serial - a.serial : b.indice - a.indice
+  );
 
-    for (const fila of orden) {
-      const destino = limpiarServicioFieh(fila.colA);
-      const servicios = buscarServiciosConocidosEnTexto(destino);
-      if (servicios.length) {
-        const s = servicios[servicios.length - 1];
-        return {
-          origen: s.origen,
-          valor: s.valor,
-          fuente: "RUTA_MOVIMIENTO",
-          fecha: fila.fecha,
-          hora: fila.hora,
-        };
-      }
+  for (const fila of orden) {
+    const destino = limpiarServicioFieh(fila.colA);
+    const servicios = buscarServiciosConocidosEnTexto(destino);
+    if (servicios.length) {
+      const s = servicios[servicios.length - 1];
+      return {
+        origen: s.origen,
+        valor: s.valor,
+        fuente: "RUTA_MOVIMIENTO",
+        fecha: fila.fecha,
+        hora: fila.hora,
+      };
     }
-    return null;
   }
   return null;
 }
