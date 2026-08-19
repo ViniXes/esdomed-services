@@ -1027,6 +1027,11 @@ export interface GestionTS {
   servicio?: string;           // último servicio conocido del paciente
   estadoPaciente: import("@/lib/trabajosocial/catalogos").EstadoPacienteGestion;
   vinculadoPadron: boolean;    // true si el expediente existía en personas al registrar
+  // Estancia (ingreso) sobre la que se hizo la gestión — id del doc de `pacientes`.
+  // Un mismo expediente puede tener N estancias; sin esto la bitácora las mezcla.
+  // Opcional: las gestiones anteriores a 2026-08 y las de pacientes fuera del
+  // censo (ambulatorios / sin ingreso) no lo llevan.
+  ingresoId?: string;
 
   // Intervención
   tipo: string;                // id del catálogo TIPOS_GESTION_TS

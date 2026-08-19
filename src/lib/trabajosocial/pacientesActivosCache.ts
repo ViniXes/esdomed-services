@@ -2,11 +2,11 @@ import { collection, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import type { Paciente } from "@/types";
 
-// Caché de módulo COMPARTIDA entre Panorama, Rastreo y Seguimiento (pestañas de
-// Gestiones) y Visitas: todas parten del mismo censo de pacientes activos
+// Caché de módulo COMPARTIDA entre Rastreo y Seguimiento (vistas de Gestiones)
+// y Visitas: todas parten del mismo censo de pacientes activos
 // creado por ESDOMED. Antes cada vista tenía su propio onSnapshot en vivo sobre
 // esa colección (sin límite); ahora es una sola lectura puntual (getDocs) que
-// las cuatro reusan al navegar entre pestañas — sin releer en cada cambio del
+// todas reusan al navegar entre vistas — sin releer en cada cambio del
 // censo mientras la pestaña queda abierta. Persiste durante la sesión del SPA
 // (sobrevive a navegación client-side, no a una recarga completa).
 let cache: Paciente[] | null = null;

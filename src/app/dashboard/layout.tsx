@@ -33,6 +33,7 @@ import {
   DoorOpen,
   CalendarClock,
   NotebookPen,
+  UserCheck,
   UserSearch,
   FileCode2,
 } from "lucide-react";
@@ -100,6 +101,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
+  const G_PROCESOS_ESDOMED = "Procesos con ESDOMED";
   const G_MEDICINA_CRITICA = "Medicina crítica";
   const G_TRABAJO_SOCIAL = "Trabajo Social";
   const G_GESTIONES_ALTAS = "Gestiones de Altas";
@@ -114,8 +116,33 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }]
       : []),
 
+    // ── Procesos con ESDOMED (solo Trabajo Social) ──
+    // Flujos de TS que dependen de o responden a ESDOMED. Los demás roles
+    // conservan estos mismos ítems dentro de sus grupos habituales.
+    ...(esTS
+      ? [
+          { href: "/dashboard/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, group: G_PROCESOS_ESDOMED },
+          {
+            // TS usa la vista de revisión (estilo Psicología), no la de ESDOMED.
+            href: "/dashboard/defunciones",
+            label: "Defunciones",
+            icon: HeartPulse,
+            badge: pendientes.fallecidos,
+            group: G_PROCESOS_ESDOMED,
+          },
+          { href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PROCESOS_ESDOMED },
+          {
+            href: "/dashboard/altas-vivos",
+            label: "Verificación de Altas",
+            icon: LogIn,
+            badge: pendientes.altas,
+            group: G_PROCESOS_ESDOMED,
+          },
+        ]
+      : []),
+
     // ── Gestión de pacientes ──
-    ...(esTS || esEsdomed || esAdmin
+    ...(esEsdomed || esAdmin
       ? [{ href: "/dashboard/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, group: G_PACIENTES }]
       : []),
     ...(verControlIngresos
@@ -185,41 +212,39 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           },
         ]
       : []),
-    ...(verAltasVivos
+    // Para TS este ítem vive en "Procesos con ESDOMED" (arriba).
+    ...(verAltasVivos && !esTS
       ? [{
           href: "/dashboard/altas-vivos",
           label: "Verificación de Altas",
           icon: LogIn,
           badge: pendientes.altas,
-          // Para TS se agrupa con Notificación; para ESDOMED/admin queda en Gestión de pacientes.
-          group: esTS ? G_GESTIONES_ALTAS : G_PACIENTES,
+          group: G_PACIENTES,
         }]
       : []),
-    {
-      // Trabajo Social usa la vista de revisión (estilo Psicología), no la de ESDOMED.
-      href: esTS ? "/dashboard/defunciones" : "/dashboard/fallecidos",
-      label: esTS ? "Defunciones" : "Fallecidos",
-      icon: HeartPulse,
-      badge: pendientes.fallecidos,
-      group: G_PACIENTES,
-    },
-    ...(profile?.role === "trabajo_social"
-      ? [{ href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PACIENTES }]
-      : []),
-    ...(esTS
-      ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_PACIENTES }]
+    ...(!esTS
+      ? [{
+          href: "/dashboard/fallecidos",
+          label: "Fallecidos",
+          icon: HeartPulse,
+          badge: pendientes.fallecidos,
+          group: G_PACIENTES,
+        }]
       : []),
 
     // ── Trabajo Social ── cada flujo con entrada propia (antes: 1 ítem + tabs).
     ...(esTS || esAdmin
       ? [
-          { href: "/dashboard/gestiones/panorama", label: "Panorama", icon: LayoutDashboard, group: G_TRABAJO_SOCIAL },
+          { href: "/dashboard/gestiones/asignaciones", label: "Asignaciones", icon: UserCheck, group: G_TRABAJO_SOCIAL },
           { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar, group: G_TRABAJO_SOCIAL },
-          { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento del día", icon: ListChecks, group: G_TRABAJO_SOCIAL },
+          { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento", icon: ListChecks, group: G_TRABAJO_SOCIAL },
           { href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen, group: G_TRABAJO_SOCIAL, exact: true },
           { href: "/dashboard/gestiones/productividad", label: "Productividad", icon: BarChart3, group: G_TRABAJO_SOCIAL },
           { href: "/dashboard/gestiones/bitacora", label: "Bitácora", icon: FileClock, group: G_TRABAJO_SOCIAL },
         ]
+      : []),
+    ...(esTS
+      ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_TRABAJO_SOCIAL }]
       : []),
 
     // ── Documentos ──
