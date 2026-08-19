@@ -43,6 +43,10 @@ export default function ReportesSimmowPage() {
   const [cargando, setCargando] = useState(true);
   const [notas, setNotas] = useState<Record<string, string>>({});
   const [guardandoId, setGuardandoId] = useState<string | null>(null);
+  // Reportes ya resueltos (confirmado/no_es_error) que el admin reabrió para
+  // corregir el estado — p. ej. si primero marcó "no es error" y luego
+  // resultó que sí lo era, una vez ya identificado y corregido el bug.
+  const [reabiertos, setReabiertos] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!loading && profile && profile.role !== "admin") {
@@ -71,9 +75,15 @@ export default function ReportesSimmowPage() {
     try {
       await actualizarEstadoReporteBugSimmow(id, estado, notas[id] ?? "", profile.nombre);
       setReportes(await listarReportesBugsSimmow());
+      setReabiertos((r) => ({ ...r, [id]: false }));
     } finally {
       setGuardandoId(null);
     }
+  };
+
+  const reabrir = (r: ReporteBugSimmow) => {
+    setNotas((n) => ({ ...n, [r.id]: r.notaAdmin }));
+    setReabiertos((re) => ({ ...re, [r.id]: true }));
   };
 
   return (
@@ -137,7 +147,7 @@ export default function ReportesSimmowPage() {
                 {r.resueltoPor && ` · Resuelto por ${r.resueltoPor}`}
               </p>
 
-              {r.estado === "pendiente" && (
+              {(r.estado === "pendiente" || reabiertos[r.id]) && (
                 <div className="space-y-2">
                   <textarea
                     value={notas[r.id] ?? ""}
@@ -161,11 +171,28 @@ export default function ReportesSimmowPage() {
                     >
                       No es error
                     </button>
+                    {reabiertos[r.id] && (
+                      <button
+                        onClick={() => setReabiertos((re) => ({ ...re, [r.id]: false }))}
+                        disabled={guardandoId === r.id}
+                        className="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-medium disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
               {r.notaAdmin && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 italic">Nota: {r.notaAdmin}</p>
+              )}
+              {r.estado !== "pendiente" && !reabiertos[r.id] && (
+                <button
+                  onClick={() => reabrir(r)}
+                  className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Editar estado
+                </button>
               )}
             </div>
           ))}
