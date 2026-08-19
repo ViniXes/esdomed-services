@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp, limit } from "@/lib/firestoreMeter";
+import { collection, query, orderBy, getDocs, getDoc, doc, updateDoc, Timestamp, limit, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, RefreshCw, AlertTriangle } from "lucide-react";
-import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
+import type { FilaPlanTrabajo, PlanTrabajo, TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
+import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
 
 const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
   "A1_permiso_con_goce": "A.1 - Permisos con goce de sueldo",
@@ -41,6 +42,53 @@ const docsDe = (t: TramitePersonal): { url: string; nombre: string }[] =>
       ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
       : [];
 
+const esPermisoPersonal = (t: TramitePersonal) =>
+  t.categoria === "A1_permiso_con_goce" || t.categoria === "A2_permiso_sin_goce";
+
+type ConflictoPermisoGrupo = {
+  fecha: string;
+  grupo: string;
+  empleadoNombre: string;
+};
+
+const fechaLocal = (valor: unknown): string | null => {
+  const fecha = toDate(valor);
+  if (!fecha || Number.isNaN(fecha.getTime())) return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
+};
+
+const fechasDelPermiso = (tramite: TramitePersonal): string[] => {
+  const inicio = fechaLocal(tramite.fechaInicio);
+  const fin = fechaLocal(tramite.fechaFin) ?? inicio;
+  if (!inicio || !fin || fin < inicio) return [];
+
+  const fechas: string[] = [];
+  const cursor = new Date(`${inicio}T12:00:00`);
+  const ultimo = new Date(`${fin}T12:00:00`);
+  while (cursor <= ultimo) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    fechas.push(`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return fechas;
+};
+
+const periodoDeFecha = (fecha: string) => fecha.slice(0, 7);
+
+const filaDelEmpleado = (plan: PlanTrabajo | undefined, empleadoId: string): FilaPlanTrabajo | undefined =>
+  plan?.filas?.find((fila) => fila.uid === empleadoId);
+
+const grupoOperativo = (plan: PlanTrabajo | undefined, empleadoId: string): string | null => {
+  const fila = filaDelEmpleado(plan, empleadoId);
+  if (!fila || esAdministrativoPlan(fila)) return null;
+  const grupo = fila.grupo?.trim() ?? "";
+  return grupo && grupo.toLowerCase() !== "administrativo" ? grupo : null;
+};
+
+const fechaLegible = (fecha: string) =>
+  new Date(`${fecha}T12:00:00`).toLocaleDateString("es-SV", { day: "2-digit", month: "long", year: "numeric" });
+
 // Caché a nivel módulo: persiste mientras no se recargue la página (no en F5).
 let cacheTramites: TramitePersonal[] | null = null;
 
@@ -58,6 +106,9 @@ export default function AprobacionTramitesPage() {
   const [accionAdmin, setAccionAdmin] = useState<"aprobado" | "rechazado">("aprobado");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [conflictosPermiso, setConflictosPermiso] = useState<ConflictoPermisoGrupo[]>([]);
+  const [advertenciasPermiso, setAdvertenciasPermiso] = useState<ConflictoPermisoGrupo[]>([]);
+  const [revisandoCoincidencias, setRevisandoCoincidencias] = useState(false);
 
   // Lectura puntual bajo demanda (no listener vivo; la bandeja se refresca con el botón).
   const consultar = async () => {
@@ -78,11 +129,92 @@ export default function AprobacionTramitesPage() {
     }
   };
 
+  const buscarCoincidenciasPermiso = async (
+    solicitud: TramitePersonal,
+    estadoAComparar: "pendiente" | "aprobado",
+  ): Promise<ConflictoPermisoGrupo[]> => {
+    if (!esPermisoPersonal(solicitud)) return [];
+
+    const permisosSnap = await getDocs(
+      query(collection(db, "tramites_personal"), where("estado", "==", estadoAComparar)),
+    );
+    const permisos = permisosSnap.docs
+      .map((d) => ({ id: d.id, ...d.data() } as TramitePersonal))
+      .filter((tramite) =>
+        tramite.id !== solicitud.id
+        && tramite.empleadoId !== solicitud.empleadoId
+        && esPermisoPersonal(tramite),
+      );
+    const fechasSolicitadas = fechasDelPermiso(solicitud);
+    const fechasARevisar = new Set(
+      permisos.flatMap((permiso) =>
+        fechasDelPermiso(permiso).filter((fecha) => fechasSolicitadas.includes(fecha)),
+      ),
+    );
+    if (fechasARevisar.size === 0) return [];
+
+    const planes = new Map<string, PlanTrabajo>();
+    await Promise.all(
+      [...new Set([...fechasARevisar].map(periodoDeFecha))].map(async (periodo) => {
+        const planSnap = await getDoc(doc(db, "planes_trabajo", periodo));
+        if (planSnap.exists()) planes.set(periodo, { id: planSnap.id, ...planSnap.data() } as PlanTrabajo);
+      }),
+    );
+
+    const coincidencias = permisos.flatMap((permiso) => {
+      const fechasEnComun = fechasDelPermiso(permiso).filter((fecha) => fechasSolicitadas.includes(fecha));
+      return fechasEnComun.flatMap((fecha) => {
+        const plan = planes.get(periodoDeFecha(fecha));
+        const grupoSolicitante = grupoOperativo(plan, solicitud.empleadoId);
+        const grupoExistente = grupoOperativo(plan, permiso.empleadoId);
+        if (!grupoSolicitante || grupoSolicitante !== grupoExistente) return [];
+        return [{ fecha, grupo: grupoSolicitante, empleadoNombre: permiso.empleadoNombre }];
+      });
+    });
+
+    return coincidencias.filter((coincidencia, indice, lista) =>
+      indice === lista.findIndex((otra) =>
+        otra.fecha === coincidencia.fecha && otra.grupo === coincidencia.grupo && otra.empleadoNombre === coincidencia.empleadoNombre,
+      ),
+    );
+  };
+
+  const abrirResolucion = (tramite: TramitePersonal) => {
+    setTramiteAprobando(tramite);
+    setAccionAdmin("aprobado");
+    setComentarioAdmin("");
+    setConflictosPermiso([]);
+    setAdvertenciasPermiso([]);
+    if (!esPermisoPersonal(tramite)) return;
+
+    setRevisandoCoincidencias(true);
+    buscarCoincidenciasPermiso(tramite, "pendiente")
+      .then(setAdvertenciasPermiso)
+      .catch((err) => console.error("No se pudieron revisar permisos pendientes del grupo", err))
+      .finally(() => setRevisandoCoincidencias(false));
+  };
+
   const handleResolver = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tramiteAprobando?.id || !user || !profile) return;
     setSaving(true);
     try {
+      if (accionAdmin === "aprobado" && esPermisoPersonal(tramiteAprobando)) {
+        // Se consulta al momento de resolver para no depender de la caché de la
+        // bandeja: otro administrador pudo aprobar una solicitud recientemente.
+        const conflictos = await buscarCoincidenciasPermiso(tramiteAprobando, "aprobado");
+
+        if (conflictos.length > 0) {
+          const primero = conflictos[0];
+          setConflictosPermiso(conflictos);
+          setAccionAdmin("rechazado");
+          setComentarioAdmin((actual) => actual.trim() ||
+            `No procede: ya hay un permiso personal aprobado para ${primero.empleadoNombre} del ${primero.grupo} el ${fechaLegible(primero.fecha)}. Por acuerdo del personal operativo, solo puede aprobarse un permiso personal por grupo y día.`,
+          );
+          return;
+        }
+      }
+
       const id = tramiteAprobando.id;
       await updateDoc(doc(db, "tramites_personal", id), {
         estado: accionAdmin,
@@ -102,6 +234,8 @@ export default function AprobacionTramitesPage() {
       if (cacheTramites) cacheTramites = cacheTramites.map(parche);
       setTramiteAprobando(null);
       setComentarioAdmin("");
+      setConflictosPermiso([]);
+      setAdvertenciasPermiso([]);
     } catch (err) {
       console.error(err);
       setErrorMsg("No se pudo guardar la resolución. Por favor intenta de nuevo.");
@@ -254,7 +388,7 @@ export default function AprobacionTramitesPage() {
                         ))}
                         {t.estado === "pendiente" && (
                           <button
-                            onClick={() => setTramiteAprobando(t)}
+                            onClick={() => abrirResolucion(t)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
                           >
                             Resolver
@@ -317,6 +451,33 @@ export default function AprobacionTramitesPage() {
                 )}
               </div>
 
+              {revisandoCoincidencias && esPermisoPersonal(tramiteAprobando) && (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
+                  <RefreshCw size={15} className="animate-spin" /> Revisando otras solicitudes pendientes del mismo grupo…
+                </div>
+              )}
+
+              {advertenciasPermiso.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div>
+                      <p className="font-bold">Hay otra solicitud pendiente para el mismo grupo y fecha</p>
+                      <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                        Es solo una advertencia: puedes decidir cuál solicitud priorizar según la necesidad. Al aprobar una, la otra ya no podrá aprobarse para esa misma fecha.
+                      </p>
+                      <ul className="mt-2 space-y-1 text-xs font-medium">
+                        {advertenciasPermiso.map((advertencia) => (
+                          <li key={`${advertencia.fecha}-${advertencia.grupo}-${advertencia.empleadoNombre}`}>
+                            {fechaLegible(advertencia.fecha)} · {advertencia.grupo} · {advertencia.empleadoNombre}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                   Resolución
@@ -335,6 +496,27 @@ export default function AprobacionTramitesPage() {
                 </div>
               </div>
 
+              {conflictosPermiso.length > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-100">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                    <div>
+                      <p className="font-bold">No se puede aprobar este permiso personal</p>
+                      <p className="mt-1 text-xs leading-5 text-rose-800 dark:text-rose-200">
+                        Ya existe un permiso personal aprobado para el mismo grupo operativo en la fecha solicitada. Esta regla no aplica al personal administrativo.
+                      </p>
+                      <ul className="mt-2 space-y-1 text-xs font-medium">
+                        {conflictosPermiso.map((conflicto) => (
+                          <li key={`${conflicto.fecha}-${conflicto.grupo}-${conflicto.empleadoNombre}`}>
+                            {fechaLegible(conflicto.fecha)} · {conflicto.grupo} · {conflicto.empleadoNombre}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                   Comentario / Respuesta <span className="text-slate-400 font-normal normal-case">(opcional)</span>
@@ -351,7 +533,11 @@ export default function AprobacionTramitesPage() {
               <div className="pt-2 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setTramiteAprobando(null)}
+                  onClick={() => {
+                    setTramiteAprobando(null);
+                    setConflictosPermiso([]);
+                    setAdvertenciasPermiso([]);
+                  }}
                   disabled={saving}
                   className="px-5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
                 >
