@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, ShieldAlert, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, ShieldAlert, Megaphone, X } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -57,6 +57,11 @@ const CONFIG: Record<
     icon: ShieldAlert,
     borderColor: "border-l-amber-500",
     iconColor: "text-amber-400",
+  },
+  solicitud_lesion: {
+    icon: Megaphone,
+    borderColor: "border-l-orange-500",
+    iconColor: "text-orange-400",
   },
 };
 

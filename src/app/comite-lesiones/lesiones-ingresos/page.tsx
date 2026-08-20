@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  collection, query, where, orderBy, limit, getDocs, setDoc, doc, serverTimestamp, Timestamp,
+  collection, query, where, orderBy, limit, getDocs, setDoc, addDoc, doc, serverTimestamp, Timestamp,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,15 +10,17 @@ import { DateField } from "@/components/ui/DateField";
 import { calcularEdad, toDate, ESTADO_LABEL as ESTADO_PACIENTE_LABEL, ESTADO_BADGE } from "@/lib/pacientes/helpers";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP, analizarIngreso, esMenorDeEdad,
-  GRUPOS_LESION, GRUPO_LESION_LABEL, type AnalisisIngreso, type GrupoLesion,
+  GRUPOS_LESION, GRUPO_LESION_LABEL, SOLICITUD_NOTA_MAX,
+  type AnalisisIngreso, type GrupoLesion,
 } from "@/lib/conapinaFgr";
 import {
   ShieldAlert, Car, HeartCrack, Search, X, Download, AlertTriangle, CheckCircle2,
   Activity, ChevronLeft, ChevronRight, Info, Loader2, CircleSlash, ClipboardCheck,
-  RefreshCw,
+  RefreshCw, Megaphone, Send, AlertCircle,
 } from "lucide-react";
 import type {
   Paciente, TipoCasoConapinaFgr, NotificacionConapinaFgr, RevisionLesion, ResultadoRevisionLesion,
+  SolicitudNotificacionLesion,
 } from "@/types";
 
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
@@ -81,6 +83,9 @@ interface Fila {
   analisis: AnalisisIngreso;
   tieneAviso: boolean;
   revision: RevisionLesion | null;
+  // Ya hay una solicitud de notificación PENDIENTE para este ingreso: los
+  // médicos ya lo ven en su bandeja, no hay que volver a pedirlo.
+  solicitada: boolean;
 }
 
 const primerDiaDelMes = () => {
@@ -121,6 +126,12 @@ export default function LesionesIngresosPage() {
   const [observacion, setObservacion] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [errGuardar, setErrGuardar] = useState<string | null>(null);
+
+  // Modal de solicitud de notificación al área médica
+  const [solicitando, setSolicitando] = useState<Fila | null>(null);
+  const [notaSolicitud, setNotaSolicitud] = useState("");
+  const [guardandoSolicitud, setGuardandoSolicitud] = useState(false);
+  const [errSolicitud, setErrSolicitud] = useState<string | null>(null);
 
   const buscar = async (forzar = false) => {
     if (!fechaDesde || !fechaHasta) {
@@ -170,7 +181,7 @@ export default function LesionesIngresosPage() {
         if (fechaHasta > base.hasta) huecos.push(rango(Timestamp.fromDate(finDia(base.hasta)), ">", hasta, "<="));
       }
 
-      const [snapsPacientes, snapAvisos, snapRevisiones] = await Promise.all([
+      const [snapsPacientes, snapAvisos, snapRevisiones, snapSolicitudes] = await Promise.all([
         Promise.all(huecos.map(q => getDocs(q))),
         // Los avisos del periodo, sin techo superior: el aviso del médico
         // siempre es posterior al ingreso.
@@ -186,6 +197,12 @@ export default function LesionesIngresosPage() {
           where("fechaIngreso", "<=", hasta),
           orderBy("fechaIngreso", "desc"),
           limit(MAX_INGRESOS),
+        )),
+        // Solicitudes pendientes de notificación (son pocas y sin acotar por
+        // fecha a propósito: una vieja sin resolver debe seguirse viendo).
+        getDocs(query(
+          collection(db, "solicitudes_notificacion_lesion"),
+          where("estado", "==", "pendiente"),
         )),
       ]);
 
@@ -251,10 +268,21 @@ export default function LesionesIngresosPage() {
         snapRevisiones.docs.map(d => [d.id, { id: d.id, ...d.data() } as RevisionLesion]),
       );
 
+      // Mismo criterio que los avisos: por INGRESO cuando la solicitud lo trae,
+      // por expediente si quedara alguna sin pacienteId.
+      const solicitudesPend = snapSolicitudes.docs.map(d => d.data() as SolicitudNotificacionLesion);
+      const solicitadaPorIngreso = new Set(solicitudesPend.map(s => s.pacienteId).filter(Boolean));
+      const solicitadaPorExpediente = new Set(
+        solicitudesPend.filter(s => !s.pacienteId).map(s => (s.expediente ?? "").trim().toLowerCase()),
+      );
+      const estaSolicitada = (p: Paciente) =>
+        solicitadaPorIngreso.has(p.id) || solicitadaPorExpediente.has((p.expediente ?? "").trim().toLowerCase());
+
       setFilas(visibles.map(c => ({
         ...c,
         tieneAviso: tieneAviso(c.paciente),
         revision: revisiones.get(c.paciente.id ?? "") ?? null,
+        solicitada: estaSolicitada(c.paciente),
       })));
       setAlcance({
         leidos: exacto ? actualizada.leidos : null,
@@ -344,6 +372,48 @@ export default function LesionesIngresosPage() {
       setErrGuardar(e instanceof Error ? e.message : "No se pudo guardar la revisión.");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const abrirSolicitud = (f: Fila) => {
+    setSolicitando(f);
+    setNotaSolicitud("");
+    setErrSolicitud(null);
+  };
+
+  // Difunde el caso a la bandeja CONAPINA/FGR de todos los médicos. La
+  // categoría sugerida sale de la revisión (o del código, si aún no se revisó).
+  const enviarSolicitud = async () => {
+    if (!solicitando || !profile) return;
+    const nota = notaSolicitud.trim();
+    if (nota.length > SOLICITUD_NOTA_MAX) {
+      setErrSolicitud(`La nota no puede pasar de ${SOLICITUD_NOTA_MAX} caracteres.`);
+      return;
+    }
+    setGuardandoSolicitud(true);
+    setErrSolicitud(null);
+    const p = solicitando.paciente;
+    try {
+      await addDoc(collection(db, "solicitudes_notificacion_lesion"), {
+        pacienteId: p.id ?? null,
+        expediente: p.expediente ?? "",
+        pacienteNombre: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
+        servicio: p.servicioActual || p.servicioIngreso || "",
+        origen: "tamizaje",
+        categoriaSugerida: solicitando.revision?.categoria ?? solicitando.analisis.sugerida ?? null,
+        nota: nota || null,
+        estado: "pendiente",
+        creadoPor: profile.uid,
+        creadoPorNombre: profile.nombre,
+        // Las reglas exigen creadoEn == request.time: la solicitud no se antedata.
+        creadoEn: serverTimestamp(),
+      });
+      setFilas(prev => prev?.map(f => (f.paciente.id === p.id ? { ...f, solicitada: true } : f)) ?? prev);
+      setSolicitando(null);
+    } catch (e) {
+      setErrSolicitud(e instanceof Error ? e.message : "No se pudo enviar la solicitud.");
+    } finally {
+      setGuardandoSolicitud(false);
     }
   };
 
@@ -601,8 +671,28 @@ export default function LesionesIngresosPage() {
                             <CheckCircle2 size={12} /> Notificado
                           </span>
                         ) : faltaAviso ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400">
-                            <AlertTriangle size={11} /> Falta el aviso
+                          <span className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                              <AlertTriangle size={11} /> Falta el aviso
+                            </span>
+                            {f.solicitada ? (
+                              <span title="Ya está en la bandeja de los médicos"
+                                className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:border-orange-900 dark:bg-orange-950/50 dark:text-orange-400">
+                                <Megaphone size={11} /> Solicitada
+                              </span>
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); abrirSolicitud(f); }}
+                                title="Pedir al área médica que lo notifique"
+                                className="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2 py-0.5 text-[11px] font-bold text-white transition-colors hover:bg-orange-500">
+                                <Megaphone size={11} /> Solicitar
+                              </button>
+                            )}
+                          </span>
+                        ) : f.solicitada ? (
+                          <span title="Ya está en la bandeja de los médicos"
+                            className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:border-orange-900 dark:bg-orange-950/50 dark:text-orange-400">
+                            <Megaphone size={11} /> Solicitada
                           </span>
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
@@ -764,6 +854,70 @@ export default function LesionesIngresosPage() {
               <button onClick={guardarRevision} disabled={guardando || !puedeGuardar}
                 className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-50">
                 <ClipboardCheck size={14} /> {guardando ? "Guardando..." : "Guardar revisión"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: solicitar la notificación al área médica */}
+      {solicitando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 p-5 dark:border-slate-800">
+              <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 font-heading">
+                <Megaphone size={16} className="text-orange-500" /> Solicitar notificación
+              </h2>
+              <button onClick={() => setSolicitando(null)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"><X size={16} /></button>
+            </div>
+            <div className="space-y-4 p-5 text-sm">
+              <div className="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900/60 dark:bg-orange-950/20">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                  {solicitando.paciente.apellidos}, {solicitando.paciente.nombres}
+                </p>
+                <p className="mt-0.5 font-mono text-xs text-slate-500">Exp. {solicitando.paciente.expediente}</p>
+                {(solicitando.revision?.categoria ?? solicitando.analisis.sugerida) && (
+                  <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                    Se sugerirá al médico:
+                    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[(solicitando.revision?.categoria ?? solicitando.analisis.sugerida)!]}`}>
+                      {TIPO_CASO_LABEL[(solicitando.revision?.categoria ?? solicitando.analisis.sugerida)!]}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <p className="text-xs leading-5 text-slate-500">
+                El caso aparecerá en la bandeja CONAPINA/FGR de <strong>todos los médicos</strong> con globo de aviso.
+                Se marcará solo cuando alguno envíe la notificación de este expediente.
+              </p>
+              <div>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <label className="text-xs font-medium text-slate-500">
+                    Nota para el área médica <span className="font-normal text-slate-400">(opcional)</span>
+                  </label>
+                  <span className={`text-[11px] tabular-nums ${notaSolicitud.trim().length > SOLICITUD_NOTA_MAX ? "font-semibold text-red-600 dark:text-red-400" : "text-slate-400"}`}>
+                    {notaSolicitud.trim().length}/{SOLICITUD_NOTA_MAX}
+                  </span>
+                </div>
+                <textarea value={notaSolicitud} onChange={e => setNotaSolicitud(e.target.value)} rows={3}
+                  maxLength={SOLICITUD_NOTA_MAX + 100}
+                  className={`${inputCls} resize-none`}
+                  placeholder="Contexto del caso: qué se detectó en la revisión..." />
+              </div>
+              {errSolicitud && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  <span className="text-xs">{errSolicitud}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+              <button onClick={() => setSolicitando(null)} disabled={guardandoSolicitud}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                Cancelar
+              </button>
+              <button onClick={enviarSolicitud} disabled={guardandoSolicitud || notaSolicitud.trim().length > SOLICITUD_NOTA_MAX}
+                className="flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-500 disabled:opacity-50">
+                <Send size={14} /> {guardandoSolicitud ? "Enviando..." : "Enviar a los médicos"}
               </button>
             </div>
           </div>

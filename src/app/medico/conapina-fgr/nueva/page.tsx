@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { collection, query, where, onSnapshot, addDoc, doc, getDoc, Timestamp, serverTimestamp } from "@/lib/firestoreMeter";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { collection, query, where, onSnapshot, addDoc, doc, getDoc, getDocs, updateDoc, Timestamp, serverTimestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
@@ -66,9 +66,13 @@ const formatDia = (ts: unknown) => {
   return d.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-export default function NuevaNotificacionConapinaFgrPage() {
+function NuevaNotificacionConapinaFgr() {
   const { user, profile } = useAuth();
   const router = useRouter();
+  // La bandeja de solicitudes del comité llega con ?exp=…: el buscador del
+  // paso 1 arranca con ese expediente ya escrito.
+  const searchParams = useSearchParams();
+  const expPrefill = searchParams.get("exp") ?? "";
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -165,7 +169,7 @@ export default function NuevaNotificacionConapinaFgrPage() {
         }
       }
 
-      await addDoc(collection(db, "notificaciones_conapina_fgr"), {
+      const ref = await addDoc(collection(db, "notificaciones_conapina_fgr"), {
         medicoId: user.uid,
         medicoNombre: profile.nombre,
         medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
@@ -195,6 +199,28 @@ export default function NuevaNotificacionConapinaFgrPage() {
         creadoEn: serverTimestamp(),
         actualizadoEn: serverTimestamp(),
       });
+
+      // Cierra las solicitudes de difusión del comité para este EXPEDIENTE (si
+      // las hay): por expediente y no por el link de la bandeja, para que se
+      // marquen también cuando el médico entra directo por "Nueva notificación".
+      // En try/catch propio: la notificación ya se envió y este cierre no puede
+      // hacerla fallar; si algo sale mal, el comité igual verá el caso cruzado
+      // con el aviso en su informe.
+      try {
+        const pend = await getDocs(query(
+          collection(db, "solicitudes_notificacion_lesion"),
+          where("estado", "==", "pendiente"),
+          where("expediente", "==", paciente.expediente),
+        ));
+        await Promise.all(pend.docs.map(d => updateDoc(doc(db, "solicitudes_notificacion_lesion", d.id), {
+          estado: "notificado",
+          notificacionId: ref.id,
+          notificadoPor: user.uid,
+          notificadoPorNombre: profile.nombre,
+          notificadoEn: serverTimestamp(),
+        })));
+      } catch { /* la solicitud queda pendiente; no es crítico */ }
+
       setModal({ type: "success", message: `${paciente.apellidos}, ${paciente.nombres} · Exp. ${paciente.expediente}` });
     } catch (err) {
       setModal({ type: "error", message: err instanceof Error ? err.message : "No se pudo enviar la notificación." });
@@ -262,7 +288,7 @@ export default function NuevaNotificacionConapinaFgrPage() {
             </div>
 
             {!paciente ? (
-              <BuscadorIngresoPorExpediente value={paciente} onSelect={setPaciente} />
+              <BuscadorIngresoPorExpediente value={paciente} onSelect={setPaciente} initialTexto={expPrefill} />
             ) : (
               <div className="space-y-3">
                 <div className="relative overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/80 to-white p-4 dark:border-cyan-800 dark:from-cyan-950/40 dark:via-blue-950/20 dark:to-slate-900">
@@ -741,5 +767,14 @@ function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {
       <span className="w-28 shrink-0 pt-px text-xs font-medium text-slate-500">{label}</span>
       <span className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">{valor}</span>
     </div>
+  );
+}
+
+// useSearchParams exige un límite de Suspense al prerenderizar la página.
+export default function NuevaNotificacionConapinaFgrPage() {
+  return (
+    <Suspense fallback={null}>
+      <NuevaNotificacionConapinaFgr />
+    </Suspense>
   );
 }

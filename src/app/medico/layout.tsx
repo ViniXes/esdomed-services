@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
+import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
+import { ToastContainer } from "@/components/ui/ToastContainer";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { SoporteGlobo } from "@/components/SoporteGlobo";
 
@@ -32,8 +34,9 @@ const baseNavItems: NavItem[] = [
   { href: "/medico/anexo5/nueva",    label: "Anexo 5",         icon: ClipboardList, tone: "emerald" },
 ];
 
-export default function MedicoLayout({ children }: { children: React.ReactNode }) {
+function MedicoContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
+  const { pendientes } = useNotificaciones();
   const router = useRouter();
 
   useEffect(() => {
@@ -43,15 +46,18 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
   const esAdmin = profile?.role === "admin";
   const tipoMedicoNavegacion = esAdmin ? "uci_ucin" : profile?.tipoMedico;
   const esJefeUciUcin = profile?.tipoMedico === "jefe_uci_ucin";
-  const navItems: NavItem[] = tipoMedicoNavegacion
+  const navItems: NavItem[] = (tipoMedicoNavegacion
     ? [
         baseNavItems[0],
-        { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, exact: true, tone: "rose" },
-        { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2, tone: "teal" },
+        { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, exact: true, tone: "rose" as const },
+        { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2, tone: "teal" as const },
         ...((esAdmin || esJefeUciUcin) ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, tone: "blue" as const }] : []),
         ...(esAdmin ? [] : baseNavItems.slice(1)),
       ]
-    : baseNavItems;
+    : baseNavItems
+  // El globo del ítem CONAPINA/FGR son las solicitudes de notificación que el
+  // comité difunde a todos los médicos y siguen pendientes.
+  ).map(i => (i.href === "/medico/conapina-fgr" ? { ...i, badge: pendientes.solicitudesLesion } : i));
   const roleLabel = tipoMedicoNavegacion
     ? TIPO_MEDICO_CRITICO_LABEL[tipoMedicoNavegacion]
     : "Portal Médico";
@@ -71,6 +77,15 @@ export default function MedicoLayout({ children }: { children: React.ReactNode }
           </>
         )}
       </main>
+      <ToastContainer />
     </div>
+  );
+}
+
+export default function MedicoLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <NotificacionesProvider>
+      <MedicoContent>{children}</MedicoContent>
+    </NotificacionesProvider>
   );
 }

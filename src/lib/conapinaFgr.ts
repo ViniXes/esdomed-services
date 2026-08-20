@@ -1,6 +1,7 @@
 import type {
   EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, InstanciaAviso,
   CondicionPacienteAviso, NotificacionConapinaFgr, DiagnosticoCIE,
+  EstadoSolicitudNotificacion, OrigenSolicitudNotificacion,
 } from "@/types";
 
 // Catálogo y reglas de validación del módulo Lesiones intencionales
@@ -49,6 +50,33 @@ export const ESTADO_CHIP: Record<EstadoNotificacionConapinaFgr, string> = {
   anulado:
     "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700",
 };
+
+// ── Solicitudes de notificación al área médica ──────────────────────────────
+// El estado se lee desde la bandeja del médico: una "pendiente" es un caso que
+// nadie ha notificado todavía; una "notificada" ya se cerró con el aviso.
+export const SOLICITUD_ESTADO_LABEL: Record<EstadoSolicitudNotificacion, string> = {
+  pendiente: "Pendiente",
+  notificado: "Notificada",
+  cancelado: "Cancelada",
+};
+
+// Mismos tonos que ESTADO_CHIP (ámbar/verde/gris): significan lo mismo
+// —por hacer / hecho / sin efecto— y así conviven en las mismas pantallas.
+export const SOLICITUD_ESTADO_CHIP: Record<EstadoSolicitudNotificacion, string> = {
+  pendiente:
+    "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900",
+  notificado:
+    "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900",
+  cancelado:
+    "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700",
+};
+
+export const SOLICITUD_ORIGEN_LABEL: Record<OrigenSolicitudNotificacion, string> = {
+  tamizaje: "Informe de lesiones",
+  manual: "Búsqueda directa",
+};
+
+export const SOLICITUD_NOTA_MAX = 500;
 
 export const INSTANCIA_LABEL: Record<InstanciaAviso, string> = {
   conapina: "CONAPINA",

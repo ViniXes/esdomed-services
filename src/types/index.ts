@@ -352,6 +352,53 @@ export interface RevisionLesion {
   revisadoEn: Date;
 }
 
+// ============================================================================
+// Solicitud de notificación al área médica
+// ============================================================================
+// El comité detecta un caso SIN aviso (en el tamizaje de ingresos por lesión,
+// o buscando un expediente activo concreto aunque su diagnóstico no sea de
+// lesión) y lo difunde a TODOS los médicos: aparece en la bandeja del área
+// CONAPINA/FGR del portal médico para que el tratante lo reconozca y lo
+// notifique. Colección: solicitudes_notificacion_lesion.
+//
+// Se cierra sola: al enviarse una notificación CONAPINA/FGR del mismo
+// expediente, las solicitudes pendientes de ese expediente pasan a
+// "notificado" con el enlace a la notificación — venga el médico desde la
+// bandeja o directo por "Nueva notificación".
+
+export type EstadoSolicitudNotificacion = "pendiente" | "notificado" | "cancelado";
+// De dónde salió el caso: del informe de ingresos por lesión o de una
+// búsqueda directa de expediente (el diagnóstico puede no ser de lesión).
+export type OrigenSolicitudNotificacion = "tamizaje" | "manual";
+
+export interface SolicitudNotificacionLesion {
+  id?: string;
+  pacienteId?: string | null;     // docId del ingreso en /pacientes
+  expediente: string;             // la llave del cierre automático
+  pacienteNombre: string;
+  servicio?: string;              // ubicación al solicitar (snapshot)
+  origen: OrigenSolicitudNotificacion;
+  categoriaSugerida?: TipoCasoConapinaFgr | null;
+  nota?: string | null;           // por qué lo pide el comité
+
+  estado: EstadoSolicitudNotificacion;
+  creadoPor: string;
+  creadoPorNombre: string;
+  creadoEn: Date;
+
+  // Cierre: la escribió el médico que envió la notificación.
+  notificacionId?: string;        // doc en notificaciones_conapina_fgr
+  notificadoPor?: string;
+  notificadoPorNombre?: string;
+  notificadoEn?: Date;
+
+  // Cancelación por el propio comité (solo mientras esté pendiente).
+  canceladoPor?: string;
+  canceladoPorNombre?: string;
+  canceladoEn?: Date;
+  motivoCancelacion?: string | null;
+}
+
 export type EstadoFallecido = "pendiente" | "confirmado";
 
 export interface NotificacionFallecido {

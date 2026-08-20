@@ -326,6 +326,55 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Solicitudes de notificación al área médica ────────────────────────────
+    // El comité detecta un caso sin aviso (en el tamizaje o buscando un
+    // expediente concreto) y lo difunde a TODOS los médicos para que el
+    // tratante lo notifique. A diferencia del resto del módulo, los médicos
+    // leen la colección completa: es una difusión, no un dato por dueño.
+    match /solicitudes_notificacion_lesion/{id} {
+      allow read:   if isAuth() && (isComiteLesiones() || isAdmin() || isMedico());
+
+      // Nace pendiente, a nombre de quien la crea y con la hora del servidor;
+      // los campos del cierre y de la cancelación no pueden venir del formulario.
+      allow create: if isComiteLesiones()
+                    && request.resource.data.creadoPor == uid()
+                    && request.resource.data.estado == 'pendiente'
+                    && request.resource.data.creadoEn == request.time
+                    && request.resource.data.expediente is string
+                    && request.resource.data.expediente.size() > 0
+                    && request.resource.data.origen in ['tamizaje', 'manual']
+                    && !request.resource.data.keys().hasAny([
+                         'notificacionId', 'notificadoPor', 'notificadoPorNombre', 'notificadoEn',
+                         'canceladoPor', 'canceladoPorNombre', 'canceladoEn', 'motivoCancelacion']);
+
+      // El médico solo puede CERRARLA: pendiente → notificado, con su uid, la
+      // hora del servidor y el enlace a la notificación que acaba de enviar.
+      // El contenido (paciente, nota del comité) queda sellado.
+      allow update: if isMedico()
+                    && resource.data.estado == 'pendiente'
+                    && request.resource.data.estado == 'notificado'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'estado', 'notificacionId', 'notificadoPor',
+                         'notificadoPorNombre', 'notificadoEn'])
+                    && request.resource.data.notificadoPor == uid()
+                    && request.resource.data.notificadoEn == request.time
+                    && request.resource.data.notificacionId is string;
+
+      // El comité puede cancelar una pendiente (p. ej. se pidió por error).
+      // Una notificada es inmutable: ya quedó ligada a un aviso real.
+      allow update: if isComiteLesiones()
+                    && resource.data.estado == 'pendiente'
+                    && request.resource.data.estado == 'cancelado'
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'estado', 'canceladoPor', 'canceladoPorNombre',
+                         'canceladoEn', 'motivoCancelacion'])
+                    && request.resource.data.canceladoPor == uid()
+                    && request.resource.data.canceladoEn == request.time;
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Notificaciones de fallecidos ─────────────────────────────────────────
     // Delete: ESDOMED puede eliminar notificaciones duplicadas, pero NO las de
     // trámite cerrado (esas solo el admin, previa revisión).
