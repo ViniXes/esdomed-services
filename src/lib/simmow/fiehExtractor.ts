@@ -444,6 +444,23 @@ function juntarPalabras(items: { str: string; x: number; w: number }[]): string 
  * a:" en ambas líneas de cada fila.
  */
 function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimiento | null {
+  interface Fila {
+    fecha: string;
+    hora: string;
+    colA: string;
+    serial: number;
+    indice: number;
+  }
+  // Cuando el paciente tuvo muchos traslados, la tabla se parte entre dos
+  // (o más) páginas del PDF, repitiendo el encabezado "Fecha Hora Traslado
+  // de: Traslado a:..." en cada página de continuación. Antes se procesaba
+  // solo la PRIMERA página con una tabla válida y se devolvía de inmediato
+  // — así que, sin importar cuántos traslados tuviera el paciente después,
+  // siempre quedaba el primero (el único visible en esa página), nunca el
+  // más reciente. Ahora se juntan las filas de TODAS las páginas antes de
+  // decidir cuál es la más reciente.
+  const todasLasFilas: Fila[] = [];
+
   for (const pagina of doc.paginas) {
     // Puede haber un tercer "traslado" suelto en la nota final de la sección
     // ("...encargada del traslado de paciente"): se descarta agrupando por Y
@@ -479,7 +496,17 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
     const limFechaHora = medio(colFecha.x, colHora.x);
     const limHoraDe = medio(colHora.x, colDe.x);
     const limDeA = medio(colDe.x, colA.x);
-    const limANombre = colMedico ? medio(colA.x, colMedico.x) : colA.x + 200;
+    // El límite hacia "Nombre" NO puede ser el punto medio: el nombre del
+    // médico siempre empieza pegado a su propio encabezado (a ~4pt a la
+    // izquierda de "Nombre"), pero un valor largo en "Traslado a:" (p. ej.
+    // "Medicina Interna Hombres 1") puede terminar pasado ese punto medio —
+    // se perdía su última palabra ("1"), dejaba de coincidir con ningún
+    // servicio conocido y el traslado se descartaba a favor de uno anterior
+    // (comprobado en vivo: "Medicina Interna Hombres 1" recortada a "...
+    // Hombres" caía de vuelta a "Servicio de Hematologia" del traslado
+    // previo). Se deja el límite bien pegado al nombre del médico en vez de
+    // partir la distancia.
+    const limANombre = colMedico ? colMedico.x - 10 : colA.x + 200;
 
     const notaFinal = pagina.items.find(
       (it) => /^El$/i.test(it.str.trim()) && it.y < yEncabezado
@@ -499,15 +526,6 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
     }
     lineas.sort((a, b) => b[0].y - a[0].y);
 
-    interface Fila {
-      fecha: string;
-      hora: string;
-      colA: string;
-      serial: number;
-      indice: number;
-    }
-    const filas: Fila[] = [];
-
     for (const linea of lineas) {
       const enFecha = linea.filter((it) => it.x < limFechaHora);
       const enColA = linea.filter((it) => it.x >= limDeA && it.x < limANombre);
@@ -516,39 +534,42 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
         const enHora = linea.filter((it) => it.x >= limFechaHora && it.x < limHoraDe);
         const fecha = juntarPalabras(enFecha);
         const hora = juntarPalabras(enHora);
-        filas.push({
+        todasLasFilas.push({
           fecha,
           hora,
           colA: juntarPalabras(enColA),
           serial: serialFechaHora(fecha, hora),
-          indice: filas.length,
+          indice: todasLasFilas.length,
         });
-      } else if (filas.length && enColA.length) {
-        filas[filas.length - 1].colA += " " + juntarPalabras(enColA);
+      } else if (todasLasFilas.length && enColA.length) {
+        // Continuación de una fila envuelta — puede caer en la misma página
+        // o, si la tabla se partió justo ahí, al inicio de la siguiente
+        // (por eso se sigue acumulando sobre el mismo arreglo entre páginas
+        // en vez de reiniciarlo).
+        todasLasFilas[todasLasFilas.length - 1].colA += " " + juntarPalabras(enColA);
       }
     }
+  }
 
-    if (!filas.length) return null;
+  if (!todasLasFilas.length) return null;
 
-    const orden = [...filas].sort((a, b) =>
-      b.serial !== a.serial ? b.serial - a.serial : b.indice - a.indice
-    );
+  const orden = [...todasLasFilas].sort((a, b) =>
+    b.serial !== a.serial ? b.serial - a.serial : b.indice - a.indice
+  );
 
-    for (const fila of orden) {
-      const destino = limpiarServicioFieh(fila.colA);
-      const servicios = buscarServiciosConocidosEnTexto(destino);
-      if (servicios.length) {
-        const s = servicios[servicios.length - 1];
-        return {
-          origen: s.origen,
-          valor: s.valor,
-          fuente: "RUTA_MOVIMIENTO",
-          fecha: fila.fecha,
-          hora: fila.hora,
-        };
-      }
+  for (const fila of orden) {
+    const destino = limpiarServicioFieh(fila.colA);
+    const servicios = buscarServiciosConocidosEnTexto(destino);
+    if (servicios.length) {
+      const s = servicios[servicios.length - 1];
+      return {
+        origen: s.origen,
+        valor: s.valor,
+        fuente: "RUTA_MOVIMIENTO",
+        fecha: fila.fecha,
+        hora: fila.hora,
+      };
     }
-    return null;
   }
   return null;
 }
@@ -908,7 +929,12 @@ function extraerComplementarios(texto: string): {
     const patron = new RegExp(
       "(?:^|\\s)" +
         letra +
-        "\\s*\\)\\s*([\\s\\S]*?)(?=\\s*(?:" +
+        // El texto de un diagnóstico suele terminar en palabras como
+        // "primaria)" — sin el (?<![A-Za-z]) de abajo, el marcador del
+        // SIGUIENTE segmento ("a)") matchea ahí mismo (la "a" final de
+        // "primaria" + el paréntesis de cierre de la palabra), cortando el
+        // texto antes de llegar al código CIE-10 real y dejándolo vacío.
+        "\\s*\\)\\s*([\\s\\S]*?)(?=\\s*(?:(?<![A-Za-z])" +
         siguienteRegex +
         "|Diagnostico\\s+de\\s+causa\\s+externa|Discapacidad\\s+principal|Procedimientos|Fecha\\s+de\\s+egreso|Condicion|$))",
       "i"
@@ -926,10 +952,19 @@ function extraerComplementarios(texto: string): {
     };
   };
 
-  // Orden visual del FIEH: c) = Complementario 1, b) = 2, a) = 3.
-  res.c = extraerSegmento("c", "b\\s*\\)");
-  res.b = extraerSegmento("b", "a\\s*\\)");
-  res.a = extraerSegmento("a", "II\\s*\\)");
+  // El FIEH imprime este bloque en orden visual INVERSO al alfabético:
+  // c) aparece primero (arriba), luego b), y a) al final (abajo) — se ubica
+  // cada uno por su letra literal, no por posición. SIMMOW en cambio numera
+  // los complementarios 1, 2, 3 en orden alfabético normal (a→1, b→2, c→3),
+  // así que lo que el FIEH marca "a)" debe terminar en el complementario 1
+  // de SIMMOW (res.c, que alimenta ese campo — ver DIAG_C_* en extraerFieh),
+  // lo de "c)" en el 3 (res.a), y "b)" se queda en medio en ambos órdenes.
+  const dxC = extraerSegmento("c", "b\\s*\\)");
+  const dxB = extraerSegmento("b", "a\\s*\\)");
+  const dxA = extraerSegmento("a", "II\\s*\\)");
+  res.c = dxA;
+  res.b = dxB;
+  res.a = dxC;
 
   const patronII = new RegExp(
     "(?:^|\\s)II\\s*\\)\\s*([\\s\\S]*?)(?=\\s*(?:II\\s*\\)|Diagnostico\\s+de\\s+causa\\s+externa|Discapacidad\\s+principal|Procedimientos|Fecha\\s+de\\s+egreso|Condicion|$))",
@@ -996,19 +1031,47 @@ function extraerCausaExternaYCirugias(texto: string): {
     );
 
   // Causa externa
-  const mCausaExterna = plano.match(
+  //
+  // La etiqueta "Diagnóstico de causa externa:" envuelve a una segunda
+  // línea en la plantilla del FIEH ("Diagnóstico de causa" / "externa:"),
+  // con la etiqueta de su propio código ("Código CIE-10:") intercalada en
+  // la primera línea — mismo patrón ya visto y corregido en "Servicio en
+  // la que ingresa". Confirmado contra 15 FIEH reales: en los 15 la
+  // etiqueta se corta exactamente en el mismo punto, aunque ninguno traía
+  // un valor real de causa externa para confirmar el orden texto/código
+  // con un caso lleno — se asume el mismo orden de lectura de arriba hacia
+  // abajo que el resto de la plantilla (código en la primera línea,
+  // "externa:" y el texto en la segunda), y si no matchea así se intenta
+  // el orden "normal" (texto antes que código, como Diagnóstico Principal)
+  // por si acaso.
+  const mCausaExternaEnvuelta = plano.match(
     new RegExp(
-      "Diagnostico\\s+de\\s+causa\\s+externa\\s*:?\\s*([\\s\\S]*?)\\s*" +
+      "Diagnostico\\s+de\\s+causa\\s+" +
         patronCodigoCIE10 +
         "\\s*" +
         cie +
-        "\\s*(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
+        "\\s*externa\\s*:?\\s*([\\s\\S]*?)(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
       "i"
     )
   );
-  if (mCausaExterna) {
-    res.causaExterna.texto = limpiarTextoLocal(mCausaExterna[1]);
-    res.causaExterna.codigo = normalizarCodigoCIE(mCausaExterna[2]);
+  if (mCausaExternaEnvuelta) {
+    res.causaExterna.codigo = normalizarCodigoCIE(mCausaExternaEnvuelta[1]);
+    res.causaExterna.texto = limpiarTextoLocal(mCausaExternaEnvuelta[2]);
+  } else {
+    const mCausaExterna = plano.match(
+      new RegExp(
+        "Diagnostico\\s+de\\s+causa\\s+externa\\s*:?\\s*([\\s\\S]*?)\\s*" +
+          patronCodigoCIE10 +
+          "\\s*" +
+          cie +
+          "\\s*(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
+        "i"
+      )
+    );
+    if (mCausaExterna) {
+      res.causaExterna.texto = limpiarTextoLocal(mCausaExterna[1]);
+      res.causaExterna.codigo = normalizarCodigoCIE(mCausaExterna[2]);
+    }
   }
 
   // Discapacidad principal
