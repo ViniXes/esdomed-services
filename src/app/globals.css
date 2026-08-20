@@ -67,12 +67,12 @@
    SEMÁNTICAS quedan estándar a propósito: amber = advertencia/pendiente,
    rose/red = error y fallecidos, emerald/green = éxito. */
 .tema-hnes {
-  --font-heading: var(--font-barlow);
-  --font-body: var(--font-barlow);
+  --font-heading: var(--font-ui);
+  --font-body: var(--font-ui);
   /* El font-family de body se computa FUERA del alcance (con Geist) y los
      hijos heredan el valor ya resuelto: re-declarar la variable no basta.
-     Se fija la familia aquí para que todo el árbol herede Barlow. */
-  font-family: var(--font-barlow), system-ui, sans-serif;
+     Se fija la familia aquí para que todo el árbol herede la fuente de UI. */
+  font-family: var(--font-ui), system-ui, sans-serif;
 
   /* Tinta: el texto principal usa el negro de la paleta. */
   --color-slate-950: #0e1114;
@@ -133,13 +133,6 @@
   --color-orange-300: #8ed0e0; --color-orange-400: #57b4cb; --color-orange-500: #379db6;
   --color-orange-600: #2b8ca8; --color-orange-700: #26758c; --color-orange-800: #245f73;
   --color-orange-900: #224e5e; --color-orange-950: #12333e;
-}
-
-/* Los cintillos y chips en mayúsculas usan la Barlow Condensed Medium en
-   versalitas que dicta la paleta (solo la familia: el peso y el tracking los
-   sigue poniendo cada clase). */
-.tema-hnes .uppercase {
-  font-family: var(--font-barlow-condensed), var(--font-barlow), system-ui, sans-serif;
 }
 
 /* Modo oscuro del área: mismas dos familias pero con rampas invertidas hacia
