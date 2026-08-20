@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BuscadorIngresoPorExpediente } from "@/components/pacientes/BuscadorIngresoPorExpediente";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP,
-  SOLICITUD_ESTADO_LABEL, SOLICITUD_ESTADO_CHIP, SOLICITUD_ORIGEN_LABEL, SOLICITUD_NOTA_MAX,
+  SOLICITUD_ESTADO_LABEL, SOLICITUD_ESTADO_CHIP, SOLICITUD_NOTA_MAX,
 } from "@/lib/conapinaFgr";
 import {
   Megaphone, ShieldAlert, Car, HeartCrack, X, CheckCircle2, AlertCircle, AlertTriangle,
@@ -327,8 +327,7 @@ export default function SolicitudesNotificacionPage() {
               <tr>
                 <th className={thCls}>Expediente</th>
                 <th className={thCls}>Paciente</th>
-                <th className={thCls}>Sospecha</th>
-                <th className={thCls}>Origen</th>
+                <th className={thCls}>Motivo</th>
                 <th className={thCls}>Solicitada</th>
                 <th className={thCls}>Estado</th>
                 <th className={thCls}>Cierre</th>
@@ -353,7 +352,6 @@ export default function SolicitudesNotificacionPage() {
                       </span>
                     ) : <span className="text-xs text-slate-400">—</span>}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{SOLICITUD_ORIGEN_LABEL[sol.origen]}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
                     {formatDia(sol.creadoEn)}
                     <span className="block text-[11px] text-slate-400">{sol.creadoPorNombre}</span>
