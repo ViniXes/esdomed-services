@@ -107,7 +107,11 @@ function NavLink({
           ? "text-blue-600 dark:text-cyan-300"
           : medical
             ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
-            : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
+            : item.tone
+              // La variante normal también respeta el tono explícito (p. ej.
+              // rose en Fallecidos/Defunciones); sin tono, azul institucional.
+              ? MEDICAL_ICON_TONE[item.tone]
+              : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
       }`}>
         <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} />
       </span>
@@ -152,7 +156,9 @@ function NavExpandable({
               ? "text-blue-600 dark:text-cyan-300"
               : medical
                 ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
-                : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
+                : item.tone
+                  ? MEDICAL_ICON_TONE[item.tone]
+                  : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
           }`}>
             <Icon size={16} strokeWidth={active ? 2.5 : 2} />
           </span>
