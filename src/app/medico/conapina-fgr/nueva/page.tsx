@@ -26,7 +26,7 @@ import type {
   Paciente, DiagnosticoCIE, TipoCasoConapinaFgr, NotificacionConapinaFgr, InstanciaAviso,
 } from "@/types";
 
-const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition";
+const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition";
 
 const SIN_DIAGNOSTICO: DiagnosticoCIE = { codigo: "", descripcion: "" };
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
@@ -234,7 +234,7 @@ function NuevaNotificacionConapinaFgr() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* Encabezado con el recorrido: se ve dónde está y cuánto falta. */}
-      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a3312] via-amber-700 to-orange-600 px-5 py-5 shadow-lg shadow-amber-950/20 md:px-7 md:py-6">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/20 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
         <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative">
@@ -245,7 +245,7 @@ function NuevaNotificacionConapinaFgr() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Nueva notificación CONAPINA / FGR</h1>
-                <p className="mt-1 max-w-xl text-sm text-amber-50/90">
+                <p className="mt-1 max-w-xl text-sm text-cyan-50/90">
                   Deje constancia del aviso que ya dio. Al final podrá revisarlo todo antes de enviarlo.
                 </p>
               </div>
@@ -259,10 +259,10 @@ function NuevaNotificacionConapinaFgr() {
           <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PASOS.map(({ n, l }) => (
               <li key={n} className={`flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors ${
-                n === step ? "bg-white/20 text-white ring-1 ring-white/25" : n < step ? "bg-white/10 text-amber-50" : "text-amber-100/75"
+                n === step ? "bg-white/20 text-white ring-1 ring-white/25" : n < step ? "bg-white/10 text-cyan-50" : "text-cyan-100/75"
               }`}>
                 <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  n < step ? "bg-emerald-400 text-emerald-950" : n === step ? "bg-white text-amber-900" : "bg-white/15 text-white"
+                  n < step ? "bg-emerald-400 text-emerald-950" : n === step ? "bg-white text-blue-900" : "bg-white/15 text-white"
                 }`}>
                   {n < step ? <CheckCircle2 size={14} /> : n}
                 </span>
@@ -412,11 +412,11 @@ function NuevaNotificacionConapinaFgr() {
                   <button key={t} type="button" onClick={() => setTipoCaso(t)}
                     className={`group relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
                       activo
-                        ? "border-amber-300 bg-amber-50 text-amber-900 shadow-sm shadow-amber-950/5 dark:border-amber-700 dark:bg-amber-950/35 dark:text-amber-100"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-amber-200 hover:bg-amber-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-amber-800"
+                        ? "border-blue-300 bg-blue-50 text-blue-900 shadow-sm shadow-blue-950/5 dark:border-blue-700 dark:bg-blue-950/35 dark:text-blue-100"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800"
                     }`}>
                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                      activo ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-amber-100 group-hover:text-amber-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-amber-950"
+                      activo ? "bg-blue-800 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-blue-950"
                     }`}>
                       <Icono size={18} />
                     </span>
@@ -424,7 +424,7 @@ function NuevaNotificacionConapinaFgr() {
                       <span className="block text-sm font-semibold">{TIPO_CASO_LABEL[t]}</span>
                       <span className="mt-0.5 block text-xs leading-4 text-slate-500 dark:text-slate-400">{TIPO_CASO_AYUDA[t]}</span>
                     </span>
-                    {activo && <CheckCircle2 size={16} className="ml-auto shrink-0 text-amber-600 dark:text-amber-300" />}
+                    {activo && <CheckCircle2 size={16} className="ml-auto shrink-0 text-blue-600 dark:text-blue-300" />}
                   </button>
                 );
               })}
@@ -457,7 +457,7 @@ function NuevaNotificacionConapinaFgr() {
                   placeholder="Buscar diagnóstico o código CIE-10..." />
                 {sugerencia && !diagnostico.codigo && (
                   <button type="button" onClick={() => setDiagnostico(sugerencia)}
-                    className="mt-2 flex items-start gap-1.5 text-left text-xs text-slate-500 transition-colors hover:text-amber-700 dark:hover:text-amber-400">
+                    className="mt-2 flex items-start gap-1.5 text-left text-xs text-slate-500 transition-colors hover:text-cyan-700 dark:hover:text-cyan-400">
                     <Copy size={12} className="mt-0.5 shrink-0 text-slate-400" />
                     <span>
                       Usar el del expediente:{" "}
@@ -478,7 +478,7 @@ function NuevaNotificacionConapinaFgr() {
                 </p>
                 {sugerenciaCausa && !causaExterna.codigo && (
                   <button type="button" onClick={() => setCausaExterna(sugerenciaCausa)}
-                    className="mt-2 flex items-start gap-1.5 text-left text-xs text-slate-500 transition-colors hover:text-amber-700 dark:hover:text-amber-400">
+                    className="mt-2 flex items-start gap-1.5 text-left text-xs text-slate-500 transition-colors hover:text-cyan-700 dark:hover:text-cyan-400">
                     <Copy size={12} className="mt-0.5 shrink-0 text-slate-400" />
                     <span>
                       Usar la del expediente:{" "}
@@ -538,11 +538,11 @@ function NuevaNotificacionConapinaFgr() {
                   <button key={i} type="button" onClick={() => setAvisoInstancia(i)}
                     className={`group relative flex items-start gap-3 rounded-xl border p-3 text-left transition-all ${
                       activo
-                        ? "border-amber-300 bg-amber-50 text-amber-900 shadow-sm shadow-amber-950/5 dark:border-amber-700 dark:bg-amber-950/35 dark:text-amber-100"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-amber-200 hover:bg-amber-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-amber-800"
+                        ? "border-blue-300 bg-blue-50 text-blue-900 shadow-sm shadow-blue-950/5 dark:border-blue-700 dark:bg-blue-950/35 dark:text-blue-100"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-800"
                     }`}>
                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                      activo ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-amber-100 group-hover:text-amber-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-amber-950"
+                      activo ? "bg-blue-800 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700 dark:bg-slate-800 dark:text-slate-400 dark:group-hover:bg-blue-950"
                     }`}>
                       {Icono ? <Icono size={18} /> : (
                         // "Ambos" = las dos instancias, y así se dibuja.
@@ -553,7 +553,7 @@ function NuevaNotificacionConapinaFgr() {
                       <span className="block text-sm font-semibold">{INSTANCIA_LABEL[i]}</span>
                       <span className="mt-0.5 block text-xs leading-4 text-slate-500 dark:text-slate-400">{INSTANCIA_AYUDA[i]}</span>
                     </span>
-                    {activo && <CheckCircle2 size={16} className="ml-auto shrink-0 text-amber-600 dark:text-amber-300" />}
+                    {activo && <CheckCircle2 size={16} className="ml-auto shrink-0 text-blue-600 dark:text-blue-300" />}
                   </button>
                 );
               })}
@@ -634,9 +634,9 @@ function NuevaNotificacionConapinaFgr() {
               </p>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20">
-              <div className="border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/50">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800 dark:text-amber-300">Paciente</p>
+            <div className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/60 dark:border-blue-900/60 dark:bg-blue-950/20">
+              <div className="border-b border-blue-200/70 px-4 py-3 dark:border-blue-900/50">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">Paciente</p>
                 <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{paciente.apellidos}, {paciente.nombres}</p>
                 <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
                   <span className="font-mono">Exp. {paciente.expediente}</span>
@@ -646,12 +646,12 @@ function NuevaNotificacionConapinaFgr() {
                 </p>
               </div>
 
-              <div className="grid md:grid-cols-2 md:divide-x md:divide-amber-200/70 md:dark:divide-amber-900/50">
-              <div className="space-y-2 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/50 md:border-b-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800 dark:text-amber-300">El caso</p>
+              <div className="grid md:grid-cols-2 md:divide-x md:divide-blue-200/70 md:dark:divide-blue-900/50">
+              <div className="space-y-2 border-b border-blue-200/70 px-4 py-3 dark:border-blue-900/50 md:border-b-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">El caso</p>
                 <Dato label="Motivo" valor={
                   <span className="flex items-center gap-1.5">
-                    {IconoTipo && <IconoTipo size={13} className="text-amber-700 dark:text-amber-400" />}
+                    {IconoTipo && <IconoTipo size={13} className="text-blue-700 dark:text-blue-400" />}
                     {tipoCaso ? TIPO_CASO_LABEL[tipoCaso] : "—"}
                   </span>
                 } />
@@ -669,7 +669,7 @@ function NuevaNotificacionConapinaFgr() {
               </div>
 
               <div className="space-y-2 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-800 dark:text-amber-300">El aviso que usted dio</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">El aviso que usted dio</p>
                 <Dato label="Instancia" valor={avisoInstancia ? (
                   <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${INSTANCIA_CHIP[avisoInstancia]}`}>
                     {avisoInstancia === "ambos"
@@ -703,12 +703,12 @@ function NuevaNotificacionConapinaFgr() {
 
           {step < 4 ? (
             <button type="button" onClick={siguiente} disabled={!puedeAvanzar()}
-              className="flex items-center gap-2 rounded-xl bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-amber-700/20 transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-500 dark:disabled:bg-amber-900">
+              className="flex items-center gap-2 rounded-xl bg-blue-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400 dark:disabled:bg-blue-900">
               Siguiente <ArrowRight size={16} />
             </button>
           ) : (
             <button type="button" onClick={enviar} disabled={!puedeAvanzar() || saving}
-              className="flex items-center gap-2 rounded-xl bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-amber-700/25 transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-500 dark:disabled:bg-amber-900">
+              className="flex items-center gap-2 rounded-xl bg-blue-800 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-900/25 transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400 dark:disabled:bg-blue-900">
               <ClipboardCheck size={16} /> {saving ? "Enviando..." : "Enviar notificación"}
             </button>
           )}

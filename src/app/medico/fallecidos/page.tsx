@@ -250,7 +250,7 @@ export default function MedicoFallecidosPage() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* Encabezado de tarea: deja claro qué se hará y a quién se notificará. */}
-      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a2430] via-[#713246] to-[#91435a] px-5 py-5 shadow-lg shadow-rose-950/20 md:px-7 md:py-6">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/20 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
         <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

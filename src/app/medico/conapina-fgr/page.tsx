@@ -192,7 +192,7 @@ export default function MedicoConapinaFgrPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* Encabezado de tarea: deja claro qué se notifica y a quién le llega. */}
-      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a3312] via-amber-700 to-orange-600 px-5 py-5 shadow-lg shadow-amber-950/20 md:px-7 md:py-6">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/20 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
         <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -202,14 +202,14 @@ export default function MedicoConapinaFgrPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Notificación CONAPINA / FGR</h1>
-              <p className="mt-1 max-w-xl text-sm text-amber-50/90">
+              <p className="mt-1 max-w-xl text-sm text-cyan-50/90">
                 Deje constancia del aviso que dio a CONAPINA o la Fiscalía. El Comité de Lesiones Intencionales lo recibe y lo lleva al registro que audita el MINSAL.
               </p>
             </div>
           </div>
           <button
             onClick={() => router.push("/medico/conapina-fgr/nueva")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-all hover:bg-amber-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-900 shadow-sm transition-all hover:bg-blue-50"
           >
             <Plus size={16} /> Nueva notificación
           </button>
@@ -367,7 +367,7 @@ export default function MedicoConapinaFgrPage() {
                 const anulada = n.estado === "anulado";
                 return (
                   <tr key={n.id} onClick={() => setDetalle(n)}
-                    className={`cursor-pointer transition-colors hover:bg-amber-50/40 dark:hover:bg-slate-800/60 ${anulada ? "opacity-60" : ""}`}>
+                    className={`cursor-pointer transition-colors hover:bg-cyan-50/40 dark:hover:bg-slate-800/60 ${anulada ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${

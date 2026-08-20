@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { Sora } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -10,6 +11,13 @@ import { PwaRegister } from "@/components/PwaRegister";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const sora = Sora({ variable: "--font-sora", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// Identidad institucional HNES (public/paletanueva_tipografia.png): Barlow
+// para títulos y cuerpo, Barlow Condensed para cintillos en versalitas. El
+// tema .tema-hnes va en el <body> para que TODAS las áreas lo hereden —
+// incluidos los portales (DateField) que se montan directo en body.
+const barlow = Barlow({ variable: "--font-barlow", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const barlowCondensed = Barlow_Condensed({ variable: "--font-barlow-condensed", subsets: ["latin"], weight: ["500", "600"] });
 
 export const metadata: Metadata = {
   title: "ESDOMED Services",
@@ -50,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-[var(--color-institutional-dark)] text-slate-900 dark:text-slate-100">
+      <body className={`tema-hnes ${barlow.variable} ${barlowCondensed.variable} min-h-full flex flex-col bg-slate-50 dark:bg-[var(--color-institutional-dark)] text-slate-900 dark:text-slate-100`}>
         <ThemeProvider>
           <AuthProvider>
             <ServiciosProvider>{children}</ServiciosProvider>
