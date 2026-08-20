@@ -23,7 +23,7 @@ function ComiteLesionesContent({ children }: { children: React.ReactNode }) {
   const navItems: NavItem[] = [
     { href: "/comite-lesiones/conapina-fgr", label: "Avisos CONAPINA / FGR", icon: ShieldAlert, badge: pendientes.conapina },
     { href: "/comite-lesiones/lesiones-ingresos", label: "Ingresos por lesión", icon: Activity },
-    { href: "/comite-lesiones/solicitudes", label: "Solicitudes al área médica", icon: Megaphone },
+    { href: "/comite-lesiones/solicitudes", label: "Avisos pendientes a notificar / Solicitudes al área médica", icon: Megaphone },
     { href: "/comite-lesiones/ingresos-adolescentes", label: "Ingresos adolescentes", icon: Users },
   ];
 

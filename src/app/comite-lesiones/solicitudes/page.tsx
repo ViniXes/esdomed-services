@@ -192,7 +192,7 @@ export default function SolicitudesNotificacionPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700 dark:text-orange-300">Nueva solicitud</p>
           <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Pedir la notificación de un expediente</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Sirve para cualquier ingreso, aunque su diagnóstico no sea de lesión. La solicitud se cierra sola cuando un
+            Sirve para cualquier ingreso que requiera aviso. La solicitud se cierra sola cuando un
             médico notifica el expediente.
           </p>
         </div>
