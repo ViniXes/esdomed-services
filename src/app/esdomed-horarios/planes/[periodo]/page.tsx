@@ -683,6 +683,66 @@ export default function EditorPlanPage() {
 
   const colSpanTotal = dias.length + 2; // Personal + días + Hrs
 
+  const renderFilaTotal = (tipo: "emergencia" | "apoyo" | "operativos") => {
+    const configuracion = {
+      emergencia: {
+        etiqueta: "Total Emergencia / Día:",
+        conteos: conteoEmergenciaPorDia,
+        fila: "bg-rose-50 dark:bg-rose-950/20 border-t-2 border-rose-200 dark:border-rose-900/60",
+        fija: "bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-r border-rose-200 dark:border-rose-900/60",
+        celda: "border-r border-rose-100 dark:border-rose-900/40",
+        caja: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300",
+        final: "border-l border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950",
+      },
+      apoyo: {
+        etiqueta: "Total Apoyo diurno / Día:",
+        conteos: conteoApoyoDiurnoPorDia,
+        fila: "bg-orange-50 dark:bg-orange-950/20 border-t-2 border-orange-200 dark:border-orange-900/60",
+        fija: "bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-r border-orange-200 dark:border-orange-900/60",
+        celda: "border-r border-orange-100 dark:border-orange-900/40",
+        caja: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
+        final: "border-l border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950",
+      },
+      operativos: {
+        etiqueta: "Total Operativos de Grupo / Día:",
+        conteos: conteoOperativosPorDia,
+        fila: "bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-200 dark:border-slate-700",
+        fija: "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700",
+        celda: "border-r border-slate-100 dark:border-slate-700/50",
+        caja: "",
+        final: "border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800",
+      },
+    }[tipo];
+
+    return (
+      <tr className={configuracion.fila}>
+        <td className={`sticky left-0 z-10 px-2 py-2 font-bold text-[10px] text-right uppercase tracking-wider ${configuracion.fija}`}>
+          {configuracion.etiqueta}
+        </td>
+        {dias.map((d, diaIdx) => {
+          const count = configuracion.conteos[diaIdx];
+          const faltan = tipo === "operativos" && count < 2;
+          const cajaOperativos = faltan
+            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400 border border-rose-300 dark:border-rose-700/80 shadow-sm"
+            : "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400";
+          return (
+            <td key={`tot-${tipo}-${d}`} className={`text-center font-bold text-[10px] py-1 last:border-r-0 ${configuracion.celda}`}>
+              <div
+                className={`mx-auto w-7 h-6 flex items-center justify-center rounded transition-colors ${
+                  tipo === "operativos" ? cajaOperativos : configuracion.caja
+                }`}
+                title={tipo === "operativos" ? (faltan ? "Se requieren al menos 2 operativos de grupo" : "Cobertura operativa OK") : undefined}
+              >
+                {count}
+              </div>
+            </td>
+          );
+        })}
+        <td className={configuracion.final}></td>
+      </tr>
+    );
+  };
+
   return (
     <div className="px-3 sm:px-5 py-5">
       {/* Encabezado + acciones */}
@@ -829,6 +889,13 @@ export default function EditorPlanPage() {
                     const mostrarHeader = grupoActual !== grupoPrev;
                     grupoPrev = grupoActual;
                     const estiloGrupo = grupoActual ? COLOR_GRUPO[grupoActual] : null;
+                    const grupoSiguiente = filasOrdenadas[displayIdx + 1]?.f.grupo?.trim() || "";
+                    const esFinDeGrupo = grupoActual !== grupoSiguiente;
+                    const totalDelGrupo = {
+                      "Grupo 4": "operativos",
+                      "Equipo de emergencia": "emergencia",
+                      "Equipo de apoyo diurno / emergencia": "apoyo",
+                    }[grupoActual] as "emergencia" | "apoyo" | "operativos" | undefined;
 
                     return (
                       <Fragment key={fila.uid || fila.codigoMarcacion || filaIdx}>
@@ -1009,62 +1076,12 @@ export default function EditorPlanPage() {
                             )}
                           </td>
                         </tr>
+                        {esFinDeGrupo && totalDelGrupo && renderFilaTotal(totalDelGrupo)}
                       </Fragment>
                     );
                   });
                 })()}
               </tbody>
-              <tfoot>
-                <tr className="bg-rose-50 dark:bg-rose-950/20 border-t-2 border-rose-200 dark:border-rose-900/60">
-                  <td className="sticky left-0 z-10 bg-rose-50 dark:bg-rose-950 px-2 py-2 font-bold text-[10px] text-right text-rose-700 dark:text-rose-300 border-r border-rose-200 dark:border-rose-900/60 uppercase tracking-wider">
-                    Total Emergencia / Día:
-                  </td>
-                  {dias.map((d, diaIdx) => {
-                    const count = conteoEmergenciaPorDia[diaIdx];
-                    return (
-                      <td key={`tot-emergencia-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-rose-100 dark:border-rose-900/40 last:border-r-0">
-                        <div className="mx-auto w-7 h-6 flex items-center justify-center rounded bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300">
-                          {count}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td className="border-l border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950"></td>
-                </tr>
-                <tr className="bg-orange-50 dark:bg-orange-950/20 border-t-2 border-orange-200 dark:border-orange-900/60">
-                  <td className="sticky left-0 z-10 bg-orange-50 dark:bg-orange-950 px-2 py-2 font-bold text-[10px] text-right text-orange-700 dark:text-orange-300 border-r border-orange-200 dark:border-orange-900/60 uppercase tracking-wider">
-                    Total Apoyo diurno / Día:
-                  </td>
-                  {dias.map((d, diaIdx) => {
-                    const count = conteoApoyoDiurnoPorDia[diaIdx];
-                    return (
-                      <td key={`tot-apoyo-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-orange-100 dark:border-orange-900/40 last:border-r-0">
-                        <div className="mx-auto w-7 h-6 flex items-center justify-center rounded bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
-                          {count}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td className="border-l border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950"></td>
-                </tr>
-                <tr className="bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-200 dark:border-slate-700">
-                  <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-2 py-2 font-bold text-[10px] text-right text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 uppercase tracking-wider">
-                    Total Operativos de Grupo / Día:
-                  </td>
-                  {dias.map((d, diaIdx) => {
-                    const count = conteoOperativosPorDia[diaIdx];
-                    const faltan = count < 2;
-                    return (
-                      <td key={`tot-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-slate-100 dark:border-slate-700/50 last:border-r-0">
-                        <div className={`mx-auto w-7 h-6 flex items-center justify-center rounded transition-colors ${faltan ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400 border border-rose-300 dark:border-rose-700/80 shadow-sm" : "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"}`} title={faltan ? "Se requieren al menos 2 operativos de grupo" : "Cobertura operativa OK"}>
-                          {count}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td className="border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"></td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         </>

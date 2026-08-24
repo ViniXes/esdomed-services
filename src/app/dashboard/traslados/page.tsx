@@ -146,13 +146,18 @@ export default function DashboardTrasladosPage() {
       try {
         if (user) {
           const token = await user.getIdToken();
-          await fetch(`/api/esdomed/traslados/${id}/cerrar-ficha-critica`, {
+          const cierreRes = await fetch(`/api/esdomed/traslados/${id}/cerrar-ficha-critica`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
           });
+          if (!cierreRes.ok) {
+            const detalle = await cierreRes.text();
+            throw new Error(detalle || "No se pudo cerrar la ficha UCI/UCIN.");
+          }
         }
       } catch (err) {
         console.error("Error cerrando ficha UCI/UCIN tras traslado:", err);
+        alert("El traslado fue aprobado, pero no se pudo cerrar automáticamente la ficha UCI/UCIN. Revisá el expediente en Matriz UCI/UCIN.");
       }
     }
     // La lista en vivo se actualiza sola (listeners). Los resultados de búsqueda son

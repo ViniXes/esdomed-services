@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { SERVICIOS_UCI, SERVICIOS_UCIN } from "@/lib/cuidadosCriticos";
 
@@ -12,10 +12,41 @@ import { SERVICIOS_UCI, SERVICIOS_UCIN } from "@/lib/cuidadosCriticos";
 // "intercambio" cuando involucra a un segundo paciente en otra unidad crítica:
 // eso queda fuera de este primer alcance.
 const SERVICIOS_CRITICOS = new Set<string>([...SERVICIOS_UCI, ...SERVICIOS_UCIN]);
+const SERVICIOS_CRITICOS_NORMALIZADOS = new Set([...SERVICIOS_CRITICOS].map(normalizar));
 
-function fechaInputHoy() {
-  const hoy = new Date();
-  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+function texto(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function normalizar(value: unknown) {
+  return texto(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+function parseDate(value: unknown) {
+  if (!value) return null;
+  const date = typeof (value as { toDate?: () => Date }).toDate === "function"
+    ? (value as { toDate: () => Date }).toDate()
+    : value instanceof Date
+      ? value
+      : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function fechaInput(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function diasInclusivos(desde: unknown, hasta: Date) {
+  const inicio = parseDate(desde);
+  if (!inicio) return null;
+  const a = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+  const b = new Date(hasta.getFullYear(), hasta.getMonth(), hasta.getDate());
+  if (b < a) return null;
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000) + 1;
 }
 
 async function getCaller(req: NextRequest) {
@@ -53,48 +84,73 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Solo aplica a traslados creados a partir de agosto 2026: los anteriores son de
   // cuando esta automatizacion todavia no existia, no se deben cerrar en retroactivo.
   const CORTE_INICIO = new Date("2026-08-01T00:00:00");
-  const creadoEn = (t.creadoEn as { toDate?: () => Date })?.toDate?.() ?? new Date(t.creadoEn as string);
-  if (Number.isNaN(creadoEn.getTime()) || creadoEn < CORTE_INICIO) {
+  const creadoEn = parseDate(t.creadoEn);
+  if (!creadoEn || creadoEn < CORTE_INICIO) {
     return NextResponse.json({ ok: true, cerrada: false, motivo: "traslado_anterior_al_corte" });
   }
 
-  const servicioOrigen = String(t.servicioOrigen ?? "");
+  const servicioOrigen = texto(t.servicioOrigen);
   const servicioDestino = t.tipoTraslado === "interno"
     ? servicioOrigen
-    : String(t.servicioDestino ?? servicioOrigen);
+    : texto(t.servicioDestino ?? servicioOrigen);
+  const servicioOrigenNormalizado = normalizar(servicioOrigen);
 
-  if (!servicioOrigen || servicioOrigen === servicioDestino) {
+  if (!servicioOrigen || servicioOrigenNormalizado === normalizar(servicioDestino)) {
     return NextResponse.json({ ok: true, cerrada: false, motivo: "mismo_servicio" });
   }
-  if (!SERVICIOS_CRITICOS.has(servicioOrigen)) {
+  if (!SERVICIOS_CRITICOS_NORMALIZADOS.has(servicioOrigenNormalizado)) {
     return NextResponse.json({ ok: true, cerrada: false, motivo: "origen_no_critico" });
   }
 
-  const expediente = String(t.pacienteExpediente ?? "");
+  const expediente = texto(t.pacienteExpediente);
   if (!expediente) {
     return NextResponse.json({ ok: true, cerrada: false, motivo: "sin_expediente" });
   }
 
   const fichaQuery = await adminDb.collection("fichas_cuidados_criticos")
     .where("pacienteExpediente", "==", expediente)
-    .where("servicio", "==", servicioOrigen)
     .where("estadoEstancia", "==", "activa")
-    .limit(1)
     .get();
+  const fichasCerrables = fichaQuery.docs.filter(doc => normalizar(doc.data().servicio) === servicioOrigenNormalizado);
 
-  if (fichaQuery.empty) {
+  if (fichasCerrables.length === 0) {
     return NextResponse.json({ ok: true, cerrada: false, motivo: "sin_ficha_activa" });
   }
 
-  const fichaRef = fichaQuery.docs[0].ref;
-  await fichaRef.update({
-    "datos.alta": "TRASLADO",
-    "datos.fecha_egreso_del_servicio": fechaInputHoy(),
-    estadoEstancia: "egresada",
-    actualizadoPorId: caller.uid,
-    actualizadoPorNombre: caller.nombre,
-    actualizadoEn: FieldValue.serverTimestamp(),
-  });
+  const fechaTraslado = parseDate(t.actualizadoEn) ?? parseDate(t.creadoEn) ?? new Date();
+  const fechaEgresoServicio = fechaInput(fechaTraslado);
+  const batch = adminDb.batch();
 
-  return NextResponse.json({ ok: true, cerrada: true, fichaId: fichaRef.id });
+  for (const fichaDoc of fichasCerrables) {
+    const ficha = fichaDoc.data();
+    const datos = { ...(ficha.datos ?? {}) };
+    datos.alta = "TRASLADO";
+    datos.fecha_egreso_del_servicio = fechaEgresoServicio;
+
+    const dias = diasInclusivos(datos.fecha_ingreso_al_servicio, fechaTraslado);
+    if (dias !== null) datos.dias_en_servicio = dias;
+
+    batch.update(fichaDoc.ref, {
+      datos,
+      estadoEstancia: "egresada",
+      actualizadoPorId: caller.uid,
+      actualizadoPorNombre: caller.nombre,
+      actualizadoEn: FieldValue.serverTimestamp(),
+      cierreAutomaticoHospitalario: {
+        fuente: "traslado_aprobado",
+        referenciaId: id,
+        pacienteId: texto(ficha.pacienteId) || null,
+        expediente,
+        pacienteEstado: "traslado",
+        fechaEgresoHospitalario: Timestamp.fromDate(fechaTraslado),
+        servicioOrigen,
+        servicioDestino,
+        aplicadoEn: FieldValue.serverTimestamp(),
+      },
+    });
+  }
+
+  await batch.commit();
+
+  return NextResponse.json({ ok: true, cerrada: true, fichas: fichasCerrables.map(doc => doc.id) });
 }
