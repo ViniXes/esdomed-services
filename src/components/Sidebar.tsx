@@ -62,9 +62,9 @@ function Badge({ count }: { count: number }) {
 }
 
 const ACTIVE_CLS =
-  "bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 shadow-sm shadow-blue-100 dark:bg-[var(--color-institutional-navy)] dark:text-white dark:ring-[#c9a892]/55 dark:shadow-[#c9a892]/15";
+  "bg-blue-50 text-blue-900 ring-1 ring-cyan-600/35 shadow-sm shadow-blue-100 dark:bg-blue-900 dark:text-white dark:ring-cyan-400/40 dark:shadow-cyan-950/30";
 const IDLE_CLS =
-  "text-slate-600 dark:text-slate-300 hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white";
+  "text-slate-600 dark:text-slate-300 hover:bg-blue-50/70 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white";
 const MEDICAL_ICON_TONE: Record<NonNullable<NavItem["tone"]>, string> = {
   blue: "text-blue-500 group-hover:text-blue-600 dark:text-blue-300",
   indigo: "text-indigo-500 group-hover:text-indigo-600 dark:text-indigo-300",
@@ -107,7 +107,11 @@ function NavLink({
           ? "text-blue-600 dark:text-cyan-300"
           : medical
             ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
-            : ""
+            : item.tone
+              // La variante normal también respeta el tono explícito (p. ej.
+              // rose en Fallecidos/Defunciones); sin tono, azul institucional.
+              ? MEDICAL_ICON_TONE[item.tone]
+              : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
       }`}>
         <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} />
       </span>
@@ -152,7 +156,9 @@ function NavExpandable({
               ? "text-blue-600 dark:text-cyan-300"
               : medical
                 ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
-                : ""
+                : item.tone
+                  ? MEDICAL_ICON_TONE[item.tone]
+                  : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
           }`}>
             <Icon size={16} strokeWidth={active ? 2.5 : 2} />
           </span>
@@ -169,7 +175,7 @@ function NavExpandable({
         </button>
       </div>
       {open && (
-        <div className="mt-0.5 ml-5 pl-2 border-l border-slate-200 dark:border-[#c9a892]/25 space-y-0.5">
+        <div className="mt-0.5 ml-5 pl-2 border-l border-slate-200 dark:border-cyan-800/40 space-y-0.5">
           {children.map((c) => (
             <NavLink key={c.href} item={c} active={isActive(c)} onNavigate={onNavigate} nested variant={variant} />
           ))}
@@ -197,7 +203,7 @@ function SidebarBody({
   const medical = variant === "medical";
   const medicalFooterAction = medical
     ? "text-slate-500 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-400 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-200"
-    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-[#c9a892]/10 dark:hover:bg-slate-800/80";
+    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-blue-50/70 dark:hover:bg-slate-800/80";
   const renderItem = (item: NavItem) =>
     item.children?.length
       ? <NavExpandable key={item.href} item={item} isActive={isActive} onNavigate={onNavigate} variant={variant} />
@@ -209,8 +215,8 @@ function SidebarBody({
   for (const i of navItems) if (i.group && !grupos.includes(i.group)) grupos.push(i.group);
 
   return (
-    <div className={`flex h-full flex-col border-r text-slate-700 dark:text-white ${medical ? "border-slate-200 bg-white dark:border-cyan-950 dark:bg-slate-950" : "border-slate-200 bg-white dark:border-[#c9a892]/25 dark:bg-[var(--color-institutional-dark)]"}`}>
-      <div className={`flex flex-col items-center gap-3 border-b px-4 pt-5 pb-4 ${medical ? "border-blue-100 bg-gradient-to-b from-white to-cyan-50/45 dark:border-cyan-950 dark:from-slate-950 dark:to-cyan-950/25" : "border-slate-200 dark:border-[#c9a892]/20"}`}>
+    <div className={`flex h-full flex-col border-r text-slate-700 dark:text-white ${medical ? "border-slate-200 bg-white dark:border-cyan-950 dark:bg-slate-950" : "border-slate-200 bg-white dark:border-cyan-900/40 dark:bg-[var(--color-institutional-dark)]"}`}>
+      <div className={`flex flex-col items-center gap-3 border-b px-4 pt-5 pb-4 ${medical ? "border-blue-100 bg-gradient-to-b from-white to-cyan-50/45 dark:border-cyan-950 dark:from-slate-950 dark:to-cyan-950/25" : "border-slate-200 dark:border-cyan-900/40"}`}>
         <div className={`${medical ? "h-16" : "h-20"} flex items-center justify-center`}>
           <Image
             src={SIDEBAR_LOGO_LIGHT_SRC}
@@ -230,7 +236,7 @@ function SidebarBody({
           />
         </div>
         <div className="flex items-center gap-2.5 w-full">
-          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${medical ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-600/25 dark:from-cyan-400 dark:to-blue-400" : "bg-[var(--color-institutional-navy)] dark:bg-[var(--color-institutional-warm)]"}`}>
+          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${medical ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-600/25 dark:from-cyan-400 dark:to-blue-400" : "bg-gradient-to-br from-[#2b8ca8] to-[#1a4e70] shadow-cyan-900/25 dark:from-cyan-400 dark:to-blue-400"}`}>
             <span className="text-white dark:text-[var(--color-institutional-dark)] text-[10px] font-bold tracking-wide">ES</span>
           </div>
           <div className="min-w-0">
@@ -256,7 +262,7 @@ function SidebarBody({
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${medical ? "text-slate-400 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-500 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-300" : "text-[#1c1e4d] dark:text-[#c9a892]/70 hover:text-[#2f48aa] dark:hover:text-[#f0ece8] hover:bg-[#1c1e4d]/5 dark:hover:bg-slate-800/70"}`}
+                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${medical ? "text-slate-400 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-500 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-300" : "text-blue-900 dark:text-cyan-300/80 hover:text-cyan-700 dark:hover:text-cyan-200 hover:bg-blue-50/70 dark:hover:bg-slate-800/70"}`}
               >
                 <ChevronDown
                   size={12}
@@ -271,7 +277,7 @@ function SidebarBody({
         })}
       </nav>
 
-      <div className={`px-2 pb-4 pt-2 border-t space-y-1 ${medical ? "border-blue-100 dark:border-cyan-950" : "border-slate-200 dark:border-[#c9a892]/20"}`}>
+      <div className={`px-2 pb-4 pt-2 border-t space-y-1 ${medical ? "border-blue-100 dark:border-cyan-950" : "border-slate-200 dark:border-cyan-900/40"}`}>
         {profile?.tipoMedico ? (
           <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400">
             {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · {profile.servicios?.length ?? 0} unidades
@@ -527,7 +533,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={toggleDesktopPanel}
-          className="hidden md:flex fixed left-0 top-1/2 z-40 h-12 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-slate-200 bg-white text-slate-500 shadow-lg shadow-slate-900/10 transition-colors hover:bg-slate-50 hover:text-[#1c1e4d] dark:border-[#c9a892]/35 dark:bg-[var(--color-institutional-dark)] dark:text-slate-300 dark:shadow-black/30 dark:hover:bg-slate-800 dark:hover:text-white"
+          className="hidden md:flex fixed left-0 top-1/2 z-40 h-12 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl border border-l-0 border-slate-200 bg-white text-slate-500 shadow-lg shadow-slate-900/10 transition-colors hover:bg-slate-50 hover:text-blue-800 dark:border-cyan-900/50 dark:bg-[var(--color-institutional-dark)] dark:text-slate-300 dark:shadow-black/30 dark:hover:bg-slate-800 dark:hover:text-white"
           aria-label="Mostrar panel lateral"
           title="Mostrar panel lateral"
         >

@@ -101,7 +101,7 @@ export default function MedicoDashboardPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-7">
 
       {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-950 via-sky-900 to-teal-800 px-5 py-6 text-white shadow-lg shadow-cyan-950/15 md:px-7 md:py-7">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-6 text-white shadow-lg shadow-cyan-950/15 md:px-7 md:py-7">
         <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full border-[22px] border-white/10" />
         <div className="absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-teal-300/10 blur-2xl" />
         <div className="relative flex items-start justify-between gap-4">

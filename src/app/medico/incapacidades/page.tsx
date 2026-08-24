@@ -240,7 +240,7 @@ export default function MedicoIncapacidadesPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#243b6b] via-indigo-700 to-blue-700 px-5 py-5 shadow-lg shadow-indigo-950/15 md:px-7 md:py-6">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-indigo-950/15 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
         <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

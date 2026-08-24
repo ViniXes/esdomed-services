@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
-import { Ambulance } from "lucide-react";
+import { Ambulance, Download } from "lucide-react";
 import { Icon } from "@iconify/react";
 import documentAdd from "@iconify-icons/solar/document-add-linear";
 import calendar from "@iconify-icons/solar/calendar-minimalistic-linear";
@@ -78,6 +78,7 @@ export default function ControlIngresosPage() {
   const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [detalleIngreso, setDetalleIngreso] = useState<ControlIngreso | null>(null);
+  const [exportando, setExportando] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -218,16 +219,20 @@ export default function ControlIngresosPage() {
   const fueraDeRangoVivo = !!fechaDesde && fechaDesde < limiteVivoStr;
 
   // Búsqueda de registros anteriores a ayer: una sola lectura (getDocs), no listener.
+  const consultarHistoricos = async (): Promise<ControlIngreso[]> => {
+    const constraints: QueryConstraint[] = [];
+    if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+    if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+    constraints.push(orderBy("creadoEn", "desc"), limit(500));
+    const snap = await getDocs(query(collection(db, "control_ingresos"), ...constraints));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso));
+  };
+
   const buscarHistoricos = async () => {
     if (!fechaDesde && !fechaHasta) return;
     setBuscandoHistoricos(true);
     try {
-      const constraints: QueryConstraint[] = [];
-      if (fechaDesde) constraints.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
-      if (fechaHasta) constraints.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
-      constraints.push(orderBy("creadoEn", "desc"), limit(500));
-      const snap = await getDocs(query(collection(db, "control_ingresos"), ...constraints));
-      setResultadosHistoricos(snap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)));
+      setResultadosHistoricos(await consultarHistoricos());
       setPagina(1);
     } finally {
       setBuscandoHistoricos(false);
@@ -240,7 +245,7 @@ export default function ControlIngresosPage() {
     setPagina(1);
   };
 
-  const lista = (resultadosHistoricos ?? ingresos).filter(i => {
+  const filtrarLista = (fuente: ControlIngreso[]) => fuente.filter(i => {
     if (busqueda) {
       const q = busqueda.toLowerCase();
       const enExp = (i.expediente?.toLowerCase() ?? "").includes(q);
@@ -255,6 +260,91 @@ export default function ControlIngresosPage() {
     }
     return true;
   });
+  const lista = filtrarLista(resultadosHistoricos ?? ingresos);
+
+  const exportarExcel = async () => {
+    setExportando(true);
+    try {
+      // Si el rango elegido cae fuera de la vista en vivo y aún no se
+      // consultaron los históricos, la exportación los trae por sí sola.
+      let filas = lista;
+      if (fueraDeRangoVivo && resultadosHistoricos === null) {
+        const historicos = await consultarHistoricos();
+        setResultadosHistoricos(historicos);
+        setPagina(1);
+        filas = filtrarLista(historicos);
+      }
+      if (filas.length === 0) {
+        setModalInfo({ tipo: "error", mensaje: "No hay registros para exportar con los filtros elegidos." });
+        return;
+      }
+
+      const hoy = (() => {
+        const d = new Date();
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+      })();
+      const desdeRango = fechaDesde || limiteVivoStr;
+      const hastaRango = fechaHasta || hoy;
+
+      const XLSX = await import("xlsx");
+      const wb = XLSX.utils.book_new();
+
+      // Hoja Ingresos — una fila por registro del rango
+      const detalle = filas.map(i => ({
+        "Fecha registro": formatFecha(i.creadoEn),
+        Expediente: i.expediente,
+        DUI: i.dui ?? "",
+        Apellidos: i.apellidos,
+        Nombres: i.nombres,
+        Edad: i.edad ?? "",
+        Género: i.genero === "masculino" ? "Masculino" : i.genero === "femenino" ? "Femenino" : "",
+        Servicio: i.servicio,
+        "Tipo de ingreso": i.ingresoDirectoServicio ? "Directo a servicio" : "Triage",
+        "Registrado por": i.responsableIngresoNombre ?? "",
+      }));
+      const wsDetalle = XLSX.utils.json_to_sheet(detalle);
+      wsDetalle["!cols"] = [
+        { wch: 20 }, { wch: 11 }, { wch: 12 }, { wch: 24 }, { wch: 24 },
+        { wch: 6 }, { wch: 10 }, { wch: 28 }, { wch: 17 }, { wch: 28 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsDetalle, "Ingresos");
+
+      // Hoja Resumen — totales por servicio, tipo de ingreso y género
+      const porServicio = new Map<string, number>();
+      let directos = 0, masculino = 0, femenino = 0;
+      for (const i of filas) {
+        porServicio.set(i.servicio, (porServicio.get(i.servicio) ?? 0) + 1);
+        if (i.ingresoDirectoServicio) directos++;
+        if (i.genero === "masculino") masculino++;
+        else if (i.genero === "femenino") femenino++;
+      }
+      const aoa: (string | number)[][] = [
+        [`Control de ingresos del ${desdeRango} al ${hastaRango}`],
+        [`Total de ingresos: ${filas.length}`],
+        [],
+        ["Servicio", "Ingresos"],
+        ...Array.from(porServicio.entries()).sort((a, b) => b[1] - a[1]),
+        [],
+        ["Tipo de ingreso", "Ingresos"],
+        ["Directo a servicio", directos],
+        ["Triage", filas.length - directos],
+        [],
+        ["Género", "Ingresos"],
+        ["Masculino", masculino],
+        ["Femenino", femenino],
+      ];
+      const wsResumen = XLSX.utils.aoa_to_sheet(aoa);
+      wsResumen["!cols"] = [{ wch: 30 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+
+      XLSX.writeFile(wb, `control_ingresos_${desdeRango}_a_${hastaRango}.xlsx`);
+    } catch (e) {
+      setModalInfo({ tipo: "error", mensaje: `No se pudo exportar: ${e instanceof Error ? e.message : "desconocido"}` });
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const totalPaginas = Math.max(1, Math.ceil(lista.length / FILAS_POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
   const inicioPagina = (paginaActual - 1) * FILAS_POR_PAGINA;
@@ -339,7 +429,7 @@ export default function ControlIngresosPage() {
         <div className="absolute bottom-0 right-28 h-20 w-20 rounded-full bg-cyan-200/35 blur-xl dark:bg-cyan-500/10" />
         <div className="relative flex items-center gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#4f5ee8] text-white shadow-lg shadow-blue-500/20">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#2b8ca8] to-[#1a4e70] text-white shadow-lg shadow-blue-500/20">
               <Ambulance size={25} strokeWidth={2.1} />
             </div>
             <div className="min-w-0">
@@ -513,6 +603,16 @@ export default function ControlIngresosPage() {
               <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">{resultadosHistoricos !== null ? "Resultados históricos" : "Ingresos de ayer y hoy"}</p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">{lista.length} registro(s) mostrados</p>
             </div>
+            <button
+              type="button"
+              onClick={exportarExcel}
+              disabled={exportando || (lista.length === 0 && !(fueraDeRangoVivo && resultadosHistoricos === null))}
+              title="Descargar Excel con el rango de fechas elegido"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={14} />
+              {exportando ? "Generando…" : <><span className="hidden sm:inline">Exportar a&nbsp;</span>Excel</>}
+            </button>
           </div>
 
         {/* Barra de búsqueda y fechas */}

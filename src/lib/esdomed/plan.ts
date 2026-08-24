@@ -22,6 +22,7 @@ export const GRUPOS_ESDOMED = [
   "Grupo 3",
   "Grupo 4",
   "Equipo de emergencia",
+  "Equipo de apoyo diurno / emergencia",
 ] as const;
 
 export type GrupoEsdomed = (typeof GRUPOS_ESDOMED)[number];
@@ -63,6 +64,12 @@ export const COLOR_GRUPO: Record<string, { badge: string; dot: string; barra: st
     dot: "bg-rose-500",
     barra: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
     corto: "Emerg.",
+  },
+  "Equipo de apoyo diurno / emergencia": {
+    badge: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+    dot: "bg-orange-500",
+    barra: "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300",
+    corto: "Apoyo",
   },
 };
 

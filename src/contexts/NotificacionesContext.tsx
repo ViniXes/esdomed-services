@@ -19,7 +19,8 @@ import type { NotificacionFallecido } from "@/types";
 
 export type TipoNotif =
   | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
-  | "incapacidad" | "anexo5" | "impresion" | "recepcion" | "conapina";
+  | "incapacidad" | "anexo5" | "impresion" | "recepcion" | "conapina"
+  | "solicitud_lesion";
 
 export interface NotifToast {
   id: string;
@@ -38,6 +39,8 @@ interface Pendientes {
   impresiones: number;
   recepciones: number;
   conapina: number;
+  // Solicitudes de notificación del comité difundidas al área médica.
+  solicitudesLesion: number;
   total: number;
 }
 
@@ -48,7 +51,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -64,11 +67,12 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
 
   const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
-    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0,
+    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0,
   });
   const [toasts, setToasts] = useState<NotifToast[]>([]);
 
   const esEsdomed    = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+  const esMedico     = profile?.role === "medico";
   const puedeAltas   = esEsdomed || profile?.role === "trabajo_social";
   const esPsicologia = profile?.role === "psicologia";
   const esTS         = profile?.role === "trabajo_social";
@@ -269,9 +273,39 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     };
   }, [esComiteLesiones, addToast, setCount]);
 
+  // ── Médicos: solicitudes de notificación difundidas por el comité ──
+  // Un solo listener sobre las PENDIENTES (son pocas por diseño: las crea el
+  // comité a mano): da el contador vivo del globo y detecta las nuevas para el
+  // toast, sin poll ni conteo por agregación.
+  const knownSolicitudes = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!esMedico) return;
+    knownSolicitudes.current = null;
+    const q = query(collection(db, "solicitudes_notificacion_lesion"), where("estado", "==", "pendiente"));
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownSolicitudes.current === null) {
+        knownSolicitudes.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownSolicitudes.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "solicitud_lesion",
+              titulo: "El comité solicita una notificación",
+              mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.expediente)}`,
+            });
+          }
+        });
+        knownSolicitudes.current = ids;
+      }
+      setCount("solicitudesLesion", snap.size);
+    });
+  }, [esMedico, addToast, setCount]);
+
   const pendientes: Pendientes = {
     ...counts,
-    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina,
+    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion,
   };
 
   return (

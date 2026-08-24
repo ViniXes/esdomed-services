@@ -54,6 +54,151 @@
   --color-amber-50:  #fdf7f2;
 }
 
+/* ══ Tema institucional HNES — perfil médico (.tema-hnes) ══
+   Paleta oficial (public/paletanueva_tipografia.png): azul #1A4E70, acento
+   #2B8CA8, tinta #16191C; tipografía Barlow / Barlow Condensed (las carga
+   next/font en el layout del área).
+
+   Mismo mecanismo que el bloque .dark de arriba: en Tailwind v4 las utilidades
+   leen var(--color-*), así que re-declarar las variables dentro del alcance
+   re-tematiza TODAS las páginas del área sin tocarlas una a una. Solo se
+   re-mapean las familias DECORATIVAS (blue → azul institucional; cyan, teal,
+   sky y orange → acento; indigo, violet y purple → azul). Las familias
+   SEMÁNTICAS quedan estándar a propósito: amber = advertencia/pendiente,
+   rose/red = error y fallecidos, emerald/green = éxito. */
+.tema-hnes {
+  --font-heading: var(--font-ui);
+  --font-body: var(--font-ui);
+  /* El font-family de body se computa FUERA del alcance (con Geist) y los
+     hijos heredan el valor ya resuelto: re-declarar la variable no basta.
+     Se fija la familia aquí para que todo el árbol herede la fuente de UI. */
+  font-family: var(--font-ui), system-ui, sans-serif;
+
+  /* Tinta: el texto principal usa el negro de la paleta. */
+  --color-slate-950: #0e1114;
+  --color-slate-900: #16191c;
+
+  /* Azul institucional (#1A4E70 ≈ tono 800) */
+  --color-blue-50:  #f1f7fa;
+  --color-blue-100: #e0edf3;
+  --color-blue-200: #c3dde9;
+  --color-blue-300: #98c3d7;
+  --color-blue-400: #64a3bf;
+  --color-blue-500: #4187a8;
+  --color-blue-600: #2f7092;
+  --color-blue-700: #245d7c;
+  --color-blue-800: #1a4e70;
+  --color-blue-900: #143c57;
+  --color-blue-950: #0d2739;
+
+  --color-indigo-50:  #f1f7fa; --color-indigo-100: #e0edf3; --color-indigo-200: #c3dde9;
+  --color-indigo-300: #98c3d7; --color-indigo-400: #64a3bf; --color-indigo-500: #4187a8;
+  --color-indigo-600: #2f7092; --color-indigo-700: #245d7c; --color-indigo-800: #1a4e70;
+  --color-indigo-900: #143c57; --color-indigo-950: #0d2739;
+
+  --color-violet-50:  #f1f7fa; --color-violet-100: #e0edf3; --color-violet-200: #c3dde9;
+  --color-violet-300: #98c3d7; --color-violet-400: #64a3bf; --color-violet-500: #4187a8;
+  --color-violet-600: #2f7092; --color-violet-700: #245d7c; --color-violet-800: #1a4e70;
+  --color-violet-900: #143c57; --color-violet-950: #0d2739;
+
+  --color-purple-50:  #f1f7fa; --color-purple-100: #e0edf3; --color-purple-200: #c3dde9;
+  --color-purple-300: #98c3d7; --color-purple-400: #64a3bf; --color-purple-500: #4187a8;
+  --color-purple-600: #2f7092; --color-purple-700: #245d7c; --color-purple-800: #1a4e70;
+  --color-purple-900: #143c57; --color-purple-950: #0d2739;
+
+  /* Acento (#2B8CA8 ≈ tono 600) */
+  --color-cyan-50:  #f0f9fb;
+  --color-cyan-100: #ddf1f6;
+  --color-cyan-200: #bce4ed;
+  --color-cyan-300: #8ed0e0;
+  --color-cyan-400: #57b4cb;
+  --color-cyan-500: #379db6;
+  --color-cyan-600: #2b8ca8;
+  --color-cyan-700: #26758c;
+  --color-cyan-800: #245f73;
+  --color-cyan-900: #224e5e;
+  --color-cyan-950: #12333e;
+
+  --color-teal-50:  #f0f9fb; --color-teal-100: #ddf1f6; --color-teal-200: #bce4ed;
+  --color-teal-300: #8ed0e0; --color-teal-400: #57b4cb; --color-teal-500: #379db6;
+  --color-teal-600: #2b8ca8; --color-teal-700: #26758c; --color-teal-800: #245f73;
+  --color-teal-900: #224e5e; --color-teal-950: #12333e;
+
+  --color-sky-50:  #f0f9fb; --color-sky-100: #ddf1f6; --color-sky-200: #bce4ed;
+  --color-sky-300: #8ed0e0; --color-sky-400: #57b4cb; --color-sky-500: #379db6;
+  --color-sky-600: #2b8ca8; --color-sky-700: #26758c; --color-sky-800: #245f73;
+  --color-sky-900: #224e5e; --color-sky-950: #12333e;
+
+  --color-orange-50:  #f0f9fb; --color-orange-100: #ddf1f6; --color-orange-200: #bce4ed;
+  --color-orange-300: #8ed0e0; --color-orange-400: #57b4cb; --color-orange-500: #379db6;
+  --color-orange-600: #2b8ca8; --color-orange-700: #26758c; --color-orange-800: #245f73;
+  --color-orange-900: #224e5e; --color-orange-950: #12333e;
+}
+
+/* Modo oscuro del área: mismas dos familias pero con rampas invertidas hacia
+   fondos profundos, conviviendo con la rampa slate MINSAL global de .dark. */
+.dark .tema-hnes {
+  /* La tinta clara de arriba NO aplica en oscuro: aquí slate-900/950 son
+     FONDOS (dark:bg-slate-900) y deben seguir siendo los de la rampa MINSAL
+     del bloque .dark — sin esto las tarjetas saldrían casi negras. */
+  --color-slate-950: #1c2834;
+  --color-slate-900: #243342;
+
+  --color-blue-50:  #eff7fa;
+  --color-blue-100: #e2eff5;
+  --color-blue-200: #cbe3ec;
+  --color-blue-300: #a7cfe0;
+  --color-blue-400: #7ab4cf;
+  --color-blue-500: #4b93b5;
+  --color-blue-600: #2f7092;
+  --color-blue-700: #21587a;
+  --color-blue-800: #1a4560;
+  --color-blue-900: #143349;
+  --color-blue-950: #0e2333;
+
+  --color-indigo-50:  #eff7fa; --color-indigo-100: #e2eff5; --color-indigo-200: #cbe3ec;
+  --color-indigo-300: #a7cfe0; --color-indigo-400: #7ab4cf; --color-indigo-500: #4b93b5;
+  --color-indigo-600: #2f7092; --color-indigo-700: #21587a; --color-indigo-800: #1a4560;
+  --color-indigo-900: #143349; --color-indigo-950: #0e2333;
+
+  --color-violet-50:  #eff7fa; --color-violet-100: #e2eff5; --color-violet-200: #cbe3ec;
+  --color-violet-300: #a7cfe0; --color-violet-400: #7ab4cf; --color-violet-500: #4b93b5;
+  --color-violet-600: #2f7092; --color-violet-700: #21587a; --color-violet-800: #1a4560;
+  --color-violet-900: #143349; --color-violet-950: #0e2333;
+
+  --color-purple-50:  #eff7fa; --color-purple-100: #e2eff5; --color-purple-200: #cbe3ec;
+  --color-purple-300: #a7cfe0; --color-purple-400: #7ab4cf; --color-purple-500: #4b93b5;
+  --color-purple-600: #2f7092; --color-purple-700: #21587a; --color-purple-800: #1a4560;
+  --color-purple-900: #143349; --color-purple-950: #0e2333;
+
+  --color-cyan-50:  #eff9fb;
+  --color-cyan-100: #e0f2f7;
+  --color-cyan-200: #c6e8f0;
+  --color-cyan-300: #9fd7e6;
+  --color-cyan-400: #6fc2d8;
+  --color-cyan-500: #45aac6;
+  --color-cyan-600: #2f97b5;
+  --color-cyan-700: #266f80;
+  --color-cyan-800: #1e5866;
+  --color-cyan-900: #17434f;
+  --color-cyan-950: #10303a;
+
+  --color-teal-50:  #eff9fb; --color-teal-100: #e0f2f7; --color-teal-200: #c6e8f0;
+  --color-teal-300: #9fd7e6; --color-teal-400: #6fc2d8; --color-teal-500: #45aac6;
+  --color-teal-600: #2f97b5; --color-teal-700: #266f80; --color-teal-800: #1e5866;
+  --color-teal-900: #17434f; --color-teal-950: #10303a;
+
+  --color-sky-50:  #eff9fb; --color-sky-100: #e0f2f7; --color-sky-200: #c6e8f0;
+  --color-sky-300: #9fd7e6; --color-sky-400: #6fc2d8; --color-sky-500: #45aac6;
+  --color-sky-600: #2f97b5; --color-sky-700: #266f80; --color-sky-800: #1e5866;
+  --color-sky-900: #17434f; --color-sky-950: #10303a;
+
+  --color-orange-50:  #eff9fb; --color-orange-100: #e0f2f7; --color-orange-200: #c6e8f0;
+  --color-orange-300: #9fd7e6; --color-orange-400: #6fc2d8; --color-orange-500: #45aac6;
+  --color-orange-600: #2f97b5; --color-orange-700: #266f80; --color-orange-800: #1e5866;
+  --color-orange-900: #17434f; --color-orange-950: #10303a;
+}
+
 @theme inline {
   --font-sans: var(--font-body);
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp,
+  collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, Timestamp,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,8 +15,9 @@ import {
 import {
   ShieldAlert, Plus, X, CheckCircle2, AlertCircle, Search, ChevronLeft, ChevronRight,
   Car, HeartCrack, Clock3, FileText, StickyNote, Ban, Landmark, Baby, Scale,
+  Megaphone, ArrowRight,
 } from "lucide-react";
-import type { NotificacionConapinaFgr, InstanciaAviso } from "@/types";
+import type { NotificacionConapinaFgr, InstanciaAviso, SolicitudNotificacionLesion } from "@/types";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
@@ -47,6 +48,10 @@ function ChipInstancia({ instancia, size = 10 }: { instancia: InstanciaAviso; si
 const MOTIVO_ANULACION_MIN = 10;
 const PAGE_SIZE = 15;
 
+// Cuántos días se siguen viendo las solicitudes ya notificadas en la bandeja,
+// para que el área médica vea el cierre antes de que desaparezcan.
+const DIAS_CERRADAS_VISIBLES = 7;
+
 // El servidor resuelve creadoEn (serverTimestamp); mientras la escritura está
 // pendiente llega null → esos documentos son los más nuevos, no los más viejos.
 const msDe = (v: unknown) => (v as { toDate?: () => Date })?.toDate?.()?.getTime() ?? Number.MAX_SAFE_INTEGER;
@@ -70,6 +75,14 @@ export default function MedicoConapinaFgrPage() {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
 
+  // Solicitudes que el comité difunde a TODOS los médicos: las pendientes son
+  // la bandeja de trabajo y las notificadas de los últimos días muestran el
+  // cierre. Dos consultas chicas en vez de una con índice compuesto: las
+  // pendientes por igualdad y las cerradas por rango sobre notificadoEn (solo
+  // las notificadas tienen ese campo, así que el rango basta solo).
+  const [solicitudesPend, setSolicitudesPend] = useState<SolicitudNotificacionLesion[]>([]);
+  const [solicitudesCerradas, setSolicitudesCerradas] = useState<SolicitudNotificacionLesion[]>([]);
+
   useEffect(() => {
     if (!user) return;
     // Sin orderBy: se ordena en cliente para no exigir índice compuesto.
@@ -80,6 +93,29 @@ export default function MedicoConapinaFgrPage() {
       setNotificaciones(docs);
       setDetalle(prev => (prev?.id ? docs.find(d => d.id === prev.id) ?? prev : prev));
     });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const uPend = onSnapshot(
+      query(collection(db, "solicitudes_notificacion_lesion"), where("estado", "==", "pendiente")),
+      s => {
+        const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudNotificacionLesion));
+        docs.sort((a, b) => msDe(b.creadoEn) - msDe(a.creadoEn));
+        setSolicitudesPend(docs);
+      },
+    );
+    const corte = new Date();
+    corte.setDate(corte.getDate() - DIAS_CERRADAS_VISIBLES);
+    const uCerr = onSnapshot(
+      query(collection(db, "solicitudes_notificacion_lesion"), where("notificadoEn", ">=", Timestamp.fromDate(corte))),
+      s => {
+        const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudNotificacionLesion));
+        docs.sort((a, b) => msDe(b.notificadoEn) - msDe(a.notificadoEn));
+        setSolicitudesCerradas(docs);
+      },
+    );
+    return () => { uPend(); uCerr(); };
   }, [user]);
 
 
@@ -156,7 +192,7 @@ export default function MedicoConapinaFgrPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* Encabezado de tarea: deja claro qué se notifica y a quién le llega. */}
-      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#4a3312] via-amber-700 to-orange-600 px-5 py-5 shadow-lg shadow-amber-950/20 md:px-7 md:py-6">
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/20 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
         <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -166,19 +202,99 @@ export default function MedicoConapinaFgrPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Notificación CONAPINA / FGR</h1>
-              <p className="mt-1 max-w-xl text-sm text-amber-50/90">
+              <p className="mt-1 max-w-xl text-sm text-cyan-50/90">
                 Deje constancia del aviso que dio a CONAPINA o la Fiscalía. El Comité de Lesiones Intencionales lo recibe y lo lleva al registro que audita el MINSAL.
               </p>
             </div>
           </div>
           <button
             onClick={() => router.push("/medico/conapina-fgr/nueva")}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-all hover:bg-amber-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-900 shadow-sm transition-all hover:bg-blue-50"
           >
             <Plus size={16} /> Nueva notificación
           </button>
         </div>
       </section>
+
+      {/* Bandeja de difusión del comité: casos que pide notificar. Solo se
+          dibuja si hay algo que mostrar — el día normal no existe. */}
+      {(solicitudesPend.length > 0 || solicitudesCerradas.length > 0) && (
+        <section className="mb-4 rounded-3xl border border-orange-200 bg-white p-4 shadow-sm shadow-orange-900/5 dark:border-orange-900/60 dark:bg-slate-900 md:p-5">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm shadow-orange-600/30">
+              <Megaphone size={17} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Solicitudes del comité</h2>
+                {solicitudesPend.length > 0 && (
+                  <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                    {solicitudesPend.length} {solicitudesPend.length === 1 ? "pendiente" : "pendientes"}
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                El Comité de Lesiones pide que el área médica notifique estos casos. Si el paciente es suyo o de su
+                servicio, pulse Notificar: el formulario llega con el expediente ya puesto.
+              </p>
+            </div>
+          </div>
+
+          {solicitudesPend.length > 0 && (
+            <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+              {solicitudesPend.map(sol => (
+                <div key={sol.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900/60 dark:bg-orange-950/20 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">{sol.pacienteNombre}</span>
+                      {sol.categoriaSugerida && (
+                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[sol.categoriaSugerida]}`}>
+                          {TIPO_CASO_LABEL[sol.categoriaSugerida]}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-mono font-medium">Exp. {sol.expediente}</span>
+                      {sol.servicio && <span>· {sol.servicio}</span>}
+                    </p>
+                    {sol.nota && (
+                      <p className="mt-1.5 flex items-start gap-1.5 text-xs italic leading-5 text-slate-600 dark:text-slate-400">
+                        <StickyNote size={12} className="mt-0.5 shrink-0 text-slate-400" />
+                        <span className="whitespace-pre-wrap">{sol.nota}</span>
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-[11px] text-slate-400">
+                      Solicitada por {sol.creadoPorNombre} · {formatDia(sol.creadoEn)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/medico/conapina-fgr/nueva?exp=${encodeURIComponent(sol.expediente)}`)}
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-orange-600/25 transition-colors hover:bg-orange-500">
+                    Notificar <ArrowRight size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {solicitudesCerradas.length > 0 && (
+            <div className={solicitudesPend.length > 0 ? "mt-3 space-y-1.5" : "space-y-1.5"}>
+              {solicitudesCerradas.map(sol => (
+                <div key={sol.id}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                  <CheckCircle2 size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-medium text-slate-800 dark:text-slate-200">{sol.pacienteNombre}</span>
+                  <span className="font-mono text-slate-500">Exp. {sol.expediente}</span>
+                  <span className="ml-auto text-emerald-700 dark:text-emerald-400">
+                    Notificada por {sol.notificadoPorNombre ?? "—"} · {formatDia(sol.notificadoEn)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Historial y filtros */}
       <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
@@ -251,7 +367,7 @@ export default function MedicoConapinaFgrPage() {
                 const anulada = n.estado === "anulado";
                 return (
                   <tr key={n.id} onClick={() => setDetalle(n)}
-                    className={`cursor-pointer transition-colors hover:bg-amber-50/40 dark:hover:bg-slate-800/60 ${anulada ? "opacity-60" : ""}`}>
+                    className={`cursor-pointer transition-colors hover:bg-cyan-50/40 dark:hover:bg-slate-800/60 ${anulada ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${

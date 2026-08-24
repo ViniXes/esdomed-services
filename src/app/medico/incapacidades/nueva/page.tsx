@@ -273,7 +273,7 @@ export default function NuevaIncapacidadPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#243b6b] via-indigo-700 to-blue-700 px-5 py-5 shadow-lg shadow-indigo-950/15 md:px-7 md:py-6">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-indigo-950/15 md:px-7 md:py-6">
         <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/20"><FileText size={24} /></span><div><h1 className="text-xl font-bold text-white md:text-2xl font-heading">Nueva incapacidad</h1><p className="mt-1 text-sm text-indigo-50/90">Identifique al paciente y complete los datos para enviar la solicitud.</p></div></div>

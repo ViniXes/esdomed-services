@@ -25,7 +25,7 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
     { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },
     { href: "/psicologia/altas",             label: "Altas efectivas",   icon: LogOut },
     { href: "/psicologia/altas-vivos",       label: "Verificación de Altas", icon: LogIn },
-    { href: "/psicologia/fallecidos",        label: "Fallecidos",        icon: HeartPulse, badge: pendientes.fallecidos },
+    { href: "/psicologia/fallecidos",        label: "Fallecidos",        icon: HeartPulse, tone: "rose", badge: pendientes.fallecidos },
     { href: "/psicologia/recepciones",       label: "Recepciones",       icon: Inbox,      badge: pendientes.recepciones },
   ];
 

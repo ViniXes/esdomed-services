@@ -127,6 +127,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             href: "/dashboard/defunciones",
             label: "Defunciones",
             icon: HeartPulse,
+            tone: "rose" as const,
             badge: pendientes.fallecidos,
             group: G_PROCESOS_ESDOMED,
           },
@@ -227,6 +228,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           href: "/dashboard/fallecidos",
           label: "Fallecidos",
           icon: HeartPulse,
+          tone: "rose" as const,
           badge: pendientes.fallecidos,
           group: G_PACIENTES,
         }]

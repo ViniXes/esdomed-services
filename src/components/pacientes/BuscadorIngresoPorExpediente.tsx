@@ -23,6 +23,9 @@ import type { Paciente } from "@/types";
 interface Props {
   value: Paciente | null;
   onSelect: (p: Paciente | null) => void;
+  // Texto inicial de búsqueda: la bandeja de solicitudes del comité llega con
+  // el expediente ya puesto para que el médico solo elija el ingreso.
+  initialTexto?: string;
 }
 
 const inputCls =
@@ -31,8 +34,8 @@ const inputCls =
 const formatDia = (d?: Date | null) =>
   d ? d.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-export function BuscadorIngresoPorExpediente({ value, onSelect }: Props) {
-  const [texto, setTexto] = useState("");
+export function BuscadorIngresoPorExpediente({ value, onSelect, initialTexto }: Props) {
+  const [texto, setTexto] = useState(initialTexto ?? "");
   const [resultados, setResultados] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(false);
   const [buscado, setBuscado] = useState(false);

@@ -389,7 +389,7 @@ export default function ColaExpedientesPage() {
         <div className="absolute right-24 bottom-0 h-24 w-24 rounded-full bg-cyan-200/35 blur-xl dark:bg-cyan-500/10" />
         <div className="relative flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#4f5ee8] text-white shadow-lg shadow-blue-500/20">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#2b8ca8] to-[#1a4e70] text-white shadow-lg shadow-blue-500/20">
             <Ambulance size={25} strokeWidth={2.1} />
           </div>
           <div>

@@ -660,6 +660,7 @@ export default function EditorPlanPage() {
 
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
   const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
+  const conteoApoyoDiurnoPorDia = new Array(dias.length).fill(0);
   filas.forEach((fila) => {
     fila.asignaciones.forEach((celda, diaIdx) => {
       const horario = getHorario(celda);
@@ -667,6 +668,9 @@ export default function EditorPlanPage() {
         conteoOperativosPorDia[diaIdx]++;
         if (fila.grupo?.trim() === "Equipo de emergencia") {
           conteoEmergenciaPorDia[diaIdx]++;
+        }
+        if (fila.grupo?.trim() === "Equipo de apoyo diurno / emergencia") {
+          conteoApoyoDiurnoPorDia[diaIdx]++;
         }
       }
     });
@@ -1021,6 +1025,22 @@ export default function EditorPlanPage() {
                     );
                   })}
                   <td className="border-l border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950"></td>
+                </tr>
+                <tr className="bg-orange-50 dark:bg-orange-950/20 border-t-2 border-orange-200 dark:border-orange-900/60">
+                  <td className="sticky left-0 z-10 bg-orange-50 dark:bg-orange-950 px-2 py-2 font-bold text-[10px] text-right text-orange-700 dark:text-orange-300 border-r border-orange-200 dark:border-orange-900/60 uppercase tracking-wider">
+                    Total Apoyo diurno / Día:
+                  </td>
+                  {dias.map((d, diaIdx) => {
+                    const count = conteoApoyoDiurnoPorDia[diaIdx];
+                    return (
+                      <td key={`tot-apoyo-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-orange-100 dark:border-orange-900/40 last:border-r-0">
+                        <div className="mx-auto w-7 h-6 flex items-center justify-center rounded bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
+                          {count}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="border-l border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950"></td>
                 </tr>
                 <tr className="bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-200 dark:border-slate-700">
                   <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-2 py-2 font-bold text-[10px] text-right text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 uppercase tracking-wider">
