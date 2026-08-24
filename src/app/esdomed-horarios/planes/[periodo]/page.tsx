@@ -466,7 +466,7 @@ export default function EditorPlanPage() {
       .map((count, idx) => count < 2 ? idx + 1 : null)
       .filter((val): val is number => val !== null);
     if (diasIncompletos.length > 0) {
-      advertencias.push(`Días con menos de 2 operativos asignados: ${diasIncompletos.join(", ")}.`);
+      advertencias.push(`Días con menos de 2 operativos de grupo asignados (sin contar emergencia ni apoyo diurno): ${diasIncompletos.join(", ")}.`);
     }
 
     // Las vacaciones siempre son un periodo de 15 días: avisar si alguien tiene
@@ -658,19 +658,24 @@ export default function EditorPlanPage() {
     }
   };
 
+  // Tres contadores EXCLUYENTES: cada turno operativo/hospitalario suma solo a
+  // uno según el grupo de la fila. El de operativos cubre a los grupos
+  // regulares (y filas sin grupo); los equipos de emergencia y de apoyo diurno
+  // llevan cada uno su propia fila de totales.
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
   const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
   const conteoApoyoDiurnoPorDia = new Array(dias.length).fill(0);
   filas.forEach((fila) => {
+    const grupo = fila.grupo?.trim();
     fila.asignaciones.forEach((celda, diaIdx) => {
       const horario = getHorario(celda);
       if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
-        conteoOperativosPorDia[diaIdx]++;
-        if (fila.grupo?.trim() === "Equipo de emergencia") {
+        if (grupo === "Equipo de emergencia") {
           conteoEmergenciaPorDia[diaIdx]++;
-        }
-        if (fila.grupo?.trim() === "Equipo de apoyo diurno / emergencia") {
+        } else if (grupo === "Equipo de apoyo diurno / emergencia") {
           conteoApoyoDiurnoPorDia[diaIdx]++;
+        } else {
+          conteoOperativosPorDia[diaIdx]++;
         }
       }
     });
@@ -1044,14 +1049,14 @@ export default function EditorPlanPage() {
                 </tr>
                 <tr className="bg-slate-50 dark:bg-slate-800/80 border-t-2 border-slate-200 dark:border-slate-700">
                   <td className="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-2 py-2 font-bold text-[10px] text-right text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-slate-700 uppercase tracking-wider">
-                    Total Operativos / Día:
+                    Total Operativos de Grupo / Día:
                   </td>
                   {dias.map((d, diaIdx) => {
                     const count = conteoOperativosPorDia[diaIdx];
                     const faltan = count < 2;
                     return (
                       <td key={`tot-${d}`} className="text-center font-bold text-[10px] py-1 border-r border-slate-100 dark:border-slate-700/50 last:border-r-0">
-                        <div className={`mx-auto w-7 h-6 flex items-center justify-center rounded transition-colors ${faltan ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400 border border-rose-300 dark:border-rose-700/80 shadow-sm" : "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"}`} title={faltan ? "Se requieren al menos 2 operativos" : "Cobertura operativa OK"}>
+                        <div className={`mx-auto w-7 h-6 flex items-center justify-center rounded transition-colors ${faltan ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400 border border-rose-300 dark:border-rose-700/80 shadow-sm" : "text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"}`} title={faltan ? "Se requieren al menos 2 operativos de grupo" : "Cobertura operativa OK"}>
                           {count}
                         </div>
                       </td>

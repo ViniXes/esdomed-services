@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Activity, Users, Megaphone } from "lucide-react";
+import { ShieldAlert, Activity, Users, Megaphone, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -25,6 +25,7 @@ function ComiteLesionesContent({ children }: { children: React.ReactNode }) {
     { href: "/comite-lesiones/lesiones-ingresos", label: "Ingresos por lesión", icon: Activity },
     { href: "/comite-lesiones/solicitudes", label: "Avisos pendientes a notificar / Solicitudes al área médica", icon: Megaphone },
     { href: "/comite-lesiones/ingresos-adolescentes", label: "Ingresos adolescentes", icon: Users },
+    { href: "/comite-lesiones/reportes", label: "Reportes", icon: BarChart3 },
   ];
 
   return (

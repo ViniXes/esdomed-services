@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [],
+  "files": [
+    "next-env.d.ts",
+    "src/lib/servicios.ts",
+    "src/lib/pacientes/importMapper.ts",
+    "src/app/dashboard/pacientes/importar/page.tsx",
+    "src/app/dashboard/pacientes/nuevo/page.tsx",
+    "src/app/dashboard/pacientes/[id]/editar-ingreso/page.tsx",
+    "src/contexts/ServiciosContext.tsx",
+    "src/app/dashboard/configuracion/servicios/page.tsx"
+  ]
+}

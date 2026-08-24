@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { FilaPlanTrabajo, PlanTrabajo } from "@/types";
+import type { PlanTrabajo } from "@/types";
 import {
   getHorario,
   esMarcaEspecial,
+  labelMarca,
   totalHorasFila,
+  HORARIOS,
 } from "@/lib/esdomed/horarios";
 import {
   diasDelMesArray,
@@ -18,11 +20,10 @@ import {
   parsePeriodo,
   periodosCercanos,
   PERIODO_ACTUAL,
-  GRUPOS_ESDOMED,
   COLOR_GRUPO,
   ordenGrupo,
 } from "@/lib/esdomed/plan";
-import { Users, UsersRound } from "lucide-react";
+import { Clock, LogIn, LogOut, Users, UsersRound } from "lucide-react";
 
 export default function MiGrupoPage() {
   const { profile } = useAuth();
@@ -73,6 +74,19 @@ export default function MiGrupoPage() {
   }, [plan, grupoSel]);
 
   const estiloGrupo = grupoSel ? COLOR_GRUPO[grupoSel] : null;
+
+  // Jornadas del catálogo que este grupo usa en el mes (para decodificar los
+  // códigos de la cuadrícula con su hora de entrada y salida).
+  const horariosUsados = useMemo(() => {
+    const set = new Set<string>();
+    miembros.forEach((f) =>
+      f.asignaciones.forEach((c) => {
+        const v = (c ?? "").trim().toUpperCase();
+        if (v && getHorario(v)) set.add(v);
+      }),
+    );
+    return HORARIOS.filter((h) => set.has(h.codigo));
+  }, [miembros]);
 
   return (
     <div className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
@@ -189,7 +203,10 @@ export default function MiGrupoPage() {
                         const hoy = d === diaHoy;
                         return (
                           <td key={d} className={`text-center ${hoy ? "ring-1 ring-inset ring-blue-300 dark:ring-blue-700" : finde ? "bg-rose-50/30 dark:bg-rose-950/20" : ""}`}>
-                            <span className={`block w-8 h-7 leading-7 text-[10px] font-bold tabular-nums ${colorCelda(celda)}`}>
+                            <span
+                              title={tooltipCelda(celda)}
+                              className={`block w-8 h-7 leading-7 text-[10px] font-bold tabular-nums ${celda ? "cursor-help" : ""} ${colorCelda(celda)}`}
+                            >
                               {celda.toUpperCase()}
                             </span>
                           </td>
@@ -205,6 +222,54 @@ export default function MiGrupoPage() {
             </table>
           </div>
 
+          {/* Horarios del grupo — decodifica los códigos de la cuadrícula */}
+          {horariosUsados.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="inline-flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <Clock size={14} /> Horarios de este grupo
+                </h2>
+                <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
+                      <th className="px-3 py-2 text-left font-semibold">Código</th>
+                      <th className="px-3 py-2 text-left font-semibold">Entrada</th>
+                      <th className="px-3 py-2 text-left font-semibold">Salida</th>
+                      <th className="px-3 py-2 text-right font-semibold">Horas</th>
+                      <th className="hidden sm:table-cell px-3 py-2 text-left font-semibold">Jornada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {horariosUsados.map((h) => (
+                      <tr key={h.codigo} className="border-t border-slate-100 dark:border-slate-800">
+                        <td className="px-3 py-2">
+                          <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 font-bold text-blue-700 dark:bg-[var(--color-institutional-navy)]/50 dark:text-[#c9a892]">
+                            {h.codigo}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center gap-1 font-medium text-slate-800 dark:text-slate-200">
+                            <LogIn size={12} className="text-blue-600 dark:text-blue-300" /> {h.entrada}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center gap-1 font-medium text-slate-800 dark:text-slate-200">
+                            <LogOut size={12} className="text-amber-600 dark:text-amber-400" /> {h.salida}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-700 dark:text-slate-200">{h.horas}</td>
+                        <td className="hidden sm:table-cell px-3 py-2 text-slate-500 dark:text-slate-400">{h.tipo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Roster — tarjetas de los miembros del grupo */}
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-3">
@@ -214,6 +279,8 @@ export default function MiGrupoPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {miembros.map((fila) => {
                 const esYo = fila.uid && fila.uid === profile?.uid;
+                const celdaHoy = esMesActual ? (fila.asignaciones[diaHoy - 1] ?? "").trim().toUpperCase() : "";
+                const horarioHoy = getHorario(celdaHoy);
                 return (
                   <div
                     key={fila.uid || fila.codigoMarcacion || fila.nombre}
@@ -239,6 +306,26 @@ export default function MiGrupoPage() {
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate" title={fila.puesto}>
                         {fila.puesto || "Sin puesto"}
                       </p>
+                      {/* Turno de HOY con hora de entrada y salida (solo mes actual) */}
+                      {esMesActual && (
+                        horarioHoy ? (
+                          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
+                            <span className="inline-flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200">
+                              <Clock size={11} className="text-blue-600 dark:text-blue-300 shrink-0" /> Hoy {celdaHoy}
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-100">
+                              {horarioHoy.entrada} – {horarioHoy.salida}
+                            </span>
+                            <span className="text-slate-400">({horarioHoy.horas} h)</span>
+                          </p>
+                        ) : esMarcaEspecial(celdaHoy) ? (
+                          <p className="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                            Hoy: {labelMarca(celdaHoy)}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-slate-400">Hoy: libre / descanso</p>
+                        )
+                      )}
                     </div>
                   </div>
                 );
@@ -266,6 +353,16 @@ function inicialesNombre(nombre: string): string {
   if (palabras.length === 0) return "?";
   if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase();
   return (palabras[0][0] + palabras[palabras.length - 1][0]).toUpperCase();
+}
+
+// Texto emergente de una celda: horario con entrada-salida, o la marca especial.
+function tooltipCelda(celda: string): string | undefined {
+  const v = celda.trim().toUpperCase();
+  if (!v) return undefined;
+  const h = getHorario(v);
+  if (h) return `${v} · ${h.entrada} – ${h.salida} · ${h.horas} h`;
+  if (esMarcaEspecial(v)) return labelMarca(v);
+  return undefined;
 }
 
 function colorCelda(celda: string): string {

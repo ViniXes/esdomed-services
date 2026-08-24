@@ -13,6 +13,7 @@ import {
   UserPlus, ArrowRightLeft, MinusCircle, HelpCircle, LogOut, ChevronDown,
 } from "lucide-react";
 import { mapearFilaReporte } from "@/lib/pacientes/importMapper";
+import { mismoServicio, mismaCama } from "@/lib/servicios";
 import { construirDatosPersonales, construirDocIngreso, limpiarResponsable } from "@/lib/pacientes/persona";
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";
 import type { DiagnosticoCIE, ResponsablePaciente } from "@/types";
@@ -25,6 +26,8 @@ interface Actualizar {
   id: string; expediente: string; nombre: string;
   servicioAnterior: string; camaAnterior: string;
   servicioNuevo: string; camaNuevo: string;
+  cambioUbicacion: boolean;   // traslado REAL: cambió de servicio o de cama
+  normalizaUbicacion: boolean; // mismo lugar, solo se reescribe con el nombre canónico
   ultimoDiagnostico?: DiagnosticoCIE;   // último diagnóstico del reporte (se refresca)
   cambioDx: boolean;                    // true si el último diagnóstico cambió
   cambiosPersonales?: CambioPersonal[]; // cambios en datos personales detectados
@@ -142,8 +145,16 @@ export default function ImportarReportePage() {
         const camaNueva = (m.form.camaActual ?? "").trim();
 
         if (existente) {
-          const cambioServicio = existente.servicioActual !== servicioNuevo;
-          const cambioCama = camaNueva !== "" && existente.camaActual !== camaNueva;
+          // Comparar por CLAVE canónica: "Unidad de cuidados intensivos …" y
+          // "Unidad de Cuidados Intensivos …" son el mismo servicio, y "02" es la
+          // misma cama que "2". Comparar literal generaba traslados fantasma en
+          // cada importación (todo un servicio "moviéndose" por un cambio de caja).
+          const cambioServicio = !mismoServicio(existente.servicioActual, servicioNuevo);
+          const cambioCama = camaNueva !== "" && !mismaCama(existente.camaActual, camaNueva);
+          // Mismo lugar, distinta escritura: se corrige el texto guardado, sin movimiento.
+          const normalizaUbicacion =
+            (!cambioServicio && servicioNuevo !== "" && existente.servicioActual !== servicioNuevo) ||
+            (!cambioCama && camaNueva !== "" && existente.camaActual !== camaNueva);
           const dxNuevo = m.form.ultimoDiagnostico;
           const cambioDx = !!dxNuevo && dxKey(existente.ultimoDiagnostico) !== dxKey(dxNuevo);
 
@@ -190,11 +201,13 @@ export default function ImportarReportePage() {
             if (limpio) dp.responsable = limpio;
           }
 
-          if (cambioServicio || cambioCama || cambioDx || cambiosPersonales.length > 0) {
+          if (cambioServicio || cambioCama || normalizaUbicacion || cambioDx || cambiosPersonales.length > 0) {
             d.actualizar.push({
               id: existente.id, expediente: m.expediente, nombre: nombreDe(m.form),
               servicioAnterior: existente.servicioActual, camaAnterior: existente.camaActual,
               servicioNuevo, camaNuevo: camaNueva,
+              cambioUbicacion: cambioServicio || cambioCama,
+              normalizaUbicacion,
               ultimoDiagnostico: dxNuevo, cambioDx,
               cambiosPersonales: cambiosPersonales.length ? cambiosPersonales : undefined,
               datosPersonales: Object.keys(dp).length ? dp : undefined,
@@ -252,9 +265,7 @@ export default function ImportarReportePage() {
           actualizadoEn: ahora,
           actualizadoPor: profile.uid,
         };
-        const cambioServicio = a.servicioAnterior !== a.servicioNuevo;
-        const cambioCama = !!a.camaNuevo && a.camaAnterior !== a.camaNuevo;
-        if (cambioServicio || cambioCama) {
+        if (a.cambioUbicacion) {
           const mov: Record<string, unknown> = {
             fecha: ahora,
             servicioOrigen: a.servicioAnterior,
@@ -266,6 +277,11 @@ export default function ImportarReportePage() {
           payload.servicioActual = a.servicioNuevo;
           payload.camaActual = a.camaNuevo || null;
           payload.movimientos = arrayUnion(mov);
+        } else if (a.normalizaUbicacion) {
+          // El paciente NO se movió: solo se reescribe el nombre con el del catálogo.
+          // Nunca se registra un movimiento por esto.
+          payload.servicioActual = a.servicioNuevo;
+          if (a.camaNuevo) payload.camaActual = a.camaNuevo;
         }
         if (a.cambioDx && a.ultimoDiagnostico) {
           payload.ultimoDiagnostico = {
@@ -395,11 +411,17 @@ export default function ImportarReportePage() {
           </Seccion>
 
           <Seccion titulo="Actualizaciones (servicio / cama / diagnóstico / datos)" vacioMsg="Ningún activo cambió de servicio, cama, diagnóstico o datos personales." items={diff.actualizar}>
+            <p className="pb-1 text-[11px] text-slate-500">
+              Solo se registra un traslado cuando el paciente realmente cambió de servicio o de cama.
+              Las filas marcadas «Nombre normalizado» únicamente corrigen la escritura al nombre del catálogo.
+            </p>
             {diff.actualizar.map((a) => {
-              const cambioUbicacion = a.servicioAnterior !== a.servicioNuevo || (!!a.camaNuevo && a.camaAnterior !== a.camaNuevo);
               const partes = [
-                cambioUbicacion
+                a.cambioUbicacion
                   ? `${a.servicioAnterior}${a.camaAnterior ? ` (${a.camaAnterior})` : ""} → ${a.servicioNuevo}${a.camaNuevo ? ` (${a.camaNuevo})` : ""}`
+                  : null,
+                !a.cambioUbicacion && a.normalizaUbicacion
+                  ? `Nombre normalizado → ${a.servicioNuevo}${a.camaNuevo ? ` (${a.camaNuevo})` : ""} · sin traslado`
                   : null,
                 a.cambioDx ? `Dx → ${a.ultimoDiagnostico?.codigo || a.ultimoDiagnostico?.descripcion || "actualizado"}` : null,
               ].filter(Boolean).join("  ·  ");

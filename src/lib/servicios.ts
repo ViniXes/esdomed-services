@@ -32,7 +32,6 @@ export const SERVICIOS_HOSPITALARIOS = [
   "Unidad de Cuidados Neurointensivos Adultos",
   "Unidad de Cuidados Coronarios y Posquirúrgicos Cardiovasculares",
   "Unidad de Cuidados Intensivos",                                       // nuevo en SIS (genérico)
-  "Unidad de Cuidados Intensivos Adultos BM",
   "Unidad de Evaluacion y Observación Medica",                          // SIS: sin tildes en "Evaluacion" y "Medica"
   "Quimioterapia Ambulatoria",
   "Unidad de Terapia Intervencionista Endovascular",
@@ -179,4 +178,107 @@ export function ubicacionLabel(servicio?: string, cama?: string): string {
   if (/[a-zA-Z]/.test(c)) return c;
   const abbr = servicio ? ABREVIATURA_SERVICIO[servicio] : undefined;
   return abbr ? `${abbr}-${c}` : s ? `${s} ${c}` : c;
+}
+
+// ── Normalización canónica de nombres ─────────────────────────────────────────
+// El SIS escribe los mismos servicios con variaciones inofensivas: mayúsculas vs.
+// minúsculas ("Unidad de Cuidados Intensivos" / "Unidad de cuidados intensivos"),
+// tildes, dobles espacios ("Intensivos␣␣Adultos BM"), numeral romano vs. dígito.
+// Todas esas variantes se colapsan en una CLAVE de comparación; el nombre que se
+// GUARDA es siempre el del catálogo vivo (Firestore) — nunca el crudo del reporte.
+//
+// Regla de oro: comparar por clave, escribir el canónico.
+
+const ROMANOS: Record<string, string> = {
+  i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10",
+};
+
+/** Clave de comparación de servicios: sin tildes, sin puntuación, minúsculas,
+ *  espacios colapsados y numerales romanos sueltos convertidos a dígito. */
+export function claveServicio(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")   // quita tildes/diacríticos (ñ → n)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")       // puntuación y símbolos → espacio
+    .trim()
+    .split(/\s+/)
+    .map((t) => ROMANOS[t] ?? t)
+    .join(" ");
+}
+
+/** Clave de comparación de camas: sin espacios, mayúsculas y sin ceros a la
+ *  izquierda ("02" ≡ "2", "MH1-04" ≡ "MH1-4"). */
+export function claveCama(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/(^|[^0-9])0+(\d)/g, "$1$2");
+}
+
+/** ¿Dos nombres de servicio designan el mismo servicio? (ignora mayúsculas,
+ *  tildes, espacios de más y romanos). Úsalo SIEMPRE en vez de `a !== b`. */
+export const mismoServicio = (a: unknown, b: unknown): boolean =>
+  claveServicio(a) === claveServicio(b);
+
+/** ¿Dos camas son la misma? (ignora ceros a la izquierda y espacios). */
+export const mismaCama = (a: unknown, b: unknown): boolean =>
+  claveCama(a) === claveCama(b);
+
+// ── Alias: cómo se escribe fuera → cómo se llama aquí ─────────────────────────
+// EDITABLE. La izquierda es la forma que puede venir en un reporte del SIS o en
+// datos viejos; la derecha DEBE ser un nombre del catálogo canónico de arriba.
+// No hace falta registrar variantes de mayúsculas, tildes, dobles espacios ni
+// romanos: esas ya las absorbe claveServicio(). Aquí solo van los nombres
+// realmente distintos (siglas, formas cortas, nombres históricos).
+const ALIAS_CRUDOS: Record<string, ServicioHospitalario> = {
+  // Siglas de cuidados intensivos
+  "UCI General 1 Adultos":        "Unidad de cuidados intensivos General 1 Adultos",
+  "UCI Aislados Adultos":         "Unidad de cuidados intensivos aislados Adultos",
+  "UCI Cardiovascular Adultos":   "Unidad de cuidados intensivos cardiovascular Adultos",
+  "UCI Quirúrgicos Adultos":      "Unidad de Cuidados Intensivos Quirúrgicos Adultos",
+  "UCI Extracorpórea Adultos":    "Unidad de Cuidados Intensivos Extracorpórea Adultos",
+  "UCI Adultos BM":               "Unidad de Cuidados Intensivos Adultos BM",
+  "UCI Neurointensivos Adultos":  "Unidad de Cuidados Neurointensivos Adultos",
+  "Unidad de Cuidados Neurointensivos": "Unidad de Cuidados Neurointensivos Adultos",
+  // Siglas de cuidados intermedios
+  "UCIM Adultos BM":              "Unidad de Cuidados Intermedios Adultos BM",
+  "UCIM Adultos MINSAL":          "Unidad de Cuidados Intermedios Adultos MINSAL",
+  "UCIM Aislados Adultos":        "Unidad de Cuidados Intermedios Aislados Adultos",
+  "UCIM Crónicos Adultos":        "Unidad de Cuidados Intermedios Crónicos Adultos",
+  // Formas cortas de los servicios de medicina
+  "Hematologia":                  "Servicio de Hematologia",
+  "Oncologia":                    "Servicio de Oncologia",
+  "Cardiologia":                  "Servicio de Cardiologia",
+  "Aislados":                     "Servicio de Aislados",
+  "Medicina Aislados":            "Servicio de Aislados",
+  "Cuidados Paliativos":          "Dolor y cuidados Paliativos",
+};
+
+/** Alias indexados por clave (se construye una sola vez). */
+export const ALIAS_SERVICIO: Record<string, string> = Object.fromEntries(
+  Object.entries(ALIAS_CRUDOS).map(([alias, canonico]) => [claveServicio(alias), canonico])
+);
+
+/**
+ * Resuelve cualquier forma de escribir un servicio al nombre EXACTO del catálogo.
+ * 1) calce directo por clave contra el catálogo vivo;
+ * 2) si no, tabla de alias → y ese canónico se busca otra vez en el catálogo.
+ * Devuelve null si el servicio no existe en el catálogo (para reportarlo, nunca
+ * para guardar el nombre crudo).
+ */
+export function resolverServicioCanonico(
+  nombre: unknown,
+  catalogo: readonly string[] = SERVICIOS_HOSPITALARIOS,
+): string | null {
+  const k = claveServicio(nombre);
+  if (!k) return null;
+  const directo = catalogo.find((s) => claveServicio(s) === k);
+  if (directo) return directo;
+  const canonicoAlias = ALIAS_SERVICIO[k];
+  if (!canonicoAlias) return null;
+  const kAlias = claveServicio(canonicoAlias);
+  return catalogo.find((s) => claveServicio(s) === kAlias) ?? null;
 }

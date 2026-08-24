@@ -1,5 +1,6 @@
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";
 import { normalizarGenero, normalizarArea } from "@/lib/pacientes/helpers";
+import { claveCama, resolverServicioCanonico } from "@/lib/servicios";
 
 // Mapeo del reporte de Excel "pacientes ingresados" → shape del formulario
 // (PacienteFormValue), para reutilizar construirDatosPersonales / construirDocIngreso.
@@ -21,25 +22,9 @@ export interface FilaMapeada {
 
 const txt = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
 
-// Numerales romanos → dígito (el SIS usa "General 1", el catálogo puede usar "General I").
-const ROMANOS: Record<string, string> = {
-  i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6", vii: "7", viii: "8", ix: "9", x: "10",
-};
-
-/**
- * Clave de comparación de servicios: minúsculas, sin tildes, espacios colapsados y
- * numerales romanos sueltos convertidos a dígito. Permite que el catálogo tenga los
- * nombres "bonitos" (con tilde) y aun así calce el reporte del SIS (sin tilde).
- */
-function claveServicio(v: unknown): string {
-  return txt(v)
-    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita tildes/diacríticos
-    .replace(/\s+/g, " ")
-    .toLowerCase()
-    .split(" ")
-    .map((t) => ROMANOS[t] ?? t)
-    .join(" ");
-}
+// La normalización de nombres de servicio/cama vive en @/lib/servicios
+// (claveServicio, claveCama, ALIAS_SERVICIO, resolverServicioCanonico), para que
+// importación, alta manual y edición de ingreso usen exactamente el mismo criterio.
 
 function parseFechaHora(valor: unknown): Date | null {
   if (!valor) return null;
@@ -84,11 +69,11 @@ function limpiarMunicipio(str: unknown): string | undefined {
   return txt(str).replace(/\s+[A-Z]{2,3}$/, "").trim() || undefined;
 }
 
-/** Resuelve el nombre del servicio del Excel contra el catálogo vivo. */
+/** Resuelve el nombre del servicio del Excel contra el catálogo vivo.
+ *  Absorbe mayúsculas, tildes, dobles espacios y romanos, y luego consulta la
+ *  tabla de alias (siglas y nombres históricos) de @/lib/servicios. */
 export function resolverServicio(servicioExcel: unknown, servicios: string[]): string | null {
-  const objetivo = claveServicio(servicioExcel);
-  if (!objetivo) return null;
-  return servicios.find((s) => claveServicio(s) === objetivo) ?? null;
+  return resolverServicioCanonico(servicioExcel, servicios);
 }
 
 /** Intenta encajar la cama del Excel con el catálogo del servicio. */
@@ -99,11 +84,11 @@ export function resolverCama(
   const raw = txt(camaExcel).replace(/\s+/g, "");
   if (!raw) return { cama: null };
   if (camasDelServicio.length === 0) return { cama: raw };
-  if (camasDelServicio.includes(raw)) return { cama: raw };
-  const padded = raw.padStart(2, "0");
-  if (camasDelServicio.includes(padded)) return { cama: padded };
-  const stripped = raw.replace(/^0+/, "") || "0";
-  if (camasDelServicio.includes(stripped)) return { cama: stripped };
+  // Calce por clave: "2", "02" y "  2 " son la misma cama. Se devuelve SIEMPRE la
+  // forma que tiene el catálogo, para que dos importaciones nunca difieran.
+  const k = claveCama(raw);
+  const enCatalogo = camasDelServicio.find((c) => claveCama(c) === k);
+  if (enCatalogo) return { cama: enCatalogo };
   return {
     cama: raw,
     advertencia: `"${raw}" no está en el catálogo (esperado: ${camasDelServicio[0] ?? "?"})`,

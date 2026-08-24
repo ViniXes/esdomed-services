@@ -81,6 +81,17 @@ Todos los tipos están definidos en `src/types/index.ts`.
 
 `src/lib/firebase.ts` exporta `auth`, `db`, `storage`. Usa `getApps()` para evitar re-inicialización en hot reload. Importar siempre desde ahí, nunca llamar `initializeApp` directamente.
 
+### Nombres de servicio — comparar por clave, escribir el canónico
+
+El catálogo canónico de servicios y camas vive en `src/lib/servicios.ts`; el catálogo **vivo** es `configuracion/servicios` en Firestore (`ServiciosContext`), que arranca sembrado del canónico y ESDOMED puede editar.
+
+El SIS escribe los mismos servicios de varias formas (mayúsculas/minúsculas, tildes, dobles espacios, romano vs. dígito). Regla obligatoria en TODO código que toque un nombre de servicio o de cama:
+
+- **Comparar** con `mismoServicio()` / `mismaCama()` (nunca `a !== b`). Comparar literal fue lo que generó traslados fantasma en la importación: un cambio de caja hacía que un servicio entero pareciera moverse y se escribía un `movimientos` con origen ≡ destino.
+- **Guardar** siempre el nombre que devuelve `resolverServicioCanonico()` (el del catálogo vivo), nunca el crudo del reporte.
+- Los nombres realmente distintos (siglas como “UCI General 1 Adultos”, formas cortas, nombres históricos) se agregan a `ALIAS_CRUDOS` en `src/lib/servicios.ts`. Las variantes de caja/tilde/espacio NO necesitan alias: las absorbe `claveServicio()`.
+- Limpieza de datos ya afectados: `node scripts/limpiar-traslados-fantasma.mjs --dry-run`.
+
 ### Creating Users
 
 Los usuarios no se registran solos — los crea el administrador directamente en Firebase Auth y luego se crea su documento en `usuarios/{uid}` con el rol correspondiente. No hay flujo de registro público.
