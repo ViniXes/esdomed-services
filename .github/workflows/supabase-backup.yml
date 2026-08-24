@@ -38,7 +38,9 @@ jobs:
             echo "::error::Falta el secret SUPABASE_DB_URL"; exit 1
           fi
           FECHA=$(date -u +%Y-%m-%d)
-          pg_dump "$DB_URL" \
+          # Ruta versionada: el runner trae Postgres 16 preinstalado y su
+          # pg_dump genérico gana en el PATH → "server version mismatch".
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" \
             --no-owner --no-privileges \
             --schema=public \
             --file="isbm_backup_${FECHA}.sql"
