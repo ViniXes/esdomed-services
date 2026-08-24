@@ -16,7 +16,14 @@ import {
 import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { serviciosPorTipoMedico, tipoUnidadPorServicio, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import {
+  servicioCanonicoCuidadosCriticos,
+  servicioCoincideCuidadosCriticos,
+  serviciosConsultaCuidadosCriticos,
+  serviciosPorTipoMedico,
+  tipoUnidadPorServicio,
+  TIPO_MEDICO_CRITICO_LABEL,
+} from "@/lib/cuidadosCriticos";
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
@@ -47,6 +54,10 @@ function ordenarFichas(fichas: FichaCuidadosCriticos[]) {
   return [...fichas].sort((a, b) => (toDate(a.creadoEn)?.getTime() ?? 0) - (toDate(b.creadoEn)?.getTime() ?? 0));
 }
 
+function servicioEnLista(servicio: string | null | undefined, servicios: string[]) {
+  return servicios.some(asignado => servicioCoincideCuidadosCriticos(servicio, asignado));
+}
+
 function estadoPacienteLabel(estado: Paciente["estado"]) {
   if (estado === "activo") return "Paciente ingresado";
   return estado.replaceAll("_", " ");
@@ -56,6 +67,7 @@ function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente 
   const [apellidos = ficha.pacienteNombre, nombres = ""] = ficha.pacienteNombre.split(",").map(parte => parte.trim());
   const sexo = valorComoTexto(ficha.datos?.sexo).toLowerCase();
   const fechaIngreso = fechaCuidadosCriticos(ficha.datos?.fecha_ingreso_al_servicio);
+  const servicioFicha = servicioCanonicoCuidadosCriticos(ficha.servicio);
   return {
     id,
     expediente: ficha.pacienteExpediente,
@@ -64,8 +76,8 @@ function pacienteDesdeFicha(ficha: FichaCuidadosCriticos, id: string): Paciente 
     genero: sexo === "femenino" ? "femenino" : sexo === "masculino" ? "masculino" : "otro",
     fechaIngreso: fechaIngreso ?? new Date(),
     establecimientoProcedencia: valorComoTexto(ficha.datos?.centro_de_procedencia),
-    servicioIngreso: valorComoTexto(ficha.datos?.servicio_proveniente) || ficha.servicio,
-    servicioActual: ficha.servicio,
+    servicioIngreso: valorComoTexto(ficha.datos?.servicio_proveniente) || servicioFicha,
+    servicioActual: servicioFicha,
     camaActual: ficha.cama ?? "",
     estado: ficha.datos?.alta === "FALLECIDO" ? "alta_fallecido" : fichaEgresada(ficha) ? "alta_vivo" : "activo",
     creadoEn: toDate(ficha.creadoEn) ?? new Date(),
@@ -92,7 +104,7 @@ export default function CuidadosCriticosMedicoPage() {
   const cacheInicialFichas = getFichasCuidadosCriticosCache(claveConsultaFichas);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [pacientesHistoricos, setPacientesHistoricos] = useState<Paciente[]>([]);
-  const [fichasBase, setFichasBase] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicialFichas?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+  const [fichasBase, setFichasBase] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicialFichas?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
   const [fichasBusqueda, setFichasBusqueda] = useState<FichaCuidadosCriticos[]>([]);
   const [pacientePrecargado, setPacientePrecargado] = useState<Paciente | null>(null);
   const [fichaUrlId, setFichaUrlId] = useState("");
@@ -118,7 +130,7 @@ export default function CuidadosCriticosMedicoPage() {
     const clave = `medico-cuidados-criticos-pacientes:${servicios.join("|")}`;
     return suscribirPacientesCuidadosCriticos(clave, servicios, docs => {
       const ordenados = [...docs]
-        .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || a.servicioActual.localeCompare(b.servicioActual) || (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
+        .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || servicioCanonicoCuidadosCriticos(a.servicioActual).localeCompare(servicioCanonicoCuidadosCriticos(b.servicioActual)) || (a.camaActual ?? "").localeCompare(b.camaActual ?? "", undefined, { numeric: true }));
       setPacientes(ordenados);
     });
   }, [tipoMedicoActivo, servicios]);
@@ -126,7 +138,7 @@ export default function CuidadosCriticosMedicoPage() {
   useEffect(() => {
     const cache = getFichasCuidadosCriticosCache(claveConsultaFichas);
     queueMicrotask(() => {
-      setFichasBase(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+      setFichasBase(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
       setConsultadoEn(cache?.consultadoEn ?? null);
     });
   }, [claveConsultaFichas, servicios]);
@@ -138,7 +150,7 @@ export default function CuidadosCriticosMedicoPage() {
       const resultado = await consultarFichasCuidadosCriticos(claveConsultaFichas, [
         queryFichasServicios(servicios),
       ]);
-      setFichasBase(ordenarFichas(resultado.fichas.filter(ficha => servicios.includes(ficha.servicio))));
+      setFichasBase(ordenarFichas(resultado.fichas.filter(ficha => servicioEnLista(ficha.servicio, servicios))));
       setConsultadoEn(resultado.consultadoEn);
     } finally {
       setConsultandoFichas(false);
@@ -161,7 +173,9 @@ export default function CuidadosCriticosMedicoPage() {
           limit(5)
         ));
         if (!activo) return;
-        setPacientesHistoricos(snap.docs.map(item => ({ id: item.id, ...item.data() } as Paciente)));
+        setPacientesHistoricos(snap.docs
+          .map(item => ({ id: item.id, ...item.data() } as Paciente))
+          .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0)));
       } catch {
         if (activo) setPacientesHistoricos([]);
       }
@@ -186,13 +200,13 @@ export default function CuidadosCriticosMedicoPage() {
         const snap = await getDocs(query(
           collection(db, "fichas_cuidados_criticos"),
           where("pacienteExpediente", "==", expediente),
-          where("servicio", "in", servicios),
+          where("servicio", "in", serviciosConsultaCuidadosCriticos(servicios)),
           limit(12)
         ));
         if (!activo) return;
         setFichasBusqueda(snap.docs
           .map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos))
-          .filter(ficha => servicios.includes(ficha.servicio)));
+          .filter(ficha => servicioEnLista(ficha.servicio, servicios)));
       } catch {
         if (activo) setFichasBusqueda([]);
       }
@@ -246,7 +260,7 @@ export default function CuidadosCriticosMedicoPage() {
       setSelectedId(pacienteId);
       setSelectedEstanciaId(ficha.id ?? "");
       setBusqueda(ficha.pacienteExpediente);
-      setServicioFiltro(ficha.servicio);
+      setServicioFiltro(servicioCanonicoCuidadosCriticos(ficha.servicio));
       setError("");
       setFichaUrlId("");
     });
@@ -294,7 +308,7 @@ export default function CuidadosCriticosMedicoPage() {
     ? []
     : fichas
         .filter(ficha => {
-          if (servicioFiltro !== "todos" && ficha.servicio !== servicioFiltro) return false;
+          if (servicioFiltro !== "todos" && !servicioCoincideCuidadosCriticos(ficha.servicio, servicioFiltro)) return false;
           return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaNormalizada);
         })
         .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
@@ -307,15 +321,15 @@ export default function CuidadosCriticosMedicoPage() {
   const pacientesFiltrados = pacientesBase.filter(paciente => {
     const vieneDeBusquedaHistorica = pacientesHistoricos.some(item => (paciente.id && item.id === paciente.id) || item.expediente === paciente.expediente);
     if (debeBuscarOFiltrar) return false;
-    if (servicioFiltro !== "todos" && paciente.servicioActual !== servicioFiltro && !vieneDeBusquedaHistorica) return false;
+    if (servicioFiltro !== "todos" && !servicioCoincideCuidadosCriticos(paciente.servicioActual, servicioFiltro) && !vieneDeBusquedaHistorica) return false;
     const term = busquedaNormalizada;
     const coincide = !term || `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
       .toLowerCase()
       .includes(term);
     if (!coincide) return false;
-    const fichaActiva = fichas.find(ficha => ficha.pacienteId === paciente.id && !fichaEgresada(ficha));
+    const fichaActiva = fichas.find(ficha => ((ficha.pacienteId && ficha.pacienteId === paciente.id) || ficha.pacienteExpediente === paciente.expediente) && !fichaEgresada(ficha));
     const fichaGuardadaCoincidente = fichasCoincidentes.some(ficha => (ficha.pacienteId && ficha.pacienteId === paciente.id) || ficha.pacienteExpediente === paciente.expediente);
-    return Boolean(fichaActiva) || !fichaGuardadaCoincidente;
+    return paciente.estado === "activo" || Boolean(fichaActiva) || !fichaGuardadaCoincidente;
   });
   const pacientesFiltradosIds = new Set(pacientesFiltrados.map(paciente => paciente.id).filter(Boolean));
   const pacientesFiltradosExpedientes = new Set(pacientesFiltrados.map(paciente => paciente.expediente));
@@ -339,7 +353,7 @@ export default function CuidadosCriticosMedicoPage() {
     setSelectedId(pacienteId);
     setSelectedEstanciaId(ficha.id ?? "");
     setBusqueda(paciente.expediente);
-    setServicioFiltro(paciente.servicioActual);
+    setServicioFiltro(servicioCanonicoCuidadosCriticos(paciente.servicioActual));
     setError("");
   };
 
@@ -351,12 +365,12 @@ export default function CuidadosCriticosMedicoPage() {
         const snap = await getDocs(query(
           collection(db, "fichas_cuidados_criticos"),
           where("pacienteId", "==", paciente.id),
-          where("servicio", "in", servicios),
+          where("servicio", "in", serviciosConsultaCuidadosCriticos(servicios)),
           limit(20)
         ));
         const fichasRemotas = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
-        fichasPacienteActuales = unirFichas(fichasPacienteActuales, fichasRemotas).filter(ficha => servicios.includes(ficha.servicio));
-        setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, fichasRemotas).filter(item => servicios.includes(item.servicio))));
+        fichasPacienteActuales = unirFichas(fichasPacienteActuales, fichasRemotas).filter(ficha => servicioEnLista(ficha.servicio, servicios));
+        setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, fichasRemotas).filter(item => servicioEnLista(item.servicio, servicios))));
       } catch {
         // Si la consulta puntual falla, se conserva el flujo actual con las fichas ya cargadas.
       }
@@ -372,8 +386,8 @@ export default function CuidadosCriticosMedicoPage() {
   };
 
   const upsertFichaLocal = (ficha: FichaCuidadosCriticos) => {
-    setFichasBase(prev => ordenarFichas(unirFichas(prev, [ficha]).filter(item => servicios.includes(item.servicio))));
-    setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, [ficha]).filter(item => servicios.includes(item.servicio))));
+    setFichasBase(prev => ordenarFichas(unirFichas(prev, [ficha]).filter(item => servicioEnLista(item.servicio, servicios))));
+    setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, [ficha]).filter(item => servicioEnLista(item.servicio, servicios))));
   };
 
   const guardarFicha = async (datos: DatosMatrizCuidadosCriticos) => {
@@ -385,7 +399,7 @@ export default function CuidadosCriticosMedicoPage() {
       throw new Error(message);
     }
     const especialidad = valorComoTexto(datos.especialidad).trim();
-    if (!servicios.includes(especialidad)) {
+    if (!servicioEnLista(especialidad, servicios)) {
       const message = "Selecciona una ESPECIALIDAD valida de las unidades asignadas a tu rol.";
       setError(message);
       throw new Error(message);
@@ -393,14 +407,17 @@ export default function CuidadosCriticosMedicoPage() {
     const tipoRegistroGuardar = tipoUnidadPorServicio(especialidad)
       ?? tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected.servicioActual)
       ?? (tipoMedicoActivo === "ucin" ? "ucin" : "uci");
-    const servicioFicha = especialidad || selected.servicioActual;
+    const servicioFicha = servicioCanonicoCuidadosCriticos(especialidad || selected.servicioActual);
 
     setSaving(true);
     setError("");
     const estadoEstancia: FichaCuidadosCriticos["estadoEstancia"] = esValorRegistrado(datos.fecha_egreso_del_servicio) || datos.alta === "FALLECIDO"
       ? "egresada"
       : "activa";
-    const datosParaGuardar = aplicarValoresPorDefectoMatriz(datos, tipoRegistroGuardar);
+    const datosParaGuardar = {
+      ...aplicarValoresPorDefectoMatriz(datos, tipoRegistroGuardar),
+      especialidad: servicioFicha,
+    };
     const registroActivoExistente = fichasPaciente.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
     if (!fichaSeleccionada?.id && registroActivoExistente) {
       const message = "Este paciente ya tiene un registro activo. Cierra el registro actual antes de crear uno nuevo.";
@@ -551,7 +568,7 @@ export default function CuidadosCriticosMedicoPage() {
         </div>
         <div className="grid max-h-64 gap-2 overflow-y-auto p-2 md:grid-cols-3 xl:grid-cols-4">
           {pacientesFiltrados.map(paciente => {
-            const estancias = fichas.filter(ficha => ficha.pacienteId === paciente.id);
+            const estancias = fichas.filter(ficha => ficha.pacienteId === paciente.id || ficha.pacienteExpediente === paciente.expediente);
             const fichaActiva = estancias.find(ficha => !fichaEgresada(ficha));
             return (
               <button
@@ -567,7 +584,7 @@ export default function CuidadosCriticosMedicoPage() {
                   </div>
                   <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${paciente.estado === "activo" ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800"}`}>{estadoPacienteLabel(paciente.estado)}</span>
                 </div>
-                <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(paciente.servicioActual, paciente.camaActual)}</p>
+                <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(servicioCanonicoCuidadosCriticos(paciente.servicioActual), paciente.camaActual)}</p>
                 <p className={`mt-1 text-[11px] font-medium ${fichaActiva ? "text-green-600 dark:text-green-400" : "text-blue-600 dark:text-blue-400"}`}>
                   {fichaActiva
                     ? `Abrir registro activo - Ingreso ${valorComoTexto(fichaActiva.datos?.fecha_ingreso_al_servicio) || "No registrado"}`
@@ -683,7 +700,7 @@ export default function CuidadosCriticosMedicoPage() {
           key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
           paciente={selected}
           tipo={tipoFormulario}
-          servicioEstancia={fichaSeleccionada?.servicio ?? selected.servicioActual}
+          servicioEstancia={servicioCanonicoCuidadosCriticos(fichaSeleccionada?.servicio ?? selected.servicioActual)}
           numeroEstancia={numeroEstancia}
           datosGuardados={fichaSeleccionada?.datos}
           saving={saving}

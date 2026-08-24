@@ -1,4 +1,5 @@
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";
+import { servicioCanonicoCuidadosCriticos, servicioCoincideCuidadosCriticos } from "@/lib/cuidadosCriticos";
 import { normalizarGenero, normalizarArea } from "@/lib/pacientes/helpers";
 
 // Mapeo del reporte de Excel "pacientes ingresados" → shape del formulario
@@ -88,6 +89,10 @@ function limpiarMunicipio(str: unknown): string | undefined {
 export function resolverServicio(servicioExcel: unknown, servicios: string[]): string | null {
   const objetivo = claveServicio(servicioExcel);
   if (!objetivo) return null;
+  const canonicoCritico = servicioCanonicoCuidadosCriticos(txt(servicioExcel));
+  if (canonicoCritico && servicios.some(servicio => servicioCoincideCuidadosCriticos(servicio, canonicoCritico))) {
+    return canonicoCritico;
+  }
   return servicios.find((s) => claveServicio(s) === objetivo) ?? null;
 }
 
