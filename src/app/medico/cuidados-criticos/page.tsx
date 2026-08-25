@@ -283,9 +283,9 @@ export default function CuidadosCriticosMedicoPage() {
     };
   }, [pacientePrecargado?.id, pacientes, selectedId]);
 
-  const selected = pacientePrecargado?.id === selectedId
-    ? pacientePrecargado
-    : pacientes.find(paciente => paciente.id === selectedId) ?? null;
+  const pacienteActivoSeleccionado = pacientes.find(paciente => paciente.id === selectedId || paciente.expediente === pacientePrecargado?.expediente);
+  const selected = pacienteActivoSeleccionado
+    ?? (pacientePrecargado?.id === selectedId ? pacientePrecargado : null);
   const selectedDesdeFichaGuardada = pacientePrecargado?.id === selectedId;
   const fichasPaciente = ordenarFichas(fichas.filter(ficha => {
     if (ficha.id === selectedEstanciaId) return true;
