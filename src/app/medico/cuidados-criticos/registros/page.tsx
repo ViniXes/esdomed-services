@@ -5,7 +5,11 @@ import { Activity, AlertCircle, FileSpreadsheet, Search, Table2, Trash2, Users }
 import { LienzoMatrizCuidadosCriticos } from "@/components/cuidados-criticos/LienzoMatrizCuidadosCriticos";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
-import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import {
+  servicioCoincideCuidadosCriticos,
+  serviciosPorTipoMedico,
+  TIPO_MEDICO_CRITICO_LABEL,
+} from "@/lib/cuidadosCriticos";
 import {
   actualizarFichaEnCache,
   consultarFichasCuidadosCriticos,
@@ -100,6 +104,10 @@ function fichaEgresada(ficha: FichaCuidadosCriticos) {
     || ficha.datos?.alta === "FALLECIDO";
 }
 
+function servicioEnLista(servicio: string | null | undefined, servicios: string[]) {
+  return servicios.some(item => servicioCoincideCuidadosCriticos(servicio, item));
+}
+
 function ordenarFichas(fichas: FichaCuidadosCriticos[]) {
   return [...fichas].sort((a, b) => {
     const mesA = mesFicha(a);
@@ -131,12 +139,12 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const servicios = useMemo(() => tipoMedicoActivo ? serviciosPorTipoMedico(tipoMedicoActivo) : [], [tipoMedicoActivo]);
   const claveConsulta = `medico-registros-cuidados:${servicios.join("|")}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
-  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
   const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
   const [consultando, setConsultando] = useState(false);
 
   useEffect(() => {
-    if (servicio === "todos" || servicios.length === 0 || servicios.includes(servicio)) return;
+    if (servicio === "todos" || servicios.length === 0 || servicioEnLista(servicio, servicios)) return;
     setServicio("todos");
   }, [servicio, servicios]);
 
@@ -156,7 +164,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   useEffect(() => {
     const cache = getFichasCuidadosCriticosCache(claveConsulta);
     queueMicrotask(() => {
-      setFichas(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicios.includes(ficha.servicio))));
+      setFichas(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
       setConsultadoEn(cache?.consultadoEn ?? null);
     });
   }, [claveConsulta, servicios]);
@@ -166,7 +174,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     setConsultando(true);
     try {
       const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasServicios(servicios)]);
-      setFichas(ordenarFichas(resultado.fichas.filter(ficha => servicios.includes(ficha.servicio))));
+      setFichas(ordenarFichas(resultado.fichas.filter(ficha => servicioEnLista(ficha.servicio, servicios))));
       setConsultadoEn(resultado.consultadoEn);
     } finally {
       setConsultando(false);
@@ -176,7 +184,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const fichasFiltradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
     return fichas.filter(ficha => {
-      if (servicio !== "todos" && ficha.servicio !== servicio) return false;
+      if (servicio !== "todos" && !servicioCoincideCuidadosCriticos(ficha.servicio, servicio)) return false;
       const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
       if (cierre === "pendientes" && !pendienteCierre) return false;
       if (cierre === "cerrados" && pendienteCierre) return false;

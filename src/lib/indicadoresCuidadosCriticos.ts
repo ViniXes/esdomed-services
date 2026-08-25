@@ -1,4 +1,5 @@
 import type { ConfigIndicadoresCuidadosCriticos, FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
+import { servicioCoincideCuidadosCriticos, tipoUnidadPorServicio } from "@/lib/cuidadosCriticos";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { esValorRegistrado, normalizarValorSiNo, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
 
@@ -466,8 +467,9 @@ function conteosMensuales(
 ): ConteosMensuales {
   const { anio, mes, servicio, tipo, camasAsignadas } = parametros;
   const fichasServicio = fichas.filter(ficha => {
-    if (servicio !== "todos" && ficha.servicio !== servicio) return false;
-    if (tipo && tipo !== "todos" && ficha.tipoUnidad !== tipo) return false;
+    if (servicio !== "todos" && !servicioCoincideCuidadosCriticos(ficha.servicio, servicio)) return false;
+    const tipoFicha = tipoUnidadPorServicio(ficha.servicio) ?? ficha.tipoUnidad;
+    if (tipo && tipo !== "todos" && tipoFicha !== tipo) return false;
     return true;
   });
   const fichasIngresoMes = fichasServicio.filter(ficha => fechaEnMes(ficha.datos?.fecha_ingreso_al_servicio, anio, mes));

@@ -1,5 +1,5 @@
 import { Activity, BedDouble, CalendarDays, UsersRound } from "lucide-react";
-import { TIPO_ATENCION_CRITICA_LABEL } from "@/lib/cuidadosCriticos";
+import { servicioCanonicoCuidadosCriticos, TIPO_ATENCION_CRITICA_LABEL } from "@/lib/cuidadosCriticos";
 import type { AtencionCuidadosCriticos } from "@/types";
 
 function toDate(value: unknown): Date | null {
@@ -32,7 +32,8 @@ export function ResumenCuidadosCriticos({
   ).sort((a, b) => b[1] - a[1]);
   const porServicio = Object.entries(
     atenciones.reduce<Record<string, number>>((acc, item) => {
-      acc[item.servicio] = (acc[item.servicio] ?? 0) + 1;
+      const servicio = servicioCanonicoCuidadosCriticos(item.servicio);
+      acc[servicio] = (acc[servicio] ?? 0) + 1;
       return acc;
     }, {})
   ).sort((a, b) => b[1] - a[1]);

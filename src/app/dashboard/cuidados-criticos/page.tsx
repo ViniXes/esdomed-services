@@ -16,7 +16,7 @@ import {
   queryFichasTodas,
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
-import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import { serviciosPorTipoMedico, tipoUnidadPorServicio } from "@/lib/cuidadosCriticos";
 import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, HistorialEliminacionCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
@@ -69,6 +69,10 @@ function fechaIngresoOrdenFicha(ficha: FichaCuidadosCriticos) {
   return toDate(ficha.datos?.fecha_ingreso_al_servicio)?.getTime() ?? Number.MAX_SAFE_INTEGER;
 }
 
+function tipoFicha(ficha: FichaCuidadosCriticos) {
+  return tipoUnidadPorServicio(ficha.servicio) ?? ficha.tipoUnidad;
+}
+
 export default function CuidadosCriticosDashboardPage() {
   const { profile, loading } = useAuth();
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -119,7 +123,9 @@ export default function CuidadosCriticosDashboardPage() {
     if (filtroCierre === "cerrados") return !pendiente;
     return true;
   });
-  const fichasPorTipo = filtro === "todos" ? fichasPeriodoCierre : fichasPeriodoCierre.filter(ficha => ficha.tipoUnidad === filtro);
+  const fichasPorTipo = filtro === "todos"
+    ? fichasPeriodoCierre
+    : fichasPeriodoCierre.filter(ficha => tipoFicha(ficha) === filtro);
   const fichasFiltradas = [...fichasPorTipo].sort((a, b) => {
     const mesA = mesFicha(a);
     const mesB = mesFicha(b);
@@ -204,8 +210,8 @@ export default function CuidadosCriticosDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={<FileSpreadsheet size={18} />} label="Fichas registradas" value={fichasPeriodoCierre.length} />
-        <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "uci").length} />
-        <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichasPeriodoCierre.filter(item => item.tipoUnidad === "ucin").length} />
+        <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichasPeriodoCierre.filter(item => tipoFicha(item) === "uci").length} />
+        <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichasPeriodoCierre.filter(item => tipoFicha(item) === "ucin").length} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
         <Stat
           icon={<Trash2 size={18} />}
