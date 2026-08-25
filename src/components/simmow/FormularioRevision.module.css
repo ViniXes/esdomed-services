@@ -10,6 +10,10 @@
   background: #003063;
   padding: 18px;
   border-radius: 12px;
+  /* Respaldo para pantallas muy angostas donde ni ensanchar el contenedor
+     alcanza — normalmente no debería activarse (ver max-w-none en
+     page.tsx durante el paso de revisión, que le da a esta tabla más
+     ancho disponible en vez de depender del scroll). */
   overflow-x: auto;
 }
 

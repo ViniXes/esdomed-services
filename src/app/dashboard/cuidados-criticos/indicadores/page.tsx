@@ -7,7 +7,11 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { CAMAS_POR_SERVICIO } from "@/lib/servicios";
-import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
+import {
+  servicioCanonicoCuidadosCriticos,
+  servicioCoincideCuidadosCriticos,
+  serviciosPorTipoMedico,
+} from "@/lib/cuidadosCriticos";
 import {
   consultarFichasCuidadosCriticos,
   getFichasCuidadosCriticosCache,
@@ -168,7 +172,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const serviciosUnidad = useMemo(() => tipoUnidad === "uci" ? SERVICIOS_UCI : SERVICIOS_UCIN, [tipoUnidad]);
 
   useEffect(() => {
-    if (servicio !== "todos" && !serviciosUnidad.includes(servicio)) {
+    if (servicio !== "todos" && !serviciosUnidad.some(item => servicioCoincideCuidadosCriticos(item, servicio))) {
       setServicio("todos");
     }
   }, [servicio, serviciosUnidad]);
@@ -203,7 +207,7 @@ export default function IndicadoresCuidadosCriticosPage() {
   const datosGraficos = useMemo<DatoGraficoServicio[]>(() => {
     const serviciosFiltrados = servicio === "todos"
       ? serviciosUnidad
-      : serviciosUnidad.filter(item => item === servicio);
+      : serviciosUnidad.filter(item => servicioCoincideCuidadosCriticos(item, servicio));
 
     return serviciosFiltrados.map(nombreServicio => {
       const camas = camasServicio(nombreServicio);
@@ -786,7 +790,8 @@ function tituloVista(vista: VistaTablaIndicadores) {
 }
 
 function camasServicio(servicio: string) {
-  return CAMAS_POR_SERVICIO[servicio as keyof typeof CAMAS_POR_SERVICIO]?.length ?? 0;
+  const canonico = servicioCanonicoCuidadosCriticos(servicio);
+  return CAMAS_POR_SERVICIO[canonico as keyof typeof CAMAS_POR_SERVICIO]?.length ?? 0;
 }
 
 function capitalizarMes(mes: string) {

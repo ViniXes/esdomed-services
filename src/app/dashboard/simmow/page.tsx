@@ -535,11 +535,20 @@ export default function SimmowPage() {
     setSeleccionadoAmb((p) => (p ? { ...p, codigoCopiadoEn: ahora } : p));
   };
 
+  // La tabla de revisión (réplica de SIMMOW) mide 980px fijos — con el
+  // contenedor general de la página (max-w-5xl = 1024px) sobraba muy poco
+  // margen y en pantallas angostas (laptop con el panel lateral abierto)
+  // se cortaba. Solo durante el paso de revisión se le da más ancho
+  // disponible; el resto de los pasos (elegir flujo, cargar, lista) se
+  // queda en el ancho normal de la página.
+  const enPasoRevision =
+    (flujo === "hospitalaria" && paso === "revision") || (flujo === "ambulatoria" && pasoAmb === "revision");
+
   return (
     <>
       <TerminosSimmowGate />
       <ReportarErrorSimmow />
-      <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className={`p-4 md:p-6 mx-auto ${enPasoRevision ? "max-w-[1100px]" : "max-w-5xl"}`}>
       <div className="flex items-center gap-2 mb-6">
         <FileCode2 className="h-6 w-6 text-blue-600 dark:text-[#c9a892]" />
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">

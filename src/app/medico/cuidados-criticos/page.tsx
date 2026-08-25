@@ -17,9 +17,9 @@ import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lu
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  serviciosCanonicosCuidadosCriticos,
   servicioCanonicoCuidadosCriticos,
   servicioCoincideCuidadosCriticos,
-  serviciosConsultaCuidadosCriticos,
   serviciosPorTipoMedico,
   tipoUnidadPorServicio,
   TIPO_MEDICO_CRITICO_LABEL,
@@ -34,7 +34,13 @@ import {
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { ubicacionLabel } from "@/lib/servicios";
 import { FichaMatrizCuidadosCriticos } from "@/components/cuidados-criticos/FichaMatrizCuidadosCriticos";
-import { aplicarValoresPorDefectoMatriz, esValorRegistrado, valorComoTexto, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import {
+  aplicarValoresPorDefectoMatriz,
+  esValorRegistrado,
+  fichaCerradaSinDiagnosticoEgresoCuidadosCriticos,
+  valorComoTexto,
+  type DatosMatrizCuidadosCriticos,
+} from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
 const NUEVA_ESTANCIA = "nueva";
@@ -197,10 +203,11 @@ export default function CuidadosCriticosMedicoPage() {
     let activo = true;
     const timeout = window.setTimeout(async () => {
       try {
+        const serviciosConsulta = serviciosCanonicosCuidadosCriticos(servicios);
         const snap = await getDocs(query(
           collection(db, "fichas_cuidados_criticos"),
           where("pacienteExpediente", "==", expediente),
-          where("servicio", "in", serviciosConsultaCuidadosCriticos(servicios)),
+          where("servicio", "in", serviciosConsulta),
           limit(12)
         ));
         if (!activo) return;
@@ -282,9 +289,9 @@ export default function CuidadosCriticosMedicoPage() {
     };
   }, [pacientePrecargado?.id, pacientes, selectedId]);
 
-  const selected = pacientePrecargado?.id === selectedId
-    ? pacientePrecargado
-    : pacientes.find(paciente => paciente.id === selectedId) ?? null;
+  const pacienteActivoSeleccionado = pacientes.find(paciente => paciente.id === selectedId || paciente.expediente === pacientePrecargado?.expediente);
+  const selected = pacienteActivoSeleccionado
+    ?? (pacientePrecargado?.id === selectedId ? pacientePrecargado : null);
   const selectedDesdeFichaGuardada = pacientePrecargado?.id === selectedId;
   const fichasPaciente = ordenarFichas(fichas.filter(ficha => {
     if (ficha.id === selectedEstanciaId) return true;
@@ -339,8 +346,9 @@ export default function CuidadosCriticosMedicoPage() {
     : fichasCoincidentes
         .filter(ficha => {
           const pacienteYaVisible = (ficha.pacienteId && pacientesFiltradosIds.has(ficha.pacienteId)) || pacientesFiltradosExpedientes.has(ficha.pacienteExpediente);
-          return !pacienteYaVisible;
+          return fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha) || !pacienteYaVisible;
         })
+        .sort((a, b) => Number(fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(b)) - Number(fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(a)) || (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0))
         .slice(0, 8);
   const totalResultadosBusqueda = pacientesFiltrados.length + fichasHistoricasFiltradas.length;
 
@@ -362,10 +370,11 @@ export default function CuidadosCriticosMedicoPage() {
     let fichasPacienteActuales = fichas.filter(ficha => ficha.pacienteId === paciente.id || ficha.pacienteExpediente === paciente.expediente);
     if (paciente.id && servicios.length > 0) {
       try {
+        const serviciosConsulta = serviciosCanonicosCuidadosCriticos(servicios);
         const snap = await getDocs(query(
           collection(db, "fichas_cuidados_criticos"),
           where("pacienteId", "==", paciente.id),
-          where("servicio", "in", serviciosConsultaCuidadosCriticos(servicios)),
+          where("servicio", "in", serviciosConsulta),
           limit(20)
         ));
         const fichasRemotas = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));
@@ -595,26 +604,27 @@ export default function CuidadosCriticosMedicoPage() {
           })}
           {fichasHistoricasFiltradas.map(ficha => {
             const cerrada = fichaEgresada(ficha);
+            const faltaDiagnosticoEgreso = fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha);
             const seleccionada = selectedEstanciaId === ficha.id;
             return (
               <button
                 key={ficha.id}
                 type="button"
                 onClick={() => abrirFichaHistorica(ficha)}
-                className={`rounded-lg border px-3 py-2 text-left transition-colors ${seleccionada ? "border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950" : "border-slate-200 hover:border-blue-300 dark:border-slate-700 dark:hover:border-blue-800"}`}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${seleccionada ? "border-blue-400 bg-blue-50 dark:border-blue-700 dark:bg-blue-950" : faltaDiagnosticoEgreso ? "border-rose-300 bg-rose-50/70 hover:border-rose-400 dark:border-rose-800 dark:bg-rose-950/25 dark:hover:border-rose-700" : "border-slate-200 hover:border-blue-300 dark:border-slate-700 dark:hover:border-blue-800"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="line-clamp-2 text-[13px] font-semibold leading-tight text-slate-900 dark:text-slate-100">{ficha.pacienteNombre}</p>
                     <p className="mt-0.5 text-[11px] font-mono text-slate-500">Exp. {ficha.pacienteExpediente}</p>
                   </div>
-                  <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${cerrada ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"}`}>
-                    {cerrada ? "Registro cerrado" : "Registro activo"}
+                  <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase ${faltaDiagnosticoEgreso ? "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300" : cerrada ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"}`}>
+                    {faltaDiagnosticoEgreso ? "Falta egreso" : cerrada ? "Registro cerrado" : "Registro activo"}
                   </span>
                 </div>
                 <p className="mt-1 truncate text-[11px] text-slate-500">{ubicacionLabel(ficha.servicio, ficha.cama)}</p>
-                <p className="mt-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                  Abrir registro guardado - Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}
+                <p className={`mt-1 text-[11px] font-medium ${faltaDiagnosticoEgreso ? "text-rose-700 dark:text-rose-300" : "text-blue-600 dark:text-blue-400"}`}>
+                  {faltaDiagnosticoEgreso ? "Completar diagnostico de egreso" : "Abrir registro guardado"} - Ingreso {valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "No registrado"}
                 </p>
               </button>
             );
