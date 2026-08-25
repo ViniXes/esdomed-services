@@ -36,8 +36,13 @@ type FiltrosPersistidos = {
   hasta?: string;
   busqueda?: string;
 };
+type CacheFichasPersistido = {
+  fichas: FichaCuidadosCriticos[];
+  consultadoEn: string;
+};
 
 const FILTROS_STORAGE_KEY = "cuidados-criticos:mis-registros:filtros:v1";
+const FICHAS_STORAGE_PREFIX = "cuidados-criticos:mis-registros:fichas:v1:";
 const TODOS_LOS_MESES = "TODOS";
 
 const MESES = [
@@ -82,6 +87,52 @@ function leerFiltrosPersistidos(): FiltrosPersistidos {
     };
   } catch {
     return {};
+  }
+}
+
+function storageKeyFichas(clave: string) {
+  return `${FICHAS_STORAGE_PREFIX}${clave}`;
+}
+
+function normalizarParaStorage(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (!value || typeof value !== "object") return value;
+  const maybeTimestamp = value as { toDate?: () => Date };
+  if (typeof maybeTimestamp.toDate === "function") {
+    const fecha = maybeTimestamp.toDate();
+    return Number.isNaN(fecha.getTime()) ? null : fecha.toISOString();
+  }
+  if (Array.isArray(value)) return value.map(normalizarParaStorage);
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, normalizarParaStorage(item)])
+  );
+}
+
+function leerCacheFichasPersistido(clave: string): { fichas: FichaCuidadosCriticos[]; consultadoEn: Date } | null {
+  if (typeof window === "undefined" || !clave) return null;
+  try {
+    const raw = window.localStorage.getItem(storageKeyFichas(clave));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CacheFichasPersistido>;
+    if (!Array.isArray(parsed.fichas) || typeof parsed.consultadoEn !== "string") return null;
+    const consultadoEn = new Date(parsed.consultadoEn);
+    if (Number.isNaN(consultadoEn.getTime())) return null;
+    return { fichas: parsed.fichas, consultadoEn };
+  } catch {
+    return null;
+  }
+}
+
+function guardarCacheFichasPersistido(clave: string, fichas: FichaCuidadosCriticos[], consultadoEn: Date) {
+  if (typeof window === "undefined" || !clave) return;
+  try {
+    window.localStorage.setItem(storageKeyFichas(clave), JSON.stringify({
+      fichas: normalizarParaStorage(fichas) as FichaCuidadosCriticos[],
+      consultadoEn: consultadoEn.toISOString(),
+    } satisfies CacheFichasPersistido));
+  } catch {
+    // Si el navegador no permite guardar o la tabla es muy grande, la pantalla
+    // sigue funcionando con la cache en memoria y consulta manual.
   }
 }
 
@@ -138,6 +189,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const [desde, setDesde] = useState(filtrosIniciales.desde ?? "");
   const [hasta, setHasta] = useState(filtrosIniciales.hasta ?? "");
   const [busqueda, setBusqueda] = useState(filtrosIniciales.busqueda ?? "");
+  const [soloSolicitudesEliminacion, setSoloSolicitudesEliminacion] = useState(false);
 
   const tipoMedicoActivo: TipoMedicoCuidadosCriticos | null = profile?.role === "admin"
     ? "uci_ucin"
@@ -145,8 +197,9 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const servicios = useMemo(() => tipoMedicoActivo ? serviciosPorTipoMedico(tipoMedicoActivo) : [], [tipoMedicoActivo]);
   const claveConsulta = `medico-registros-cuidados:${servicios.join("|")}`;
   const cacheInicial = getFichasCuidadosCriticosCache(claveConsulta);
-  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas((cacheInicial?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
-  const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => cacheInicial?.consultadoEn ?? null);
+  const cachePersistidoInicial = leerCacheFichasPersistido(claveConsulta);
+  const [fichas, setFichas] = useState<FichaCuidadosCriticos[]>(() => ordenarFichas(((cacheInicial ?? cachePersistidoInicial)?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
+  const [consultadoEn, setConsultadoEn] = useState<Date | null>(() => (cacheInicial ?? cachePersistidoInicial)?.consultadoEn ?? null);
   const [consultando, setConsultando] = useState(false);
 
   useEffect(() => {
@@ -169,9 +222,11 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
 
   useEffect(() => {
     const cache = getFichasCuidadosCriticosCache(claveConsulta);
+    const cachePersistido = leerCacheFichasPersistido(claveConsulta);
+    const entrada = cache ?? cachePersistido;
     queueMicrotask(() => {
-      setFichas(ordenarFichas((cache?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
-      setConsultadoEn(cache?.consultadoEn ?? null);
+      setFichas(ordenarFichas((entrada?.fichas ?? []).filter(ficha => servicioEnLista(ficha.servicio, servicios))));
+      setConsultadoEn(entrada?.consultadoEn ?? null);
     });
   }, [claveConsulta, servicios]);
 
@@ -180,8 +235,10 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     setConsultando(true);
     try {
       const resultado = await consultarFichasCuidadosCriticos(claveConsulta, [queryFichasServicios(servicios)]);
-      setFichas(ordenarFichas(resultado.fichas.filter(ficha => servicioEnLista(ficha.servicio, servicios))));
+      const fichasOrdenadas = ordenarFichas(resultado.fichas.filter(ficha => servicioEnLista(ficha.servicio, servicios)));
+      setFichas(fichasOrdenadas);
       setConsultadoEn(resultado.consultadoEn);
+      guardarCacheFichasPersistido(claveConsulta, fichasOrdenadas, resultado.consultadoEn);
     } finally {
       setConsultando(false);
     }
@@ -209,19 +266,31 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
       return true;
     });
   }, [cierre, fichasBaseFiltradas]);
+  const fichasMostradas = soloSolicitudesEliminacion
+    ? fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente")
+    : fichasFiltradas;
 
-  const pacientesUnicos = new Set(fichasFiltradas.map(ficha => ficha.pacienteExpediente)).size;
-  const activas = fichasFiltradas.filter(ficha => !fichaEgresada(ficha)).length;
+  const pacientesUnicos = new Set(fichasMostradas.map(ficha => ficha.pacienteExpediente)).size;
+  const activas = fichasMostradas.filter(ficha => !fichaEgresada(ficha)).length;
   const pendientesCierre = fichasBaseFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
   const cerradasSinDiagnosticoEgreso = fichasBaseFiltradas.filter(fichaCerradaSinDiagnosticoEgresoCuidadosCriticos).length;
   const solicitudesPendientes = fichasBaseFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
 
   const filtrarCerradasSinDiagnosticoEgreso = () => {
+    setSoloSolicitudesEliminacion(false);
     setCierre(actual => actual === "sin_diagnostico_egreso" ? "todos" : "sin_diagnostico_egreso");
   };
 
+  const filtrarSolicitudesEliminacion = () => {
+    setSoloSolicitudesEliminacion(actual => !actual);
+  };
+
   const manejarFichaActualizada = (ficha: FichaCuidadosCriticos) => {
-    setFichas(prev => prev.map(item => item.id === ficha.id ? ficha : item));
+    setFichas(prev => {
+      const actualizadas = prev.map(item => item.id === ficha.id ? ficha : item);
+      guardarCacheFichasPersistido(claveConsulta, actualizadas, consultadoEn ?? new Date());
+      return actualizadas;
+    });
     actualizarFichaEnCache(claveConsulta, ficha);
   };
 
@@ -250,7 +319,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasFiltradas.length} />
+        <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasMostradas.length} />
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
         <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} variant={pendientesCierre > 0 ? "warning" : "default"} />
@@ -262,7 +331,14 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
           onClick={cerradasSinDiagnosticoEgreso > 0 || cierre === "sin_diagnostico_egreso" ? filtrarCerradasSinDiagnosticoEgreso : undefined}
           active={cierre === "sin_diagnostico_egreso"}
         />
-        <Stat icon={<Trash2 size={18} />} label="Solicitudes de eliminación" value={solicitudesPendientes} variant={solicitudesPendientes > 0 ? "warning" : "default"} />
+        <Stat
+          icon={<Trash2 size={18} />}
+          label="Solicitudes de eliminación"
+          value={solicitudesPendientes}
+          variant={solicitudesPendientes > 0 ? "warning" : "default"}
+          onClick={solicitudesPendientes > 0 || soloSolicitudesEliminacion ? filtrarSolicitudesEliminacion : undefined}
+          active={soloSolicitudesEliminacion}
+        />
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -347,7 +423,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <LienzoMatrizCuidadosCriticos
           tipo={tipoMedicoActivo}
-          fichas={fichasFiltradas}
+          fichas={fichasMostradas}
           expedienteHref={ficha => ficha.id ? `/medico/cuidados-criticos?ficha=${ficha.id}` : undefined}
           onFichaActualizada={manejarFichaActualizada}
         />
