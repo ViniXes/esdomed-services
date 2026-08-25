@@ -22,12 +22,13 @@ export interface GrupoMatrizCuidadosCriticos {
 type ValorMatriz = string | number;
 export type DatosMatrizCuidadosCriticos = Record<string, ValorMatriz>;
 export const VALOR_NO_REGISTRADO = "No registrado";
-export const CAMPOS_CIERRE_CUIDADOS_CRITICOS = new Set(["fecha_egreso_del_servicio", "alta", "fecha_de_muerte"]);
+export const CAMPOS_CIERRE_CUIDADOS_CRITICOS = new Set(["fecha_egreso_del_servicio", "alta", "fecha_de_muerte", "diagnostico_de_egreso_1"]);
 
 const LABELS_CIERRE_CUIDADOS_CRITICOS: Record<string, string> = {
   fecha_egreso_del_servicio: "FECHA EGRESO DEL SERVICIO",
   alta: "ALTA",
   fecha_de_muerte: "FECHA DE MUERTE",
+  diagnostico_de_egreso_1: "DIAGNOSTICO DE EGRESO 1",
 };
 
 const CAMPOS_SI_NO = new Set([
@@ -597,14 +598,32 @@ export function aplicarValoresPorDefectoMatriz(datos: DatosMatrizCuidadosCritico
 export function camposPendientesCierreCuidadosCriticos(datos?: DatosMatrizCuidadosCriticos) {
   const pendientes = ["fecha_egreso_del_servicio", "alta"].filter(key => !esValorRegistrado(datos?.[key]));
   const alta = valorComoTexto(datos?.alta).trim().toUpperCase();
+  const registroConEgreso =
+    esValorRegistrado(datos?.fecha_egreso_del_servicio) ||
+    esValorRegistrado(datos?.fecha_de_muerte) ||
+    esValorRegistrado(datos?.alta);
   if (alta === "FALLECIDO") {
     if (!esValorRegistrado(datos?.fecha_de_muerte)) pendientes.push("fecha_de_muerte");
+  }
+  if (registroConEgreso && !esValorRegistrado(datos?.diagnostico_de_egreso_1)) {
+    pendientes.push("diagnostico_de_egreso_1");
   }
   return pendientes.map(key => ({ key, label: LABELS_CIERRE_CUIDADOS_CRITICOS[key] ?? key }));
 }
 
+export function fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha: FichaCuidadosCriticos) {
+  const datos = ficha.datos;
+  const registroCerrado =
+    ficha.estadoEstancia === "egresada" ||
+    esValorRegistrado(datos?.fecha_egreso_del_servicio) ||
+    esValorRegistrado(datos?.fecha_de_muerte) ||
+    esValorRegistrado(datos?.alta);
+  return registroCerrado && !esValorRegistrado(datos?.diagnostico_de_egreso_1);
+}
+
 export function fichaPendienteCierreCuidadosCriticos(ficha: FichaCuidadosCriticos) {
-  return camposPendientesCierreCuidadosCriticos(ficha.datos).length > 0;
+  return camposPendientesCierreCuidadosCriticos(ficha.datos).length > 0
+    || fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha);
 }
 
 export function valorComoTexto(value: unknown) {

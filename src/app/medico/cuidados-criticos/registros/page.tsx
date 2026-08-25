@@ -17,11 +17,16 @@ import {
   queryFichasServicios,
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
-import { esValorRegistrado, fichaPendienteCierreCuidadosCriticos, valorComoTexto } from "@/lib/matrizCuidadosCriticos";
+import {
+  esValorRegistrado,
+  fichaCerradaSinDiagnosticoEgresoCuidadosCriticos,
+  fichaPendienteCierreCuidadosCriticos,
+  valorComoTexto,
+} from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
-type CierreFiltro = "todos" | "pendientes" | "cerrados";
+type CierreFiltro = "todos" | "pendientes" | "cerrados" | "sin_diagnostico_egreso";
 type FiltrosPersistidos = {
   servicio?: string;
   periodo?: PeriodoFiltro;
@@ -57,7 +62,7 @@ function esPeriodoFiltro(value: unknown): value is PeriodoFiltro {
 }
 
 function esCierreFiltro(value: unknown): value is CierreFiltro {
-  return value === "todos" || value === "pendientes" || value === "cerrados";
+  return value === "todos" || value === "pendientes" || value === "cerrados" || value === "sin_diagnostico_egreso";
 }
 
 function leerFiltrosPersistidos(): FiltrosPersistidos {
@@ -182,13 +187,10 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     }
   };
 
-  const fichasFiltradas = useMemo(() => {
+  const fichasBaseFiltradas = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
     return fichas.filter(ficha => {
       if (servicio !== "todos" && !servicioCoincideCuidadosCriticos(ficha.servicio, servicio)) return false;
-      const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
-      if (cierre === "pendientes" && !pendienteCierre) return false;
-      if (cierre === "cerrados" && pendienteCierre) return false;
       if (periodo === "mes" && mes !== TODOS_LOS_MESES && valorComoTexto(ficha.datos?.mes) !== mes) return false;
       if (periodo === "rango" && !enRango(fechaIngresoFicha(ficha), desde, hasta)) return false;
       if (!texto) return true;
@@ -196,12 +198,27 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         .toLowerCase()
         .includes(texto);
     });
-  }, [busqueda, cierre, desde, fichas, hasta, mes, periodo, servicio]);
+  }, [busqueda, desde, fichas, hasta, mes, periodo, servicio]);
+
+  const fichasFiltradas = useMemo(() => {
+    return fichasBaseFiltradas.filter(ficha => {
+      const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
+      if (cierre === "pendientes") return pendienteCierre;
+      if (cierre === "cerrados") return !pendienteCierre;
+      if (cierre === "sin_diagnostico_egreso") return fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha);
+      return true;
+    });
+  }, [cierre, fichasBaseFiltradas]);
 
   const pacientesUnicos = new Set(fichasFiltradas.map(ficha => ficha.pacienteExpediente)).size;
   const activas = fichasFiltradas.filter(ficha => !fichaEgresada(ficha)).length;
-  const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
-  const solicitudesPendientes = fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+  const pendientesCierre = fichasBaseFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
+  const cerradasSinDiagnosticoEgreso = fichasBaseFiltradas.filter(fichaCerradaSinDiagnosticoEgresoCuidadosCriticos).length;
+  const solicitudesPendientes = fichasBaseFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+
+  const filtrarCerradasSinDiagnosticoEgreso = () => {
+    setCierre(actual => actual === "sin_diagnostico_egreso" ? "todos" : "sin_diagnostico_egreso");
+  };
 
   const manejarFichaActualizada = (ficha: FichaCuidadosCriticos) => {
     setFichas(prev => prev.map(item => item.id === ficha.id ? ficha : item));
@@ -232,11 +249,19 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
         </div>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasFiltradas.length} />
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
         <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} variant={pendientesCierre > 0 ? "warning" : "default"} />
+        <Stat
+          icon={<AlertCircle size={18} />}
+          label="Sin diagnóstico egreso"
+          value={cerradasSinDiagnosticoEgreso}
+          variant={cerradasSinDiagnosticoEgreso > 0 ? "warning" : "default"}
+          onClick={cerradasSinDiagnosticoEgreso > 0 || cierre === "sin_diagnostico_egreso" ? filtrarCerradasSinDiagnosticoEgreso : undefined}
+          active={cierre === "sin_diagnostico_egreso"}
+        />
         <Stat icon={<Trash2 size={18} />} label="Solicitudes de eliminación" value={solicitudesPendientes} variant={solicitudesPendientes > 0 ? "warning" : "default"} />
       </div>
 
@@ -267,6 +292,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
               <option value="todos">Todos</option>
               <option value="pendientes">Pendientes</option>
               <option value="cerrados">Cerrados</option>
+              <option value="sin_diagnostico_egreso">Sin diagnóstico egreso</option>
             </select>
           </label>
 
@@ -330,28 +356,54 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   );
 }
 
-function Stat({ icon, label, value, variant = "default" }: { icon: React.ReactNode; label: string; value: number | string; variant?: "default" | "warning" }) {
+function Stat({
+  icon,
+  label,
+  value,
+  variant = "default",
+  onClick,
+  active = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  variant?: "default" | "warning";
+  onClick?: () => void;
+  active?: boolean;
+}) {
   const warning = variant === "warning";
+  const highlighted = warning || active;
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className={`group relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md ${
-      warning
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition-all ${onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : "hover:shadow-md"} ${
+      active
+        ? "border-rose-400 bg-gradient-to-br from-rose-100 to-white ring-2 ring-rose-200 dark:border-rose-700 dark:from-rose-950/60 dark:to-slate-900 dark:ring-rose-900/60"
+        : warning
         ? "border-rose-200 bg-gradient-to-br from-rose-50 to-white dark:border-rose-900/60 dark:from-rose-950/40 dark:to-slate-900"
         : "border-slate-200 bg-gradient-to-br from-slate-50 to-white dark:border-slate-800 dark:from-slate-900 dark:to-slate-900"
     }`}>
-      <div className={`absolute -right-3 -top-3 h-16 w-16 rounded-full blur-2xl ${warning ? "bg-rose-300/30 dark:bg-rose-500/10" : "bg-blue-300/20 dark:bg-blue-500/10"}`} />
+      <div className={`absolute -right-3 -top-3 h-16 w-16 rounded-full blur-2xl ${highlighted ? "bg-rose-300/30 dark:bg-rose-500/10" : "bg-blue-300/20 dark:bg-blue-500/10"}`} />
       <div className="relative flex items-center gap-3">
         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-          warning
+          highlighted
             ? "bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-300"
             : "bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300"
         }`}>
           {icon}
         </div>
         <div className="min-w-0">
-          <p className={`truncate text-xs font-semibold uppercase tracking-wide ${warning ? "text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>{label}</p>
-          <p className={`text-2xl font-bold font-heading leading-tight ${warning ? "text-rose-700 dark:text-rose-100" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
+          <p className={`truncate text-xs font-semibold uppercase tracking-wide ${highlighted ? "text-rose-600 dark:text-rose-300" : "text-slate-500 dark:text-slate-400"}`}>{label}</p>
+          <p className={`text-2xl font-bold font-heading leading-tight ${highlighted ? "text-rose-700 dark:text-rose-100" : "text-slate-900 dark:text-slate-100"}`}>{value}</p>
+          {onClick && (
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-300">
+              {active ? "Mostrando lista" : "Click para ver"}
+            </p>
+          )}
         </div>
       </div>
-    </div>
+    </Wrapper>
   );
 }

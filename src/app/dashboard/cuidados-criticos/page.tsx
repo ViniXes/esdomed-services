@@ -17,11 +17,14 @@ import {
 } from "@/lib/fichasCuidadosCriticosQueries";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { serviciosPorTipoMedico, tipoUnidadPorServicio } from "@/lib/cuidadosCriticos";
-import { fichaPendienteCierreCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
+import {
+  fichaCerradaSinDiagnosticoEgresoCuidadosCriticos,
+  fichaPendienteCierreCuidadosCriticos,
+} from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, HistorialEliminacionCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type Filtro = "todos" | TipoMedicoCuidadosCriticos;
-type FiltroCierre = "todos" | "pendientes" | "cerrados";
+type FiltroCierre = "todos" | "pendientes" | "cerrados" | "sin_diagnostico_egreso";
 type FiltroMes = "todos" | number;
 
 const MESES = [
@@ -121,11 +124,17 @@ export default function CuidadosCriticosDashboardPage() {
     if (filtroMes !== "todos" && mesFicha(ficha) !== filtroMes) return false;
     if (filtroCierre === "pendientes") return pendiente;
     if (filtroCierre === "cerrados") return !pendiente;
+    if (filtroCierre === "sin_diagnostico_egreso") return fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha);
     return true;
   });
+  const fichasPeriodoSinFiltroCierre = fichas.filter(ficha => filtroMes === "todos" || mesFicha(ficha) === filtroMes);
+  const fichasSinDiagnosticoEgresoPeriodo = fichasPeriodoSinFiltroCierre.filter(fichaCerradaSinDiagnosticoEgresoCuidadosCriticos);
   const fichasPorTipo = filtro === "todos"
     ? fichasPeriodoCierre
     : fichasPeriodoCierre.filter(ficha => tipoFicha(ficha) === filtro);
+  const fichasBasePorTipo = filtro === "todos"
+    ? fichasPeriodoSinFiltroCierre
+    : fichasPeriodoSinFiltroCierre.filter(ficha => tipoFicha(ficha) === filtro);
   const fichasFiltradas = [...fichasPorTipo].sort((a, b) => {
     const mesA = mesFicha(a);
     const mesB = mesFicha(b);
@@ -134,8 +143,12 @@ export default function CuidadosCriticosDashboardPage() {
     const fechaB = fechaIngresoOrdenFicha(b);
     return fechaA - fechaB;
   });
-  const pendientesCierre = fichasFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
-  const solicitudesEliminacionPendientes = fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+  const pendientesCierre = fichasBasePorTipo.filter(fichaPendienteCierreCuidadosCriticos).length;
+  const cerradasSinDiagnosticoEgreso = (filtro === "todos"
+    ? fichasSinDiagnosticoEgresoPeriodo
+    : fichasSinDiagnosticoEgresoPeriodo.filter(ficha => tipoFicha(ficha) === filtro)
+  ).length;
+  const solicitudesEliminacionPendientes = fichasBasePorTipo.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
   const fichasMostradas = soloSolicitudes
     ? fichasFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente")
     : fichasFiltradas;
@@ -146,6 +159,10 @@ export default function CuidadosCriticosDashboardPage() {
       if (siguiente) setFiltroMes("todos"); // evita que el periodo esconda la solicitud que se busca
       return siguiente;
     });
+  };
+
+  const alternarCerradasSinDiagnosticoEgreso = () => {
+    setFiltroCierre(prev => prev === "sin_diagnostico_egreso" ? "todos" : "sin_diagnostico_egreso");
   };
 
   const consultarHistorial = async () => {
@@ -208,11 +225,19 @@ export default function CuidadosCriticosDashboardPage() {
         </div>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <Stat icon={<FileSpreadsheet size={18} />} label="Fichas registradas" value={fichasPeriodoCierre.length} />
         <Stat icon={<Users size={18} />} label="Pacientes UCI" value={fichasPeriodoCierre.filter(item => tipoFicha(item) === "uci").length} />
         <Stat icon={<Users size={18} />} label="Pacientes UCIN" value={fichasPeriodoCierre.filter(item => tipoFicha(item) === "ucin").length} />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} />
+        <Stat
+          icon={<AlertCircle size={18} />}
+          label="Sin diagnóstico egreso"
+          value={cerradasSinDiagnosticoEgreso}
+          alerta={cerradasSinDiagnosticoEgreso > 0}
+          onClick={cerradasSinDiagnosticoEgreso > 0 || filtroCierre === "sin_diagnostico_egreso" ? alternarCerradasSinDiagnosticoEgreso : undefined}
+          activo={filtroCierre === "sin_diagnostico_egreso"}
+        />
         <Stat
           icon={<Trash2 size={18} />}
           label="Solicitudes de eliminación"
@@ -341,6 +366,7 @@ export default function CuidadosCriticosDashboardPage() {
                 <option value="todos">Todos</option>
                 <option value="pendientes">Pendientes</option>
                 <option value="cerrados">Cerrados</option>
+                <option value="sin_diagnostico_egreso">Sin diagnóstico egreso</option>
               </select>
             </label>
           </div>
