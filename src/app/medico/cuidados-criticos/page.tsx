@@ -17,9 +17,9 @@ import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lu
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  serviciosCanonicosCuidadosCriticos,
   servicioCanonicoCuidadosCriticos,
   servicioCoincideCuidadosCriticos,
-  serviciosConsultaCuidadosCriticos,
   serviciosPorTipoMedico,
   tipoUnidadPorServicio,
   TIPO_MEDICO_CRITICO_LABEL,
@@ -197,10 +197,11 @@ export default function CuidadosCriticosMedicoPage() {
     let activo = true;
     const timeout = window.setTimeout(async () => {
       try {
+        const serviciosConsulta = serviciosCanonicosCuidadosCriticos(servicios);
         const snap = await getDocs(query(
           collection(db, "fichas_cuidados_criticos"),
           where("pacienteExpediente", "==", expediente),
-          where("servicio", "in", serviciosConsultaCuidadosCriticos(servicios)),
+          where("servicio", "in", serviciosConsulta),
           limit(12)
         ));
         if (!activo) return;
@@ -362,10 +363,11 @@ export default function CuidadosCriticosMedicoPage() {
     let fichasPacienteActuales = fichas.filter(ficha => ficha.pacienteId === paciente.id || ficha.pacienteExpediente === paciente.expediente);
     if (paciente.id && servicios.length > 0) {
       try {
+        const serviciosConsulta = serviciosCanonicosCuidadosCriticos(servicios);
         const snap = await getDocs(query(
           collection(db, "fichas_cuidados_criticos"),
           where("pacienteId", "==", paciente.id),
-          where("servicio", "in", serviciosConsultaCuidadosCriticos(servicios)),
+          where("servicio", "in", serviciosConsulta),
           limit(20)
         ));
         const fichasRemotas = snap.docs.map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos));

@@ -10,7 +10,10 @@ import {
   type Query,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import { serviciosConsultaCuidadosCriticos } from "@/lib/cuidadosCriticos";
+import {
+  serviciosCanonicosCuidadosCriticos,
+  serviciosConsultaCuidadosCriticos,
+} from "@/lib/cuidadosCriticos";
 import type { FichaCuidadosCriticos, Paciente } from "@/types";
 
 const COLLECTION = "fichas_cuidados_criticos";
@@ -29,10 +32,18 @@ function fechaInput(fecha: Date) {
   return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
 }
 
-function serviciosParaConsulta(servicios: string[]) {
-  const unicos = [...new Set(serviciosConsultaCuidadosCriticos(servicios).map(servicio => servicio.trim()).filter(Boolean))];
+function serviciosParaConsultaFichas(servicios: string[]) {
+  const unicos = [...new Set(serviciosCanonicosCuidadosCriticos(servicios).map(servicio => servicio.trim()).filter(Boolean))];
   if (unicos.length === 0) {
     throw new Error("No hay servicios asignados para consultar fichas de cuidados criticos.");
+  }
+  return unicos.slice(0, 30);
+}
+
+function serviciosParaConsultaPacientes(servicios: string[]) {
+  const unicos = [...new Set(serviciosConsultaCuidadosCriticos(servicios).map(servicio => servicio.trim()).filter(Boolean))];
+  if (unicos.length === 0) {
+    throw new Error("No hay servicios asignados para consultar pacientes de cuidados criticos.");
   }
   return unicos.slice(0, 30);
 }
@@ -71,7 +82,7 @@ export function queryFichasTodas(limite = LIMITE_CONSULTA_MANUAL) {
 export function queryFichasServicios(servicios: string[], limite = LIMITE_CONSULTA_MANUAL) {
   return query(
     collection(db, COLLECTION),
-    where("servicio", "in", serviciosParaConsulta(servicios)),
+    where("servicio", "in", serviciosParaConsultaFichas(servicios)),
     limit(limite),
   );
 }
@@ -79,7 +90,7 @@ export function queryFichasServicios(servicios: string[], limite = LIMITE_CONSUL
 export function queryFichasPorIngresoServicios(desde: string, hasta: string, servicios: string[], limite = LIMITE_RANGO) {
   return query(
     collection(db, COLLECTION),
-    where("servicio", "in", serviciosParaConsulta(servicios)),
+    where("servicio", "in", serviciosParaConsultaFichas(servicios)),
     where("datos.fecha_ingreso_al_servicio", ">=", desde),
     where("datos.fecha_ingreso_al_servicio", "<=", hasta),
     orderBy("datos.fecha_ingreso_al_servicio", "asc"),
@@ -133,7 +144,7 @@ export function queryFichasActivas(limite = LIMITE_ACTIVAS) {
 export function queryFichasActivasServicios(servicios: string[], limite = LIMITE_ACTIVAS) {
   return query(
     collection(db, COLLECTION),
-    where("servicio", "in", serviciosParaConsulta(servicios)),
+    where("servicio", "in", serviciosParaConsultaFichas(servicios)),
     where("estadoEstancia", "==", "activa"),
     limit(limite),
   );
@@ -228,7 +239,7 @@ export function suscribirPacientesCuidadosCriticos(
     onSnapshot(
       query(
         collection(db, "pacientes"),
-        where("servicioActual", "in", serviciosParaConsulta(servicios)),
+        where("servicioActual", "in", serviciosParaConsultaPacientes(servicios)),
         where("estado", "==", "activo"),
       ),
       snap => {

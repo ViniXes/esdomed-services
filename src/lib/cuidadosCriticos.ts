@@ -98,6 +98,15 @@ export function serviciosConsultaCuidadosCriticos(servicios: string[]) {
   return [...consulta].filter(Boolean);
 }
 
+export function serviciosCanonicosCuidadosCriticos(servicios: string[]) {
+  const consulta = new Set<string>();
+  for (const servicio of servicios) {
+    const canonico = servicioCanonicoCuidadosCriticos(servicio);
+    if (canonico) consulta.add(canonico);
+  }
+  return [...consulta].filter(Boolean);
+}
+
 export function servicioCoincideCuidadosCriticos(servicio?: string | null, esperado?: string | null) {
   if (!servicio || !esperado) return false;
   return servicioCanonicoCuidadosCriticos(servicio) === servicioCanonicoCuidadosCriticos(esperado);
