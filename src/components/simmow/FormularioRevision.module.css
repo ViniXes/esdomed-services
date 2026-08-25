@@ -10,26 +10,11 @@
   background: #003063;
   padding: 18px;
   border-radius: 12px;
+  /* Respaldo para pantallas muy angostas donde ni ensanchar el contenedor
+     alcanza — normalmente no debería activarse (ver max-w-none en
+     page.tsx durante el paso de revisión, que le da a esta tabla más
+     ancho disponible en vez de depender del scroll). */
   overflow-x: auto;
-  /* La tabla (980px) no cabe entera en pantallas angostas (laptop con el
-     panel lateral abierto) — sin esto el scrollbar por defecto es tan
-     delgado que la mitad derecha parece cortada en vez de desplazable. */
-  scrollbar-width: auto;
-  scrollbar-color: #6b93b8 #003063;
-}
-
-.wrap::-webkit-scrollbar {
-  height: 12px;
-}
-
-.wrap::-webkit-scrollbar-track {
-  background: #003063;
-}
-
-.wrap::-webkit-scrollbar-thumb {
-  background-color: #6b93b8;
-  border-radius: 6px;
-  border: 2px solid #003063;
 }
 
 .form {
