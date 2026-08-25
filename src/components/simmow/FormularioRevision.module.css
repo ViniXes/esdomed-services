@@ -11,6 +11,25 @@
   padding: 18px;
   border-radius: 12px;
   overflow-x: auto;
+  /* La tabla (980px) no cabe entera en pantallas angostas (laptop con el
+     panel lateral abierto) — sin esto el scrollbar por defecto es tan
+     delgado que la mitad derecha parece cortada en vez de desplazable. */
+  scrollbar-width: auto;
+  scrollbar-color: #6b93b8 #003063;
+}
+
+.wrap::-webkit-scrollbar {
+  height: 12px;
+}
+
+.wrap::-webkit-scrollbar-track {
+  background: #003063;
+}
+
+.wrap::-webkit-scrollbar-thumb {
+  background-color: #6b93b8;
+  border-radius: 6px;
+  border: 2px solid #003063;
 }
 
 .form {
