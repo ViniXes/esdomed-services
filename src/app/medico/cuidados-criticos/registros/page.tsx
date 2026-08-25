@@ -33,6 +33,7 @@ type FiltrosPersistidos = {
 };
 
 const FILTROS_STORAGE_KEY = "cuidados-criticos:mis-registros:filtros:v1";
+const TODOS_LOS_MESES = "TODOS";
 
 const MESES = [
   "ENERO",
@@ -69,7 +70,7 @@ function leerFiltrosPersistidos(): FiltrosPersistidos {
       servicio: typeof parsed.servicio === "string" ? parsed.servicio : undefined,
       periodo: esPeriodoFiltro(parsed.periodo) ? parsed.periodo : undefined,
       cierre: esCierreFiltro(parsed.cierre) ? parsed.cierre : undefined,
-      mes: typeof parsed.mes === "string" && MESES.includes(parsed.mes) ? parsed.mes : undefined,
+      mes: typeof parsed.mes === "string" && (parsed.mes === TODOS_LOS_MESES || MESES.includes(parsed.mes)) ? parsed.mes : undefined,
       desde: typeof parsed.desde === "string" ? parsed.desde : undefined,
       hasta: typeof parsed.hasta === "string" ? parsed.hasta : undefined,
       busqueda: typeof parsed.busqueda === "string" ? parsed.busqueda : undefined,
@@ -188,7 +189,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
       const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
       if (cierre === "pendientes" && !pendienteCierre) return false;
       if (cierre === "cerrados" && pendienteCierre) return false;
-      if (periodo === "mes" && valorComoTexto(ficha.datos?.mes) !== mes) return false;
+      if (periodo === "mes" && mes !== TODOS_LOS_MESES && valorComoTexto(ficha.datos?.mes) !== mes) return false;
       if (periodo === "rango" && !enRango(fechaIngresoFicha(ficha), desde, hasta)) return false;
       if (!texto) return true;
       return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`
@@ -273,6 +274,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
             <label>
               <span className="mb-1 block text-xs font-semibold text-slate-500">Mes</span>
               <select value={mes} onChange={event => setMes(event.target.value)} className={inputCls}>
+                <option value={TODOS_LOS_MESES}>TODOS</option>
                 {MESES.map(item => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
