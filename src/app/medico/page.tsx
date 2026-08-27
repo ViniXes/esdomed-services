@@ -10,8 +10,19 @@ import {
   ArrowRightLeft, HeartPulse, Printer,
   Clock, CheckCircle2, XCircle, Plus, ChevronRight,
   Activity, BedDouble, FileClock, Stethoscope,
+  BookOpen, FileText, ExternalLink,
 } from "lucide-react";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+
+// Guías y material de apoyo colgados en public/documentos. Se abren en otra
+// pestaña; para sumar uno nuevo basta copiar el archivo y agregarlo aquí.
+const DOCUMENTOS = [
+  {
+    href: "/documentos/tutorial-notificacion-avisos.pdf",
+    titulo: "Tutorial: notificación de avisos CONAPINA / FGR",
+    desc: "Paso a paso para notificar los avisos desde el portal, con el directorio de las juntas de protección",
+  },
+];
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -271,6 +282,51 @@ export default function MedicoDashboardPage() {
           </ul>
         </div>
       )}
+
+      {/* Documentos */}
+      <div>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Documentos</h2>
+            <p className="mt-1 max-w-md text-xs text-slate-500 dark:text-slate-400">Guías y material de apoyo del servicio.</p>
+          </div>
+          <BookOpen size={17} className="text-teal-600 dark:text-teal-400" aria-hidden="true" />
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {DOCUMENTOS.map((doc) => (
+              <li key={doc.href}>
+                <a
+                  href={doc.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-4 px-5 py-4 hover:bg-blue-50/60 dark:hover:bg-slate-800/60 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center flex-shrink-0">
+                    <FileText size={18} className="text-blue-600 dark:text-blue-300" strokeWidth={1.9} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 group-hover:text-blue-900 dark:group-hover:text-white transition-colors">
+                      {doc.titulo}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{doc.desc}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="hidden rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 sm:inline">
+                      PDF
+                    </span>
+                    <ExternalLink
+                      size={15}
+                      className="text-slate-400 group-hover:text-blue-600 dark:group-hover:text-cyan-300 transition-colors"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
