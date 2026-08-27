@@ -32,6 +32,7 @@ import {
   Users,
   DoorOpen,
   CalendarClock,
+  CalendarRange,
   NotebookPen,
   UserCheck,
   UserSearch,
@@ -277,6 +278,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verHorario
       ? [
           { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL },
+          { href: "/horarios", label: "Horarios por área", icon: CalendarRange, group: G_PERSONAL },
           { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList, group: G_PERSONAL },
           { href: "/dashboard/directorio-extensiones", label: "Directorio de extensiones", icon: PhoneCall, group: G_PERSONAL }
         ]

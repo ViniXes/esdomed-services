@@ -1439,6 +1439,12 @@ export interface FilaPlanTrabajo {
 
 export interface PlanTrabajo {
   id?: string;             // == periodo, ej. "2026-06"
+  // Área del hospital a la que pertenece el plan. Los planes de ESDOMED (colección
+  // `planes_trabajo`, doc id == periodo) no llevan área; los planes de las demás
+  // áreas viven en `planes_trabajo_areas` con doc id `{areaId}_{periodo}` y estos
+  // dos campos siempre presentes. Catálogo de áreas: src/lib/areas-trabajo.ts.
+  areaId?: string;         // ej. "terapia-respiratoria"
+  areaNombre?: string;     // snapshot del nombre, ej. "Unidad de Terapia Respiratoria"
   periodo: string;         // "YYYY-MM"
   anio: number;
   mes: number;             // 1-12

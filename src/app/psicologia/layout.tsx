@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, HeartPulse, Inbox, LogOut, LogIn, UserSearch } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sidebar, type NavItem } from "@/components/Sidebar";
+import { Sidebar } from "@/components/Sidebar";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
 import { ToastContainer } from "@/components/ui/ToastContainer";
+import { navItemsPsicologia } from "@/lib/navPsicologia";
 
 function PsicologiaContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
@@ -17,17 +17,9 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
     if (!loading && profile?.role !== "psicologia") router.replace("/login");
   }, [loading, profile, router]);
 
-  // Las lesiones intencionales (avisos CONAPINA/FGR e ingresos por lesión) ya
-  // NO viven aquí: son trámite del Comité de Lesiones Intencionales, que tiene
-  // su propio perfil y su propia área en /comite-lesiones.
-  const navItems: NavItem[] = [
-    { href: "/psicologia/buscar-paciente",   label: "Buscar Paciente",   icon: UserSearch },
-    { href: "/psicologia/pacientes-activos", label: "Pacientes activos", icon: Clock },
-    { href: "/psicologia/altas",             label: "Altas efectivas",   icon: LogOut },
-    { href: "/psicologia/altas-vivos",       label: "Verificación de Altas", icon: LogIn },
-    { href: "/psicologia/fallecidos",        label: "Fallecidos",        icon: HeartPulse, tone: "rose", badge: pendientes.fallecidos },
-    { href: "/psicologia/recepciones",       label: "Recepciones",       icon: Inbox,      badge: pendientes.recepciones },
-  ];
+  // El menú (propio + vistas del Comité de Lesiones, salvo Reportes) vive en
+  // navPsicologia para que el layout de /comite-lesiones muestre el mismo.
+  const navItems = navItemsPsicologia(pendientes);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">

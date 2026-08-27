@@ -7,15 +7,17 @@ import { diasDelMesArray, inicialesDeMes, compararFilasPlan } from "@/lib/esdome
 
 interface Props {
   plan: PlanTrabajo;
+  /** Nombre del área/departamento en el encabezado. Por defecto ESDOMED (uso legacy). */
+  departamento?: string;
 }
 
 /**
- * Replica el formato oficial del rol de turnos ESDOMED (hoja del Excel que se
- * presenta a RH). Cuadrícula: una fila por empleado, una columna por día del
- * mes con su código de horario. Diseñado para imprimir en horizontal (oficio/
- * carta apaisado).
+ * Replica el formato oficial del rol de turnos (hoja del Excel que se presenta
+ * a RH). Cuadrícula: una fila por empleado, una columna por día del mes con su
+ * código de horario. Diseñado para imprimir en horizontal (oficio/carta
+ * apaisado). Sirve para ESDOMED y para cualquier área (prop `departamento`).
  */
-export function PlanPrintLayout({ plan }: Props) {
+export function PlanPrintLayout({ plan, departamento = "ESDOMED" }: Props) {
   const dias = diasDelMesArray(plan.anio, plan.mes);
   const iniciales = inicialesDeMes(plan.anio, plan.mes);
   const colSpanTotal = dias.length + 4; // código + nombre + puesto + días + total
@@ -50,7 +52,7 @@ export function PlanPrintLayout({ plan }: Props) {
 
           <div className="px-2 flex justify-between items-end">
             <div>
-              <p className="text-[11px] font-bold">DEPARTAMENTO: ESDOMED</p>
+              <p className="text-[11px] font-bold">DEPARTAMENTO: {departamento.toUpperCase()}</p>
               <p className="text-[9px]">
                 <span className="font-bold">NÚMERO DE HORAS: </span>
                 {plan.numeroHoras || "—"}

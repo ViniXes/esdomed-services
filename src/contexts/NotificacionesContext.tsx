@@ -77,6 +77,8 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esPsicologia = profile?.role === "psicologia";
   const esTS         = profile?.role === "trabajo_social";
   const esComiteLesiones = profile?.role === "comite_lesiones";
+  // Psicología apoya el trámite del comité: comparte sus vistas y su bandeja.
+  const cuentaConapina = esComiteLesiones || esPsicologia;
   // Psicología y Trabajo Social comparten la revisión de fallecidos (confirmar "visto").
   const revisaFallecidos = esPsicologia || esTS;
   const psUid        = profile?.uid;
@@ -226,7 +228,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   // para el toast, igual que las fuentes de ESDOMED.
   const knownConapina = useRef<string | null>(null);
   useEffect(() => {
-    if (!esComiteLesiones) return;
+    if (!cuentaConapina) return;
     let activo = true;
     knownConapina.current = null;
 
@@ -271,7 +273,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
       window.clearInterval(iv);
       unsub();
     };
-  }, [esComiteLesiones, addToast, setCount]);
+  }, [cuentaConapina, addToast, setCount]);
 
   // ── Médicos: solicitudes de notificación difundidas por el comité ──
   // Un solo listener sobre las PENDIENTES (son pocas por diseño: las crea el

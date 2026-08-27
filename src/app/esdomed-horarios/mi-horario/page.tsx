@@ -185,11 +185,11 @@ export default function MiHorarioPage() {
 }
 
 // ── Estilos de celda por tipo de asignación ──────────────────────────────────
-function tipoCelda(celda: string): "trabajo" | "VAC" | "INC" | "PER" | "ASU" | "descanso" {
+function tipoCelda(celda: string): "trabajo" | "VAC" | "INC" | "PER" | "ASU" | "LIC" | "MAT" | "descanso" {
   const v = celda.trim().toUpperCase();
   if (!v) return "descanso";
   if (getHorario(v)) return "trabajo";
-  if (v === "VAC" || v === "INC" || v === "PER" || v === "ASU") return v;
+  if (v === "VAC" || v === "INC" || v === "PER" || v === "ASU" || v === "LIC" || v === "MAT") return v;
   return "trabajo";
 }
 
@@ -213,6 +213,14 @@ const ESTILO_CELDA: Record<ReturnType<typeof tipoCelda>, { cell: string; code: s
   ASU: {
     cell: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/45 dark:border-emerald-900/50",
     code: "text-emerald-700 dark:text-emerald-300",
+  },
+  LIC: {
+    cell: "bg-slate-100 border-slate-200 dark:bg-slate-800/70 dark:border-slate-700",
+    code: "text-slate-600 dark:text-slate-300",
+  },
+  MAT: {
+    cell: "bg-cyan-50 border-cyan-200 dark:bg-cyan-950/45 dark:border-cyan-900/50",
+    code: "text-cyan-700 dark:text-cyan-300",
   },
   descanso: {
     cell: "bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-800",

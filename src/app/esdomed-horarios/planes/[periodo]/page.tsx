@@ -1213,7 +1213,8 @@ function colorCelda(celda: string): string {
     if (v === "VAC") return "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300";
     if (v === "INC") return "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300";
     if (v === "ASU") return "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300";
-    // PER (permiso) — tono neutro de la paleta institucional (charcoal).
+    if (v === "MAT") return "bg-cyan-100 text-cyan-700 hover:bg-cyan-200 dark:bg-cyan-950 dark:text-cyan-300";
+    // PER y LIC — tono neutro de la paleta institucional (charcoal).
     return "bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-[var(--color-institutional-charcoal)] dark:text-slate-200";
   }
   return "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300";
