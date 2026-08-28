@@ -1422,6 +1422,19 @@ export interface Licencia {
 // Los empleados con rol esdomed consultan su propia fila en "Mi horario".
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Permiso personal (trámite A1/A2 aprobado) reflejado en una fila del plan.
+// Turno completo: la celda pasa a "PER" y aquí queda el turno que tenía.
+// Fracción de turno: la celda CONSERVA su código y este registro anota las horas.
+// Un registro (tramiteId, dia) ya aplicado nunca se re-aplica: si el asistente
+// edita la celda después, su decisión manual prevalece.
+export interface PermisoTramitePlan {
+  dia: number;          // día del mes (1-based)
+  tramiteId: string;    // doc de tramites_personal que lo originó
+  horas: number;        // horas de permiso ese día
+  parcial: boolean;     // true = fracción (la celda mantiene el turno)
+  codigoTurno: string;  // turno asignado al momento de aplicar ("TH34")
+}
+
 // Una fila del plan = un empleado y sus asignaciones día por día.
 export interface FilaPlanTrabajo {
   uid?: string;            // uid del usuario si está vinculado (para "Mi horario")
@@ -1435,6 +1448,7 @@ export interface FilaPlanTrabajo {
   // ("MA2", "TH34"), marca especial ("VAC"|"INC"|"PER") o "" (descanso).
   asignaciones: string[];
   observaciones?: string;  // nota libre por persona (columna final del Excel)
+  permisos?: PermisoTramitePlan[]; // permisos de trámites aprobados aplicados este mes
 }
 
 export interface PlanTrabajo {

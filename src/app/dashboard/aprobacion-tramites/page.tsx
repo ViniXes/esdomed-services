@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { collection, query, orderBy, getDocs, getDoc, doc, updateDoc, Timestamp, limit, where } from "@/lib/firestoreMeter";
+import { collection, query, orderBy, getDocs, getDoc, doc, updateDoc, runTransaction, Timestamp, limit, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, RefreshCw, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, RefreshCw, AlertTriangle, CalendarCheck } from "lucide-react";
 import type { FilaPlanTrabajo, PlanTrabajo, TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
+import {
+  aplicarPermisoEnFilas,
+  esPermisoPersonal,
+  fechasDelPermiso,
+  periodoDeFecha,
+  periodosDelPermiso,
+} from "@/lib/esdomed/permisos-plan";
+import { labelPeriodo, parsePeriodo } from "@/lib/esdomed/plan";
 
 const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
   "A1_permiso_con_goce": "A.1 - Permisos con goce de sueldo",
@@ -42,39 +50,11 @@ const docsDe = (t: TramitePersonal): { url: string; nombre: string }[] =>
       ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
       : [];
 
-const esPermisoPersonal = (t: TramitePersonal) =>
-  t.categoria === "A1_permiso_con_goce" || t.categoria === "A2_permiso_sin_goce";
-
 type ConflictoPermisoGrupo = {
   fecha: string;
   grupo: string;
   empleadoNombre: string;
 };
-
-const fechaLocal = (valor: unknown): string | null => {
-  const fecha = toDate(valor);
-  if (!fecha || Number.isNaN(fecha.getTime())) return null;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
-};
-
-const fechasDelPermiso = (tramite: TramitePersonal): string[] => {
-  const inicio = fechaLocal(tramite.fechaInicio);
-  const fin = fechaLocal(tramite.fechaFin) ?? inicio;
-  if (!inicio || !fin || fin < inicio) return [];
-
-  const fechas: string[] = [];
-  const cursor = new Date(`${inicio}T12:00:00`);
-  const ultimo = new Date(`${fin}T12:00:00`);
-  while (cursor <= ultimo) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    fechas.push(`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`);
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return fechas;
-};
-
-const periodoDeFecha = (fecha: string) => fecha.slice(0, 7);
 
 const filaDelEmpleado = (plan: PlanTrabajo | undefined, empleadoId: string): FilaPlanTrabajo | undefined =>
   plan?.filas?.find((fila) => fila.uid === empleadoId);
@@ -106,6 +86,7 @@ export default function AprobacionTramitesPage() {
   const [accionAdmin, setAccionAdmin] = useState<"aprobado" | "rechazado">("aprobado");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [resultadoPlan, setResultadoPlan] = useState<{ titulo: string; lineas: string[]; tono: "exito" | "alerta" } | null>(null);
   const [conflictosPermiso, setConflictosPermiso] = useState<ConflictoPermisoGrupo[]>([]);
   const [advertenciasPermiso, setAdvertenciasPermiso] = useState<ConflictoPermisoGrupo[]>([]);
   const [revisandoCoincidencias, setRevisandoCoincidencias] = useState(false);
@@ -194,6 +175,71 @@ export default function AprobacionTramitesPage() {
       .finally(() => setRevisandoCoincidencias(false));
   };
 
+  // Refleja el permiso aprobado en el plan de trabajo del/los mes(es) que cubre.
+  // Corre en transacción para no pisar ediciones concurrentes del asistente.
+  // Si un plan aún no existe, no pasa nada: el editor lo aplica al crearlo.
+  const reflejarPermisoEnPlan = async (
+    tramite: TramitePersonal,
+  ): Promise<{ titulo: string; lineas: string[]; tono: "exito" | "alerta" }> => {
+    const periodos = periodosDelPermiso(tramite);
+    if (periodos.length === 0) {
+      return { titulo: "Permiso aprobado", lineas: ["El trámite no tiene fechas válidas, no se reflejó en el plan de trabajo."], tono: "alerta" };
+    }
+    const lineas: string[] = [];
+    let marcados = 0;
+    try {
+      await runTransaction(db, async (tx) => {
+        lineas.length = 0;
+        marcados = 0;
+        // Todas las lecturas primero (requisito de las transacciones de Firestore).
+        const snaps: { periodo: string; snap: Awaited<ReturnType<typeof tx.get>> }[] = [];
+        for (const periodo of periodos) {
+          snaps.push({ periodo, snap: await tx.get(doc(db, "planes_trabajo", periodo)) });
+        }
+        for (const { periodo, snap } of snaps) {
+          if (!snap.exists()) {
+            lineas.push(`${labelPeriodo(periodo)}: el plan aún no existe; el permiso se aplicará solo al crearlo.`);
+            continue;
+          }
+          const plan = snap.data() as PlanTrabajo;
+          const { anio, mes } = parsePeriodo(periodo);
+          const r = aplicarPermisoEnFilas(plan.filas ?? [], tramite, anio, mes);
+          if (r.sinFila) {
+            lineas.push(`${labelPeriodo(periodo)}: ${tramite.empleadoNombre} no tiene fila en el plan; márcalo manualmente.`);
+            continue;
+          }
+          if (!r.cambio) {
+            lineas.push(`${labelPeriodo(periodo)}: no había turnos que marcar en esas fechas (días de descanso o permiso ya aplicado).`);
+            continue;
+          }
+          tx.update(doc(db, "planes_trabajo", periodo), {
+            filas: r.filas,
+            actualizadoEn: Timestamp.now(),
+            actualizadoPorId: user?.uid ?? "",
+            actualizadoPorNombre: profile?.nombre ?? "",
+          });
+          marcados += r.completos + r.parciales;
+          const partes: string[] = [];
+          if (r.completos > 0) partes.push(`${r.completos} día(s) marcados PER`);
+          if (r.parciales > 0) partes.push(`${r.parciales} día(s) con fracción de turno anotada`);
+          lineas.push(`${labelPeriodo(periodo)}: ${partes.join(" y ")}.`);
+        }
+      });
+    } catch (err) {
+      console.error("No se pudo reflejar el permiso en el plan de trabajo", err);
+      return {
+        titulo: "Permiso aprobado, plan sin actualizar",
+        lineas: ["El trámite quedó aprobado, pero no se pudo escribir en el plan de trabajo. Se aplicará automáticamente al abrir el editor del plan."],
+        tono: "alerta",
+      };
+    }
+    return {
+      titulo: marcados > 0 ? "Permiso reflejado en el plan" : "Permiso aprobado",
+      lineas,
+      tono: marcados > 0 ? "exito" : "alerta",
+    };
+  };
+
   const handleResolver = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tramiteAprobando?.id || !user || !profile) return;
@@ -232,6 +278,12 @@ export default function AprobacionTramitesPage() {
           : t;
       setTramites(prev => prev.map(parche));
       if (cacheTramites) cacheTramites = cacheTramites.map(parche);
+
+      // Permiso personal aprobado → se refleja en el plan de trabajo.
+      if (accionAdmin === "aprobado" && esPermisoPersonal(tramiteAprobando)) {
+        setResultadoPlan(await reflejarPermisoEnPlan({ ...tramiteAprobando, estado: "aprobado" }));
+      }
+
       setTramiteAprobando(null);
       setComentarioAdmin("");
       setConflictosPermiso([]);
@@ -556,6 +608,36 @@ export default function AprobacionTramitesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: resultado del reflejo en el plan de trabajo */}
+      {resultadoPlan && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className={`p-6 flex flex-col items-center gap-3 ${resultadoPlan.tono === "exito" ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-amber-50 dark:bg-amber-950/30"}`}>
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${resultadoPlan.tono === "exito" ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-amber-100 dark:bg-amber-900/50"}`}>
+                <CalendarCheck size={28} className={resultadoPlan.tono === "exito" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"} />
+              </div>
+              <h3 className={`text-lg font-bold text-center ${resultadoPlan.tono === "exito" ? "text-emerald-800 dark:text-emerald-300" : "text-amber-800 dark:text-amber-300"}`}>
+                {resultadoPlan.titulo}
+              </h3>
+              <ul className={`text-sm space-y-1.5 ${resultadoPlan.tono === "exito" ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>
+                {resultadoPlan.lineas.map((linea, i) => (
+                  <li key={i} className="text-center">{linea}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="p-5">
+              <button
+                type="button"
+                onClick={() => setResultadoPlan(null)}
+                className={`w-full py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${resultadoPlan.tono === "exito" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-amber-500 hover:bg-amber-600"}`}
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { FilaPlanTrabajo, PlanTrabajo } from "@/types";
+import type { FilaPlanTrabajo, PermisoTramitePlan, PlanTrabajo } from "@/types";
+import { permisoDelDia } from "@/lib/esdomed/permisos-plan";
 import {
   describirCelda,
   getHorario,
@@ -130,6 +131,7 @@ export default function MiHorarioPage() {
               dia={diaDetalle}
               celda={fila.asignaciones[diaDetalle - 1] ?? ""}
               esHoy={diaDetalle === diaHoy}
+              permiso={permisoDelDia(fila, diaDetalle)}
             />
           )}
 
@@ -162,6 +164,7 @@ export default function MiHorarioPage() {
                     celda={fila.asignaciones[dia - 1] ?? ""}
                     esHoy={dia === diaHoy}
                     seleccionado={dia === diaSel}
+                    permiso={permisoDelDia(fila, dia)}
                     onClick={() => setDiaSel(dia === diaSel ? null : dia)}
                   />
                 );
@@ -234,6 +237,7 @@ function CalendarCell({
   celda,
   esHoy,
   seleccionado,
+  permiso,
   onClick,
 }: {
   dia: number;
@@ -241,12 +245,14 @@ function CalendarCell({
   celda: string;
   esHoy: boolean;
   seleccionado: boolean;
+  permiso?: PermisoTramitePlan;
   onClick: () => void;
 }) {
   const tipo = tipoCelda(celda);
   const estilo = ESTILO_CELDA[tipo];
   const horario = getHorario(celda);
   const valor = celda.trim().toUpperCase();
+  const permisoParcial = permiso?.parcial && valor === permiso.codigoTurno;
 
   return (
     <button
@@ -263,6 +269,14 @@ function CalendarCell({
       >
         {dia}
       </span>
+
+      {/* Permiso parcial aprobado sobre el turno de este día */}
+      {permisoParcial && (
+        <span
+          className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400"
+          title={`Permiso parcial de ${permiso?.horas} h aprobado`}
+        />
+      )}
 
       {/* Contenido */}
       {tipo === "descanso" ? (
@@ -288,18 +302,22 @@ function DetalleDia({
   dia,
   celda,
   esHoy,
+  permiso,
 }: {
   anio: number;
   mes: number;
   dia: number;
   celda: string;
   esHoy: boolean;
+  permiso?: PermisoTramitePlan;
 }) {
   const dow = new Date(anio, mes - 1, dia).getDay();
   const horario = getHorario(celda);
   const marca = esMarcaEspecial(celda);
   const descanso = !celda.trim();
   const valor = celda.trim().toUpperCase();
+  const permisoParcial = permiso?.parcial && valor === permiso.codigoTurno;
+  const permisoCompleto = permiso && !permiso.parcial && valor === "PER";
 
   return (
     <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
@@ -352,6 +370,17 @@ function DetalleDia({
           </div>
         ) : (
           <span className="text-sm text-slate-600 dark:text-slate-300">{describirCelda(celda)}</span>
+        )}
+
+        {permisoParcial && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+            <FileText size={13} /> Permiso parcial aprobado: {permiso?.horas} h de este turno
+          </p>
+        )}
+        {permisoCompleto && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <FileText size={13} /> Permiso aprobado por trámite (cubría el turno {permiso?.codigoTurno})
+          </p>
         )}
       </div>
     </div>

@@ -43,6 +43,11 @@ import {
   esAdministrativoPlan,
   normalizarMetadatosFilaPlan,
 } from "@/lib/esdomed/catalogo-plan";
+import {
+  aplicarPermisosAprobados,
+  cargarPermisosAprobadosDelPeriodo,
+  permisoDelDia,
+} from "@/lib/esdomed/permisos-plan";
 import { esDiaNoLaboralAdministrativo } from "@/lib/esdomed/calendario-plan";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
 import { exportarPlanExcel, type TipoPlan } from "@/lib/esdomed/exportar-plan";
@@ -253,13 +258,37 @@ export default function EditorPlanPage() {
           window.localStorage.removeItem(borradorKey);
         }
 
+        // Respaldo del puente trámites → plan: aplica permisos personales
+        // aprobados que aún no estén reflejados (p. ej. aprobados antes de que
+        // existiera el plan de este mes). Idempotente vía fila.permisos.
+        let mensajePermisos: string | null = null;
+        try {
+          const aprobados = await cargarPermisosAprobadosDelPeriodo(anio, mes);
+          const r = aplicarPermisosAprobados(filasBase, aprobados, anio, mes);
+          if (r.completos + r.parciales > 0) {
+            filasBase = r.filas;
+            const partes: string[] = [];
+            if (r.completos > 0) partes.push(`${r.completos} día(s) marcados PER`);
+            if (r.parciales > 0) partes.push(`${r.parciales} fracción(es) de turno anotadas`);
+            mensajePermisos = `Se aplicaron permisos personales aprobados de: ${r.empleados.join(", ")} — ${partes.join(" y ")}.`;
+          }
+        } catch (err) {
+          console.error("No se pudieron revisar los permisos aprobados del periodo", err);
+        }
+
         filasRef.current = filasBase;
         setFilas(filasBase);
         setNumeroHoras(numeroHorasBase);
         setMetaHorasAdmin(metaAdminBase);
         setMetaHorasOperativas(metaOperativaBase);
-        setGuardado(snap.exists() && !borradorRecuperado);
-        if (borradorRecuperado) {
+        setGuardado(snap.exists() && !borradorRecuperado && !mensajePermisos);
+        if (mensajePermisos) {
+          setModalState({
+            tipo: "alerta",
+            titulo: "Permisos aprobados aplicados",
+            mensaje: `${mensajePermisos}${borradorRecuperado ? "\n\nAdemás se recuperaron cambios locales pendientes de guardar." : ""}\n\nGuarda el plan para que quede permanente.`,
+          });
+        } else if (borradorRecuperado) {
           setModalState({
             tipo: "alerta",
             titulo: "Borrador recuperado",
@@ -519,6 +548,8 @@ export default function EditorPlanPage() {
           observaciones: f.observaciones ?? "",
           // Firestore no acepta `undefined`; solo guardamos orden si es manual.
           ...(typeof f.orden === "number" ? { orden: f.orden } : {}),
+          // Procedencia de permisos de trámites aprobados aplicados este mes.
+          ...(f.permisos?.length ? { permisos: f.permisos } : {}),
         })),
         creadoEn: creadoMeta?.creadoEn ?? ahora,
         creadoPorId: creadoMeta?.creadoPorId ?? profile.uid,
@@ -965,6 +996,10 @@ export default function EditorPlanPage() {
                             const celda = (fila.asignaciones[diaIdx] ?? "").trim();
                             const finde = iniciales[diaIdx] === "S" || iniciales[diaIdx] === "D";
                             const sugerido = sugerencias[diaIdx] === true;
+                            // Marca de procedencia: permiso de trámite aprobado en este día.
+                            const permiso = permisoDelDia(fila, diaIdx + 1);
+                            const permisoCompleto = permiso && !permiso.parcial && celda.toUpperCase() === "PER";
+                            const permisoParcial = permiso?.parcial && celda.toUpperCase() === permiso.codigoTurno;
                             return (
                               <td key={d} className={`p-0 text-center ${finde ? "bg-rose-50/40 dark:bg-rose-950/20" : ""}`}>
                                 <button
@@ -1031,9 +1066,13 @@ export default function EditorPlanPage() {
                                     setCelda(filaIdx, diaIdx, "");
                                   }}
                                   title={
-                                    sugerido
-                                      ? "Siguiente turno sugerido; usa flechas para moverte y doble clic para abrir el selector"
-                                      : "Usa flechas para moverte; Backspace/Supr borra y doble clic abre el selector"
+                                    permisoCompleto
+                                      ? `Permiso de trámite aprobado (cubría el turno ${permiso.codigoTurno})`
+                                      : permisoParcial
+                                        ? `Permiso parcial de ${permiso.horas} h aprobado por trámite; el turno se conserva`
+                                        : sugerido
+                                          ? "Siguiente turno sugerido; usa flechas para moverte y doble clic para abrir el selector"
+                                          : "Usa flechas para moverte; Backspace/Supr borra y doble clic abre el selector"
                                   }
                                   className={`w-9 h-8 text-[10px] font-bold tabular-nums transition-colors cursor-cell hover:ring-2 hover:ring-blue-400 focus:ring-2 focus:ring-blue-500 focus:outline-none hover:z-10 relative ${
                                     sugerido
@@ -1042,6 +1081,9 @@ export default function EditorPlanPage() {
                                   }`}
                                 >
                                   {celda ? celda.toUpperCase() : sugerido ? "•" : ""}
+                                  {permisoParcial && (
+                                    <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                                  )}
                                 </button>
                               </td>
                             );

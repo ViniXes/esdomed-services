@@ -281,7 +281,10 @@ export function prepararFilasNuevoPeriodo(
   const anteriores = planAnterior?.filas ?? [];
   return sincronizarFilas(usuarios, anteriores, dias).map((fila) => {
     const origen = filaCoincidente(anteriores, fila);
-    const normalizada = normalizarMetadatosFilaPlan(fila);
+    // Los permisos aplicados pertenecen al mes de origen; un mes nuevo arranca sin ellos.
+    const sinPermisos = { ...fila };
+    delete sinPermisos.permisos;
+    const normalizada = normalizarMetadatosFilaPlan(sinPermisos);
     if (!esAdministrativoPlan(normalizada)) {
       return { ...normalizada, asignaciones: Array(dias).fill("") };
     }
