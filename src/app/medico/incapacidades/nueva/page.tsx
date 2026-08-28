@@ -224,7 +224,8 @@ export default function NuevaIncapacidadPage() {
         doc.medicoServicio = profile.servicio ?? (profile.servicios?.[0] ?? "Emergencia");
         doc.diasIncapacidad = diasNum;
         doc.fechaDesde = Timestamp.fromDate(fAlta);
-        doc.fechaHasta = Timestamp.fromDate(calcularFechaHasta(fAlta, diasNum));
+        // El día de la consulta cuenta como primer día: hasta = inicio + (días − 1).
+        doc.fechaHasta = Timestamp.fromDate(calcularFechaHasta(fAlta, diasNum - 1));
         if (atencion.dui)    doc.pacienteDui = atencion.dui;
         if (atencion.genero) doc.pacienteGenero = atencion.genero;
       } else if (paciente) {
