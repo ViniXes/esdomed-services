@@ -479,6 +479,30 @@ export interface NotificacionFallecido {
   tramiteJustificacion?: string;
 }
 
+// ── Bitácora interna del caso (solo ESDOMED / admin) ──
+// Subcolección notificaciones_fallecidos/{id}/bitacora. Comentarios y adjuntos
+// (PDF/imágenes) que abonan al trámite. Va aparte del documento padre a propósito:
+// el padre lo leen médicos, Psic./T.S., recepciones y productividad, y las reglas
+// de la subcolección limitan la lectura a ESDOMED/admin. Entradas inmutables
+// (creadoEn sellado con serverTimestamp); las borra su autor o un admin.
+export interface AdjuntoBitacora {
+  url: string;
+  nombre: string;          // nombre original del archivo
+  tipo: "pdf" | "imagen";
+  tamano: number;          // bytes
+  storagePath: string;     // ruta en Storage, para retirar el objeto al borrar la entrada
+}
+
+export interface EntradaBitacoraFallecido {
+  id?: string;
+  texto?: string;
+  adjuntos?: AdjuntoBitacora[];   // hasta 5 por entrada
+  autorUid: string;
+  autorNombre: string;
+  autorRol: UserRole;
+  creadoEn: Date;
+}
+
 export type EstadoImpresion = "pendiente" | "impreso";
 
 export interface SolicitudImpresion {

@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
+import { BitacoraFallecido } from "@/components/BitacoraFallecido";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
 import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive, Inbox, History, FileSignature, PenLine } from "lucide-react";
@@ -25,7 +26,7 @@ const PARENTESCOS = [
 ] as const;
 
 type CampoSeguimiento = typeof COLUMNAS_SEGUIMIENTO[number]["key"];
-type ActiveTab = "expediente" | "seguimiento" | "entrega" | "certificado";
+type ActiveTab = "expediente" | "seguimiento" | "entrega" | "certificado" | "bitacora";
 // Bandeja = trámites abiertos (en vivo). Buscar = histórico bajo demanda.
 type Vista = "bandeja" | "buscar";
 
@@ -425,6 +426,7 @@ export default function DashboardFallecidosPage() {
     { id: "seguimiento", label: "Seguimiento" },
     { id: "certificado", label: "Certificado" },
     { id: "entrega",     label: "Entrega"     },
+    { id: "bitacora",    label: "Bitácora"    },
   ];
 
   const isLocked    = !!(selectedLive?.tramiteCerrado && !selectedLive.tramiteDesbloqueado);
@@ -1261,6 +1263,11 @@ export default function DashboardFallecidosPage() {
                   {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
                 </button>
               )}
+              {/* ── Tab: Bitácora (comentarios + adjuntos internos de ESDOMED) ── */}
+              {activeTab === "bitacora" && selectedLive.id && (
+                <BitacoraFallecido key={selectedLive.id} notificacionId={selectedLive.id} tramiteCerrado={isLocked} />
+              )}
+
               {/* Bloqueo de cierre por entrega pendiente: todo lo demás está listo,
                   pero el certificado no se ha entregado ni resguardado. */}
               {activeTab === "entrega" && !isLocked && selectedLive.estado === "confirmado" && todos4 && !entregaResuelta && (

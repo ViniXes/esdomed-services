@@ -387,6 +387,21 @@ service cloud.firestore {
       allow update: if isStaff() || isPsicologia() || isTrabajoSocial();
       allow delete: if isAdmin()
                     || (isEsdomed() && resource.data.tramiteCerrado != true);
+
+      // ── Bitácora interna del caso (comentarios + adjuntos de ESDOMED) ──
+      // Las reglas NO se heredan a subcolecciones, así que esta va aparte y más
+      // cerrada que el padre: solo ESDOMED/asistente/admin la leen y escriben
+      // (Psic./T.S. y el médico leen el padre, no esto). Entradas inmutables,
+      // con autor = quien escribe y creadoEn sellado por el servidor. Se
+      // conserva abierta aunque el trámite esté cerrado (constancia posterior).
+      match /bitacora/{entradaId} {
+        allow read:   if isEsdomed() || isAdmin();
+        allow create: if (isEsdomed() || isAdmin())
+                      && request.resource.data.autorUid == uid()
+                      && request.resource.data.creadoEn == request.time;
+        allow update: if false;
+        allow delete: if isAdmin() || (isEsdomed() && resource.data.autorUid == uid());
+      }
     }
 
     // ─── Reportes de errores de la herramienta SIMMOW ─────────────────────────

@@ -49,6 +49,21 @@ service firebase.storage {
                    && tamanoValido();
     }
 
+    // Adjuntos de la bitácora interna de fallecidos (ESDOMED). Mismo criterio:
+    // carpeta propia, y la URL solo se expone desde la subcolección
+    // notificaciones_fallecidos/{id}/bitacora, que Firestore limita a
+    // ESDOMED/admin. Solo PDF e imágenes. El borrado va aparte porque en un
+    // delete request.resource es null y tamanoValido() no se puede evaluar.
+    match /fallecidos_bitacora/{userId}/{fileName} {
+      allow read:   if request.auth != null;
+      allow create, update: if request.auth != null
+                   && request.auth.uid == userId
+                   && tamanoValido()
+                   && request.resource.contentType.matches('application/pdf|image/.*');
+      allow delete: if request.auth != null
+                   && request.auth.uid == userId;
+    }
+
     // Cualquier otra ruta queda denegada.
     match /{allPaths=**} {
       allow read, write: if false;
