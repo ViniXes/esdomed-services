@@ -58,7 +58,7 @@ function CeldaLarga({ texto, ancho = "max-w-[260px]" }: { texto: string; ancho?:
 }
 
 const thCls =
-  "sticky top-0 z-10 text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#c9a892] bg-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] whitespace-nowrap border-b-2 border-[#c9a892]";
+  "sticky top-0 z-10 text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-cyan-50 bg-blue-800 dark:bg-blue-900 whitespace-nowrap border-b-2 border-cyan-500";
 const tdCls = "px-3 py-1.5 text-[11px] text-slate-700 dark:text-slate-300 whitespace-nowrap";
 
 export default function ConsultaCensosPage() {
@@ -219,26 +219,28 @@ export default function ConsultaCensosPage() {
   return (
     <div className="p-4 md:p-6 space-y-4">
 
-      {/* Header */}
-      <div className="space-y-3">
-        <Link
-          href="/medico/cola-expedientes"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft size={13} /> Volver a la cola de expedientes
-        </Link>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-50 dark:bg-[var(--color-institutional-navy)] rounded-xl flex items-center justify-center border border-blue-100 dark:border-[#c9a892]/30 flex-shrink-0">
-            <BookOpenText size={17} className="text-[#1c1e4d] dark:text-[#c9a892]" />
+      {/* Hero institucional */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+              <BookOpenText size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Consulta de censos de emergencia</h1>
+              <p className="mt-1 max-w-xl text-sm text-cyan-50/90">Libro digital de demanda espontánea y referidos. Consulte por día, rango o expediente y exporte lo que ve en pantalla.</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight">
-              Consulta de censos de emergencia
-            </h1>
-            <p className="text-xs text-slate-500">Libro digital · demanda espontánea y referidos</p>
-          </div>
+          <Link
+            href="/medico/cola-expedientes"
+            className="inline-flex items-center justify-center gap-1.5 self-start rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/25 transition-colors hover:bg-white/20"
+          >
+            <ArrowLeft size={16} /> Cola de expedientes
+          </Link>
         </div>
-      </div>
+      </section>
 
       {/* Pestañas */}
       <div className="inline-flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -251,18 +253,18 @@ export default function ConsultaCensosPage() {
             onClick={() => cambiarTab(key)}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               tab === key
-                ? "bg-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] text-white shadow-sm ring-1 ring-[#c9a892]/40"
-                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
             }`}
           >
-            <Icon size={14} className={tab === key ? "text-[#c9a892]" : ""} />
+            <Icon size={14} className={tab === key ? "text-cyan-600 dark:text-cyan-300" : ""} />
             {label}
           </button>
         ))}
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 space-y-2">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 space-y-2 shadow-sm shadow-slate-900/5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[150px] md:max-w-[200px]">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -317,9 +319,11 @@ export default function ConsultaCensosPage() {
       )}
 
       {/* Libro */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm shadow-slate-900/5">
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="w-1 h-5 bg-[#c9a892] rounded-full flex-shrink-0" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-cyan-600 text-white shadow-sm shadow-cyan-600/25">
+            <BookOpenText size={14} />
+          </span>
           <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading">
             {tab === "demanda" ? "Libro de demanda espontánea" : "Libro de referidos"}
           </span>
@@ -336,7 +340,7 @@ export default function ConsultaCensosPage() {
           <button
             onClick={exportar}
             disabled={exportando || !lista?.length}
-            className="ml-auto flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="ml-auto flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download size={13} />
             {exportando ? "Generando…" : "Exportar Excel"}

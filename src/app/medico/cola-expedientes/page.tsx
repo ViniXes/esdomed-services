@@ -203,8 +203,8 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
             onClick={() => irACenso("demanda-espontanea")}
             className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            <div className="w-8 h-8 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Icon icon={clipboardList} width={18} className="text-orange-600 dark:text-orange-400" />
+            <div className="w-8 h-8 bg-cyan-50 dark:bg-cyan-950 border border-cyan-200 dark:border-cyan-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Icon icon={clipboardList} width={18} className="text-cyan-600 dark:text-cyan-300" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Censo de demanda espontánea</p>
@@ -216,8 +216,8 @@ function MenuCensoFila({ ingreso, censo }: { ingreso: ControlIngreso; censo: Cen
             onClick={() => irACenso("referidos")}
             className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Icon icon={hospital} width={18} className="text-indigo-600 dark:text-indigo-400" />
+            <div className="w-8 h-8 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Icon icon={hospital} width={18} className="text-blue-800 dark:text-blue-300" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Censo de referidos</p>

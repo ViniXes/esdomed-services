@@ -1,7 +1,8 @@
 "use client";
 
 // Piezas de página compartidas por los dos censos de emergencia (demanda
-// espontánea y referidos): sección institucional navy/dorado, botón primario,
+// espontánea y referidos): sección con cabecera institucional (azul/acento del
+// tema HNES), botón primario,
 // notas médicas con estampa de fecha y las dos secciones idénticas de ambos
 // formularios (Momento de la atención e Identificación del paciente).
 
@@ -16,9 +17,9 @@ export const toDtLocal = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 export const BOTON_PRIMARIO =
-  "flex items-center gap-2 text-sm font-semibold text-white bg-[#1c1e4d] hover:bg-[#29337c] dark:bg-[var(--color-institutional-navy)] dark:hover:bg-blue-800 ring-1 ring-[#c9a892]/40 rounded-xl disabled:opacity-50 transition-colors";
+  "flex items-center gap-2 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-sm shadow-blue-900/20 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
 
-// ── Sección institucional: cabecera navy con número y acento dorado ──────────
+// ── Sección institucional: cabecera con número, ícono en acento y título ─────
 
 export function Seccion({ num, titulo, icon: Icon, children }: {
   num: string;
@@ -27,13 +28,15 @@ export function Seccion({ num, titulo, icon: Icon, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-2.5 bg-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] border-b-2 border-[#c9a892]">
-        <span className="font-mono text-[11px] font-bold text-[#c9a892]">{num}</span>
-        <Icon size={15} className="text-[#c9a892]" />
-        <h2 className="text-[13px] font-bold text-white uppercase tracking-widest font-heading">
-          {titulo}
-        </h2>
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm shadow-slate-900/5">
+      <div className="flex items-center gap-3 border-b border-cyan-100 bg-gradient-to-r from-cyan-50 via-blue-50/70 to-white px-5 py-3 dark:border-cyan-900/50 dark:from-cyan-950/30 dark:via-blue-950/20 dark:to-slate-900">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-sm shadow-cyan-600/25">
+          <Icon size={15} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Sección {num}</p>
+          <h2 className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100 font-heading">{titulo}</h2>
+        </div>
       </div>
       <div className="p-5 space-y-4">{children}</div>
     </section>
@@ -69,10 +72,10 @@ export function NotasEditor({ notas, onChange, draft, onDraftChange, placeholder
           {notas.map((n, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800/60 border-l-4 border-[#c9a892] rounded-r-xl px-3.5 py-2.5"
+              className="flex items-start gap-3 bg-slate-50 dark:bg-slate-800/60 border-l-4 border-cyan-500 dark:border-cyan-400 rounded-r-xl px-3.5 py-2.5"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-mono font-semibold text-[#1c1e4d] dark:text-[#c9a892]">
+                <p className="text-[11px] font-mono font-semibold text-blue-800 dark:text-cyan-300">
                   {formatNotaFecha(n.fecha)}
                 </p>
                 <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words mt-0.5">
@@ -170,7 +173,7 @@ export function CamposIdentidad({
             type="button"
             onClick={prellenar}
             disabled={buscandoId || !expediente.trim()}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-800 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm font-medium rounded-lg shadow-sm shadow-blue-900/20 transition-colors disabled:opacity-50 whitespace-nowrap"
           >
             {buscandoId ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
             Buscar

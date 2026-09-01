@@ -4,7 +4,7 @@
 // Se llega desde el botón "+" de la cola de expedientes. Un registro por
 // paciente referido de otro establecimiento; guardar con campos pendientes es
 // válido (queda "Falta por cerrar").
-// Diseño institucional: secciones numeradas con cabecera navy y acento dorado.
+// Diseño institucional HNES: hero con el degradado único y secciones numeradas.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -343,31 +343,35 @@ export default function CensoReferidosPage() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
 
-      {/* Header */}
-      <div className="space-y-3">
-        <Link
-          href={editandoId ? "/medico/censos" : "/medico/cola-expedientes"}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft size={13} /> {editandoId ? "Volver al libro de censos" : "Volver a la cola de expedientes"}
-        </Link>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-50 dark:bg-[var(--color-institutional-navy)] rounded-xl flex items-center justify-center border border-blue-100 dark:border-[#c9a892]/30 flex-shrink-0">
-            <Building2 size={17} className="text-[#1c1e4d] dark:text-[#c9a892]" />
+      {/* Hero institucional */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+              <Building2 size={24} className="text-white" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Censo de referidos</h1>
+                {editandoId && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 ring-1 ring-amber-300/60">
+                    Editando registro
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 max-w-xl text-sm text-cyan-50/90">Unidad de Emergencia · un registro por paciente referido de otro establecimiento. Puede guardar con campos pendientes y completarlo después.</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight flex items-center gap-2 flex-wrap">
-              Censo de referidos
-              {editandoId && (
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900 rounded-full">
-                  Editando registro
-                </span>
-              )}
-            </h1>
-            <p className="text-xs text-slate-500">Unidad de Emergencia · un registro por paciente referido</p>
-          </div>
+          <Link
+            href={editandoId ? "/medico/censos" : "/medico/cola-expedientes"}
+            className="inline-flex items-center justify-center gap-1.5 self-start rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white ring-1 ring-white/25 transition-colors hover:bg-white/20"
+          >
+            <ArrowLeft size={16} /> {editandoId ? "Libro de censos" : "Cola de expedientes"}
+          </Link>
         </div>
-      </div>
+      </section>
 
       {error && (
         <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400">
@@ -414,7 +418,7 @@ export default function CensoReferidosPage() {
           </Field>
           <Field label="Referencia en SIS (no modificar)">
             {clasifSis ? (
-              <div className="inline-flex px-3 py-2 rounded-lg bg-blue-50 dark:bg-[var(--color-institutional-navy)] border border-blue-100 dark:border-[#c9a892]/30 text-xs font-mono font-semibold text-[#1c1e4d] dark:text-[#c9a892]">
+              <div className="inline-flex px-3 py-2 rounded-lg bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-900 text-xs font-mono font-semibold text-cyan-800 dark:text-cyan-300">
                 {clasifSis}
               </div>
             ) : (

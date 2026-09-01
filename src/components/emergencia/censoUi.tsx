@@ -86,7 +86,7 @@ export function ChipSelect<T extends string>({ options, value, onChange }: {
             onClick={() => onChange(o.value)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
               activo
-                ? o.chip ?? "bg-[#1c1e4d] text-white border-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] dark:ring-1 dark:ring-[#c9a892]/40"
+                ? o.chip ?? "bg-blue-800 text-white border-blue-800 dark:bg-blue-700 dark:border-blue-700 shadow-sm shadow-blue-900/20"
                 : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
@@ -140,7 +140,7 @@ export function ChipMulti({ options, value, onChange }: {
             onClick={() => toggle(o)}
             className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
               activo
-                ? "bg-[#1c1e4d] text-white border-[#1c1e4d] dark:bg-[var(--color-institutional-navy)] dark:ring-1 dark:ring-[#c9a892]/40"
+                ? "bg-blue-800 text-white border-blue-800 dark:bg-blue-700 dark:border-blue-700 shadow-sm shadow-blue-900/20"
                 : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
             }`}
           >
@@ -199,11 +199,11 @@ export function EvaluadorSelect({ value, onChange, staff, generales, placeholder
 export function EvaluadorBadge({ tipo }: { tipo: TipoEvaluadorEmergencia | null | undefined }) {
   if (!tipo) return null;
   return tipo === "staff" ? (
-    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900 whitespace-nowrap">
+    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-900 whitespace-nowrap">
       Staff
     </span>
   ) : (
-    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-900 whitespace-nowrap">
+    <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-900 whitespace-nowrap">
       Méd. general
     </span>
   );
