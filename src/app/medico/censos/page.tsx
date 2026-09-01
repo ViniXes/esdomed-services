@@ -17,9 +17,9 @@ import type { CensoDemandaEspontanea, CensoReferido, DiagnosticoCIE } from "@/ty
 import { DateField } from "@/components/ui/DateField";
 import { toDate } from "@/lib/pacientes/helpers";
 import {
-  DESTINO_LABEL, TRIAGE_LABEL, TURNO_LABEL,
+  DESTINO_LABEL, TRIAGE_LABEL, TURNO_LABEL, medicosGeneralesLista, procedimientosUnificados,
 } from "@/lib/emergencia/censos";
-import { EstadoRegistroBadge, inputCls } from "@/components/emergencia/censoUi";
+import { EstadoRegistroBadge } from "@/components/emergencia/censoUi";
 import { BOTON_PRIMARIO, pad } from "@/components/emergencia/censoSecciones";
 
 type TabCenso = "demanda" | "referido";
@@ -47,6 +47,14 @@ const notasCelda = (notas?: { texto: string; fecha: unknown }[]) =>
         return `${d ? `[${fFecha(d)} ${fHora(d)}] ` : ""}${n.texto}`;
       }).join(" // ")
     : "—";
+
+// Médicos generales de la atención: el que evaluó (si fue general) + los del
+// turno, sin repetir. Acepta la lista nueva y el texto libre de registros viejos.
+const generalesCelda = (r: { evaluadoPor?: string | null; staffEvalua?: string; medicosGenerales?: unknown }) => {
+  const lista = medicosGeneralesLista(r.medicosGenerales);
+  if (r.evaluadoPor === "medico_general" && r.staffEvalua && !lista.includes(r.staffEvalua)) lista.unshift(r.staffEvalua);
+  return lista.join(" // ");
+};
 
 // Celda con truncado + tooltip para columnas de texto largo.
 function CeldaLarga({ texto, ancho = "max-w-[260px]" }: { texto: string; ancho?: string }) {
@@ -165,15 +173,13 @@ export default function ConsultaCensosPage() {
           "STAFF QUE EVALUA": r.evaluadoPor === "medico_general" ? "MEDICO GENERAL" : r.staffEvalua,
           "REEVALUACION MEDICA": r.reevaluacion || "NO APLICA",
           "VENTILACION MECANICA": r.ventilacionMecanica ? "Sí" : "No",
-          "MEDICO GENERAL QUE ASISTE EN LA ATENCION":
-            r.evaluadoPor === "medico_general" ? r.staffEvalua : r.medicosGenerales ?? "",
+          "MEDICO GENERAL QUE ASISTE EN LA ATENCION": generalesCelda(r),
           "CENTRO DE SALUD AL QUE REFIERE": r.centroRefiere ?? "",
           "CONSULTA NUEVAMENTE EN < 48H": siNo(r.consulta48h),
           "ASEGURADO ISSS": siNo(r.aseguradoIsss),
           "EMPLEADO DE HES": siNo(r.empleadoHes),
           "DEPENDENCIA": r.dependencia ?? "",
-          "PROCEDIMIENTOS EN MAXIMA": procsCelda(r.procedimientosMaxima),
-          "PROCEDIMIENTO EN U/E": procsCelda(r.procedimientosUE),
+          "PROCEDIMIENTO EN U/E": procsCelda(procedimientosUnificados(r)),
           "PLAN / OBSERVACIONES": notasCelda(r.notas) === "—" ? "" : notasCelda(r.notas),
         }));
       } else {
@@ -196,10 +202,9 @@ export default function ConsultaCensosPage() {
           "REEVALUACION MEDICA": r.reevaluacion || "NO APLICA",
           "TIEMPO TOTAL QUE PERMANECE": r.tiempoPermanencia ?? "",
           "RAZON DE DEMORA": r.razonDemora ?? "",
-          "PROCEDIMIENTOS EN MAXIMA": procsCelda(r.procedimientosMaxima),
-          "OTROS PROCEDIMIENTOS": procsCelda(r.otrosProcedimientos),
+          "PROCEDIMIENTOS EN U/E": procsCelda(procedimientosUnificados(r)),
           "OBSERVACIONES": notasCelda(r.notas) === "—" ? "" : notasCelda(r.notas),
-          "MEDICOS GENERALES": r.evaluadoPor === "medico_general" ? r.staffEvalua : r.medicosGenerales ?? "",
+          "MEDICOS GENERALES": generalesCelda(r),
         }));
       }
       const wb = XLSX.utils.book_new();
@@ -365,7 +370,7 @@ export default function ConsultaCensosPage() {
                     "Condición", "Impresión diagnóstica", "Especialidad", "Trae ref.", "Lugar de referencia",
                     "Destino", "Servicio a ingresar", "Staff que evalúa", "Reevaluación", "V. mecánica",
                     "Médico general", "Centro al que refiere", "< 48 h", "ISSS", "HES", "Dependencia",
-                    "Proc. Máxima", "Proc. U/E", "Plan / observaciones", "Estado", "",
+                    "Proc. U/E", "Plan / observaciones", "Estado", "",
                   ].map((h, i) => <th key={`${h}-${i}`} className={thCls}>{h}</th>)}
                 </tr>
               </thead>
@@ -391,14 +396,13 @@ export default function ConsultaCensosPage() {
                     <td className={tdCls}><CeldaLarga texto={r.evaluadoPor === "medico_general" ? "MÉDICO GENERAL" : (r.staffEvalua || "—")} ancho="max-w-[200px]" /></td>
                     <td className={tdCls}><CeldaLarga texto={r.reevaluacion || "NO APLICA"} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}>{siNo(r.ventilacionMecanica)}</td>
-                    <td className={tdCls}><CeldaLarga texto={(r.evaluadoPor === "medico_general" ? r.staffEvalua : r.medicosGenerales) || "—"} ancho="max-w-[200px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={generalesCelda(r) || "—"} ancho="max-w-[200px]" /></td>
                     <td className={tdCls}><CeldaLarga texto={r.centroRefiere || "—"} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}>{siNo(r.consulta48h)}</td>
                     <td className={tdCls}>{siNo(r.aseguradoIsss)}</td>
                     <td className={tdCls}>{siNo(r.empleadoHes)}</td>
                     <td className={tdCls}>{r.dependencia || "—"}</td>
-                    <td className={tdCls}><CeldaLarga texto={procsCelda(r.procedimientosMaxima)} ancho="max-w-[180px]" /></td>
-                    <td className={tdCls}><CeldaLarga texto={procsCelda(r.procedimientosUE)} ancho="max-w-[180px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={procsCelda(procedimientosUnificados(r))} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}><CeldaLarga texto={notasCelda(r.notas)} ancho="max-w-[280px]" /></td>
                     <td className={tdCls}><EstadoRegistroBadge estado={r.estadoRegistro ?? "cerrado"} faltantes={r.camposFaltantes} /></td>
                     <td className={tdCls}>
@@ -426,7 +430,7 @@ export default function ConsultaCensosPage() {
                     "Hospital de referencia", "Referencia en SIS", "Condición", "Dispositivo O₂",
                     "Discrepancia dx", "Modif. de servicio", "Servicio de ingreso", "Diagnóstico",
                     "Staff que evalúa", "Reevaluación", "Tiempo en Admisión", "Razón de demora",
-                    "Proc. Máxima", "Otros proc.", "Observaciones", "Médicos generales", "Estado", "",
+                    "Proc. U/E", "Observaciones", "Médicos generales", "Estado", "",
                   ].map((h, i) => <th key={`${h}-${i}`} className={thCls}>{h}</th>)}
                 </tr>
               </thead>
@@ -451,10 +455,9 @@ export default function ConsultaCensosPage() {
                     <td className={tdCls}><CeldaLarga texto={r.reevaluacion || "NO APLICA"} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}>{r.tiempoPermanencia || "—"}</td>
                     <td className={tdCls}><CeldaLarga texto={r.razonDemora || "—"} ancho="max-w-[200px]" /></td>
-                    <td className={tdCls}><CeldaLarga texto={procsCelda(r.procedimientosMaxima)} ancho="max-w-[180px]" /></td>
-                    <td className={tdCls}><CeldaLarga texto={procsCelda(r.otrosProcedimientos)} ancho="max-w-[180px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={procsCelda(procedimientosUnificados(r))} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}><CeldaLarga texto={notasCelda(r.notas)} ancho="max-w-[280px]" /></td>
-                    <td className={tdCls}><CeldaLarga texto={(r.evaluadoPor === "medico_general" ? r.staffEvalua : r.medicosGenerales) || "—"} ancho="max-w-[200px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={generalesCelda(r) || "—"} ancho="max-w-[200px]" /></td>
                     <td className={tdCls}><EstadoRegistroBadge estado={r.estadoRegistro ?? "cerrado"} faltantes={r.camposFaltantes} /></td>
                     <td className={tdCls}>
                       <Link

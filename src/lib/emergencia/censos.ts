@@ -283,6 +283,7 @@ export const STAFF_EMERGENCIA = [
   "VLADIMIR GOMEZ",
   "CAMILO JAVIER RIVERA RIVAS",
   "ALBA GABRIELA IBAÑEZ",
+  "MARIA FERNANDA CRUZ ZELAYA",
 ] as const;
 
 export const MEDICOS_GENERALES_EMERGENCIA = [
@@ -311,6 +312,30 @@ export function tipoEvaluador(nombre: string): TipoEvaluadorEmergencia | null {
   if ((STAFF_EMERGENCIA as readonly string[]).includes(nombre)) return "staff";
   if ((MEDICOS_GENERALES_EMERGENCIA as readonly string[]).includes(nombre)) return "medico_general";
   return null;
+}
+
+// ── Procedimientos: un solo campo ────────────────────────────────────────────
+// Desde 2026-09-01 el censo lleva UN solo campo de procedimientos (Unidad de
+// Emergencia): "Máxima" era lo mismo y se retiró. Los registros anteriores
+// pueden traer `procedimientosMaxima` / `otrosProcedimientos`; aquí se funden
+// (sin duplicados) para mostrarlos, exportarlos y re-guardarlos unificados.
+export function procedimientosUnificados(r: {
+  procedimientosUE?: string[];
+  procedimientosMaxima?: string[];
+  otrosProcedimientos?: string[];
+}): string[] {
+  const todos = [...(r.procedimientosUE ?? []), ...(r.procedimientosMaxima ?? []), ...(r.otrosProcedimientos ?? [])];
+  return Array.from(new Set(todos.map((p) => p.trim()).filter(Boolean)));
+}
+
+// ── Médicos generales: lista del catálogo (antes texto libre) ────────────────
+// Los registros viejos guardaban un string ("DRA. PÉREZ // DR. GÓMEZ"); se
+// parte por separadores para no perder nombres al editar o exportar.
+export function medicosGeneralesLista(v: unknown): string[] {
+  const lista = Array.isArray(v)
+    ? v.filter((x): x is string => typeof x === "string")
+    : typeof v === "string" ? v.split(/\/+|,|;/) : [];
+  return Array.from(new Set(lista.map((m) => m.trim().toUpperCase()).filter(Boolean)));
 }
 
 export const TIPO_EVALUADOR_LABEL: Record<TipoEvaluadorEmergencia, string> = {

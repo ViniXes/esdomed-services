@@ -9,7 +9,7 @@
 import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import type { Genero, TurnoEmergencia } from "@/types";
 import { DateTimeField } from "@/components/ui/DateTimeField";
-import { TURNOS } from "@/lib/emergencia/censos";
+import { TURNOS, medicosGeneralesLista } from "@/lib/emergencia/censos";
 import { ChipSelect, Field, inputCls } from "@/components/emergencia/censoUi";
 
 export const pad = (n: number) => String(n).padStart(2, "0");
@@ -18,6 +18,23 @@ export const toDtLocal = (d: Date) =>
 
 export const BOTON_PRIMARIO =
   "flex items-center gap-2 text-sm font-semibold text-white bg-blue-800 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-sm shadow-blue-900/20 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors";
+
+// ── Médicos generales del turno: se recuerdan entre registros (localStorage) ─
+// Antes era un string de texto libre; ahora una lista del catálogo. Si queda
+// un valor viejo guardado se convierte con medicosGeneralesLista().
+
+export const LS_MEDICOS_GENERALES = "censoEmergencia:medicosGenerales";
+
+export function leerMedicosGeneralesGuardados(): string[] {
+  if (typeof window === "undefined") return [];
+  const raw = localStorage.getItem(LS_MEDICOS_GENERALES);
+  if (!raw) return [];
+  try { return medicosGeneralesLista(JSON.parse(raw)); } catch { return medicosGeneralesLista(raw); }
+}
+
+export function guardarMedicosGenerales(lista: string[]) {
+  localStorage.setItem(LS_MEDICOS_GENERALES, JSON.stringify(lista));
+}
 
 // ── Sección institucional: cabecera con número, ícono en acento y título ─────
 

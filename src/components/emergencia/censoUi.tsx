@@ -4,7 +4,7 @@
 // (demanda espontánea y referidos). Filosofía: todo lo posible se elige
 // con chips/selects — el texto libre es la excepción, no la regla.
 
-import { CheckCircle2, Clock, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Clock, Plus, Trash2, X } from "lucide-react";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import type { DiagnosticoCIE, EstadoRegistroCenso, TipoEvaluadorEmergencia } from "@/types";
 
@@ -244,6 +244,52 @@ export function DiagnosticosEditor({ value, onChange }: {
       >
         <Plus size={12} /> Agregar otro diagnóstico
       </button>
+    </div>
+  );
+}
+
+// ── Médicos generales del turno: N nombres del catálogo ──────────────────────
+// Se agregan uno a uno desde el select (que solo ofrece los que faltan) y
+// quedan como chips removibles. Los nombres fuera de catálogo (registros
+// viejos en texto libre) también se muestran para poder quitarlos.
+
+export function MedicosGeneralesPicker({ value, onChange, catalogo }: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  catalogo: readonly string[];
+}) {
+  const disponibles = catalogo.filter((m) => !value.includes(m));
+  return (
+    <div className="space-y-2">
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((m) => (
+            <span
+              key={m}
+              className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg text-xs font-medium bg-cyan-50 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-900"
+            >
+              {m}
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((x) => x !== m))}
+                className="p-0.5 rounded text-cyan-600 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900 transition-colors"
+                aria-label={`Quitar ${m}`}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <select
+        value=""
+        onChange={(e) => { if (e.target.value) onChange([...value, e.target.value]); }}
+        disabled={disponibles.length === 0}
+        className={`${inputCls} cursor-pointer appearance-none`}
+      >
+        <option value="">{disponibles.length ? "— Agregar médico general" : "Todos los médicos generales ya están agregados"}</option>
+        {disponibles.map((m) => <option key={m} value={m}>{m}</option>)}
+      </select>
     </div>
   );
 }

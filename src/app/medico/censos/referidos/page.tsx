@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
+import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -22,18 +22,18 @@ import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   DESENLACES_SIN_INGRESO, DISPOSITIVOS_O2, HOSPITALES_REFERENCIA,
   MEDICOS_GENERALES_EMERGENCIA, PROCEDIMIENTOS, RAZONES_DEMORA, STAFF_EMERGENCIA,
-  TIEMPOS_PERMANENCIA, clasificacionSis, tipoEvaluador, turnoSegunHora,
+  TIEMPOS_PERMANENCIA, clasificacionSis, medicosGeneralesLista, procedimientosUnificados,
+  tipoEvaluador, turnoSegunHora,
 } from "@/lib/emergencia/censos";
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
   ChipMulti, ChipSelect, DiagnosticosEditor, EvaluadorBadge, EvaluadorSelect,
-  FaltantesHint, Field, SelectCatalogo, SiNoChips, inputCls,
+  FaltantesHint, Field, MedicosGeneralesPicker, SelectCatalogo, SiNoChips, inputCls,
 } from "@/components/emergencia/censoUi";
 import {
-  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, NotaLocal, NotasEditor, Seccion, toDtLocal,
+  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, NotaLocal, NotasEditor, Seccion,
+  guardarMedicosGenerales, leerMedicosGeneralesGuardados, toDtLocal,
 } from "@/components/emergencia/censoSecciones";
-
-const LS_MEDICOS_GENERALES = "censoEmergencia:medicosGenerales";
 
 const TRES_ESTADOS = [
   { value: "si", label: "Sí" },
@@ -42,7 +42,7 @@ const TRES_ESTADOS = [
 ] as { value: "si" | "no" | "no_aplica"; label: string }[];
 
 // Estado inicial del formulario (una atención nueva "ahora").
-function formVacio(medicosGenerales: string) {
+function formVacio(medicosGenerales: string[]) {
   const ahora = new Date();
   return {
     fechaHora: toDtLocal(ahora),
@@ -63,8 +63,7 @@ function formVacio(medicosGenerales: string) {
     reevaluacion: "",
     tiempoPermanencia: "",
     razonDemora: "",
-    procedimientosMaxima: [] as string[],
-    otrosProcedimientos: [] as string[],
+    procedimientosUE: [] as string[],
     notas: [] as NotaLocal[],
     medicosGenerales,
   };
@@ -92,9 +91,7 @@ export default function CensoReferidosPage() {
   const { profile } = useAuth();
   const router = useRouter();
 
-  const [form, setForm] = useState<FormState>(() =>
-    formVacio(typeof window !== "undefined" ? localStorage.getItem(LS_MEDICOS_GENERALES) ?? "" : ""),
-  );
+  const [form, setForm] = useState<FormState>(() => formVacio(leerMedicosGeneralesGuardados()));
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -124,6 +121,7 @@ export default function CensoReferidosPage() {
           if (!snap.exists()) { setError("No se encontró el registro a editar."); return; }
           const r = snap.data();
           const fecha = toDate(r.fecha) ?? new Date();
+          const generales = medicosGeneralesLista(r.medicosGenerales);
           setEditandoId(editar);
           setControlIngresoId(typeof r.controlIngresoId === "string" ? r.controlIngresoId : null);
           setForm((f) => ({
@@ -146,11 +144,10 @@ export default function CensoReferidosPage() {
             reevaluacion: r.reevaluacion ?? "",
             tiempoPermanencia: r.tiempoPermanencia ?? "",
             razonDemora: r.razonDemora ?? "",
-            procedimientosMaxima: r.procedimientosMaxima ?? [],
-            otrosProcedimientos: r.otrosProcedimientos ?? [],
+            procedimientosUE: procedimientosUnificados(r),
             notas: ((r.notas ?? []) as { texto: string; fecha: unknown }[])
               .map((n) => ({ texto: n.texto, fecha: (toDate(n.fecha) ?? new Date()).toISOString() })),
-            medicosGenerales: r.medicosGenerales ?? f.medicosGenerales,
+            medicosGenerales: generales.length ? generales : f.medicosGenerales,
           }));
         } catch (e) {
           setError(`No se pudo cargar el registro: ${e instanceof Error ? e.message : "error"}`);
@@ -213,7 +210,7 @@ export default function CensoReferidosPage() {
     setGuardando(true);
     try {
       const fecha = new Date(form.fechaHora);
-      localStorage.setItem(LS_MEDICOS_GENERALES, form.medicosGenerales.trim());
+      guardarMedicosGenerales(form.medicosGenerales);
 
       // Una misma ATENCIÓN no puede estar en los dos censos. Si ambos registros
       // tienen vínculo con la cola se compara el vínculo exacto (el paciente
@@ -260,15 +257,17 @@ export default function CensoReferidosPage() {
         reevaluacion: form.reevaluacion.trim() || null,
         tiempoPermanencia: form.tiempoPermanencia,
         razonDemora: requiereRazonDemora ? form.razonDemora : null,
-        procedimientosMaxima: form.procedimientosMaxima,
-        otrosProcedimientos: form.otrosProcedimientos,
+        procedimientosUE: form.procedimientosUE,
         notas: notas.map((n) => ({ texto: n.texto, fecha: Timestamp.fromDate(new Date(n.fecha)) })),
-        medicosGenerales: form.medicosGenerales.trim() || null,
+        medicosGenerales: form.medicosGenerales,
       };
 
       if (editandoId) {
         await updateDoc(doc(db, "censo_referidos", editandoId), {
           ...datos,
+          // campos retirados: ya van fundidos en procedimientosUE
+          procedimientosMaxima: deleteField(),
+          otrosProcedimientos: deleteField(),
           actualizadoEn: Timestamp.now(),
         });
       } else {
@@ -289,7 +288,7 @@ export default function CensoReferidosPage() {
   };
 
   const registrarOtra = () => {
-    setForm(formVacio(localStorage.getItem(LS_MEDICOS_GENERALES) ?? ""));
+    setForm(formVacio(leerMedicosGeneralesGuardados()));
     setControlIngresoId(null);
     setNuevaNota("");
     setFuentePrellenado(null);
@@ -501,11 +500,8 @@ export default function CensoReferidosPage() {
 
       {/* 06 · Procedimientos */}
       <Seccion num="06" titulo="Procedimientos" icon={Syringe}>
-        <Field label="Procedimientos en Máxima">
-          <ChipMulti options={PROCEDIMIENTOS} value={form.procedimientosMaxima} onChange={(v) => set("procedimientosMaxima", v)} />
-        </Field>
-        <Field label="Otros procedimientos">
-          <ChipMulti options={PROCEDIMIENTOS} value={form.otrosProcedimientos} onChange={(v) => set("otrosProcedimientos", v)} />
+        <Field label="Procedimientos en Unidad de Emergencia">
+          <ChipMulti options={PROCEDIMIENTOS} value={form.procedimientosUE} onChange={(v) => set("procedimientosUE", v)} />
         </Field>
       </Seccion>
 
@@ -532,13 +528,11 @@ export default function CensoReferidosPage() {
               placeholder="— No aplica"
             />
           </Field>
-          <Field label="Médico(s) general(es) del turno (se recuerda entre registros)" className="sm:col-span-2 xl:col-span-1">
-            <input
-              type="text"
+          <Field label="Médicos generales del turno (se recuerdan entre registros)" className="sm:col-span-2 xl:col-span-1">
+            <MedicosGeneralesPicker
               value={form.medicosGenerales}
-              onChange={(e) => set("medicosGenerales", e.target.value.toUpperCase())}
-              placeholder="DRA. PÉREZ // DR. GÓMEZ // DRA. LÓPEZ"
-              className={inputCls}
+              onChange={(v) => set("medicosGenerales", v)}
+              catalogo={MEDICOS_GENERALES_EMERGENCIA}
             />
           </Field>
         </div>

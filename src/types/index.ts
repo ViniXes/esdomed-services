@@ -1722,7 +1722,7 @@ export interface CensoDemandaEspontanea {
   staffEvalua: string;            // nombre del médico que evalúa (staff o general)
   evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
   reevaluacion?: string;          // vacío/undefined = no aplica
-  medicosGenerales?: string;      // los del turno (se copia a cada registro)
+  medicosGenerales?: string[] | string; // los del turno, del catálogo (string = registros viejos en texto libre; normalizar con medicosGeneralesLista)
   ventilacionMecanica: boolean;
 
   // ── Administrativo ──
@@ -1732,8 +1732,9 @@ export interface CensoDemandaEspontanea {
   dependencia?: string;           // solo si empleadoHes
 
   // ── Procedimientos (catálogo, chips) ──
-  procedimientosMaxima: string[]; // vacío = "NO"
+  // Un solo campo desde 2026-09-01: Unidad de Emergencia (vacío = "NO").
   procedimientosUE: string[];
+  procedimientosMaxima?: string[]; // RETIRADO — solo en registros viejos; se funde en procedimientosUE al editar
 
   // PLAN Y OBSERVACIONES — notas médicas agregables, cada una con estampa
   // de fecha/hora al momento de agregarla. Único texto libre del censo.
@@ -1793,15 +1794,17 @@ export interface CensoReferido {
   staffEvalua: string;            // nombre del médico que evalúa (staff o general)
   evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
   reevaluacion?: string;          // vacío/undefined = no aplica
-  medicosGenerales?: string;
+  medicosGenerales?: string[] | string; // ver CensoDemandaEspontanea.medicosGenerales
 
   // ── Tiempos ──
   tiempoPermanencia: string;      // catálogo TIEMPOS_PERMANENCIA
   razonDemora?: string;           // catálogo RAZONES_DEMORA — solo si > 1 hora
 
   // ── Procedimientos ──
-  procedimientosMaxima: string[];
-  otrosProcedimientos: string[];
+  // Un solo campo desde 2026-09-01: Unidad de Emergencia (vacío = "NO").
+  procedimientosUE: string[];
+  procedimientosMaxima?: string[]; // RETIRADOS — solo en registros viejos; se funden en procedimientosUE al editar
+  otrosProcedimientos?: string[];
 
   // OBSERVACIONES — notas médicas agregables con estampa de fecha/hora.
   notas?: { texto: string; fecha: Date }[];

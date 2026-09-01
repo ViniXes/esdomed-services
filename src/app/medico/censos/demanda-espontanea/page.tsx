@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
+import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -22,21 +22,20 @@ import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   DEPENDENCIAS_HES, DESTINOS, ESPECIALIDADES_EMERGENCIA, HOSPITALES_REFERENCIA,
   MEDICOS_GENERALES_EMERGENCIA, PROCEDIMIENTOS, STAFF_EMERGENCIA,
-  TRIAGES, tipoEvaluador, turnoSegunHora,
+  TRIAGES, medicosGeneralesLista, procedimientosUnificados, tipoEvaluador, turnoSegunHora,
 } from "@/lib/emergencia/censos";
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
   ChipMulti, ChipSelect, DiagnosticosEditor, EvaluadorBadge, EvaluadorSelect,
-  FaltantesHint, Field, SelectCatalogo, SiNoChips, inputCls,
+  FaltantesHint, Field, MedicosGeneralesPicker, SelectCatalogo, SiNoChips, inputCls,
 } from "@/components/emergencia/censoUi";
 import {
-  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, NotaLocal, NotasEditor, Seccion, toDtLocal,
+  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, NotaLocal, NotasEditor, Seccion,
+  guardarMedicosGenerales, leerMedicosGeneralesGuardados, toDtLocal,
 } from "@/components/emergencia/censoSecciones";
 
-const LS_MEDICOS_GENERALES = "censoEmergencia:medicosGenerales";
-
 // Estado inicial del formulario (una atención nueva "ahora").
-function formVacio(medicosGenerales: string) {
+function formVacio(medicosGenerales: string[]) {
   const ahora = new Date();
   return {
     fechaHora: toDtLocal(ahora),
@@ -60,7 +59,6 @@ function formVacio(medicosGenerales: string) {
     aseguradoIsss: false,
     empleadoHes: false,
     dependencia: "",
-    procedimientosMaxima: [] as string[],
     procedimientosUE: [] as string[],
     notas: [] as NotaLocal[],
     medicosGenerales,
@@ -91,9 +89,7 @@ export default function CensoDemandaEspontaneaPage() {
   const { profile } = useAuth();
   const router = useRouter();
 
-  const [form, setForm] = useState<FormState>(() =>
-    formVacio(typeof window !== "undefined" ? localStorage.getItem(LS_MEDICOS_GENERALES) ?? "" : ""),
-  );
+  const [form, setForm] = useState<FormState>(() => formVacio(leerMedicosGeneralesGuardados()));
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -122,6 +118,7 @@ export default function CensoDemandaEspontaneaPage() {
           if (!snap.exists()) { setError("No se encontró el registro a editar."); return; }
           const r = snap.data();
           const fecha = toDate(r.fecha) ?? new Date();
+          const generales = medicosGeneralesLista(r.medicosGenerales);
           setEditandoId(editar);
           setControlIngresoId(typeof r.controlIngresoId === "string" ? r.controlIngresoId : null);
           setForm((f) => ({
@@ -147,11 +144,10 @@ export default function CensoDemandaEspontaneaPage() {
             aseguradoIsss: !!r.aseguradoIsss,
             empleadoHes: !!r.empleadoHes,
             dependencia: r.dependencia ?? "",
-            procedimientosMaxima: r.procedimientosMaxima ?? [],
-            procedimientosUE: r.procedimientosUE ?? [],
+            procedimientosUE: procedimientosUnificados(r),
             notas: ((r.notas ?? []) as { texto: string; fecha: unknown }[])
               .map((n) => ({ texto: n.texto, fecha: (toDate(n.fecha) ?? new Date()).toISOString() })),
-            medicosGenerales: r.medicosGenerales ?? f.medicosGenerales,
+            medicosGenerales: generales.length ? generales : f.medicosGenerales,
           }));
         } catch (e) {
           setError(`No se pudo cargar el registro: ${e instanceof Error ? e.message : "error"}`);
@@ -214,7 +210,7 @@ export default function CensoDemandaEspontaneaPage() {
     setGuardando(true);
     try {
       const fecha = new Date(form.fechaHora);
-      localStorage.setItem(LS_MEDICOS_GENERALES, form.medicosGenerales.trim());
+      guardarMedicosGenerales(form.medicosGenerales);
 
       // Una misma ATENCIÓN no puede estar en los dos censos. Si ambos registros
       // tienen vínculo con la cola se compara el vínculo exacto (el paciente
@@ -276,15 +272,15 @@ export default function CensoDemandaEspontaneaPage() {
         aseguradoIsss: form.aseguradoIsss,
         empleadoHes: form.empleadoHes,
         dependencia: form.empleadoHes ? form.dependencia : null,
-        procedimientosMaxima: form.procedimientosMaxima,
         procedimientosUE: form.procedimientosUE,
         notas: notas.map((n) => ({ texto: n.texto, fecha: Timestamp.fromDate(new Date(n.fecha)) })),
-        medicosGenerales: form.medicosGenerales.trim() || null,
+        medicosGenerales: form.medicosGenerales,
       };
 
       if (editandoId) {
         await updateDoc(doc(db, "censo_demanda_espontanea", editandoId), {
           ...datos,
+          procedimientosMaxima: deleteField(), // campo retirado: ya va fundido en procedimientosUE
           actualizadoEn: Timestamp.now(),
         });
       } else {
@@ -305,7 +301,7 @@ export default function CensoDemandaEspontaneaPage() {
   };
 
   const registrarOtra = () => {
-    setForm(formVacio(localStorage.getItem(LS_MEDICOS_GENERALES) ?? ""));
+    setForm(formVacio(leerMedicosGeneralesGuardados()));
     setControlIngresoId(null);
     setNuevaNota("");
     setFuentePrellenado(null);
@@ -507,10 +503,7 @@ export default function CensoDemandaEspontaneaPage() {
 
       {/* 04 · Procedimientos */}
       <Seccion num="04" titulo="Procedimientos" icon={Syringe}>
-        <Field label="Procedimiento en Máxima">
-          <ChipMulti options={PROCEDIMIENTOS} value={form.procedimientosMaxima} onChange={(v) => set("procedimientosMaxima", v)} />
-        </Field>
-        <Field label="Procedimiento en Unidad de Emergencia">
+        <Field label="Procedimientos en Unidad de Emergencia">
           <ChipMulti options={PROCEDIMIENTOS} value={form.procedimientosUE} onChange={(v) => set("procedimientosUE", v)} />
         </Field>
       </Seccion>
@@ -538,13 +531,11 @@ export default function CensoDemandaEspontaneaPage() {
               placeholder="— No aplica"
             />
           </Field>
-          <Field label="Médico(s) general(es) del turno (se recuerda entre registros)" className="sm:col-span-2 xl:col-span-1">
-            <input
-              type="text"
+          <Field label="Médicos generales del turno (se recuerdan entre registros)" className="sm:col-span-2 xl:col-span-1">
+            <MedicosGeneralesPicker
               value={form.medicosGenerales}
-              onChange={(e) => set("medicosGenerales", e.target.value.toUpperCase())}
-              placeholder="DRA. PÉREZ // DR. GÓMEZ // DRA. LÓPEZ"
-              className={inputCls}
+              onChange={(v) => set("medicosGenerales", v)}
+              catalogo={MEDICOS_GENERALES_EMERGENCIA}
             />
           </Field>
         </div>
