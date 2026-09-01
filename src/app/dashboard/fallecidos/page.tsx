@@ -815,7 +815,9 @@ export default function DashboardFallecidosPage() {
               </div>
 
               {/* Tab bar */}
-              <div className="flex -mx-5 px-5 border-b border-slate-200 dark:border-slate-800">
+              {/* Con cinco pestañas la barra no cabe en un teléfono: se desplaza
+                  en horizontal sin barra visible en vez de desbordar el modal. */}
+              <div className="flex -mx-5 px-5 border-b border-slate-200 dark:border-slate-800 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {TABS.map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                     className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -1235,6 +1237,13 @@ export default function DashboardFallecidosPage() {
 
                 </div>
               )}
+
+              {/* ── Tab: Bitácora (comentarios + adjuntos internos de ESDOMED) ──
+                  Va DENTRO del área con scroll (no en el footer) porque la lista
+                  de entradas crece sin tope. */}
+              {activeTab === "bitacora" && selectedLive.id && (
+                <BitacoraFallecido key={selectedLive.id} notificacionId={selectedLive.id} tramiteCerrado={isLocked} />
+              )}
             </div>
 
             {/* Footer */}
@@ -1263,11 +1272,6 @@ export default function DashboardFallecidosPage() {
                   {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
                 </button>
               )}
-              {/* ── Tab: Bitácora (comentarios + adjuntos internos de ESDOMED) ── */}
-              {activeTab === "bitacora" && selectedLive.id && (
-                <BitacoraFallecido key={selectedLive.id} notificacionId={selectedLive.id} tramiteCerrado={isLocked} />
-              )}
-
               {/* Bloqueo de cierre por entrega pendiente: todo lo demás está listo,
                   pero el certificado no se ha entregado ni resguardado. */}
               {activeTab === "entrega" && !isLocked && selectedLive.estado === "confirmado" && todos4 && !entregaResuelta && (
