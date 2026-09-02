@@ -98,6 +98,7 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
     const campoTexto = `CIRUGIA_${num}_TEXTO` as CampoSimmow;
     const campoFecha = `CIRUGIA_${num}_FECHA` as CampoSimmow;
     const campoCirujano = `CIRUGIA_${num}_CIRUJANO` as CampoSimmow;
+    const campoCirujanoCodigo = `CIRUGIA_${num}_CIRUJANO_CODIGO_SIMMOW` as CampoSimmow;
     const campoTipo = `CIRUGIA_${num}_TIPO` as CampoSimmow;
 
     return (
@@ -112,7 +113,18 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
           {texto(campoFecha, styles.fecha)}
           <br />
           &nbsp;Cirujano
-          {texto(campoCirujano, styles.nombre)}
+          <MedicoCombobox
+            nombre={v(campoCirujano)}
+            codigo={v(campoCirujanoCodigo)}
+            codigoClassName={styles.codigo + marcarFaltante(campoCirujanoCodigo)}
+            nombreClassName={styles.nombre}
+            onChange={(nombreNuevo, codigoNuevo) =>
+              onChange({
+                [campoCirujano]: nombreNuevo,
+                [campoCirujanoCodigo]: codigoNuevo,
+              } as Partial<DatosSimmow>)
+            }
+          />
           &nbsp;Tipo
           <select value={v(campoTipo)} onChange={set(campoTipo)}>
             <option value=""></option>

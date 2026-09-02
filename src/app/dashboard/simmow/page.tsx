@@ -140,21 +140,40 @@ async function sugerirEstablecimientosDelCatalogo(datos: DatosSimmow): Promise<D
 }
 
 /**
- * Resuelve el código interno de SIMMOW para el médico responsable del alta,
- * buscando por NOMBRE (el mismo en SIS y SIMMOW) contra el catálogo real de
- * médicos — el JVPM del SIS no coincide con el código que SIMMOW espera en
- * ese campo, por eso el nombre nunca precargaba automáticamente antes. Si no
- * hay una coincidencia única y confiable, deja el código vacío para que el
- * personal lo busque/confirme a mano.
+ * Resuelve el código interno de SIMMOW para el médico responsable del alta y
+ * para el cirujano de cada fila de Cirugía (mismo registro de médicos de
+ * SIMMOW en ambos campos — verificado en vivo: el código que autocompleta
+ * "Médico Responsable" autocompleta igual el campo "Cirujano"), buscando por
+ * NOMBRE (el mismo en SIS y SIMMOW) contra el catálogo real — el JVPM del SIS
+ * no coincide con el código que SIMMOW espera en esos campos, por eso el
+ * nombre nunca precargaba automáticamente antes. Si no hay una coincidencia
+ * única y confiable para alguno, deja su código vacío para que el personal lo
+ * busque/confirme a mano.
  */
 async function sugerirMedicoDelCatalogo(datos: DatosSimmow): Promise<DatosSimmow> {
-  if (!datos.MEDICO_RESPONSABLE_ALTA) return datos;
+  const nombresCirujano = ([1, 2, 3, 4] as const).map(
+    (n) => datos[`CIRUGIA_${n}_CIRUJANO` as keyof DatosSimmow] as string
+  );
+  if (!datos.MEDICO_RESPONSABLE_ALTA && !nombresCirujano.some(Boolean)) return datos;
 
   const catalogo = await cargarMedicos();
-  const coincidencia = mejorCoincidenciaMedico(catalogo, datos.MEDICO_RESPONSABLE_ALTA);
-  if (!coincidencia) return datos;
+  const actualizado = { ...datos };
 
-  return { ...datos, MEDICO_RESPONSABLE_CODIGO_SIMMOW: coincidencia.codigo };
+  if (datos.MEDICO_RESPONSABLE_ALTA) {
+    const coincidencia = mejorCoincidenciaMedico(catalogo, datos.MEDICO_RESPONSABLE_ALTA);
+    if (coincidencia) actualizado.MEDICO_RESPONSABLE_CODIGO_SIMMOW = coincidencia.codigo;
+  }
+
+  for (const n of [1, 2, 3, 4] as const) {
+    const nombre = datos[`CIRUGIA_${n}_CIRUJANO` as keyof DatosSimmow] as string;
+    if (!nombre) continue;
+    const coincidencia = mejorCoincidenciaMedico(catalogo, nombre);
+    if (coincidencia) {
+      (actualizado as unknown as Record<string, string>)[`CIRUGIA_${n}_CIRUJANO_CODIGO_SIMMOW`] = coincidencia.codigo;
+    }
+  }
+
+  return actualizado;
 }
 
 export default function SimmowPage() {
