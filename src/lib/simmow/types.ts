@@ -114,31 +114,40 @@ export interface DatosSimmow {
   DISCAPACIDAD_PRINCIPAL_TEXTO: string;
   DISCAPACIDAD_PRINCIPAL_CODIGO: string;
 
-  // Cirugías (SIMMOW muestra 4 filas)
+  // Cirugías (SIMMOW muestra 4 filas). El Cirujano usa el mismo registro de
+  // médicos que Médico Responsable (código interno de SIMMOW, no JVPM) — ver
+  // MEDICO_RESPONSABLE_CODIGO_SIMMOW.
   CIRUGIA_1_TEXTO: string;
   CIRUGIA_1_CODIGO: string;
   CIRUGIA_1_FECHA: string;
   CIRUGIA_1_CIRUJANO: string;
+  CIRUGIA_1_CIRUJANO_CODIGO_SIMMOW: string;
   CIRUGIA_1_TIPO: string; // 1 | 3 | 5
   CIRUGIA_2_TEXTO: string;
   CIRUGIA_2_CODIGO: string;
   CIRUGIA_2_FECHA: string;
   CIRUGIA_2_CIRUJANO: string;
+  CIRUGIA_2_CIRUJANO_CODIGO_SIMMOW: string;
   CIRUGIA_2_TIPO: string;
   CIRUGIA_3_TEXTO: string;
   CIRUGIA_3_CODIGO: string;
   CIRUGIA_3_FECHA: string;
   CIRUGIA_3_CIRUJANO: string;
+  CIRUGIA_3_CIRUJANO_CODIGO_SIMMOW: string;
   CIRUGIA_3_TIPO: string;
   CIRUGIA_4_TEXTO: string;
   CIRUGIA_4_CODIGO: string;
   CIRUGIA_4_FECHA: string;
   CIRUGIA_4_CIRUJANO: string;
+  CIRUGIA_4_CIRUJANO_CODIGO_SIMMOW: string;
   CIRUGIA_4_TIPO: string;
   CIRUGIA_SUSPENDIDA_VALOR: string; // "SI" | ""
 
   // Egreso
   CONDICION_EGRESO: CondicionEgresoSimmow;
+  /** Días de cama en UCI, calculados sumando cada tramo en un servicio de
+   *  UCI de la ruta de movimiento (ingreso → traslados → egreso). */
+  DIAS_UCI: string;
   FECHA_EGRESO: string;
   HORA_EGRESO: string; // 00-23
   MINUTO_EGRESO: string; // 00-59
@@ -254,24 +263,29 @@ export function datosVacios(): DatosSimmow {
     CIRUGIA_1_CODIGO: "",
     CIRUGIA_1_FECHA: "",
     CIRUGIA_1_CIRUJANO: "",
+    CIRUGIA_1_CIRUJANO_CODIGO_SIMMOW: "",
     CIRUGIA_1_TIPO: "",
     CIRUGIA_2_TEXTO: "",
     CIRUGIA_2_CODIGO: "",
     CIRUGIA_2_FECHA: "",
     CIRUGIA_2_CIRUJANO: "",
+    CIRUGIA_2_CIRUJANO_CODIGO_SIMMOW: "",
     CIRUGIA_2_TIPO: "",
     CIRUGIA_3_TEXTO: "",
     CIRUGIA_3_CODIGO: "",
     CIRUGIA_3_FECHA: "",
     CIRUGIA_3_CIRUJANO: "",
+    CIRUGIA_3_CIRUJANO_CODIGO_SIMMOW: "",
     CIRUGIA_3_TIPO: "",
     CIRUGIA_4_TEXTO: "",
     CIRUGIA_4_CODIGO: "",
     CIRUGIA_4_FECHA: "",
     CIRUGIA_4_CIRUJANO: "",
+    CIRUGIA_4_CIRUJANO_CODIGO_SIMMOW: "",
     CIRUGIA_4_TIPO: "",
     CIRUGIA_SUSPENDIDA_VALOR: "",
     CONDICION_EGRESO: "",
+    DIAS_UCI: "",
     FECHA_EGRESO: "",
     HORA_EGRESO: "",
     MINUTO_EGRESO: "",

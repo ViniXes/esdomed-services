@@ -66,6 +66,7 @@ interface PayloadSimmow {
   cirugia_4_tipo: string;
   cirugia_suspendida: string;
   condicion: string;
+  dias_uci: string;
   diag_cd_a: string;
   diag_txt_a: string;
   diag_cd_a_intervalo: string;
@@ -153,32 +154,36 @@ function prepararPayloadSIMMOW(datos: DatosSimmow, advertencias: string[]): Payl
     discapacidad_principal_codigo: datos.DISCAPACIDAD_PRINCIPAL_CODIGO || "",
     discapacidad_principal_texto: datos.DISCAPACIDAD_PRINCIPAL_TEXTO || "",
 
+    // El campo "Cirujano" de SIMMOW espera el código interno del médico
+    // (mismo registro y comportamiento que "Médico Responsable" — verificado
+    // en vivo), no el nombre libre extraído del FIEH.
     cirugia_1_codigo: datos.CIRUGIA_1_CODIGO || "",
     cirugia_1_texto: datos.CIRUGIA_1_TEXTO || "",
     cirugia_1_fecha: datos.CIRUGIA_1_FECHA || "",
-    cirugia_1_cirujano: datos.CIRUGIA_1_CIRUJANO || "",
+    cirugia_1_cirujano: datos.CIRUGIA_1_CIRUJANO_CODIGO_SIMMOW || "",
     cirugia_1_tipo: datos.CIRUGIA_1_TIPO || "",
 
     cirugia_2_codigo: datos.CIRUGIA_2_CODIGO || "",
     cirugia_2_texto: datos.CIRUGIA_2_TEXTO || "",
     cirugia_2_fecha: datos.CIRUGIA_2_FECHA || "",
-    cirugia_2_cirujano: datos.CIRUGIA_2_CIRUJANO || "",
+    cirugia_2_cirujano: datos.CIRUGIA_2_CIRUJANO_CODIGO_SIMMOW || "",
     cirugia_2_tipo: datos.CIRUGIA_2_TIPO || "",
 
     cirugia_3_codigo: datos.CIRUGIA_3_CODIGO || "",
     cirugia_3_texto: datos.CIRUGIA_3_TEXTO || "",
     cirugia_3_fecha: datos.CIRUGIA_3_FECHA || "",
-    cirugia_3_cirujano: datos.CIRUGIA_3_CIRUJANO || "",
+    cirugia_3_cirujano: datos.CIRUGIA_3_CIRUJANO_CODIGO_SIMMOW || "",
     cirugia_3_tipo: datos.CIRUGIA_3_TIPO || "",
 
     cirugia_4_codigo: datos.CIRUGIA_4_CODIGO || "",
     cirugia_4_texto: datos.CIRUGIA_4_TEXTO || "",
     cirugia_4_fecha: datos.CIRUGIA_4_FECHA || "",
-    cirugia_4_cirujano: datos.CIRUGIA_4_CIRUJANO || "",
+    cirugia_4_cirujano: datos.CIRUGIA_4_CIRUJANO_CODIGO_SIMMOW || "",
     cirugia_4_tipo: datos.CIRUGIA_4_TIPO || "",
     cirugia_suspendida: String(datos.CIRUGIA_SUSPENDIDA_VALOR || "").toUpperCase() === "SI" ? "SI" : "",
 
     condicion: datos.CONDICION_EGRESO || "",
+    dias_uci: datos.DIAS_UCI || "",
 
     // Solo fallecidos. Vienen del Certificado de Defunción, no del FIEH.
     diag_cd_a: datos.CERT_CAUSA_A_CODIGO || "",
@@ -1156,6 +1161,9 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
   await sleep(200);
 
   setRadioByIndex('vivo', condicionIndex(DATA.condicion));
+  await sleep(300);
+
+  setText('diasuci', DATA.dias_uci);
   await sleep(300);
 
   setSelect('servicio', DATA.servicio_hospitalario);
