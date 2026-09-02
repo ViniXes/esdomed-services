@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
+import { rechazoAuth, SIN_CACHE } from "@/lib/integraciones/auth";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API de integración: INGRESOS por fecha (para consumo de OTROS sistemas).
 //
-// Autenticación máquina-a-máquina: header `x-api-key` que debe coincidir con la
-// variable de entorno INTEGRACIONES_API_KEY (configurarla en Vercel y .env.local;
-// si no está definida, la API responde 503 y queda deshabilitada).
+// Autenticación máquina-a-máquina: header `x-api-key` (ver lib/integraciones/auth).
+// Para los tableros por grupo de servicios ver /api/integraciones/tableros.
 //
 // Uso:
 //   GET /api/integraciones/ingresos?mes=2026-07
@@ -28,15 +27,6 @@ const TZ_OFFSET = "-06:00"; // America/El_Salvador — fijo, no hay horario de v
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MES_RE = /^\d{4}-\d{2}$/;
 
-function autorizado(req: NextRequest): boolean | null {
-  const esperado = process.env.INTEGRACIONES_API_KEY;
-  if (!esperado) return null; // no configurada → API deshabilitada
-  const recibido = req.headers.get("x-api-key") ?? "";
-  const a = Buffer.from(recibido);
-  const b = Buffer.from(esperado);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 // Día local de El Salvador ("YYYY-MM-DD") de una fecha.
 function diaSV(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "America/El_Salvador" });
@@ -48,13 +38,8 @@ function ultimoDiaDelMes(mes: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = autorizado(req);
-  if (auth === null) {
-    return NextResponse.json({ error: "Integración no configurada (falta INTEGRACIONES_API_KEY)" }, { status: 503 });
-  }
-  if (!auth) {
-    return NextResponse.json({ error: "API key inválida" }, { status: 401 });
-  }
+  const rechazo = rechazoAuth(req);
+  if (rechazo) return rechazo;
 
   const { searchParams } = new URL(req.url);
   const mes = searchParams.get("mes");
@@ -64,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   if (mes) {
     if (!MES_RE.test(mes)) {
-      return NextResponse.json({ error: "Parámetro `mes` inválido — formato YYYY-MM" }, { status: 400 });
+      return NextResponse.json({ error: "Parámetro `mes` inválido — formato YYYY-MM" }, { status: 400, headers: SIN_CACHE });
     }
     desde = `${mes}-01`;
     hasta = ultimoDiaDelMes(mes);
@@ -72,7 +57,7 @@ export async function GET(req: NextRequest) {
   if (!desde || !hasta || !FECHA_RE.test(desde) || !FECHA_RE.test(hasta) || desde > hasta) {
     return NextResponse.json(
       { error: "Indica `mes=YYYY-MM` o un rango válido `desde=YYYY-MM-DD&hasta=YYYY-MM-DD`" },
-      { status: 400 },
+      { status: 400, headers: SIN_CACHE },
     );
   }
 
@@ -130,5 +115,5 @@ export async function GET(req: NextRequest) {
       .map(([servicio, filas]) => ({ servicio, ...filas })),
     ...(incluirDetalle ? { detalle } : {}),
     generadoEn: new Date().toISOString(),
-  });
+  }, { headers: SIN_CACHE });
 }

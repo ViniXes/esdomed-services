@@ -92,6 +92,10 @@ El SIS escribe los mismos servicios de varias formas (mayúsculas/minúsculas, t
 - Los nombres realmente distintos (siglas como “UCI General 1 Adultos”, formas cortas, nombres históricos) se agregan a `ALIAS_CRUDOS` en `src/lib/servicios.ts`. Las variantes de caja/tilde/espacio NO necesitan alias: las absorbe `claveServicio()`.
 - Limpieza de datos ya afectados: `node scripts/limpiar-traslados-fantasma.mjs --dry-run`.
 
+### APIs de integración (máquina a máquina)
+
+`src/app/api/integraciones/*` expone datos a OTROS sistemas (tableros externos). Auth por header `x-api-key` = env `INTEGRACIONES_API_KEY` (helper `src/lib/integraciones/auth.ts`, responde 503 si la variable falta); usan `adminDb` (firebase-admin), nunca el SDK cliente. Los tableros por grupo de servicios (Medicina Interna, Cirugía, Convenios, apoyo a RIISS) se definen en `src/lib/integraciones/tableros.ts` y se sirven en `/api/integraciones/tableros/{id}`; `GET /api/integraciones/tableros` devuelve el contrato y `docs/api-integraciones-tableros.md` es la guía para el consumidor. Rangos en hora de El Salvador, `Cache-Control: private, no-store` + caché en memoria de 10 min, conteos con agregación cuando no hace falta agrupar por servicio.
+
 ### Creating Users
 
 Los usuarios no se registran solos — los crea el administrador directamente en Firebase Auth y luego se crea su documento en `usuarios/{uid}` con el rol correspondiente. No hay flujo de registro público.
