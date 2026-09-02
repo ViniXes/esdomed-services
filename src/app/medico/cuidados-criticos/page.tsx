@@ -302,8 +302,8 @@ export default function CuidadosCriticosMedicoPage() {
   const fichaSeleccionada = selectedEstanciaId !== NUEVA_ESTANCIA
     ? fichasPaciente.find(ficha => ficha.id === selectedEstanciaId)
     : undefined;
-  const tipoFormulario = tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
-    ?? tipoMedicoActivo
+  const tipoFormulario = tipoMedicoActivo
+    ?? tipoUnidadPorServicio(fichaSeleccionada?.servicio ?? selected?.servicioActual)
     ?? "uci";
   const numeroEstancia = fichaSeleccionada
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
