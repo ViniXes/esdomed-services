@@ -443,23 +443,24 @@ function juntarPalabras(items: { str: string; x: number; w: number }[]): string 
  * ubican las columnas por el encabezado y se junta el texto de "Traslado
  * a:" en ambas líneas de cada fila.
  */
-function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimiento | null {
-  interface Fila {
-    fecha: string;
-    hora: string;
-    colA: string;
-    serial: number;
-    indice: number;
-  }
-  // Cuando el paciente tuvo muchos traslados, la tabla se parte entre dos
-  // (o más) páginas del PDF, repitiendo el encabezado "Fecha Hora Traslado
-  // de: Traslado a:..." en cada página de continuación. Antes se procesaba
-  // solo la PRIMERA página con una tabla válida y se devolvía de inmediato
-  // — así que, sin importar cuántos traslados tuviera el paciente después,
-  // siempre quedaba el primero (el único visible en esa página), nunca el
-  // más reciente. Ahora se juntan las filas de TODAS las páginas antes de
-  // decidir cuál es la más reciente.
-  const todasLasFilas: Fila[] = [];
+interface FilaRutaMovimiento {
+  fecha: string;
+  hora: string;
+  colA: string;
+  serial: number;
+  indice: number;
+}
+
+/**
+ * Lee la tabla "C. Ruta de Movimiento" completa, juntando las filas de
+ * TODAS las páginas (puede partirse entre dos o más cuando el paciente tuvo
+ * muchos traslados, repitiendo el encabezado en cada página de
+ * continuación). Devuelve una fila por traslado, con la columna "Traslado
+ * a:" sin resolver todavía — la resuelven los llamadores según necesiten
+ * solo el más reciente o la ruta completa (p. ej. para sumar días en UCI).
+ */
+function extraerFilasRutaMovimiento(doc: DocumentoExtraido): FilaRutaMovimiento[] {
+  const todasLasFilas: FilaRutaMovimiento[] = [];
 
   for (const pagina of doc.paginas) {
     // Puede haber un tercer "traslado" suelto en la nota final de la sección
@@ -551,6 +552,11 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
     }
   }
 
+  return todasLasFilas;
+}
+
+function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimiento | null {
+  const todasLasFilas = extraerFilasRutaMovimiento(doc);
   if (!todasLasFilas.length) return null;
 
   const orden = [...todasLasFilas].sort((a, b) =>
@@ -572,6 +578,44 @@ function extraerUltimoServicioRutaPorCoordenadas(doc: DocumentoExtraido): Movimi
     }
   }
   return null;
+}
+
+interface MovimientoResuelto {
+  fecha: string;
+  hora: string;
+  origen: string;
+  valor: string;
+  serial: number;
+  indice: number;
+}
+
+/**
+ * Ruta de Movimiento COMPLETA (no solo el traslado más reciente), en orden
+ * cronológico y con cada destino ya resuelto a un servicio conocido — la
+ * usa el cálculo de Días UCI para poder recorrer todos los tramos del
+ * paciente, no solo el último.
+ */
+function extraerTodosMovimientosRuta(doc: DocumentoExtraido): MovimientoResuelto[] {
+  const filas = extraerFilasRutaMovimiento(doc);
+  const resueltos: MovimientoResuelto[] = [];
+
+  for (const fila of filas) {
+    const destino = limpiarServicioFieh(fila.colA);
+    const servicios = buscarServiciosConocidosEnTexto(destino);
+    if (!servicios.length) continue;
+    const s = servicios[servicios.length - 1];
+    resueltos.push({
+      fecha: fila.fecha,
+      hora: fila.hora,
+      origen: s.origen,
+      valor: s.valor,
+      serial: fila.serial,
+      indice: fila.indice,
+    });
+  }
+
+  resueltos.sort((a, b) => (a.serial !== b.serial ? a.serial - b.serial : a.indice - b.indice));
+  return resueltos;
 }
 
 /** Respaldo por texto plano, para plantillas donde no se ubique el encabezado por coordenadas. */
@@ -880,6 +924,75 @@ function extraerServicioHospitalario(doc: DocumentoExtraido, texto: string): Ser
     fuente: ingreso.origen ? "INGRESO" : "",
     detalle: "",
   };
+}
+
+// ─── Días UCI ────────────────────────────────────────────────────────────────
+// Réplica del cálculo manual que ya hace ESDOMED: se arma la línea de tiempo
+// completa del paciente (servicio de ingreso → cada traslado de la Ruta de
+// Movimiento → egreso) y se suma, por cada tramo en un servicio de UCI, la
+// cantidad de días de cama ocupada — inclusivo en ambos extremos, porque el
+// costo del día se cuenta completo sin importar la hora de entrada/salida
+// (ej. tramo del 1 al 5 = 5 días, no 4). Un mismo día puede contarse en dos
+// tramos consecutivos (el de salida de un servicio y el de entrada al
+// siguiente): así se factura en SIMMOW, cada servicio cobra el día completo
+// en el que tuvo al paciente.
+//
+// mapearServicioSIMMOW() ya colapsa las 7 unidades de cuidados intensivos
+// (aisladas, quirúrgicos, general 1, coronarios/posquirúrgicos
+// cardiovasculares, extracorpórea, neurointensivos, cardiovascular) al mismo
+// valor SIMMOW "MEDICINA INTERNA D" — y NADA MÁS mapea a ese valor (los
+// cuidados intermedios van a "MEDICINA INTERNA E") — así que sirve tal cual
+// como detector de "es UCI" sin duplicar la lista de servicios.
+function esValorUci(valor: string | undefined): boolean {
+  return valor === "MEDICINA INTERNA D";
+}
+
+/** Fecha (sin hora) en milisegundos, para comparar solo días calendario. */
+function serialSoloFecha(fecha: string): number {
+  return serialFechaHora(fecha, "");
+}
+
+/** Días de cama ocupada entre dos fechas, inclusivo en ambos extremos. */
+function diasCamaInclusive(fechaInicio: string, fechaFin: string): number {
+  const ini = serialSoloFecha(fechaInicio);
+  const fin = serialSoloFecha(fechaFin);
+  if (!ini || !fin) return 0;
+  const dias = Math.round((fin - ini) / 86400000) + 1;
+  return dias > 0 ? dias : 0;
+}
+
+function calcularDiasUci(
+  doc: DocumentoExtraido,
+  texto: string,
+  fechaIngreso: string,
+  fechaEgreso: string
+): { dias: number; ingresoNoDetectado: boolean } {
+  if (!fechaIngreso || !fechaEgreso) return { dias: 0, ingresoNoDetectado: false };
+
+  const ingreso = extraerServicioIngresoPorCoordenadas(doc) ?? extraerServicioIngresoParteB(texto);
+  const valorIngreso = ingreso.valor ?? (ingreso.origen ? mapearServicioSIMMOW(ingreso.origen) : "");
+
+  const movimientos = extraerTodosMovimientosRuta(doc);
+
+  // Línea de tiempo: [servicio de ingreso, ...cada traslado]. El fin de cada
+  // tramo es la fecha del siguiente punto, o la fecha de egreso si es el
+  // último. Si no se detectó el servicio de ingreso, el primer tramo (desde
+  // el ingreso hasta el primer traslado, o todo el internamiento si no hubo
+  // traslados) queda fuera del cálculo — se avisa al llamador para que
+  // muestre una advertencia, porque si ese tramo era UCI el resultado
+  // quedaría por debajo del real.
+  const puntos: { fecha: string; valor: string }[] = [];
+  if (ingreso.origen) puntos.push({ fecha: fechaIngreso, valor: valorIngreso });
+  for (const mov of movimientos) puntos.push({ fecha: mov.fecha, valor: mov.valor });
+
+  let total = 0;
+  for (let i = 0; i < puntos.length; i++) {
+    if (!esValorUci(puntos[i].valor)) continue;
+    const finTramo = i + 1 < puntos.length ? puntos[i + 1].fecha : fechaEgreso;
+    total += diasCamaInclusive(puntos[i].fecha, finTramo);
+  }
+
+  return { dias: total, ingresoNoDetectado: !ingreso.origen };
 }
 
 // ─── Diagnósticos complementarios ───────────────────────────────────────────
@@ -1401,6 +1514,14 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   if (horaEgreso) {
     datos.HORA_EGRESO = convertirHora24(horaEgreso[1], horaEgreso[3]);
     datos.MINUTO_EGRESO = pad2(horaEgreso[2]);
+  }
+
+  const diasUci = calcularDiasUci(doc, texto, datos.FECHA_INGRESO, datos.FECHA_EGRESO);
+  datos.DIAS_UCI = String(diasUci.dias);
+  if (diasUci.ingresoNoDetectado) {
+    advertencias.push(
+      "No se detectó el Servicio en la que ingresa — Días UCI puede estar incompleto (no cuenta el tramo desde el ingreso). Verifique manualmente."
+    );
   }
 
   datos.RECOMENDACIONES = buscar(

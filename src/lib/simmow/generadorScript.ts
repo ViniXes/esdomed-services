@@ -66,6 +66,7 @@ interface PayloadSimmow {
   cirugia_4_tipo: string;
   cirugia_suspendida: string;
   condicion: string;
+  dias_uci: string;
   diag_cd_a: string;
   diag_txt_a: string;
   diag_cd_a_intervalo: string;
@@ -182,6 +183,7 @@ function prepararPayloadSIMMOW(datos: DatosSimmow, advertencias: string[]): Payl
     cirugia_suspendida: String(datos.CIRUGIA_SUSPENDIDA_VALOR || "").toUpperCase() === "SI" ? "SI" : "",
 
     condicion: datos.CONDICION_EGRESO || "",
+    dias_uci: datos.DIAS_UCI || "",
 
     // Solo fallecidos. Vienen del Certificado de Defunción, no del FIEH.
     diag_cd_a: datos.CERT_CAUSA_A_CODIGO || "",
@@ -1159,6 +1161,9 @@ export function generarScriptConsola(datos: DatosSimmow, advertencias: string[] 
   await sleep(200);
 
   setRadioByIndex('vivo', condicionIndex(DATA.condicion));
+  await sleep(300);
+
+  setText('diasuci', DATA.dias_uci);
   await sleep(300);
 
   setSelect('servicio', DATA.servicio_hospitalario);

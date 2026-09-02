@@ -145,6 +145,9 @@ export interface DatosSimmow {
 
   // Egreso
   CONDICION_EGRESO: CondicionEgresoSimmow;
+  /** Días de cama en UCI, calculados sumando cada tramo en un servicio de
+   *  UCI de la ruta de movimiento (ingreso → traslados → egreso). */
+  DIAS_UCI: string;
   FECHA_EGRESO: string;
   HORA_EGRESO: string; // 00-23
   MINUTO_EGRESO: string; // 00-59
@@ -282,6 +285,7 @@ export function datosVacios(): DatosSimmow {
     CIRUGIA_4_TIPO: "",
     CIRUGIA_SUSPENDIDA_VALOR: "",
     CONDICION_EGRESO: "",
+    DIAS_UCI: "",
     FECHA_EGRESO: "",
     HORA_EGRESO: "",
     MINUTO_EGRESO: "",

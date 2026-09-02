@@ -400,6 +400,8 @@ export function FormularioRevision({ datos, camposNoEncontrados, onChange }: Pro
                     {op === "VIVO" ? "Vivo" : "Muerto"}{" "}
                   </label>
                 ))}
+                &nbsp;&nbsp;Días UCI
+                {texto("DIAS_UCI", styles.mini)}
               </td>
             </tr>
 
