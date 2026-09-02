@@ -8,10 +8,13 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
+  startAt,
   updateDoc,
   where,
+  endAt,
 } from "@/lib/firestoreMeter";
 import { Activity, AlertCircle, CheckCircle2, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -62,6 +65,72 @@ function ordenarFichas(fichas: FichaCuidadosCriticos[]) {
 
 function servicioEnLista(servicio: string | null | undefined, servicios: string[]) {
   return servicios.some(asignado => servicioCoincideCuidadosCriticos(servicio, asignado));
+}
+
+function normalizarTextoBusqueda(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizarExpediente(valor: string): string {
+  const limpio = valor.trim().toUpperCase().replace(/\s+/g, "");
+  if (!limpio) return "";
+  if (limpio.includes("-")) return limpio;
+  const soloNumeros = limpio.replace(/\D/g, "");
+  if (soloNumeros.length >= 4) return `${soloNumeros.slice(0, -2)}-${soloNumeros.slice(-2)}`;
+  return limpio;
+}
+
+function candidatosExpediente(valor: string): string[] {
+  const original = valor.trim().toUpperCase().replace(/\s+/g, "");
+  const soloNumeros = original.replace(/\D/g, "");
+  if (soloNumeros.length < 4) return [];
+  const normalizado = normalizarExpediente(valor);
+  return Array.from(new Set([original, normalizado].filter(Boolean))).slice(0, 10);
+}
+
+function capitalizarPalabras(value: string) {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(" ");
+}
+
+function prefijosNombreBusqueda(value: string) {
+  const limpio = value.trim().replace(/\s+/g, " ");
+  if (!/[a-záéíóúñ]/i.test(limpio)) return [];
+  const palabras = limpio.split(" ").filter(Boolean);
+  const candidatos = [
+    limpio,
+    palabras[0] ?? "",
+    palabras.slice(0, 2).join(" "),
+    palabras.slice(0, 3).join(" "),
+  ].filter(prefijo => prefijo.length >= 3);
+  const variantes = candidatos.flatMap(prefijo => [
+    prefijo,
+    prefijo.toUpperCase(),
+    prefijo.toLowerCase(),
+    capitalizarPalabras(prefijo),
+  ]);
+  return Array.from(new Set(variantes)).slice(0, 10);
+}
+
+function pacienteCoincideBusqueda(paciente: Paciente, term: string, expedientes: string[]) {
+  if (expedientes.includes(paciente.expediente)) return true;
+  return textoCoincideBusqueda(`${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""}`, term);
+}
+
+function textoCoincideBusqueda(texto: string, term: string) {
+  const tokens = normalizarTextoBusqueda(term).split(/\s+/).filter(token => token.length >= 2);
+  if (tokens.length === 0) return false;
+  const normalizado = normalizarTextoBusqueda(`${texto} ${texto.replace(/-/g, "")}`);
+  return tokens.every(token => normalizado.includes(token));
 }
 
 function estadoPacienteLabel(estado: Paciente["estado"]) {
@@ -164,8 +233,10 @@ export default function CuidadosCriticosMedicoPage() {
   };
 
   useEffect(() => {
-    const expediente = busqueda.trim();
-    if (expediente.length < 4) {
+    const termino = busqueda.trim();
+    const candidatos = candidatosExpediente(termino);
+    const prefijosNombre = prefijosNombreBusqueda(termino);
+    if (termino.length < 3 || (candidatos.length === 0 && prefijosNombre.length === 0)) {
       queueMicrotask(() => setPacientesHistoricos([]));
       return;
     }
@@ -173,14 +244,25 @@ export default function CuidadosCriticosMedicoPage() {
     let activo = true;
     const timeout = window.setTimeout(async () => {
       try {
-        const snap = await getDocs(query(
-          collection(db, "pacientes"),
-          where("expediente", "==", expediente),
-          limit(5)
-        ));
+        const consultas = [
+          ...(candidatos.length > 0
+            ? [query(collection(db, "pacientes"), where("expediente", "in", candidatos), limit(10))]
+            : []),
+          ...prefijosNombre.flatMap(prefijo => [
+            query(collection(db, "pacientes"), orderBy("apellidos"), startAt(prefijo), endAt(`${prefijo}\uf8ff`), limit(8)),
+            query(collection(db, "pacientes"), orderBy("nombres"), startAt(prefijo), endAt(`${prefijo}\uf8ff`), limit(8)),
+          ]),
+        ];
+        const snaps = await Promise.all(consultas.map(item => getDocs(item)));
         if (!activo) return;
-        setPacientesHistoricos(snap.docs
-          .map(item => ({ id: item.id, ...item.data() } as Paciente))
+        const pacientesEncontrados = new Map<string, Paciente>();
+        snaps.forEach(snap => {
+          snap.docs.forEach(item => {
+            pacientesEncontrados.set(item.id, { id: item.id, ...item.data() } as Paciente);
+          });
+        });
+        setPacientesHistoricos([...pacientesEncontrados.values()]
+          .filter(paciente => pacienteCoincideBusqueda(paciente, termino, candidatos))
           .sort((a, b) => Number(b.estado === "activo") - Number(a.estado === "activo") || (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0)));
       } catch {
         if (activo) setPacientesHistoricos([]);
@@ -309,14 +391,14 @@ export default function CuidadosCriticosMedicoPage() {
     ? fichasPaciente.findIndex(ficha => ficha.id === fichaSeleccionada.id) + 1
     : fichasPaciente.length + 1;
 
-  const busquedaNormalizada = busqueda.trim().toLowerCase();
+  const busquedaNormalizada = normalizarTextoBusqueda(busqueda);
   const debeBuscarOFiltrar = servicioFiltro === "todos" && busquedaNormalizada.length < 2;
   const fichasCoincidentes = busquedaNormalizada.length < 2
     ? []
     : fichas
         .filter(ficha => {
           if (servicioFiltro !== "todos" && !servicioCoincideCuidadosCriticos(ficha.servicio, servicioFiltro)) return false;
-          return `${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`.toLowerCase().includes(busquedaNormalizada);
+          return textoCoincideBusqueda(`${ficha.pacienteExpediente} ${ficha.pacienteNombre} ${ficha.servicio} ${ficha.cama ?? ""}`, busqueda);
         })
         .sort((a, b) => (toDate(b.actualizadoEn)?.getTime() ?? 0) - (toDate(a.actualizadoEn)?.getTime() ?? 0));
   const pacientesBase = [...pacientes];
@@ -330,9 +412,7 @@ export default function CuidadosCriticosMedicoPage() {
     if (debeBuscarOFiltrar) return false;
     if (servicioFiltro !== "todos" && !servicioCoincideCuidadosCriticos(paciente.servicioActual, servicioFiltro) && !vieneDeBusquedaHistorica) return false;
     const term = busquedaNormalizada;
-    const coincide = !term || `${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`
-      .toLowerCase()
-      .includes(term);
+    const coincide = !term || textoCoincideBusqueda(`${paciente.expediente} ${paciente.nombres} ${paciente.apellidos} ${paciente.servicioActual} ${paciente.camaActual ?? ""} ${ubicacionLabel(paciente.servicioActual, paciente.camaActual)}`, busqueda);
     if (!coincide) return false;
     const fichaActiva = fichas.find(ficha => ((ficha.pacienteId && ficha.pacienteId === paciente.id) || ficha.pacienteExpediente === paciente.expediente) && !fichaEgresada(ficha));
     const fichaGuardadaCoincidente = fichasCoincidentes.some(ficha => (ficha.pacienteId && ficha.pacienteId === paciente.id) || ficha.pacienteExpediente === paciente.expediente);
