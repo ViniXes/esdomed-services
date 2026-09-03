@@ -2,16 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { duiValido, normalizarDui } from "@/lib/dui";
+import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   CARGOS_USUARIO_SIS,
   ESPECIALIDADES_SIS,
   type CargoUsuarioSis,
+  TIPOS_DOCUMENTO_SIS,
+  type TipoDocumentoSis,
+  normalizarNombrePersona,
+  JEFATURAS_AUTORIZADORAS_SIS,
 } from "@/lib/solicitudesUsuarioSis";
 
 const SOLICITUDES = "solicitudes_usuarios_sis";
 
 const cargosValidos = new Set<string>(CARGOS_USUARIO_SIS.map((cargo) => cargo.value));
 const especialidadesValidas = new Set<string>(ESPECIALIDADES_SIS);
+const tiposDocumentoValidos = new Set<string>(TIPOS_DOCUMENTO_SIS.map((tipo) => tipo.value));
+const jefaturasAutorizadorasValidas = new Set<string>(JEFATURAS_AUTORIZADORAS_SIS);
 
 function texto(value: unknown, max = 180) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max);
@@ -19,6 +26,21 @@ function texto(value: unknown, max = 180) {
 
 function fechaIso(value: unknown) {
   return (value as { toDate?: () => Date } | undefined)?.toDate?.().toISOString() ?? null;
+}
+
+// El formulario público debe obedecer el mismo catálogo vivo que usa ESDOMED.
+// Si aún no existe una configuración guardada, se conserva el catálogo base
+// del sistema como respaldo.
+async function obtenerServiciosHabilitados() {
+  const config = await adminDb.collection("configuracion").doc("servicios").get();
+  const lista = config.data()?.lista;
+  if (Array.isArray(lista)) {
+    const servicios = lista
+      .map((item) => texto((item as { nombre?: unknown })?.nombre, 160))
+      .filter(Boolean);
+    if (servicios.length > 0) return new Set(servicios);
+  }
+  return new Set<string>(SERVICIOS_HOSPITALARIOS);
 }
 
 async function esAdmin(req: NextRequest) {
@@ -43,8 +65,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Solicitud inválida." }, { status: 400 });
   }
 
-  const nombre = texto(body.nombre, 120).toUpperCase();
-  const dui = normalizarDui(body.dui);
+  const nombre = normalizarNombrePersona(texto(body.nombre, 120));
+  const tipoDocumento = texto(body.tipoDocumento ?? "dui", 30) as TipoDocumentoSis;
+  const numeroDocumentoCrudo = texto(body.numeroDocumento ?? body.dui, 40).toUpperCase();
+  const numeroDocumento = tipoDocumento === "dui" ? normalizarDui(numeroDocumentoCrudo) : numeroDocumentoCrudo;
   const correo = texto(body.correo, 120).toLowerCase();
   const telefono = String(body.telefono ?? "").replace(/\D/g, "").slice(0, 8);
   const cargo = texto(body.cargo, 40) as CargoUsuarioSis;
@@ -55,32 +79,49 @@ export async function POST(req: NextRequest) {
   const esResidente = body.esResidente === "si" ? "si" : body.esResidente === "no" ? "no" : "";
   const yaTuvoUsuario = body.yaTuvoUsuario === "si" ? "si" : body.yaTuvoUsuario === "no" ? "no" : "";
   const servicio = texto(body.servicio, 160);
-  const autorizadoPor = texto(body.autorizadoPor, 120).toUpperCase();
+  const autorizadoPor = texto(body.autorizadoPor, 120);
 
   if (nombre.length < 5) return NextResponse.json({ error: "Escribe el nombre completo." }, { status: 400 });
-  if (!duiValido(dui)) return NextResponse.json({ error: "El DUI no es válido (formato 00000000-0)." }, { status: 400 });
+  if (!tiposDocumentoValidos.has(tipoDocumento)) return NextResponse.json({ error: "Selecciona el tipo de documento." }, { status: 400 });
+  if (tipoDocumento === "dui" && !duiValido(numeroDocumento)) return NextResponse.json({ error: "El DUI debe tener 9 dígitos (formato 00000000-0)." }, { status: 400 });
+  if (tipoDocumento !== "dui" && !/^[A-Z0-9][A-Z0-9 ./-]{1,39}$/.test(numeroDocumento)) {
+    return NextResponse.json({ error: "Escribe un número de documento válido." }, { status: 400 });
+  }
   if (!/^\S+@\S+\.\S+$/.test(correo)) return NextResponse.json({ error: "Escribe un correo electrónico válido." }, { status: 400 });
   if (!/^\d{8}$/.test(telefono)) return NextResponse.json({ error: "El teléfono debe tener 8 dígitos." }, { status: 400 });
   if (!cargosValidos.has(cargo)) return NextResponse.json({ error: "Selecciona el cargo o función." }, { status: 400 });
   if (cargo === "otro" && otroCargo.length < 3) return NextResponse.json({ error: "Especifica el otro cargo o función." }, { status: 400 });
-  if (cargo === "medico" && !numeroJunta) return NextResponse.json({ error: "El número de junta es requerido para médicos." }, { status: 400 });
+  if (!numeroJunta) return NextResponse.json({ error: "El número de junta o registro profesional es obligatorio." }, { status: 400 });
   if (!especialidadesValidas.has(especialidad)) return NextResponse.json({ error: "Selecciona la especialidad solicitada." }, { status: 400 });
   if (especialidad === "Otra" && otraEspecialidad.length < 3) return NextResponse.json({ error: "Especifica la otra especialidad." }, { status: 400 });
   if (!esResidente || !yaTuvoUsuario) return NextResponse.json({ error: "Completa las preguntas de usuario previo y residencia." }, { status: 400 });
   if (!servicio) return NextResponse.json({ error: "Indica el servicio al que será asignado." }, { status: 400 });
-  if (!autorizadoPor) return NextResponse.json({ error: "Indica quién autoriza la solicitud." }, { status: 400 });
+  if (!(await obtenerServiciosHabilitados()).has(servicio)) {
+    return NextResponse.json({ error: "Selecciona uno de los servicios habilitados en ESDOMED." }, { status: 400 });
+  }
+  if (!jefaturasAutorizadorasValidas.has(autorizadoPor)) {
+    return NextResponse.json({ error: "Selecciona una jefatura autorizadora de la lista." }, { status: 400 });
+  }
 
   // Evita que la misma persona deje varias solicitudes abiertas. La consulta es
   // por un único campo para no depender de un índice compuesto.
-  const anteriores = await adminDb.collection(SOLICITUDES).where("dui", "==", dui).limit(5).get();
-  if (anteriores.docs.some((doc) => ["pendiente", "en_proceso"].includes(String(doc.data().estado)))) {
-    return NextResponse.json({ error: "Ya existe una solicitud SIS en trámite con este DUI." }, { status: 409 });
+  const [porDocumento, porDuiLegacy] = await Promise.all([
+    adminDb.collection(SOLICITUDES).where("numeroDocumento", "==", numeroDocumento).limit(5).get(),
+    tipoDocumento === "dui"
+      ? adminDb.collection(SOLICITUDES).where("dui", "==", numeroDocumento).limit(5).get()
+      : Promise.resolve(null),
+  ]);
+  const anteriores = [...porDocumento.docs, ...(porDuiLegacy?.docs ?? [])];
+  if (anteriores.some((doc) => ["pendiente", "en_proceso"].includes(String(doc.data().estado)))) {
+    return NextResponse.json({ error: "Ya existe una solicitud SIS en trámite con este documento." }, { status: 409 });
   }
 
   await adminDb.collection(SOLICITUDES).add({
     institucion: "Hospital Nacional El Salvador",
     nombre,
-    dui,
+    tipoDocumento,
+    numeroDocumento,
+    dui: tipoDocumento === "dui" ? numeroDocumento : null,
     correo,
     telefono,
     cargo,

@@ -80,7 +80,9 @@ export interface SolicitudUsuarioSis {
   id?: string;
   institucion: string;
   nombre: string;
-  dui: string;
+  tipoDocumento: "dui" | "pasaporte" | "carne_residencia";
+  numeroDocumento: string;
+  dui?: string | null; // compatibilidad con solicitudes creadas antes de este cambio
   correo: string;
   telefono: string;
   cargo: string;
