@@ -144,12 +144,9 @@ export async function GET(req: NextRequest) {
   const rol = await obtenerRolLector(req);
   if (!rol) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  // DIMES es estrictamente de consulta: solo recibe solicitudes cuyo usuario
-  // ya fue creado. El admin conserva la bandeja completa para gestionarlas.
-  // Se ordena después en memoria para no exigir un índice compuesto nuevo.
-  const snap = rol === "medico_licenciado_dimes"
-    ? await adminDb.collection(SOLICITUDES).where("estado", "==", "creado").limit(300).get()
-    : await adminDb.collection(SOLICITUDES).orderBy("creadoEn", "desc").limit(300).get();
+  // DIMES consulta la misma bandeja completa que Administración. Su permiso es
+  // solo de lectura: el endpoint PATCH continúa reservado exclusivamente al admin.
+  const snap = await adminDb.collection(SOLICITUDES).orderBy("creadoEn", "desc").limit(300).get();
   const solicitudes = snap.docs.map((doc) => {
     const data = doc.data();
     return {
