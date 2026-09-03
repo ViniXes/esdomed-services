@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Save, Search, X } from "lucide-react";
 import { catalogoCriticoPorCampo } from "@/lib/catalogosCuidadosCriticos";
-import { serviciosPorTipoMedico, TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import {
+  serviciosPorTipoMedico,
+  SERVICIOS_UCI,
+  SERVICIOS_UCIN,
+  tipoMedicoCubreUciYUcin,
+  TIPO_MEDICO_CRITICO_LABEL,
+} from "@/lib/cuidadosCriticos";
 import { cargarCIE10 } from "@/lib/cie10";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
@@ -414,6 +420,7 @@ function ServicioCriticoCombobox({
   onChange: (value: string) => void;
 }) {
   const opciones = useMemo(() => serviciosPorTipoMedico(tipoMedico), [tipoMedico]);
+  const mostrarGrupos = tipoMedicoCubreUciYUcin(tipoMedico);
 
   return (
     <OpcionesCriticasCombobox
@@ -422,9 +429,16 @@ function ServicioCriticoCombobox({
       disabled={disabled}
       placeholder="Escribe o elige la unidad UCI / UCIN..."
       emptyText={`Sin coincidencias. Elige una unidad asignada a ${TIPO_MEDICO_CRITICO_LABEL[tipoMedico]}.`}
+      groupBy={mostrarGrupos ? grupoServicioCritico : undefined}
+      resumenOpciones={mostrarGrupos ? `${SERVICIOS_UCI.length} UCI + ${SERVICIOS_UCIN.length} UCIN disponibles` : undefined}
       onChange={onChange}
     />
   );
+}
+
+function grupoServicioCritico(servicio: string) {
+  if ((SERVICIOS_UCIN as readonly string[]).includes(servicio)) return "UCIN";
+  return "UCI";
 }
 
 function OpcionesCriticasCombobox({
@@ -434,6 +448,8 @@ function OpcionesCriticasCombobox({
   placeholder,
   emptyText = "Sin coincidencias.",
   soloOpciones = false,
+  groupBy,
+  resumenOpciones,
   onChange,
 }: {
   value: string;
@@ -442,6 +458,8 @@ function OpcionesCriticasCombobox({
   placeholder: string;
   emptyText?: string;
   soloOpciones?: boolean;
+  groupBy?: (opcion: string) => string;
+  resumenOpciones?: string;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -533,26 +551,40 @@ function OpcionesCriticasCombobox({
           {resultados.length === 0 ? (
             <div className="px-4 py-3 text-xs text-slate-400">{emptyText}</div>
           ) : (
-            <ul ref={listRef} className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-              {resultados.map((opcion, index) => (
-                <li key={opcion}>
-                  <button
-                    type="button"
-                    data-option-index={index}
-                    onMouseDown={event => {
-                      event.preventDefault();
-                      seleccionar(opcion);
-                    }}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    className={`w-full px-3 py-2.5 text-left text-sm leading-snug text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 ${
-                      index === activeIndex ? "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" : ""
-                    }`}
-                  >
-                    {opcion}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <div className="border-b border-slate-100 px-3 py-2 text-[11px] font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                {resumenOpciones ?? `${resultados.length} opcion${resultados.length !== 1 ? "es" : ""} disponible${resultados.length !== 1 ? "s" : ""}`}
+              </div>
+              <ul ref={listRef} className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {resultados.map((opcion, index) => {
+                  const grupo = groupBy?.(opcion);
+                  const grupoPrevio = index > 0 ? groupBy?.(resultados[index - 1]) : undefined;
+                  return (
+                    <li key={opcion}>
+                      {grupo && grupo !== grupoPrevio && (
+                        <div className="bg-slate-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-slate-950 dark:text-blue-300">
+                          {grupo}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        data-option-index={index}
+                        onMouseDown={event => {
+                          event.preventDefault();
+                          seleccionar(opcion);
+                        }}
+                        onMouseEnter={() => setActiveIndex(index)}
+                        className={`w-full px-3 py-2.5 text-left text-sm leading-snug text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800 ${
+                          index === activeIndex ? "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" : ""
+                        }`}
+                      >
+                        {opcion}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
       )}
