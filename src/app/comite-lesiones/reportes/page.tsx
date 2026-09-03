@@ -1,12 +1,13 @@
 "use client";
 
-// Reportes del Comité de Lesiones: primeras 10 causas de egreso por rango de
-// fechas, con filtros de estado (vivo/fallecido/todos) y edad. Dos fuentes:
-//   · Emergencia:      atenciones_emergencia (diagnóstico = texto del catálogo
-//                      del SIS, sin código CIE → se agrupa por texto normalizado).
-//                      "Egreso de emergencia" = atención que NO ingresó a
+// Reportes del Comité de Lesiones: primeras 10 causas por rango de fechas,
+// con filtros de estado (vivo/fallecido/todos) y edad. Dos fuentes:
+//   · Emergencia:      "causas de atención" — atenciones_emergencia (diagnóstico =
+//                      texto del catálogo del SIS, sin código CIE → se agrupa por
+//                      texto normalizado). Cuenta la atención que NO ingresó a
 //                      hospitalización (misma definición que la vista Egresos).
-//   · Hospitalización: pacientes egresados (diagnosticoEgreso CIE-10). Se
+//   · Hospitalización: "causas de egreso" — pacientes egresados (diagnosticoEgreso
+//                      CIE-10). Se
 //                      agrupa por DESCRIPCIÓN normalizada, no por código:
 //                      verificado con datos reales, el mismo diagnóstico se
 //                      captura a veces con el código de 3 y de 4 caracteres
@@ -102,9 +103,11 @@ class Acumulador {
 const inputCls =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-600 dark:focus:bg-slate-800";
 
-const VISTA_META: Record<Vista, { label: string; icono: typeof Siren }> = {
-  emergencia: { label: "Causas de egreso · Emergencia", icono: Siren },
-  hospitalizacion: { label: "Causas de egreso · Hospitalización", icono: BedDouble },
+// `unidad` es el sustantivo de lo que se cuenta en cada vista (Emergencia cuenta
+// atenciones; Hospitalización, egresos) y `archivo` el prefijo del Excel exportado.
+const VISTA_META: Record<Vista, { label: string; icono: typeof Siren; unidad: string; archivo: string }> = {
+  emergencia: { label: "Causas de atención · Emergencia", icono: Siren, unidad: "atenciones", archivo: "causas_atencion_emergencia" },
+  hospitalizacion: { label: "Causas de egreso · Hospitalización", icono: BedDouble, unidad: "egresos", archivo: "causas_egreso_hospitalizacion" },
 };
 
 export default function ReportesComitePage() {
@@ -231,12 +234,14 @@ export default function ReportesComitePage() {
       const wb = XLSX.utils.book_new();
       const meta = etiquetaFiltros(resultado);
       const esHosp = resultado.vista === "hospitalizacion";
+      const { unidad, archivo } = VISTA_META[resultado.vista];
+      const unidadCap = unidad.charAt(0).toUpperCase() + unidad.slice(1);
 
       const hoja = (filas: FilaCausa[], titulo: string) => {
         const aoa: (string | number)[][] = [
           [`${VISTA_META[resultado.vista].label} — ${titulo}`],
           [`Del ${resultado.desde} al ${resultado.hasta} · ${meta}`],
-          [`Egresos con diagnóstico: ${resultado.totalCasos} · Causas distintas: ${resultado.totalDistintas}`],
+          [`${unidadCap} con diagnóstico: ${resultado.totalCasos} · Causas distintas: ${resultado.totalDistintas}`],
           [],
           ["#", ...(esHosp ? ["Código CIE-10"] : []), "Diagnóstico", "Casos", "%"],
         ];
@@ -256,7 +261,7 @@ export default function ReportesComitePage() {
 
       XLSX.utils.book_append_sheet(wb, hoja(resultado.top, "Top 10"), "Top 10");
       XLSX.utils.book_append_sheet(wb, hoja(resultado.todas, "Todas las causas"), "Todas las causas");
-      XLSX.writeFile(wb, `causas_egreso_${resultado.vista}_${resultado.desde}_a_${resultado.hasta}.xlsx`);
+      XLSX.writeFile(wb, `${archivo}_${resultado.desde}_a_${resultado.hasta}.xlsx`);
     } catch (e) {
       setError(`No se pudo exportar: ${e instanceof Error ? e.message : "error"}`);
     } finally {
@@ -285,7 +290,7 @@ export default function ReportesComitePage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Reportes</h1>
-          <p className="mt-0.5 text-xs text-slate-500">Primeras 10 causas de egreso según el diagnóstico principal</p>
+          <p className="mt-0.5 text-xs text-slate-500">Primeras 10 causas según el diagnóstico principal · atenciones en Emergencia o egresos de Hospitalización</p>
         </div>
       </div>
 
@@ -392,7 +397,7 @@ export default function ReportesComitePage() {
               {etiquetaFiltros(resultado)}
             </span>
             <span className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
-              {resultado.totalCasos} egresos con diagnóstico
+              {resultado.totalCasos} {VISTA_META[resultado.vista].unidad} con diagnóstico
             </span>
             <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
               {resultado.totalDistintas} causas distintas
@@ -423,7 +428,7 @@ export default function ReportesComitePage() {
             </div>
             {resultado.top.length === 0 ? (
               <p className="py-10 text-center text-sm text-slate-500">
-                No hay egresos con diagnóstico en ese rango y filtros.
+                No hay {VISTA_META[resultado.vista].unidad} con diagnóstico en ese rango y filtros.
               </p>
             ) : (
               <div className="overflow-x-auto">
