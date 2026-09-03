@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Ambulance,
   ArrowRightLeft,
@@ -49,9 +49,16 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
   const { pendientes } = useNotificaciones();
   const router = useRouter();
+  const pathname = usePathname();
   const esJefeMedicinaCritica = esJefeCuidadosCriticos(profile);
 
   useEffect(() => {
+    // DIMES no tiene rutas alternativas: aun escribiendo otra URL del dashboard,
+    // se le devuelve a su bandeja SIS de solo lectura.
+    if (!loading && profile?.role === "medico_licenciado_dimes" && pathname !== "/dashboard/solicitudes-usuarios-sis") {
+      router.replace("/dashboard/solicitudes-usuarios-sis");
+      return;
+    }
     if (
       !loading &&
       (!profile ||
@@ -66,7 +73,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ) {
       router.replace("/login");
     }
-  }, [esJefeMedicinaCritica, loading, profile, router]);
+  }, [esJefeMedicinaCritica, loading, pathname, profile, router]);
 
   const roleLabel =
     esJefeMedicinaCritica && profile?.tipoMedico
@@ -75,6 +82,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? "Trabajo Social"
       : profile?.role === "admin"
         ? "Administración"
+        : profile?.role === "medico_licenciado_dimes"
+          ? "Médico/Licenciado DIMES"
         : "ESDOMED";
 
   const esTS = profile?.role === "trabajo_social";
@@ -82,6 +91,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed";
   const esAsistente = profile?.role === "asistente_esdomed";
   const esAdmin = profile?.role === "admin";
+  // DIMES entra únicamente a la bandeja SIS y siempre en modo consulta.
+  const esDimes = profile?.role === "medico_licenciado_dimes";
   const verControlIngresos = esEsdomed || esAdmin;
   const verPacientes       = esEsdomed || esAdmin;
   const verIncapacidades   = esEsdomed || esAdmin;
@@ -111,7 +122,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const G_PERSONAL = "Mi área";
   const G_ADMIN = "Administración";
 
-  const navItems: NavItem[] = [
+  const navItems: NavItem[] = esDimes
+    ? [{ href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, group: G_ADMIN, exact: true }]
+    : [
     // Trabajo Social no usa el inicio (panel de ESDOMED); entra directo a sus vistas.
     ...(!esTS && !esJefeMedicinaCritica
       ? [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }]

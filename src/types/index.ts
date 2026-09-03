@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
+export type UserRole = "medico" | "medico_licenciado_dimes" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
 
 // Roles del módulo Convenio ISBM (los datos del módulo viven en Supabase;
 // ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.

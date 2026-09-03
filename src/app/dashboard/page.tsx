@@ -57,9 +57,10 @@ export default function DashboardPage() {
   const { profile } = useAuth();
   const router = useRouter();
 
-  // Trabajo Social no tiene panel de inicio: va directo a sus defunciones.
+  // Trabajo Social y DIMES no tienen panel de inicio: ambos van a su única vista.
   useEffect(() => {
     if (profile?.role === "trabajo_social") router.replace("/dashboard/defunciones");
+    if (profile?.role === "medico_licenciado_dimes") router.replace("/dashboard/solicitudes-usuarios-sis");
   }, [profile, router]);
 
   const [counts, setCounts] = useState({
@@ -71,7 +72,7 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    if (!profile || profile.role === "medico" || profile.role === "psicologia" || profile.role === "enfermeria") return;
+    if (!profile || profile.role === "medico" || profile.role === "medico_licenciado_dimes" || profile.role === "psicologia" || profile.role === "enfermeria") return;
     let activo = true;
     const FUENTES = [
       { tipo: "traslado" as const,  coll: "traslados" },

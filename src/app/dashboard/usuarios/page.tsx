@@ -63,6 +63,7 @@ const roleColors: Record<UserRole, string> = {
   asistente_esdomed: "bg-[#1c1e4d]/10 text-[#1c1e4d] border-[#1c1e4d]/20 dark:bg-[var(--color-institutional-navy)] dark:text-[#c9a892] dark:border-[#c9a892]/30",
   trabajo_social: "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900",
   medico: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900",
+  medico_licenciado_dimes: "bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900",
   psicologia: "bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-900",
   comite_lesiones: "bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900",
   admin: "bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900",
@@ -80,6 +81,7 @@ const roleLabels: Record<UserRole, string> = {
   asistente_esdomed: "Asistente Admin. ESDOMED",
   trabajo_social: "Trabajo Social",
   medico: "Medico",
+  medico_licenciado_dimes: "Médico/Licenciado DIMES",
   psicologia: "Psicologia",
   comite_lesiones: "Lesiones intencionales/Adolescentes",
   admin: "Administrador Superusuario",
@@ -94,6 +96,7 @@ const roleLabels: Record<UserRole, string> = {
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: "medico", label: "Medico" },
+  { value: "medico_licenciado_dimes", label: "Médico/Licenciado DIMES (solo lectura SIS)" },
   { value: "esdomed", label: "Personal ESDOMED" },
   { value: "asistente_esdomed", label: "Asistente Administrativo ESDOMED" },
   { value: "trabajo_social", label: "Trabajo Social" },
