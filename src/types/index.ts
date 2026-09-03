@@ -71,6 +71,37 @@ export interface RegistroMedicoResuelto {
   resueltoPorNombre: string;
 }
 
+// ============================================================================
+// Solicitud de creación de usuario SIS — formulario público y seguimiento admin
+// ============================================================================
+export type EstadoSolicitudUsuarioSis = "pendiente" | "en_proceso" | "creado" | "rechazado";
+
+export interface SolicitudUsuarioSis {
+  id?: string;
+  institucion: string;
+  nombre: string;
+  dui: string;
+  correo: string;
+  telefono: string;
+  cargo: string;
+  otroCargo?: string | null;
+  numeroJunta?: string | null;
+  yaTuvoUsuario: "si" | "no";
+  especialidad: string;
+  otraEspecialidad?: string | null;
+  esResidente: "si" | "no";
+  servicio: string;
+  autorizadoPor: string;
+  estado: EstadoSolicitudUsuarioSis;
+  usuarioSis?: string | null;
+  notaAdmin?: string | null;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+  estadoActualizadoEn?: Date;
+  estadoActualizadoPorId?: string;
+  estadoActualizadoPorNombre?: string;
+}
+
 export type TipoAtencionCuidadosCriticos =
   | "evaluacion_ingreso"
   | "seguimiento_clinico"

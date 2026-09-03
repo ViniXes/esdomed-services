@@ -289,6 +289,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [
           { href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN },
           { href: "/dashboard/registros-medicos", label: "Registros de médicos", icon: ClipboardList, group: G_ADMIN },
+          { href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, group: G_ADMIN },
         ]
       : []),
     ...(verAprobacionTramites
