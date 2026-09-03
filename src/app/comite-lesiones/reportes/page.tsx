@@ -4,8 +4,13 @@
 // con filtros de estado (vivo/fallecido/todos) y edad. Dos fuentes:
 //   · Emergencia:      "causas de atención" — atenciones_emergencia (diagnóstico =
 //                      texto del catálogo del SIS, sin código CIE → se agrupa por
-//                      texto normalizado). Cuenta la atención que NO ingresó a
-//                      hospitalización (misma definición que la vista Egresos).
+//                      texto normalizado). Cuenta TODAS las atenciones del rango,
+//                      hayan ingresado o no a hospitalización (pedido del comité:
+//                      interesa la causa por la que llegaron a Emergencia). El
+//                      filtro vivo/fallecido se aplica sobre `tipoEgreso` del
+//                      reporte; el SIS lo deja VACÍO en quien ingresó a un servicio
+//                      (verificado con datos reales), así que el ingresado cuenta
+//                      como vivo: salió vivo de Emergencia hacia hospitalización.
 //   · Hospitalización: "causas de egreso" — pacientes egresados (diagnosticoEgreso
 //                      CIE-10). Se
 //                      agrupa por DESCRIPCIÓN normalizada, no por código:
@@ -171,8 +176,9 @@ export default function ReportesComitePage() {
         truncado = snap.size >= MAX_DOCS;
         snap.docs.forEach((d) => {
           const a = d.data();
-          if (a.ingresoHospitalizacion === "si") return; // ingresó: no es egreso de emergencia
-          if (filtroEstado !== "todos" && condicionEgreso(a.tipoEgreso) !== filtroEstado) return;
+          // Ingresó a un servicio ⇒ salió vivo de Emergencia (el reporte no trae tipoEgreso en ese caso).
+          const condicion = a.ingresoHospitalizacion === "si" ? "vivo" : condicionEgreso(a.tipoEgreso);
+          if (filtroEstado !== "todos" && condicion !== filtroEstado) return;
           const edad = typeof a.edadAnios === "number" ? a.edadAnios : null;
           if (!pasaEdad(edad)) { if (edad === null) sinEdad++; return; }
           const diag = String(a.diagnostico ?? "").trim();

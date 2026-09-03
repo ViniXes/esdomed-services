@@ -468,7 +468,7 @@ service cloud.firestore {
     // Atenciones de emergencia importadas del reporte del SIS. Módulo aparte de
     // pacientes. Consulta: personal + médicos (solo lectura). Importación: solo
     // ESDOMED/admin. No escribe en personas/pacientes. El Comité de Lesiones lee
-    // para su reporte de causas de egreso de emergencia.
+    // para su reporte de causas de atención en emergencia.
     match /atenciones_emergencia/{id} {
       allow read:   if isStaff() || isMedico() || isComiteLesiones();
       allow create: if isEsdomed() || isAdmin();
