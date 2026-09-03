@@ -26,7 +26,14 @@ import type { EstadoPaciente, Genero } from "@/types";
 export const ZONA_HORARIA = "America/El_Salvador";
 const TZ_OFFSET = "-06:00";
 
-export type TableroId = "medicina-interna" | "cirugia" | "convenios" | "apoyo-riiss";
+export type TableroId =
+  | "medicina-interna"
+  | "cirugia"
+  | "convenios"
+  | "uci"
+  | "ucin"
+  | "paliativos"
+  | "apoyo-riiss";
 export type MetricaTablero = "egresos" | "ingresos";
 
 export interface DefinicionTablero {
@@ -71,6 +78,39 @@ export const TABLEROS: readonly DefinicionTablero[] = [
     metrica: "egresos",
     descripcion: "Egresos (vivos y fallecidos) de Bienestar Magisterial",
     servicios: ["Bienestar Magisterial"],
+  },
+  {
+    id: "uci",
+    nombre: "Unidades de Cuidados Intensivos",
+    metrica: "egresos",
+    descripcion: "Egresos (vivos y fallecidos) de las unidades de cuidados intensivos de adultos",
+    servicios: [
+      "Unidad de cuidados intensivos General 1 Adultos",
+      "Unidad de cuidados intensivos aislados Adultos",
+      "Unidad de cuidados intensivos cardiovascular Adultos",
+      "Unidad de Cuidados Intensivos Extracorpórea Adultos",
+      "Unidad de Cuidados Intensivos Quirúrgicos Adultos",
+      "Unidad de Cuidados Neurointensivos Adultos",
+      "Unidad de Cuidados Coronarios y Posquirúrgicos Cardiovasculares",
+    ],
+  },
+  {
+    id: "ucin",
+    nombre: "Unidades de Cuidados Intermedios",
+    metrica: "egresos",
+    descripcion: "Egresos (vivos y fallecidos) de las unidades de cuidados intermedios de adultos",
+    servicios: [
+      "Unidad de Cuidados Intermedios Adultos MINSAL",
+      "Unidad de Cuidados Intermedios Crónicos Adultos",
+      "Unidad de Cuidados Intermedios Aislados Adultos",
+    ],
+  },
+  {
+    id: "paliativos",
+    nombre: "Dolor y Cuidados Paliativos",
+    metrica: "egresos",
+    descripcion: "Egresos (vivos y fallecidos) de Dolor y Cuidados Paliativos",
+    servicios: ["Dolor y cuidados Paliativos"],
   },
   {
     id: "apoyo-riiss",

@@ -21,6 +21,9 @@ responde `401`. La llave la entrega ESDOMED (variable `INTEGRACIONES_API_KEY` en
 | `medicina-interna` | Egresos vivos y fallecidos | Medicina Interna Hombres 1-3, Medicina Interna Mujeres 1-3, Servicio de Cardiologia, Servicio de Hematologia, Servicio de Aislados, Servicio de Oncologia, Dialisis Peritoneal |
 | `cirugia` | Egresos vivos y fallecidos | Cirugía Hombres 1, Cirugía Mujeres 1, Cirugía Cardiovascular, Neurocirugia |
 | `convenios` | Egresos vivos y fallecidos | Bienestar Magisterial |
+| `uci` | Egresos vivos y fallecidos | Unidad de cuidados intensivos General 1 Adultos, UCI aislados Adultos, UCI cardiovascular Adultos, UCI Extracorpórea Adultos, UCI Quirúrgicos Adultos, Unidad de Cuidados Neurointensivos Adultos, Unidad de Cuidados Coronarios y Posquirúrgicos Cardiovasculares |
+| `ucin` | Egresos vivos y fallecidos | Unidad de Cuidados Intermedios Adultos MINSAL, Intermedios Crónicos Adultos, Intermedios Aislados Adultos |
+| `paliativos` | Egresos vivos y fallecidos | Dolor y Cuidados Paliativos |
 | `apoyo-riiss` | Ingresos totales por mes | Todo el hospital |
 
 `GET /api/integraciones/tableros` devuelve este mismo índice en JSON.

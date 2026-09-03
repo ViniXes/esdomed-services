@@ -94,7 +94,7 @@ El SIS escribe los mismos servicios de varias formas (mayúsculas/minúsculas, t
 
 ### APIs de integración (máquina a máquina)
 
-`src/app/api/integraciones/*` expone datos a OTROS sistemas (tableros externos). Auth por header `x-api-key` = env `INTEGRACIONES_API_KEY` (helper `src/lib/integraciones/auth.ts`, responde 503 si la variable falta); usan `adminDb` (firebase-admin), nunca el SDK cliente. Los tableros por grupo de servicios (Medicina Interna, Cirugía, Convenios, apoyo a RIISS) se definen en `src/lib/integraciones/tableros.ts` y se sirven en `/api/integraciones/tableros/{id}`; `GET /api/integraciones/tableros` devuelve el contrato y `docs/api-integraciones-tableros.md` es la guía para el consumidor. Rangos en hora de El Salvador, `Cache-Control: private, no-store` + caché en memoria de 10 min, conteos con agregación cuando no hace falta agrupar por servicio.
+`src/app/api/integraciones/*` expone datos a OTROS sistemas (tableros externos). Auth por header `x-api-key` = env `INTEGRACIONES_API_KEY` (helper `src/lib/integraciones/auth.ts`, responde 503 si la variable falta); usan `adminDb` (firebase-admin), nunca el SDK cliente. Los tableros por grupo de servicios (Medicina Interna, Cirugía, Convenios, UCI, UCIN, Paliativos, apoyo a RIISS) se definen en `src/lib/integraciones/tableros.ts` y se sirven en `/api/integraciones/tableros/{id}`; `GET /api/integraciones/tableros` devuelve el contrato y `docs/api-integraciones-tableros.md` es la guía para el consumidor. Rangos en hora de El Salvador, `Cache-Control: private, no-store` + caché en memoria de 10 min, conteos con agregación cuando no hace falta agrupar por servicio.
 
 ### Creating Users
 
