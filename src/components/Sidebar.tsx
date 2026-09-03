@@ -4,12 +4,13 @@ import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Info } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import type { UserProfile } from "@/types";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { AcercaDeModal } from "@/components/AcercaDeModal";
 
 const SIDEBAR_LOGO_LIGHT_SRC = "/logo_hnes_sidebar.png";
 const SIDEBAR_LOGO_DARK_SRC = "/logo_hnes_sidebar.png";
@@ -47,6 +48,7 @@ interface SidebarBodyProps extends SidebarProps {
   toggleGroup: (group: string) => void;
   onChangePassword: () => void;
   onLogout: () => void;
+  onAcercaDe: () => void;
   onCollapseDesktopPanel?: () => void;
   onNavigate?: () => void;
   toggle: () => void;
@@ -197,6 +199,7 @@ function SidebarBody({
   onNavigate,
   onChangePassword,
   onLogout,
+  onAcercaDe,
   onCollapseDesktopPanel,
   variant,
 }: SidebarBodyProps) {
@@ -318,6 +321,16 @@ function SidebarBody({
             Ocultar panel
           </button>
         )}
+        {/* Enlace discreto al "Acerca de": visible para todos los roles, sin
+            competir con las acciones de cuenta. */}
+        <button
+          type="button"
+          onClick={onAcercaDe}
+          className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400 transition-colors hover:text-blue-700 dark:text-slate-500 dark:hover:text-cyan-300"
+        >
+          <Info size={11} strokeWidth={2.25} />
+          Acerca de ESDOMED Services
+        </button>
       </div>
     </div>
   );
@@ -332,6 +345,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showAcercaDe, setShowAcercaDe] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -445,6 +459,10 @@ export function Sidebar({
       setOpen(false);
     },
     onLogout: handleLogout,
+    onAcercaDe: () => {
+      setShowAcercaDe(true);
+      setOpen(false);
+    },
     onCollapseDesktopPanel: allowDesktopPanelCollapse ? toggleDesktopPanel : undefined,
     variant,
   };
@@ -540,6 +558,8 @@ export function Sidebar({
           <PanelLeftOpen size={17} />
         </button>
       )}
+
+      <AcercaDeModal open={showAcercaDe} onClose={() => setShowAcercaDe(false)} />
 
       {showPasswordModal && (
         <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
