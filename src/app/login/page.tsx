@@ -171,6 +171,12 @@ export default function LoginPage() {
               Regístrate aquí
             </Link>
           </p>
+          <p className="mt-3 text-center text-xs text-slate-500">
+            ¿Necesitas un usuario SIS?{" "}
+            <Link prefetch={false} href="/solicitud-usuario-sis" className="font-medium text-cyan-700 hover:underline dark:text-cyan-300">
+              Solicítalo aquí
+            </Link>
+          </p>
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6">

@@ -8,6 +8,7 @@ import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 const DEFAULT_TEST_PASSWORD = "123456";
 const VALID_ROLES = new Set<UserRole>([
   "medico",
+  "medico_licenciado_dimes",
   "esdomed",
   "asistente_esdomed",
   "trabajo_social",

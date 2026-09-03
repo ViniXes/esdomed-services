@@ -7,6 +7,7 @@ import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const VALID_ROLES = new Set<UserRole>([
   "medico",
+  "medico_licenciado_dimes",
   "esdomed",
   "asistente_esdomed",
   "trabajo_social",

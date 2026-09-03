@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
+export type UserRole = "medico" | "medico_licenciado_dimes" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe";
 
 // Roles del módulo Convenio ISBM (los datos del módulo viven en Supabase;
 // ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.
@@ -69,6 +69,39 @@ export interface RegistroMedicoResuelto {
   resueltoEn: Date;     // cuándo se resolvió
   resueltoPorId: string;
   resueltoPorNombre: string;
+}
+
+// ============================================================================
+// Solicitud de creación de usuario SIS — formulario público y seguimiento admin
+// ============================================================================
+export type EstadoSolicitudUsuarioSis = "pendiente" | "en_proceso" | "creado" | "rechazado";
+
+export interface SolicitudUsuarioSis {
+  id?: string;
+  institucion: string;
+  nombre: string;
+  tipoDocumento: "dui" | "pasaporte" | "carne_residencia";
+  numeroDocumento: string;
+  dui?: string | null; // compatibilidad con solicitudes creadas antes de este cambio
+  correo: string;
+  telefono: string;
+  cargo: string;
+  otroCargo?: string | null;
+  numeroJunta?: string | null;
+  yaTuvoUsuario: "si" | "no";
+  especialidad: string;
+  otraEspecialidad?: string | null;
+  esResidente: "si" | "no";
+  servicio: string;
+  autorizadoPor: string;
+  estado: EstadoSolicitudUsuarioSis;
+  usuarioSis?: string | null;
+  notaAdmin?: string | null;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+  estadoActualizadoEn?: Date;
+  estadoActualizadoPorId?: string;
+  estadoActualizadoPorNombre?: string;
 }
 
 export type TipoAtencionCuidadosCriticos =
