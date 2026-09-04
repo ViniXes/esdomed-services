@@ -62,7 +62,7 @@ const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
   observada:  "bg-rose-50/70 dark:bg-rose-950/40 text-slate-800 dark:text-rose-100 border-rose-200/80 dark:border-rose-900/70",
   deposito:   "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
   suspendida: "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700",
-  procesada:  "bg-blue-50 dark:bg-[var(--color-institutional-navy)] text-[#1c1e4d] dark:text-[#dce6ff] border-[#c9a892]/60 dark:border-[#c9a892]/40",
+  procesada:  "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900",
   recibida:   "bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
   duplicada:  "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   revertida:  "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
@@ -74,7 +74,7 @@ const ESTADO_DOT: Record<EstadoNotificacionAlta, string> = {
   observada:  "bg-rose-500",
   deposito:   "bg-slate-400",
   suspendida: "bg-slate-400",
-  procesada:  "bg-[#1c1e4d] dark:bg-[#c9a892]",
+  procesada:  "bg-emerald-500",
   recibida:   "bg-sky-500",
   duplicada:  "bg-slate-400",
   revertida:  "bg-orange-500",
@@ -134,11 +134,11 @@ const formatFecha = (v: unknown) => {
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
-/* Acción primaria institucional: marino con hairline dorado arena (mismo lenguaje que enfermería y el sidebar). */
-const primaryBtnCls = "bg-[#1c1e4d] hover:bg-[#2f48aa] text-white ring-1 ring-inset ring-[#c9a892]/40 dark:ring-[#c9a892]/50";
+/* Acción primaria: azul institucional (blue-* queda remapeado por el tema HNES). */
+const primaryBtnCls = "bg-blue-600 hover:bg-blue-500 text-white";
 
-/* Estado seleccionado institucional para chips/selecciones (eco del estado activo del sidebar). */
-const selectedChipCls = "border-[#1c1e4d] bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 dark:border-[#c9a892]/50 dark:bg-[var(--color-institutional-navy)] dark:text-white";
+/* Estado seleccionado para chips/selecciones: azul institucional. */
+const selectedChipCls = "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600 dark:border-blue-400 dark:bg-blue-950 dark:text-blue-200 dark:ring-blue-400";
 
 const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
 
@@ -248,7 +248,7 @@ function CreateModal({
             <BuscadorPacienteActivo
               value={selectedPaciente}
               onSelect={(p) => { setSelectedPaciente(p); if (!p) setTipoAlta(""); }}
-              accent="navy"
+              accent="blue"
             />
           </div>
 
@@ -281,7 +281,7 @@ function CreateModal({
                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                       tipoAlta === t.value
                         ? selectedChipCls
-                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-[#c9a892]/70"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700"
                     }`}>
                     {t.label}
                   </button>
@@ -719,7 +719,7 @@ function RectificacionModal({
           <label className="block text-xs font-medium text-slate-500 mb-1.5">
             Cambiar paciente <span className="font-normal text-slate-400">(opcional)</span>
           </label>
-          <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="navy" />
+          <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="blue" />
         </div>
 
         <div>
@@ -733,7 +733,7 @@ function RectificacionModal({
                 className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                   tipoAlta === t.value
                     ? selectedChipCls
-                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-[#c9a892]/70"
+                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700"
                 }`}
               >
                 {t.label}
@@ -1149,11 +1149,11 @@ export function AltasVivosView() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#1c1e4d] dark:bg-[#c9a892] rounded-xl flex items-center justify-center ring-1 ring-[#c9a892]/45 dark:ring-0 shadow-sm">
-            <LogIn size={17} className="text-white dark:text-[#1c2834]" />
+          <div className="w-9 h-9 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900">
+            <LogIn size={17} className="text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a67c65] dark:text-[#c9a892]/80">Verificación · Egresos vivos</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-400">Verificación · Egresos vivos</p>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Altas Vivos</h1>
             <p className="text-xs text-slate-500">Notificaciones de egreso de pacientes</p>
           </div>
@@ -1177,8 +1177,8 @@ export function AltasVivosView() {
 
       {/* Banner de éxito creación */}
       {createdBanner && (
-        <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-blue-50 dark:bg-[var(--color-institutional-navy)] border border-[#c9a892]/50 dark:border-[#c9a892]/40 rounded-xl text-sm text-[#1c1e4d] dark:text-[#f0ece8]">
-          <CheckCircle2 size={16} className="text-[#1c1e4d] dark:text-[#c9a892]" />
+        <div className="flex items-center gap-2 mb-4 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-xl text-sm text-emerald-800 dark:text-emerald-300">
+          <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
           Cambio guardado correctamente.
         </div>
       )}
@@ -1188,7 +1188,7 @@ export function AltasVivosView() {
         <button onClick={() => setVista("bandeja")}
           className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             vista === "bandeja"
-              ? "bg-white dark:bg-slate-900 shadow-sm text-[#1c1e4d] dark:text-[#c9a892] ring-1 ring-[#c9a892]/40 dark:ring-[#c9a892]/30"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-blue-700 dark:text-blue-300"
               : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}>
           <Inbox size={15} /> Bandeja del día
@@ -1196,7 +1196,7 @@ export function AltasVivosView() {
         <button onClick={() => setVista("buscar")}
           className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             vista === "buscar"
-              ? "bg-white dark:bg-slate-900 shadow-sm text-[#1c1e4d] dark:text-[#c9a892] ring-1 ring-[#c9a892]/40 dark:ring-[#c9a892]/30"
+              ? "bg-white dark:bg-slate-900 shadow-sm text-blue-700 dark:text-blue-300"
               : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
           }`}>
           <History size={15} /> Buscar anteriores
@@ -1291,7 +1291,7 @@ export function AltasVivosView() {
 
           return (
             <div key={n.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 transition-all hover:border-[#c9a892]/60 dark:hover:border-[#c9a892]/35">
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 transition-all hover:border-blue-200 dark:hover:border-blue-900">
               {/* Top row */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1333,7 +1333,7 @@ export function AltasVivosView() {
                   </p>
                 )}
                 {n.estado === "procesada" && n.procesadoPorNombre && (
-                  <p className="text-xs text-[#1c1e4d] dark:text-[#c9a892] font-medium">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">
                     Alta efectiva por {nombreEsdomedVisible(mostrarNombresEsdomed, n.procesadoPorNombre)} · {formatFecha(n.procesadoEn)}
                   </p>
                 )}
@@ -1421,7 +1421,7 @@ export function AltasVivosView() {
                       </button>
                       <button
                         onClick={() => setObservandoId(n.id!)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1c1e4d] dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors"
                       >
                         <MessageSquareWarning size={13} />
                         {n.estado === "observada" ? "Cambiar observacion" : "Marcar con observacion"}
@@ -1495,7 +1495,7 @@ export function AltasVivosView() {
                   <button
                     type="button"
                     onClick={() => setObservandoId(n.id!)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1c1e4d] dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-lg transition-colors"
                   >
                     <MessageSquareWarning size={13} />
                     Dejar en espera con observación
