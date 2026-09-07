@@ -331,10 +331,7 @@ service cloud.firestore {
                     if isComiteOPsicologia()
                     && request.resource.data.revisadoPor == uid()
                     && request.resource.data.revisadoEn == request.time
-                    && request.resource.data.resultado in ['corresponde', 'no_corresponde']
-                    // Origen del paciente (opcional; ausente = ingreso hospitalario).
-                    && (!('origenPaciente' in request.resource.data)
-                        || request.resource.data.origenPaciente in ['ingreso', 'emergencia']);
+                    && request.resource.data.resultado in ['corresponde', 'no_corresponde'];
       allow delete: if isAdmin();
     }
 

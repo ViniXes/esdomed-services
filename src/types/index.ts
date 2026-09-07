@@ -403,13 +403,11 @@ export interface NotificacionConapinaFgr {
 export type ResultadoRevisionLesion = "corresponde" | "no_corresponde";
 
 export interface RevisionLesion {
-  id?: string;              // = pacienteId (docId del ingreso) o el id de la atención de emergencia
-  pacienteId?: string | null; // docId del ingreso (null si el caso viene de emergencia)
-  origenPaciente?: OrigenPacienteLesion;
-  atencionEmergenciaId?: string | null; // docId en /atenciones_emergencia (si origenPaciente = emergencia)
+  id?: string;              // = pacienteId (docId del ingreso)
+  pacienteId: string;
   expediente: string;
   pacienteNombre: string;
-  fechaIngreso: Date;       // fecha del ingreso o de la atención; se copia para poder consultar por rango
+  fechaIngreso: Date;       // se copia para poder consultar por rango
   resultado: ResultadoRevisionLesion;
   categoria?: TipoCasoConapinaFgr | null;  // solo si corresponde
   observacion?: string | null;

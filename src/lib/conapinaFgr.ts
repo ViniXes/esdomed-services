@@ -2,9 +2,8 @@ import type {
   EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, InstanciaAviso,
   CondicionPacienteAviso, NotificacionConapinaFgr, DiagnosticoCIE,
   EstadoSolicitudNotificacion, OrigenSolicitudNotificacion,
-  AtencionEmergencia, OrigenPacienteLesion,
+  OrigenPacienteLesion,
 } from "@/types";
-import { condicionEgreso } from "@/lib/emergencia/helpers";
 
 // Catálogo y reglas de validación del módulo Lesiones intencionales
 // (avisos CONAPINA / FGR). Vive aparte de los tipos porque lo comparten las
@@ -212,11 +211,7 @@ export const CAUSA_EXTERNA_AVISO: Record<TipoCasoConapinaFgr, string> = {
 // demás consecuencias de causas externas) y luego el comité investiga caso por
 // caso si el hecho fue accidente, violencia o autoinfligido. Los que no lo sean
 // se marcan "no corresponde" y salen de la lista.
-// "fallecido_emergencia" no sale de un código CIE-10: es la fuente aparte de
-// quienes murieron en emergencia sin ingresar (ver analizarAtencionEmergencia).
-export type GrupoLesion =
-  | "maltrato" | "causa_externa" | "traumatismo" | "intoxicacion" | "otras_consecuencias"
-  | "fallecido_emergencia";
+export type GrupoLesion = "maltrato" | "causa_externa" | "traumatismo" | "intoxicacion" | "otras_consecuencias";
 
 export const GRUPO_LESION_LABEL: Record<GrupoLesion, string> = {
   maltrato: "Maltrato / denuncia",
@@ -224,11 +219,10 @@ export const GRUPO_LESION_LABEL: Record<GrupoLesion, string> = {
   traumatismo: "Traumatismo",
   intoxicacion: "Intoxicación / envenenamiento",
   otras_consecuencias: "Otras consecuencias",
-  fallecido_emergencia: "Fallecido en emergencia",
 };
 
 export const GRUPOS_LESION: GrupoLesion[] = [
-  "maltrato", "causa_externa", "traumatismo", "intoxicacion", "otras_consecuencias", "fallecido_emergencia",
+  "maltrato", "causa_externa", "traumatismo", "intoxicacion", "otras_consecuencias",
 ];
 
 const normalizarCie = (codigo?: string) => (codigo ?? "").replace(/\./g, "").toUpperCase();
@@ -287,47 +281,6 @@ export function analizarIngreso(p: {
     if (grupo) return { grupo, codigo: d!.codigo, descripcion: d!.descripcion, origen, sugerida };
   }
   return null;
-}
-
-// ── Fallecidos en emergencia ────────────────────────────────────────────────
-// Quien muere en emergencia sin llegar a ingresar no existe en `pacientes`, así
-// que el tamizaje por CIE-10 nunca lo veía. Son pocos (4 entre agosto y
-// septiembre de 2026) y el reporte del SIS trae el diagnóstico como TEXTO sin
-// código, de modo que aquí no se clasifica: cada fallecido sin ingreso entra
-// como candidato y el comité decide. Las palabras clave solo SUGIEREN el tipo.
-const PALABRAS_CASO: { tipo: TipoCasoConapinaFgr; re: RegExp }[] = [
-  // "choque" a secas NO: en el diagnóstico casi siempre es shock (séptico,
-  // hipovolémico…), no una colisión.
-  { tipo: "accidente_transito", re: /atropell|transito|motocicl|colision|choque (de |contra |entre |frontal|vehic|automov)|vehicul|automovil|volcamiento|peaton|accidente de tran/ },
-  { tipo: "intento_suicida", re: /suicid|autoinflig|autolesi|ahorc|intoxicacion voluntaria/ },
-  { tipo: "violencia", re: /arma de fuego|arma blanca|proyectil|\bpafb?\b|herida por arma|agresi|golpead|maltrato|violencia|abuso|estrangul|linchamiento|apunal|punzocortante|machet|homicid|corto ?contundente|corto ?punzante/ },
-];
-
-const normalizarTexto = (s?: string) =>
-  (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-
-export function sugerirCasoPorTexto(texto?: string): TipoCasoConapinaFgr | null {
-  const t = normalizarTexto(texto);
-  if (!t) return null;
-  for (const { tipo, re } of PALABRAS_CASO) if (re.test(t)) return tipo;
-  return null;
-}
-
-export function analizarAtencionEmergencia(
-  a: Pick<AtencionEmergencia, "diagnostico" | "tipoEgreso" | "ingresoHospitalizacion">,
-): AnalisisIngreso | null {
-  // Si ingresó a hospitalización ya existe como ingreso en `pacientes` y lo
-  // cubre el tamizaje por CIE-10: no se duplica.
-  if (a.ingresoHospitalizacion === "si") return null;
-  if (condicionEgreso(a.tipoEgreso) !== "fallecido") return null;
-  const descripcion = (a.diagnostico ?? "").trim();
-  return {
-    grupo: "fallecido_emergencia",
-    codigo: "",
-    descripcion: descripcion || "Sin diagnóstico registrado en el reporte",
-    origen: "Diagnóstico de emergencia",
-    sugerida: sugerirCasoPorTexto(descripcion),
-  };
 }
 
 export const RESULTADO_REVISION_LABEL = {
