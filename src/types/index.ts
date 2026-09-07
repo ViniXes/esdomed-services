@@ -224,6 +224,25 @@ export interface ConfigIndicadoresCuidadosCriticos {
 
 export type EstadoTraslado = "pendiente" | "en_revision" | "aprobado" | "rechazado";
 
+// Reversión administrativa de una aprobación dada por error (solo rol admin):
+// el traslado vuelve a "rechazado" (o a "pendiente" para reprocesarlo) y se
+// deshace lo que la aprobación propagó a pacientes y fichas UCI/UCIN.
+// Lo escribe POST /api/esdomed/traslados/{id}/revertir con firebase-admin.
+export interface ReversionTraslado {
+  estadoAnterior: "aprobado";
+  estadoNuevo: "rechazado" | "pendiente";
+  motivo: string;
+  aprobadoPorId?: string | null;      // quién había aprobado por error
+  aprobadoPorNombre?: string | null;
+  aprobadoEn?: Date | null;
+  porId: string;                      // admin que revirtió
+  porNombre: string;
+  en: Date;
+  pacientesRestaurados: { expediente: string; pacienteId: string; ubicacionRestaurada: boolean }[];
+  fichasReabiertas: string[];
+  fichasNoReabiertas: { id: string; motivo: string }[];
+}
+
 export interface SolicitudTraslado {
   id?: string;
   medicoId: string;
@@ -251,6 +270,7 @@ export interface SolicitudTraslado {
   revisadoPorNombre?: string;
   notasEsdomed?: string;
   respuestaMedico?: string;   // respuesta del médico a una observación (estado en_revision)
+  reversion?: ReversionTraslado; // presente si un admin revirtió una aprobación errónea
 }
 
 // ============================================================================
