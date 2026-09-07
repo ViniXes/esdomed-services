@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
   const correo = texto(body.correo, 120).toLowerCase();
   const telefono = String(body.telefono ?? "").replace(/\D/g, "").slice(0, 8);
   const cargo = texto(body.cargo, 40) as CargoUsuarioSis;
+  const esMedicoInterno = cargo === "medico_interno";
   const numeroJunta = texto(body.numeroJunta, 50).toUpperCase();
   const especialidad = texto(body.especialidad, 100);
   const esResidente = body.esResidente === "si" ? "si" : body.esResidente === "no" ? "no" : "";
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
   if (!/^\d{8}$/.test(telefono)) return NextResponse.json({ error: "El teléfono debe tener 8 dígitos." }, { status: 400 });
   if (!cargosValidos.has(cargo)) return NextResponse.json({ error: "Selecciona el cargo o función." }, { status: 400 });
   if (!numeroJunta) return NextResponse.json({ error: "El número de junta o registro profesional es obligatorio." }, { status: 400 });
-  if (!especialidadesValidas.has(especialidad)) return NextResponse.json({ error: "Selecciona la especialidad solicitada." }, { status: 400 });
+  if (!esMedicoInterno && !especialidadesValidas.has(especialidad)) return NextResponse.json({ error: "Selecciona la especialidad solicitada." }, { status: 400 });
   if (!esResidente || !yaTuvoUsuario) return NextResponse.json({ error: "Completa las preguntas de usuario previo y residencia." }, { status: 400 });
   if (!servicio) return NextResponse.json({ error: "Indica el servicio al que será asignado." }, { status: 400 });
   if (!(await obtenerServiciosHabilitados()).has(servicio)) {
@@ -127,7 +128,9 @@ export async function POST(req: NextRequest) {
     cargo,
     numeroJunta: numeroJunta || null,
     yaTuvoUsuario,
-    especialidad,
+    // El médico interno se encuentra en formación; el servicio es su única
+    // asignación clínica y no debe enviarse una especialidad a SIS.
+    especialidad: esMedicoInterno ? "" : especialidad,
     esResidente,
     servicio,
     autorizadoPor,
