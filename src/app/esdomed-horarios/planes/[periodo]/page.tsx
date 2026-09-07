@@ -41,6 +41,7 @@ import {
 import {
   configPersonalPlan,
   esAdministrativoPlan,
+  normalizarCodigoMarcacion,
   normalizarMetadatosFilaPlan,
 } from "@/lib/esdomed/catalogo-plan";
 import {
@@ -62,12 +63,21 @@ import {
   RefreshCw,
   Save,
   Trash2,
+  UserMinus,
   Users,
   XCircle,
   AlertTriangle,
 } from "lucide-react";
 
 type RosterUser = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;
+
+// Personal ESDOMED dado de baja (UserProfile.activo === false). No entra al
+// roster, pero sus filas ya guardadas se conservan y se etiquetan en el editor.
+interface BajaRoster {
+  uid: string;
+  codigoMarcacion: string;
+  fecha: string; // "YYYY-MM-DD"
+}
 
 interface BorradorPlanLocal {
   periodo: string;
@@ -106,6 +116,10 @@ export default function EditorPlanPage() {
   const [metaHorasOperativas, setMetaHorasOperativas] = useState<number | "">("");
   const [creadoMeta, setCreadoMeta] = useState<Pick<PlanTrabajo, "creadoEn" | "creadoPorId" | "creadoPorNombre"> | null>(null);
   const [prevPlanData, setPrevPlanData] = useState<PlanTrabajo | null>(null);
+  // Roster vigente y dados de baja de la última carga (para etiquetar filas
+  // cuya persona ya no está vigente y ofrecer "Quitar del plan").
+  const [rosterVigente, setRosterVigente] = useState<RosterUser[]>([]);
+  const [bajas, setBajas] = useState<BajaRoster[]>([]);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
   const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void } | null>(null);
@@ -181,11 +195,22 @@ export default function EditorPlanPage() {
     const snap = await getDocs(
       query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])),
     );
-    const lista = snap.docs
-      .filter((d) => {
-        const data = d.data();
-        return data.role !== "admin" || Boolean(data.codigoMarcacion);
-      })
+    const personal = snap.docs.filter((d) => {
+      const data = d.data();
+      return data.role !== "admin" || Boolean(data.codigoMarcacion);
+    });
+    // Los dados de baja (activo === false) no forman parte del roster: no se
+    // agregan a ningún mes ni se heredan a meses nuevos. Sus filas ya
+    // guardadas se conservan (ver sincronizarFilas → conservarFilasSinUsuario).
+    const dadosDeBaja: BajaRoster[] = personal
+      .filter((d) => d.data().activo === false)
+      .map((d) => ({
+        uid: d.id,
+        codigoMarcacion: String(d.data().codigoMarcacion ?? ""),
+        fecha: String(d.data().baja?.fecha ?? ""),
+      }));
+    const lista = personal
+      .filter((d) => d.data().activo !== false)
       .map((d) => {
         const data = d.data();
         return {
@@ -196,8 +221,32 @@ export default function EditorPlanPage() {
         } as RosterUser;
       })
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    setRosterVigente(lista);
+    setBajas(dadosDeBaja);
     return lista;
   }, []);
+
+  const vigentesPorUid = useMemo(() => new Set(rosterVigente.map((u) => u.uid)), [rosterVigente]);
+  const vigentesPorCodigo = useMemo(
+    () => new Set(rosterVigente.map((u) => normalizarCodigoMarcacion(u.codigoMarcacion)).filter(Boolean)),
+    [rosterVigente],
+  );
+
+  /** Baja registrada de la persona de una fila (por uid o código), si la hay. */
+  const bajaDeFila = (fila: FilaPlanTrabajo): BajaRoster | undefined => {
+    const codigo = normalizarCodigoMarcacion(fila.codigoMarcacion);
+    return bajas.find(
+      (b) => (fila.uid && b.uid === fila.uid) || (codigo !== "" && normalizarCodigoMarcacion(b.codigoMarcacion) === codigo),
+    );
+  };
+
+  /** True si la fila no corresponde a nadie del roster vigente (baja o usuario eliminado). */
+  const filaSinUsuarioVigente = (fila: FilaPlanTrabajo): boolean => {
+    const codigo = normalizarCodigoMarcacion(fila.codigoMarcacion);
+    if (fila.uid && vigentesPorUid.has(fila.uid)) return false;
+    if (codigo !== "" && vigentesPorCodigo.has(codigo)) return false;
+    return true;
+  };
 
   useEffect(() => {
     (async () => {
@@ -232,8 +281,9 @@ export default function EditorPlanPage() {
             creadoPorId: plan.creadoPorId,
             creadoPorNombre: plan.creadoPorNombre,
           });
-          // Mezcla con el roster para incluir personal nuevo, conservando lo guardado.
-          filasBase = sincronizarFilas(lista, plan.filas ?? [], dias.length);
+          // Mezcla con el roster para incluir personal nuevo, conservando lo guardado
+          // — incluidas las filas de quien ya no está vigente (baja): son historial.
+          filasBase = sincronizarFilas(lista, plan.filas ?? [], dias.length, { conservarFilasSinUsuario: true });
         } else {
           setCreadoMeta(null);
           const planAnterior = prevSnap.exists() ? prevSnap.data() as PlanTrabajo : null;
@@ -248,7 +298,7 @@ export default function EditorPlanPage() {
           const raw = window.localStorage.getItem(borradorKey);
           const borrador = raw ? JSON.parse(raw) as BorradorPlanLocal : null;
           if (borrador?.periodo === periodo && Array.isArray(borrador.filas)) {
-            filasBase = sincronizarFilas(lista, borrador.filas, dias.length);
+            filasBase = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
             numeroHorasBase = borrador.numeroHoras ?? numeroHorasBase;
             metaAdminBase = borrador.metaHorasAdmin ?? metaAdminBase;
             metaOperativaBase = borrador.metaHorasOperativas ?? metaOperativaBase;
@@ -403,6 +453,15 @@ export default function EditorPlanPage() {
     setGuardado(false);
   };
 
+  // Quita la fila de ESTE mes (solo se ofrece para personas sin usuario vigente:
+  // dadas de baja o eliminadas). Los demás meses no se tocan; hay que guardar.
+  const quitarFila = (filaIdx: number) => {
+    registrarUndo();
+    setFilas((prev) => prev.filter((_, i) => i !== filaIdx));
+    setPicker(null);
+    setGuardado(false);
+  };
+
   // Mueve una fila arriba/abajo dentro de su mismo grupo. Renumera `orden`
   // según el orden visible actual y luego intercambia con el vecino.
   const moverFila = (filaIdx: number, dir: -1 | 1) => {
@@ -452,8 +511,10 @@ export default function EditorPlanPage() {
   const sincronizar = async () => {
     const lista = await cargarRoster();
     registrarUndo();
-    setFilas((prev) => sincronizarFilas(lista, prev, dias.length));
-    setModalState({ tipo: "exito", titulo: "Sincronización Completa", mensaje: "El listado de personal se ha actualizado correctamente con los usuarios ESDOMED vigentes." });
+    // Agrega personal nuevo y conserva las filas ya existentes; a quien fue
+    // dado de baja se le quita con "Quitar del plan", nunca por sincronizar.
+    setFilas((prev) => sincronizarFilas(lista, prev, dias.length, { conservarFilasSinUsuario: true }));
+    setModalState({ tipo: "exito", titulo: "Sincronización Completa", mensaje: "El listado de personal se ha actualizado con los usuarios ESDOMED vigentes. Las filas de personal dado de baja se conservan; puedes quitarlas con el botón de cada fila." });
     setGuardado(false);
   };
 
@@ -897,6 +958,10 @@ export default function EditorPlanPage() {
                 {(() => {
                   let grupoPrev: string | null = "__init__";
                   return filasOrdenadas.map(({ f: fila, i: filaIdx }, displayIdx) => {
+                    // Persona sin usuario vigente: etiqueta + opción de quitar la fila del mes.
+                    const sinUsuarioVigente = filaSinUsuarioVigente(fila);
+                    const baja = sinUsuarioVigente ? bajaDeFila(fila) : undefined;
+                    const fechaBaja = baja?.fecha ? baja.fecha.split("-").reverse().join("/") : "";
                     const total = totalHorasFila(fila.asignaciones);
                     const vac = contarMarca(fila.asignaciones, "VAC");
                     const grupoActual = fila.grupo?.trim() || "";
@@ -945,6 +1010,20 @@ export default function EditorPlanPage() {
                             <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-800 dark:text-slate-100 leading-tight">
                               {estiloGrupo && <span className={`h-2 w-2 shrink-0 rounded-full ${estiloGrupo.dot}`} />}
                               <span className="truncate" title={fila.nombre}>{fila.nombre}</span>
+                              {sinUsuarioVigente && (
+                                <span
+                                  title={baja
+                                    ? `Dado de baja${fechaBaja ? ` el ${fechaBaja}` : ""}. La fila se conserva como historial de este mes; no pasará a meses nuevos.`
+                                    : "Sin usuario vigente en el sistema. La fila se conserva como historial de este mes; no pasará a meses nuevos."}
+                                  className={`shrink-0 rounded-full border px-1.5 py-px text-[9px] font-bold uppercase tracking-wide ${
+                                    baja
+                                      ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300"
+                                      : "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                  }`}
+                                >
+                                  {baja ? "Baja" : "Sin usuario"}
+                                </span>
+                              )}
                               <span className="ml-auto shrink-0 flex items-center">
                                 <button
                                   onClick={() => moverFila(filaIdx, -1)}
@@ -975,6 +1054,21 @@ export default function EditorPlanPage() {
                                 >
                                   <Trash2 size={13} />
                                 </button>
+                                {sinUsuarioVigente && (
+                                  <button
+                                    onClick={() => setConfirmState({
+                                      tipo: "peligro",
+                                      titulo: "Quitar del plan",
+                                      mensaje: `${fila.nombre} ${baja ? `fue dado de baja${fechaBaja ? ` el ${fechaBaja}` : ""}` : "ya no tiene usuario vigente"}.\n\nSe quitará su fila de ${labelPeriodo(periodo)} únicamente; los demás meses no cambian. Deberás guardar el plan para que el cambio sea permanente. ¿Continuar?`,
+                                      textoConfirmar: "Sí, quitar",
+                                      onConfirm: () => quitarFila(filaIdx),
+                                    })}
+                                    title={`Quitar a ${fila.nombre} del plan de ${labelPeriodo(periodo)}`}
+                                    className="p-1 rounded-md text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/40 transition-colors"
+                                  >
+                                    <UserMinus size={13} />
+                                  </button>
+                                )}
                               </span>
                             </p>
                             <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>

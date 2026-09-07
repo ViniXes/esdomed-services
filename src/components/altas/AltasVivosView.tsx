@@ -865,7 +865,12 @@ export function AltasVivosView() {
     if (!isEsdomed) return;
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
       .then(s => setPersonalEsdomed(
-        s.docs.map(d => d.data().nombre as string).filter(Boolean).sort((a, b) => a.localeCompare(b))
+        s.docs
+          .map(d => d.data())
+          .filter(d => d.activo !== false) // solo personal vigente (dados de baja fuera)
+          .map(d => d.nombre as string)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
       ))
       .catch(() => setPersonalEsdomed([]));
   }, [isEsdomed]);

@@ -43,14 +43,15 @@ function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos
   return value === "uci" || value === "ucin" || value === "uci_ucin" || value === "jefe_uci_ucin";
 }
 
-async function getCaller(req: NextRequest): Promise<{ uid: string; role: string } | null> {
+async function getCaller(req: NextRequest): Promise<{ uid: string; role: string; nombre: string } | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const snap = await adminDb.collection("usuarios").doc(decoded.uid).get();
     const role = snap.data()?.role;
-    return typeof role === "string" ? { uid: decoded.uid, role } : null;
+    const nombre = String(snap.data()?.nombre ?? "").trim();
+    return typeof role === "string" ? { uid: decoded.uid, role, nombre } : null;
   } catch {
     return null;
   }
@@ -70,6 +71,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
 
   if (body.resetPassword === true) {
     await adminAuth.updateUser(uid, { password: DEFAULT_TEST_PASSWORD });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Dar de baja: deshabilita la cuenta en Auth (bloquea el ingreso y expira las
+  // sesiones abiertas) y marca el perfil. NO borra el documento ni su historial
+  // — a diferencia de DELETE, que hace desaparecer a la persona de cualquier
+  // plan de trabajo que se vuelva a guardar. Ver UserProfile.baja en src/types.
+  if (body.baja === true) {
+    if (caller?.uid === uid) {
+      return NextResponse.json({ error: "No puedes darte de baja a ti mismo" }, { status: 400 });
+    }
+    const fecha = String(body.fechaBaja ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return NextResponse.json({ error: "La fecha de baja es requerida" }, { status: 400 });
+    }
+    const motivo = String(body.motivoBaja ?? "").trim().slice(0, 300);
+    await adminAuth.updateUser(uid, { disabled: true });
+    await adminAuth.revokeRefreshTokens(uid);
+    await adminDb.collection("usuarios").doc(uid).update({
+      activo: false,
+      baja: {
+        fecha,
+        ...(motivo ? { motivo } : {}),
+        registradaPorId: caller!.uid,
+        registradaPorNombre: caller!.nombre,
+        registradaEn: FieldValue.serverTimestamp(),
+      },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Reactivar: revierte la baja (vuelve a habilitar la cuenta y a aparecer en
+  // los listados de personal vigente).
+  if (body.reactivar === true) {
+    await adminAuth.updateUser(uid, { disabled: false });
+    await adminDb.collection("usuarios").doc(uid).update({
+      activo: true,
+      baja: FieldValue.delete(),
+    });
     return NextResponse.json({ ok: true });
   }
 

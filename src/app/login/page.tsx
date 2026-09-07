@@ -28,16 +28,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [avisoInactividad, setAvisoInactividad] = useState(false);
+  const [avisoBaja, setAvisoBaja] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Aviso de sesión cerrada por inactividad (marca dejada por AuthContext).
+  // Aviso de sesión cerrada por inactividad o por baja del usuario (marca
+  // dejada por AuthContext).
   useEffect(() => {
     try {
-      if (sessionStorage.getItem("esdomed:session_expired") === "inactividad") {
+      const motivo = sessionStorage.getItem("esdomed:session_expired");
+      if (motivo === "inactividad" || motivo === "baja") {
         // Lectura post-montaje de una API del navegador (hidratación-safe); el aviso
         // se fija aquí a propósito.
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setAvisoInactividad(true);
+        if (motivo === "inactividad") setAvisoInactividad(true);
+        else setAvisoBaja(true);
         sessionStorage.removeItem("esdomed:session_expired");
       }
     } catch { /* noop */ }
@@ -60,11 +64,19 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setAvisoInactividad(false);
+    setAvisoBaja(false);
     setSubmitting(true);
     try {
       await login(identifier, password);
-    } catch {
-      setError("Credenciales incorrectas. Verifica tu usuario/correo y contraseña.");
+    } catch (err) {
+      // Cuenta deshabilitada en Auth (usuario dado de baja): mensaje propio,
+      // no "credenciales incorrectas".
+      const code = (err as { code?: string } | null)?.code;
+      setError(
+        code === "auth/user-disabled"
+          ? "Esta cuenta está dada de baja. Si crees que es un error, contacta al administrador del sistema."
+          : "Credenciales incorrectas. Verifica tu usuario/correo y contraseña.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -114,6 +126,13 @@ export default function LoginPage() {
             <div className="mb-4 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2.5">
               <Clock size={15} className="mt-0.5 flex-shrink-0" />
               <span>Tu sesión se cerró por inactividad. Por seguridad, vuelve a iniciar sesión.</span>
+            </div>
+          )}
+
+          {avisoBaja && (
+            <div className="mb-4 flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2.5">
+              <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" />
+              <span>Tu cuenta fue dada de baja y la sesión se cerró. Si crees que es un error, contacta al administrador del sistema.</span>
             </div>
           )}
 

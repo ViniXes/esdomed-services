@@ -28,6 +28,22 @@ export interface UserProfile {
   // se pide además, no en vez de, la primera vez que se entra a /dashboard/simmow.
   // Si la versión no coincide con TERMINOS_SIMMOW_VERSION, se vuelve a pedir.
   terminosSimmowAceptados?: { version: string; fecha: Date };
+  // Baja del usuario (fallecimiento, retiro, traslado a otra institución).
+  // Dar de baja NO borra nada: el documento y todo su historial (filas en planes
+  // de trabajo, trámites, trazabilidad de quién hizo qué) se conservan. Lo que
+  // cambia: la cuenta queda deshabilitada en Firebase Auth (no puede iniciar
+  // sesión), y deja de aparecer en los listados de personal VIGENTE (roster al
+  // crear un mes nuevo del plan, selectores de "quién lo hizo").
+  // Ausente o true = vigente; false = dado de baja. Se escribe solo desde la API
+  // de usuarios (firebase-admin), nunca desde el cliente.
+  activo?: boolean;
+  baja?: {
+    fecha: string;            // fecha efectiva de la baja, "YYYY-MM-DD" (fecha calendario, sin hora)
+    motivo?: string;          // texto libre, ej. "Fallecimiento"
+    registradaPorId: string;
+    registradaPorNombre: string;
+    registradaEn: Date;
+  };
   createdAt: Date;
 }
 

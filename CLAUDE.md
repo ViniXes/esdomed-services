@@ -100,6 +100,18 @@ El SIS escribe los mismos servicios de varias formas (mayúsculas/minúsculas, t
 
 Los usuarios no se registran solos — los crea el administrador directamente en Firebase Auth y luego se crea su documento en `usuarios/{uid}` con el rol correspondiente. No hay flujo de registro público.
 
+### Baja de usuarios (fallecimiento, retiro, traslado) — NUNCA eliminar
+
+Un usuario que deja la institución se **da de baja** desde `/dashboard/usuarios` (botón "Dar de baja", pide fecha efectiva y motivo). La API (`PATCH /api/usuarios/{uid}` con `{ baja: true, fechaBaja, motivoBaja }`) deshabilita la cuenta en Auth, revoca sesiones y escribe `activo: false` + `baja{...}` en el perfil; `{ reactivar: true }` lo revierte. El documento y todo su historial se conservan.
+
+Consecuencias en el resto del sistema (regla para código nuevo: todo listado de personal **vigente** filtra `activo !== false`; los registros históricos guardan el nombre como snapshot y no se tocan):
+
+- Plan de trabajo ESDOMED: el roster excluye a los dados de baja, así que no entran a meses nuevos. Las filas ya guardadas se conservan (`sincronizarFilas(..., { conservarFilasSinUsuario: true })` en el editor) y se etiquetan "Baja"; el asistente puede quitarlas de ese mes con "Quitar del plan".
+- Selectores de "quién lo hizo" (fallecidos, altas) excluyen a los dados de baja.
+- `AuthContext` cierra la sesión de un perfil con `activo === false`; el login muestra un aviso propio para `auth/user-disabled`.
+
+**Eliminar** (`DELETE`) borra Auth + documento y hace desaparecer a la persona de cualquier plan que se vuelva a guardar. Reservarlo para cuentas creadas por error, nunca para personal que trabajó.
+
 ## Design System (estándar vigente — TODA UI nueva lo sigue)
 
 Identidad institucional HNES: paleta en `public/paletanueva_tipografia.png`, logo de trazabilidad en `public/1c-trazabilidad-*.svg` (también es el favicon/ícono PWA).
