@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
+import { TipoBajaUsuario, TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Pencil, Search, Trash2, UserCheck, UserMinus, UserPlus, Users, X } from "lucide-react";
 
 const PAGE_SIZE = 10;
@@ -13,6 +13,7 @@ import {
   TIPO_MEDICO_CRITICO_LABEL,
 } from "@/lib/cuidadosCriticos";
 import { DateField } from "@/components/ui/DateField";
+import { TIPOS_BAJA, TIPO_BAJA_LABEL } from "@/lib/bajaUsuarios";
 
 // "YYYY-MM-DD" → "DD/MM/YYYY" (fecha calendario de la baja, sin hora).
 const fechaCorta = (iso: string) => iso.split("-").reverse().join("/");
@@ -175,6 +176,7 @@ export default function DashboardUsuariosPage() {
   // Modal de baja / reactivación (null = cerrado).
   const [accionBaja, setAccionBaja] = useState<{ tipo: "baja" | "reactivar"; u: UserProfile } | null>(null);
   const [fechaBaja, setFechaBaja] = useState("");
+  const [tipoBaja, setTipoBaja] = useState<TipoBajaUsuario | "">("");
   const [motivoBaja, setMotivoBaja] = useState("");
   const [procesandoBaja, setProcesandoBaja] = useState(false);
 
@@ -357,6 +359,7 @@ export default function DashboardUsuariosPage() {
   // historial (a diferencia de Eliminar); ver UserProfile.baja en src/types.
   const abrirBaja = (tipo: "baja" | "reactivar", u: UserProfile) => {
     setFechaBaja(hoyISO());
+    setTipoBaja("");
     setMotivoBaja("");
     setError("");
     setAccionBaja({ tipo, u });
@@ -365,6 +368,10 @@ export default function DashboardUsuariosPage() {
   const confirmarBaja = async () => {
     if (!accionBaja) return;
     const { tipo, u } = accionBaja;
+    if (tipo === "baja" && !tipoBaja) {
+      setError("Indica el tipo de baja.");
+      return;
+    }
     if (tipo === "baja" && !fechaBaja) {
       setError("Indica la fecha efectiva de la baja.");
       return;
@@ -377,7 +384,7 @@ export default function DashboardUsuariosPage() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(
         tipo === "baja"
-          ? { baja: true, fechaBaja, motivoBaja: motivoBaja.trim() }
+          ? { baja: true, tipoBaja, fechaBaja, motivoBaja: motivoBaja.trim() }
           : { reactivar: true },
       ),
     });
@@ -808,8 +815,10 @@ export default function DashboardUsuariosPage() {
                           <UserMinus size={11} />
                           Baja{u.baja?.fecha ? ` · ${fechaCorta(u.baja.fecha)}` : ""}
                         </span>
-                        {u.baja?.motivo && (
-                          <span className="text-[11px] text-slate-400 dark:text-slate-500">{u.baja.motivo}</span>
+                        {(u.baja?.tipo || u.baja?.motivo) && (
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                            {[u.baja?.tipo ? TIPO_BAJA_LABEL[u.baja.tipo] : "", u.baja?.motivo ?? ""].filter(Boolean).join(" · ")}
+                          </span>
                         )}
                       </p>
                     )}
@@ -1150,13 +1159,33 @@ export default function DashboardUsuariosPage() {
                 </p>
                 {!esBaja && u.baja?.fecha && (
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Baja del {fechaCorta(u.baja.fecha)}{u.baja.motivo ? ` · ${u.baja.motivo}` : ""}
+                    Baja del {fechaCorta(u.baja.fecha)}
+                    {u.baja.tipo ? ` · ${TIPO_BAJA_LABEL[u.baja.tipo]}` : ""}
+                    {u.baja.motivo ? ` · ${u.baja.motivo}` : ""}
                   </p>
                 )}
               </div>
 
               {esBaja && (
                 <div className="space-y-3 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de baja</label>
+                    <select
+                      value={tipoBaja}
+                      onChange={e => setTipoBaja(e.target.value as TipoBajaUsuario | "")}
+                      className={inputCls}
+                    >
+                      <option value="" disabled>Selecciona el tipo...</option>
+                      {TIPOS_BAJA.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    {tipoBaja === "fallecimiento" && (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Aparecerá &ldquo;En memoria&rdquo; con tarjeta dorada en Personal de trabajo.
+                      </p>
+                    )}
+                  </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">Fecha efectiva de la baja</label>
                     <DateField value={fechaBaja} onChange={setFechaBaja} placeholder="Seleccionar fecha" ariaLabel="Fecha efectiva de la baja" />
@@ -1192,7 +1221,7 @@ export default function DashboardUsuariosPage() {
                 <button
                   type="button"
                   onClick={confirmarBaja}
-                  disabled={procesandoBaja || (esBaja && !fechaBaja)}
+                  disabled={procesandoBaja || (esBaja && (!fechaBaja || !tipoBaja))}
                   className={`flex-1 py-2.5 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition-colors ${
                     esBaja ? "bg-rose-600 hover:bg-rose-500" : "bg-emerald-600 hover:bg-emerald-500"
                   }`}

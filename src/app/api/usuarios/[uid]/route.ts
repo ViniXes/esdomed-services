@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { normalizarUsername, usernameValido } from "@/lib/username";
+import { esTipoBaja } from "@/lib/bajaUsuarios";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const DEFAULT_TEST_PASSWORD = "123456";
@@ -87,12 +88,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
       return NextResponse.json({ error: "La fecha de baja es requerida" }, { status: 400 });
     }
     const motivo = String(body.motivoBaja ?? "").trim().slice(0, 300);
+    // Tipo de baja: "fallecimiento" muestra a la persona "En memoria" en
+    // Personal de trabajo. Si no viene uno válido, queda como "otro".
+    const tipo = esTipoBaja(body.tipoBaja) ? body.tipoBaja : "otro";
     await adminAuth.updateUser(uid, { disabled: true });
     await adminAuth.revokeRefreshTokens(uid);
     await adminDb.collection("usuarios").doc(uid).update({
       activo: false,
       baja: {
         fecha,
+        tipo,
         ...(motivo ? { motivo } : {}),
         registradaPorId: caller!.uid,
         registradaPorNombre: caller!.nombre,

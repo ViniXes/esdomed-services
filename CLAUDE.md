@@ -108,6 +108,7 @@ Consecuencias en el resto del sistema (regla para código nuevo: todo listado de
 
 - Plan de trabajo ESDOMED: el roster excluye a los dados de baja, así que no entran a meses nuevos. Las filas ya guardadas se conservan (`sincronizarFilas(..., { conservarFilasSinUsuario: true })` en el editor) y se etiquetan "Baja"; el asistente puede quitarlas de ese mes con "Quitar del plan".
 - Selectores de "quién lo hizo" (fallecidos, altas) excluyen a los dados de baja.
+- **Personal de trabajo** (`/dashboard/personal`, grupo "Mi área"): tarjetas del equipo ESDOMED agrupadas por el grupo del plan del mes. La baja lleva `tipo` (catálogo en `src/lib/bajaUsuarios.ts`); con `tipo: "fallecimiento"` la persona sale primero, "En memoria", con tarjeta dorada y estrella. Ese dorado es una excepción deliberada al design system, concentrada en `TarjetaMemorial`; no reutilizarlo como color decorativo.
 - `AuthContext` cierra la sesión de un perfil con `activo === false`; el login muestra un aviso propio para `auth/user-disabled`.
 
 **Eliminar** (`DELETE`) borra Auth + documento y hace desaparecer a la persona de cualquier plan que se vuelva a guardar. Reservarlo para cuentas creadas por error, nunca para personal que trabajó.

@@ -6,6 +6,10 @@ export const ISBM_ROLES: UserRole[] = ["isbm_tecnico", "isbm_supervisor", "isbm_
 export const esRolIsbm = (role?: UserRole) => !!role && ISBM_ROLES.includes(role);
 export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin" | "jefe_uci_ucin";
 
+// Tipo de baja de un usuario (ver UserProfile.baja). Catálogo y helpers en
+// src/lib/bajaUsuarios.ts.
+export type TipoBajaUsuario = "fallecimiento" | "retiro" | "traslado" | "otro";
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -39,6 +43,7 @@ export interface UserProfile {
   activo?: boolean;
   baja?: {
     fecha: string;            // fecha efectiva de la baja, "YYYY-MM-DD" (fecha calendario, sin hora)
+    tipo?: TipoBajaUsuario;   // catálogo en src/lib/bajaUsuarios.ts; "fallecimiento" => "En memoria" en Personal de trabajo
     motivo?: string;          // texto libre, ej. "Fallecimiento"
     registradaPorId: string;
     registradaPorNombre: string;
