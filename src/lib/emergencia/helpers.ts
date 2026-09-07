@@ -31,6 +31,17 @@ export function condicionEgreso(tipoEgreso?: string): CondicionEgresoEmergencia 
   return "otro";
 }
 
+// Valores crudos de "Tipo de egreso" que significan defunción. Sirven para
+// consultar SOLO los fallecidos con una igualdad (`where("tipoEgreso", "in", …)`,
+// sin índice compuesto) en vez de leer todas las atenciones del periodo (~1,400
+// al mes). Medido en datos reales (2026-09): el SIS escribe "Fallecido"; el
+// resto son variantes defensivas. `condicionEgreso` sigue siendo el criterio
+// final en el cliente.
+export const TIPOS_EGRESO_FALLECIDO = [
+  "Fallecido", "FALLECIDO", "fallecido", "Fallecida", "FALLECIDA",
+  "Muerto", "MUERTO", "Muerta", "Defunción", "DEFUNCIÓN", "Defuncion", "Óbito", "Obito",
+];
+
 export const CONDICION_LABEL: Record<CondicionEgresoEmergencia, string> = {
   vivo:      "Vivo",
   fallecido: "Fallecido",

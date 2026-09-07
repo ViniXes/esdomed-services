@@ -7,6 +7,9 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { BuscadorIngresoPorExpediente } from "@/components/pacientes/BuscadorIngresoPorExpediente";
+import {
+  condicionEgreso, CONDICION_LABEL as CONDICION_EMERGENCIA_LABEL, CONDICION_BADGE as CONDICION_EMERGENCIA_BADGE,
+} from "@/lib/emergencia/helpers";
 import { CIE10Combobox } from "@/components/ui/CIE10Combobox";
 import {
   calcularEdad, toDate, ESTADO_LABEL as ESTADO_PACIENTE_LABEL, ESTADO_BADGE as ESTADO_PACIENTE_BADGE,
@@ -20,10 +23,10 @@ import {
 import {
   ShieldAlert, X, CheckCircle2, AlertCircle, AlertTriangle, BedDouble, Car, HeartCrack,
   ChevronLeft, ArrowLeft, ArrowRight, Info, CalendarDays, Copy, MapPin, UserCheck,
-  Baby, Scale, StickyNote, ClipboardCheck,
+  Baby, Scale, StickyNote, ClipboardCheck, Ambulance,
 } from "lucide-react";
 import type {
-  Paciente, DiagnosticoCIE, TipoCasoConapinaFgr, NotificacionConapinaFgr, InstanciaAviso,
+  Paciente, AtencionEmergencia, DiagnosticoCIE, TipoCasoConapinaFgr, NotificacionConapinaFgr, InstanciaAviso,
 } from "@/types";
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition";
@@ -66,6 +69,12 @@ const formatDia = (ts: unknown) => {
   return d.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const formatFechaHora = (ts: unknown) => {
+  if (!ts) return "—";
+  const d = (ts as { toDate?: () => Date }).toDate?.() ?? new Date(ts as string);
+  return d.toLocaleString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+};
+
 function NuevaNotificacionConapinaFgr() {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -82,6 +91,9 @@ function NuevaNotificacionConapinaFgr() {
   const [notificaciones, setNotificaciones] = useState<NotificacionConapinaFgr[]>([]);
 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
+  // Atención de emergencia sin ingreso (excluyente con `paciente`): el paciente
+  // egresó o falleció en emergencia y no existe en `pacientes`.
+  const [atencion, setAtencion] = useState<AtencionEmergencia | null>(null);
   const [tipoCaso, setTipoCaso] = useState<TipoCasoConapinaFgr | "">("");
   const [fechaHecho, setFechaHecho] = useState("");
   const [diagnostico, setDiagnostico] = useState<DiagnosticoCIE>(SIN_DIAGNOSTICO);
@@ -100,8 +112,17 @@ function NuevaNotificacionConapinaFgr() {
     return onSnapshot(q, s => setNotificaciones(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionConapinaFgr))));
   }, [user]);
 
+  // El caso viene de un ingreso (paciente) o de una atención de emergencia sin
+  // ingreso (atencion); nunca de los dos a la vez.
+  const hayCaso = !!paciente || !!atencion;
+  const expedienteCaso = paciente?.expediente ?? atencion?.expediente ?? "";
+  const nombreCaso = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : (atencion?.pacienteNombre ?? "");
   const fechaNacimiento = paciente ? toDate(paciente.fechaNacimiento) ?? null : null;
-  const edad = calcularEdad(fechaNacimiento);
+  // La atención de emergencia no trae fecha de nacimiento, solo la edad en años del reporte.
+  const edad = paciente
+    ? calcularEdad(fechaNacimiento)
+    : (typeof atencion?.edadAnios === "number" ? atencion.edadAnios : null);
+  const condicionEmergencia = atencion ? condicionEgreso(atencion.tipoEgreso) : null;
 
   // El diagnóstico que ya trae el expediente se OFRECE, nunca se rellena solo.
   const sugerencia = paciente?.ultimoDiagnostico?.codigo
@@ -111,8 +132,12 @@ function NuevaNotificacionConapinaFgr() {
       : null;
   const sugerenciaCausa = paciente?.causaExterna?.codigo ? paciente.causaExterna : null;
 
-  const duplicados = paciente ? duplicadosDeExpediente(notificaciones, paciente.expediente) : [];
-  const duplicadosMismoIngreso = paciente?.id ? duplicados.filter(d => d.pacienteId === paciente.id) : [];
+  const duplicados = expedienteCaso ? duplicadosDeExpediente(notificaciones, expedienteCaso) : [];
+  const duplicadosMismoIngreso = paciente?.id
+    ? duplicados.filter(d => d.pacienteId === paciente.id)
+    : atencion?.id
+      ? duplicados.filter(d => d.atencionEmergenciaId === atencion.id)
+      : [];
 
   const notaLimpia = nota.trim();
   const errorFechaHecho = validarFechaHecho(fechaHecho, fechaNacimiento);
@@ -138,28 +163,31 @@ function NuevaNotificacionConapinaFgr() {
     && avisoLugar.trim().length >= AVISO_LUGAR_MIN;
 
   const puedeAvanzar = () => {
-    if (step === 1) return !!paciente;
+    if (step === 1) return hayCaso;
     if (step === 2) return clasificacionLista;
     if (step === 3) return avisoListo;
-    return !!paciente && clasificacionLista && avisoListo;
+    return hayCaso && clasificacionLista && avisoListo;
   };
 
   const siguiente = () => { if (puedeAvanzar()) setStep(s => Math.min(4, s + 1)); };
   const anterior = () => setStep(s => Math.max(1, s - 1));
 
   const enviar = async () => {
-    if (!user || !profile || !paciente || !tipoCaso || !avisoInstancia || !puedeAvanzar()) return;
+    if (!user || !profile || !hayCaso || !tipoCaso || !avisoInstancia || !puedeAvanzar()) return;
     setSaving(true);
-    let servicio = paciente.servicioActual || paciente.servicioIngreso || "";
-    let cama = paciente.camaActual ?? "";
+    // Un caso de emergencia no tiene servicio ni cama: queda "Emergencia".
+    let servicio = paciente ? (paciente.servicioActual || paciente.servicioIngreso || "") : "Emergencia";
+    let cama = paciente?.camaActual ?? "";
     // Condición del paciente para el acta: no se le pregunta al médico, se toma
-    // del expediente y queda congelada.
-    let condicion: "vivo" | "fallecido" = paciente.estado === "alta_fallecido" ? "fallecido" : "vivo";
+    // del expediente (o de la atención de emergencia) y queda congelada.
+    let condicion: "vivo" | "fallecido" = paciente
+      ? (paciente.estado === "alta_fallecido" ? "fallecido" : "vivo")
+      : (condicionEgreso(atencion?.tipoEgreso) === "fallecido" ? "fallecido" : "vivo");
     try {
-      // Relectura del expediente (1 lectura) para que la ubicación y la condición
-      // queden al día. NO bloquea si el paciente egresó: notificar en diferido es
-      // un caso normal y el buscador lo ofrece a propósito.
-      if (paciente.id) {
+      // Relectura (1 lectura) para que la ubicación y la condición queden al
+      // día. NO bloquea si el paciente egresó: notificar en diferido es un caso
+      // normal y el buscador lo ofrece a propósito.
+      if (paciente?.id) {
         const snap = await getDoc(doc(db, "pacientes", paciente.id));
         const data = snap.data() as Paciente | undefined;
         if (data) {
@@ -167,6 +195,12 @@ function NuevaNotificacionConapinaFgr() {
           cama = data.camaActual ?? "";
           condicion = data.estado === "alta_fallecido" ? "fallecido" : "vivo";
         }
+      } else if (atencion?.id) {
+        // El tipo de egreso de la atención puede completarse en una importación
+        // posterior del reporte de emergencia.
+        const snap = await getDoc(doc(db, "atenciones_emergencia", atencion.id));
+        const data = snap.data() as AtencionEmergencia | undefined;
+        if (data) condicion = condicionEgreso(data.tipoEgreso) === "fallecido" ? "fallecido" : "vivo";
       }
 
       const ref = await addDoc(collection(db, "notificaciones_conapina_fgr"), {
@@ -174,9 +208,12 @@ function NuevaNotificacionConapinaFgr() {
         medicoNombre: profile.nombre,
         medicoServicio: profile.servicios?.join(" / ") || profile.servicio || "",
         medicoJvpm: profile.jvpm || "",
-        pacienteId: paciente.id ?? null,
-        pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
-        pacienteExpediente: paciente.expediente,
+        pacienteId: paciente?.id ?? null,
+        // De dónde sale el paciente: ingreso hospitalario o atención de emergencia sin ingreso.
+        origenPaciente: paciente ? "ingreso" : "emergencia",
+        atencionEmergenciaId: atencion?.id ?? null,
+        pacienteNombre: nombreCaso,
+        pacienteExpediente: expedienteCaso,
         pacienteEdad: edad,
         servicio,
         cama,
@@ -210,7 +247,7 @@ function NuevaNotificacionConapinaFgr() {
         const pend = await getDocs(query(
           collection(db, "solicitudes_notificacion_lesion"),
           where("estado", "==", "pendiente"),
-          where("expediente", "==", paciente.expediente),
+          where("expediente", "==", expedienteCaso),
         ));
         await Promise.all(pend.docs.map(d => updateDoc(doc(db, "solicitudes_notificacion_lesion", d.id), {
           estado: "notificado",
@@ -221,7 +258,7 @@ function NuevaNotificacionConapinaFgr() {
         })));
       } catch { /* la solicitud queda pendiente; no es crítico */ }
 
-      setModal({ type: "success", message: `${paciente.apellidos}, ${paciente.nombres} · Exp. ${paciente.expediente}` });
+      setModal({ type: "success", message: `${nombreCaso} · Exp. ${expedienteCaso}` });
     } catch (err) {
       setModal({ type: "error", message: err instanceof Error ? err.message : "No se pudo enviar la notificación." });
     } finally {
@@ -283,14 +320,22 @@ function NuevaNotificacionConapinaFgr() {
                 ¿De qué paciente se trata?
               </h2>
               <p className="text-sm text-slate-500">
-                Busque por número de expediente. Sirve también si el paciente ya egresó.
+                Busque por número de expediente. Sirve también si el paciente ya egresó o si fue atendido en
+                emergencia sin llegar a ingresar.
               </p>
             </div>
 
-            {!paciente ? (
-              <BuscadorIngresoPorExpediente value={paciente} onSelect={setPaciente} initialTexto={expPrefill} />
+            {!paciente && !atencion ? (
+              <BuscadorIngresoPorExpediente
+                value={paciente}
+                onSelect={p => { setPaciente(p); if (p) setAtencion(null); }}
+                atencionValue={atencion}
+                onSelectAtencion={a => { setAtencion(a); if (a) setPaciente(null); }}
+                initialTexto={expPrefill}
+              />
             ) : (
               <div className="space-y-3">
+                {paciente && (<>
                 <div className="relative overflow-hidden rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-blue-50/80 to-white p-4 dark:border-cyan-800 dark:from-cyan-950/40 dark:via-blue-950/20 dark:to-slate-900">
                   <div className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-cyan-500 to-blue-600" />
                   <div className="flex items-start gap-3 pl-1">
@@ -343,13 +388,64 @@ function NuevaNotificacionConapinaFgr() {
                     </p>
                   </div>
                 )}
+                </>)}
+
+                {atencion && (<>
+                <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 via-orange-50/60 to-white p-4 dark:border-rose-900 dark:from-rose-950/40 dark:via-orange-950/20 dark:to-slate-900">
+                  <div className="absolute bottom-0 left-0 top-0 w-1 bg-gradient-to-b from-rose-500 to-orange-500" />
+                  <div className="flex items-start gap-3 pl-1">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-sm shadow-rose-600/30"><Ambulance size={19} /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-700 dark:text-rose-300">Atención de emergencia seleccionada</p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{atencion.pacienteNombre}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <p className="font-mono text-xs font-medium text-slate-600 dark:text-slate-300">Exp. {atencion.expediente}</p>
+                        {edad !== null && <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{edad} años</p>}
+                        {esMenorDeEdad(edad) && (
+                          <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
+                            Menor de edad
+                          </span>
+                        )}
+                        {condicionEmergencia && (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${CONDICION_EMERGENCIA_BADGE[condicionEmergencia]}`}>
+                            {CONDICION_EMERGENCIA_LABEL[condicionEmergencia]}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        <span className="flex items-center gap-1.5">
+                          <CalendarDays size={13} className="shrink-0 text-slate-400" />
+                          Atendido el {formatFechaHora(atencion.fechaHoraIngreso)}
+                        </span>
+                        <span>· No ingresó a hospitalización</span>
+                      </div>
+                      {atencion.diagnostico && (
+                        <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300">
+                          <span className="text-xs font-medium text-slate-500">Diagnóstico de emergencia: </span>
+                          {atencion.diagnostico}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/40">
+                  <Info size={15} className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <p className="text-xs leading-5 text-blue-800 dark:text-blue-200">
+                    <strong className="font-semibold">Caso de emergencia.</strong> El paciente fue atendido en emergencia
+                    y no llegó a ingresar{condicionEmergencia === "fallecido" ? ": falleció ahí" : ""}. Se notifica igual;
+                    el registro llevará &quot;Emergencia&quot; como servicio y la condición del paciente que consta en la atención.
+                  </p>
+                </div>
+                </>)}
 
                 {edad === null && (
                   <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
                     <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
                     <p className="text-xs leading-5 text-amber-800 dark:text-amber-200">
-                      El expediente no tiene fecha de nacimiento, así que el comité no podrá ver si el paciente es menor
-                      de edad. Puede notificar igual, pero conviene completar el dato en el expediente.
+                      {paciente
+                        ? "El expediente no tiene fecha de nacimiento, así que el comité no podrá ver si el paciente es menor de edad. Puede notificar igual, pero conviene completar el dato en el expediente."
+                        : "La atención de emergencia no trae la edad del paciente, así que el comité no podrá ver si es menor de edad. Puede notificar igual."}
                     </p>
                   </div>
                 )}
@@ -368,8 +464,8 @@ function NuevaNotificacionConapinaFgr() {
                     }`}>
                       <p className="font-semibold">
                         {duplicadosMismoIngreso.length > 0
-                          ? `Ya notificó este mismo ingreso ${duplicadosMismoIngreso.length > 1 ? `${duplicadosMismoIngreso.length} veces` : "antes"}.`
-                          : "Este expediente ya tiene notificaciones suyas, de otro ingreso."}
+                          ? `Ya notificó ${paciente ? "este mismo ingreso" : "esta misma atención de emergencia"} ${duplicadosMismoIngreso.length > 1 ? `${duplicadosMismoIngreso.length} veces` : "antes"}.`
+                          : "Este expediente ya tiene notificaciones suyas, de otro ingreso u otra atención."}
                       </p>
                       <ul className="mt-1 space-y-0.5">
                         {duplicados.slice(0, 3).map(d => (
@@ -383,7 +479,7 @@ function NuevaNotificacionConapinaFgr() {
                   </div>
                 )}
 
-                <button type="button" onClick={() => setPaciente(null)}
+                <button type="button" onClick={() => { setPaciente(null); setAtencion(null); }}
                   className="inline-flex items-center gap-1 text-xs font-medium text-cyan-700 transition-colors hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-100">
                   <ArrowLeft size={13} /> Buscar otro expediente
                 </button>
@@ -507,6 +603,15 @@ function NuevaNotificacionConapinaFgr() {
                 <textarea value={nota} onChange={e => setNota(e.target.value)} rows={4} maxLength={NOTA_MAX + 200}
                   className={`${inputCls} resize-none`}
                   placeholder="Describa el hecho o el diagnóstico que no aparece en el catálogo CIE-10..." />
+                {/* La atención de emergencia trae el diagnóstico como texto sin código:
+                    se OFRECE para la nota, nunca se rellena solo. */}
+                {atencion?.diagnostico && !notaLimpia && (
+                  <button type="button" onClick={() => setNota(atencion.diagnostico ?? "")}
+                    className="mt-2 flex items-start gap-1.5 text-left text-xs text-slate-500 transition-colors hover:text-cyan-700 dark:hover:text-cyan-400">
+                    <Copy size={12} className="mt-0.5 shrink-0 text-slate-400" />
+                    <span>Usar el diagnóstico de emergencia: <span className="italic">{atencion.diagnostico}</span></span>
+                  </button>
+                )}
                 {errorNota && (
                   <p className="mt-1.5 flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
                     <AlertCircle size={13} className="mt-0.5 shrink-0" /> {errorNota}
@@ -623,7 +728,7 @@ function NuevaNotificacionConapinaFgr() {
         )}
 
         {/* Paso 4: revisar y enviar */}
-        {step === 4 && paciente && (
+        {step === 4 && hayCaso && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div>
               <h2 className="mb-2 text-xl font-bold text-slate-900 dark:text-slate-100 font-heading md:text-2xl">
@@ -637,12 +742,13 @@ function NuevaNotificacionConapinaFgr() {
             <div className="overflow-hidden rounded-2xl border border-blue-200 bg-blue-50/60 dark:border-blue-900/60 dark:bg-blue-950/20">
               <div className="border-b border-blue-200/70 px-4 py-3 dark:border-blue-900/50">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">Paciente</p>
-                <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{paciente.apellidos}, {paciente.nombres}</p>
+                <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">{nombreCaso}</p>
                 <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
-                  <span className="font-mono">Exp. {paciente.expediente}</span>
+                  <span className="font-mono">Exp. {expedienteCaso}</span>
                   {edad !== null ? ` · ${edad} años` : ""}
-                  {` · ${ESTADO_PACIENTE_LABEL[paciente.estado] ?? paciente.estado}`}
-                  {paciente.estado !== "activo" ? " · notificación diferida" : ""}
+                  {paciente
+                    ? ` · ${ESTADO_PACIENTE_LABEL[paciente.estado] ?? paciente.estado}${paciente.estado !== "activo" ? " · notificación diferida" : ""}`
+                    : ` · Emergencia, sin ingreso${condicionEmergencia ? ` · ${CONDICION_EMERGENCIA_LABEL[condicionEmergencia]}` : ""}`}
                 </p>
               </div>
 

@@ -309,6 +309,14 @@ export type TipoCasoConapinaFgr = "violencia" | "accidente_transito" | "intento_
 export type InstanciaAviso = "conapina" | "fiscalia" | "ambos";
 export type CondicionPacienteAviso = "vivo" | "fallecido";
 
+// De dónde sale el paciente de un caso de lesiones: de un INGRESO hospitalario
+// (colección pacientes) o de una ATENCIÓN DE EMERGENCIA sin ingreso (colección
+// atenciones_emergencia: el paciente egresó o falleció en emergencia sin llegar
+// a un servicio). Ausente = ingreso (registros anteriores al 2026-09-07).
+// Se llama `origenPaciente` en las tres colecciones del módulo (notificación,
+// revisión, solicitud) porque `origen` ya significa otra cosa en la solicitud.
+export type OrigenPacienteLesion = "ingreso" | "emergencia";
+
 // Oficio de egreso escaneado. Lo adjunta el comité al caso ya recibido.
 export interface OficioEgreso {
   url: string;
@@ -324,7 +332,9 @@ export interface NotificacionConapinaFgr {
   medicoServicio: string;
   medicoJvpm?: string;
 
-  pacienteId?: string;            // doc id en /pacientes
+  pacienteId?: string;            // doc id en /pacientes (null si el caso viene de emergencia)
+  origenPaciente?: OrigenPacienteLesion;
+  atencionEmergenciaId?: string | null; // doc id en /atenciones_emergencia (si origenPaciente = emergencia)
   pacienteNombre: string;
   pacienteExpediente: string;
   // Edad al momento de notificar (snapshot). Menor de 18 → también CONAPINA.
@@ -393,11 +403,13 @@ export interface NotificacionConapinaFgr {
 export type ResultadoRevisionLesion = "corresponde" | "no_corresponde";
 
 export interface RevisionLesion {
-  id?: string;              // = pacienteId (docId del ingreso)
-  pacienteId: string;
+  id?: string;              // = pacienteId (docId del ingreso) o el id de la atención de emergencia
+  pacienteId?: string | null; // docId del ingreso (null si el caso viene de emergencia)
+  origenPaciente?: OrigenPacienteLesion;
+  atencionEmergenciaId?: string | null; // docId en /atenciones_emergencia (si origenPaciente = emergencia)
   expediente: string;
   pacienteNombre: string;
-  fechaIngreso: Date;       // se copia para poder consultar por rango
+  fechaIngreso: Date;       // fecha del ingreso o de la atención; se copia para poder consultar por rango
   resultado: ResultadoRevisionLesion;
   categoria?: TipoCasoConapinaFgr | null;  // solo si corresponde
   observacion?: string | null;
@@ -427,7 +439,9 @@ export type OrigenSolicitudNotificacion = "tamizaje" | "manual";
 
 export interface SolicitudNotificacionLesion {
   id?: string;
-  pacienteId?: string | null;     // docId del ingreso en /pacientes
+  pacienteId?: string | null;     // docId del ingreso en /pacientes (null si viene de emergencia)
+  origenPaciente?: OrigenPacienteLesion;
+  atencionEmergenciaId?: string | null; // docId en /atenciones_emergencia (si origenPaciente = emergencia)
   expediente: string;             // la llave del cierre automático
   pacienteNombre: string;
   servicio?: string;              // ubicación al solicitar (snapshot)

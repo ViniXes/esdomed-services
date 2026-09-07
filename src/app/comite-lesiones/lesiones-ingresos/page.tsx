@@ -8,19 +8,20 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { calcularEdad, toDate, ESTADO_LABEL as ESTADO_PACIENTE_LABEL, ESTADO_BADGE } from "@/lib/pacientes/helpers";
+import { CONDICION_BADGE as CONDICION_EMERGENCIA_BADGE, TIPOS_EGRESO_FALLECIDO } from "@/lib/emergencia/helpers";
 import {
-  TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP, analizarIngreso, esMenorDeEdad,
-  GRUPOS_LESION, GRUPO_LESION_LABEL, SOLICITUD_NOTA_MAX,
+  TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP, analizarIngreso, analizarAtencionEmergencia, esMenorDeEdad,
+  GRUPOS_LESION, GRUPO_LESION_LABEL, SOLICITUD_NOTA_MAX, ORIGEN_PACIENTE_LABEL,
   type AnalisisIngreso, type GrupoLesion,
 } from "@/lib/conapinaFgr";
 import {
   ShieldAlert, Car, HeartCrack, Search, X, Download, AlertTriangle, CheckCircle2,
   Activity, ChevronLeft, ChevronRight, Info, Loader2, CircleSlash, ClipboardCheck,
-  RefreshCw, Megaphone, Send, AlertCircle,
+  RefreshCw, Megaphone, Send, AlertCircle, Ambulance,
 } from "lucide-react";
 import type {
-  Paciente, TipoCasoConapinaFgr, NotificacionConapinaFgr, RevisionLesion, ResultadoRevisionLesion,
-  SolicitudNotificacionLesion,
+  Paciente, AtencionEmergencia, OrigenPacienteLesion, TipoCasoConapinaFgr, NotificacionConapinaFgr,
+  RevisionLesion, ResultadoRevisionLesion, SolicitudNotificacionLesion,
 } from "@/types";
 
 const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_suicida: HeartCrack } as const;
@@ -29,6 +30,9 @@ const ICONO_CASO = { violencia: ShieldAlert, accidente_transito: Car, intento_su
 // acotarlo: sin esto un rango de un año podría leer decenas de miles de docs.
 const MAX_INGRESOS = 2000;
 const MAX_AVISOS = 1000;
+// Fallecidos en emergencia: se consultan por igualdad sobre el tipo de egreso
+// (son muy pocos, ~3 al mes) y se acotan por fecha en el cliente.
+const MAX_FALLECIDOS_EMERGENCIA = 500;
 const PAGE_SIZE = 20;
 
 type FiltroRevision = "todos" | "pendiente" | "corresponde" | "no_corresponde" | "sin_aviso";
@@ -49,8 +53,9 @@ type FiltroRevision = "todos" | "pendiente" | "corresponde" | "no_corresponde" |
 //   · rango disjunto             → escaneo completo, reemplaza la caché
 // El botón "Actualizar" fuerza el escaneo completo del rango pedido.
 //
-// Los avisos y las revisiones NO se cachean: son decenas de documentos y de
-// ellos depende el cruce "Falta el aviso", que debe verse siempre al día.
+// Los avisos, las revisiones y los fallecidos en emergencia NO se cachean: son
+// decenas de documentos y de ellos depende el cruce "Falta el aviso", que debe
+// verse siempre al día.
 interface Candidato {
   paciente: Paciente;
   analisis: AnalisisIngreso;
@@ -78,15 +83,63 @@ const finDia = (iso: string) => new Date(iso + "T23:59:59.999");
 const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap";
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-interface Fila {
-  paciente: Paciente;
+// Una fila del tamizaje. Viene de un INGRESO hospitalario (candidato por
+// diagnóstico CIE-10) o de una ATENCIÓN DE EMERGENCIA en la que el paciente
+// falleció sin llegar a ingresar (2026-09-07: antes esos casos no existían en
+// `pacientes` y el tamizaje nunca los veía). Los campos comunes de arriba son
+// los que pintan la tabla y los modales; `id` es también el id de su revisión.
+interface FilaBase {
+  id: string;
+  fuente: OrigenPacienteLesion;
+  paciente?: Paciente;             // fuente = ingreso
+  atencion?: AtencionEmergencia;   // fuente = emergencia
+  expediente: string;
+  nombre: string;
+  edad: number | null;
+  fecha: Date | null;              // fecha de ingreso o de la atención
+  servicio: string;
   analisis: AnalisisIngreso;
+}
+
+interface Fila extends FilaBase {
   tieneAviso: boolean;
   revision: RevisionLesion | null;
-  // Ya hay una solicitud de notificación PENDIENTE para este ingreso: los
+  // Ya hay una solicitud de notificación PENDIENTE para este caso: los
   // médicos ya lo ven en su bandeja, no hay que volver a pedirlo.
   solicitada: boolean;
 }
+
+function filaDeIngreso(c: Candidato): FilaBase {
+  const p = c.paciente;
+  return {
+    id: p.id ?? "",
+    fuente: "ingreso",
+    paciente: p,
+    expediente: p.expediente ?? "",
+    nombre: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
+    edad: calcularEdad(toDate(p.fechaNacimiento)),
+    fecha: toDate(p.fechaIngreso) ?? null,
+    servicio: p.servicioActual || p.servicioIngreso || "",
+    analisis: c.analisis,
+  };
+}
+
+function filaDeAtencion(a: AtencionEmergencia, analisis: AnalisisIngreso): FilaBase {
+  return {
+    id: a.id ?? "",
+    fuente: "emergencia",
+    atencion: a,
+    expediente: a.expediente ?? "",
+    nombre: a.pacienteNombre ?? "",
+    // El reporte de emergencia no trae fecha de nacimiento, solo la edad en años.
+    edad: typeof a.edadAnios === "number" ? a.edadAnios : null,
+    fecha: a.fechaHoraIngreso ?? null,
+    servicio: "Emergencia",
+    analisis,
+  };
+}
+
+const normExp = (exp?: string) => (exp ?? "").trim().toLowerCase();
 
 const primerDiaDelMes = () => {
   const d = new Date();
@@ -113,6 +166,7 @@ export default function LesionesIngresosPage() {
   // ingresos hubo solo en el sub-rango sin volver a leerlos.
   const [alcance, setAlcance] = useState<{
     leidos: number | null; tope: boolean; escaneadoEn: Date; desdeCubierto: string; hastaCubierto: string;
+    fallecidosEmergencia: number;
   } | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,7 +235,7 @@ export default function LesionesIngresosPage() {
         if (fechaHasta > base.hasta) huecos.push(rango(Timestamp.fromDate(finDia(base.hasta)), ">", hasta, "<="));
       }
 
-      const [snapsPacientes, snapAvisos, snapRevisiones, snapSolicitudes] = await Promise.all([
+      const [snapsPacientes, snapAvisos, snapRevisiones, snapSolicitudes, snapFallecidosEmergencia] = await Promise.all([
         Promise.all(huecos.map(q => getDocs(q))),
         // Los avisos del periodo, sin techo superior: el aviso del médico
         // siempre es posterior al ingreso.
@@ -203,6 +257,14 @@ export default function LesionesIngresosPage() {
         getDocs(query(
           collection(db, "solicitudes_notificacion_lesion"),
           where("estado", "==", "pendiente"),
+        )),
+        // Fallecidos en emergencia: igualdad sobre el tipo de egreso (sin índice
+        // compuesto) en vez de leer las ~1,400 atenciones del mes. Se acotan por
+        // fecha y por "no ingresó" en el cliente.
+        getDocs(query(
+          collection(db, "atenciones_emergencia"),
+          where("tipoEgreso", "in", TIPOS_EGRESO_FALLECIDO),
+          limit(MAX_FALLECIDOS_EMERGENCIA),
         )),
       ]);
 
@@ -245,44 +307,73 @@ export default function LesionesIngresosPage() {
         return t >= ini && t <= fin;
       });
 
+      // Fallecidos en emergencia del periodo que NO ingresaron (los que sí
+      // ingresaron ya están como ingreso y los cubre el tamizaje por CIE-10).
+      const fallecidosEmergencia = snapFallecidosEmergencia.docs
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id, ...data,
+            fechaHoraIngreso: toDate(data.fechaHoraIngreso) ?? new Date(0),
+            fechaHoraAltaIngreso: toDate(data.fechaHoraAltaIngreso),
+          } as AtencionEmergencia;
+        })
+        .filter(a => {
+          const t = a.fechaHoraIngreso.getTime();
+          return t >= ini && t <= fin;
+        })
+        .flatMap(a => {
+          const analisis = analizarAtencionEmergencia(a);
+          return analisis ? [filaDeAtencion(a, analisis)] : [];
+        });
+
       // El conteo de ingresos revisados solo aplica si lo escaneado coincide
       // con lo pedido; si la caché cubre más, no se sabe cuántos hubo dentro
       // del sub-rango sin volver a leerlos.
       const exacto = fechaDesde === desdeCubierto && fechaHasta === hastaCubierto;
 
-      // El cruce se hace por INGRESO, no por expediente: un paciente con dos
-      // estancias puede tener aviso de una sola, y marcarlas ambas dejaría
-      // escapar justo el hueco que persigue el comité. Los avisos sin
-      // `pacienteId` (si alguno quedara) caen al cruce viejo por expediente,
-      // para no reclamar un aviso que en realidad sí se dio.
+      // El cruce se hace por INGRESO (o por ATENCIÓN de emergencia), no por
+      // expediente: un paciente con dos estancias puede tener aviso de una sola,
+      // y marcarlas ambas dejaría escapar justo el hueco que persigue el comité.
+      // Los avisos sin referencia (si alguno quedara) caen al cruce viejo por
+      // expediente, para no reclamar un aviso que en realidad sí se dio.
       const avisos = snapAvisos.docs
         .map(d => d.data() as NotificacionConapinaFgr)
         .filter(n => n.estado !== "anulado");
       const conAvisoPorIngreso = new Set(avisos.map(n => n.pacienteId).filter(Boolean));
+      const conAvisoPorAtencion = new Set(avisos.map(n => n.atencionEmergenciaId).filter(Boolean));
       const conAvisoPorExpediente = new Set(
-        avisos.filter(n => !n.pacienteId).map(n => (n.pacienteExpediente ?? "").trim().toLowerCase()),
+        avisos.filter(n => !n.pacienteId && !n.atencionEmergenciaId).map(n => normExp(n.pacienteExpediente)),
       );
-      const tieneAviso = (p: Paciente) =>
-        conAvisoPorIngreso.has(p.id) || conAvisoPorExpediente.has((p.expediente ?? "").trim().toLowerCase());
+      const tieneAviso = (f: FilaBase) =>
+        (f.fuente === "ingreso" && conAvisoPorIngreso.has(f.id))
+        || (f.fuente === "emergencia" && conAvisoPorAtencion.has(f.id))
+        || conAvisoPorExpediente.has(normExp(f.expediente));
       const revisiones = new Map<string, RevisionLesion>(
         snapRevisiones.docs.map(d => [d.id, { id: d.id, ...d.data() } as RevisionLesion]),
       );
 
-      // Mismo criterio que los avisos: por INGRESO cuando la solicitud lo trae,
-      // por expediente si quedara alguna sin pacienteId.
+      // Mismo criterio que los avisos: por INGRESO o ATENCIÓN cuando la
+      // solicitud lo trae, por expediente si quedara alguna sin referencia.
       const solicitudesPend = snapSolicitudes.docs.map(d => d.data() as SolicitudNotificacionLesion);
       const solicitadaPorIngreso = new Set(solicitudesPend.map(s => s.pacienteId).filter(Boolean));
+      const solicitadaPorAtencion = new Set(solicitudesPend.map(s => s.atencionEmergenciaId).filter(Boolean));
       const solicitadaPorExpediente = new Set(
-        solicitudesPend.filter(s => !s.pacienteId).map(s => (s.expediente ?? "").trim().toLowerCase()),
+        solicitudesPend.filter(s => !s.pacienteId && !s.atencionEmergenciaId).map(s => normExp(s.expediente)),
       );
-      const estaSolicitada = (p: Paciente) =>
-        solicitadaPorIngreso.has(p.id) || solicitadaPorExpediente.has((p.expediente ?? "").trim().toLowerCase());
+      const estaSolicitada = (f: FilaBase) =>
+        (f.fuente === "ingreso" && solicitadaPorIngreso.has(f.id))
+        || (f.fuente === "emergencia" && solicitadaPorAtencion.has(f.id))
+        || solicitadaPorExpediente.has(normExp(f.expediente));
 
-      setFilas(visibles.map(c => ({
-        ...c,
-        tieneAviso: tieneAviso(c.paciente),
-        revision: revisiones.get(c.paciente.id ?? "") ?? null,
-        solicitada: estaSolicitada(c.paciente),
+      const basesFilas = [...visibles.map(filaDeIngreso), ...fallecidosEmergencia]
+        .sort((a, b) => (b.fecha?.getTime() ?? 0) - (a.fecha?.getTime() ?? 0));
+
+      setFilas(basesFilas.map(f => ({
+        ...f,
+        tieneAviso: tieneAviso(f),
+        revision: revisiones.get(f.id) ?? null,
+        solicitada: estaSolicitada(f),
       })));
       setAlcance({
         leidos: exacto ? actualizada.leidos : null,
@@ -290,6 +381,7 @@ export default function LesionesIngresosPage() {
         escaneadoEn: actualizada.escaneadoEn,
         desdeCubierto: actualizada.desde,
         hastaCubierto: actualizada.hasta,
+        fallecidosEmergencia: fallecidosEmergencia.length,
       });
       setPage(1);
     } catch (e) {
@@ -331,6 +423,8 @@ export default function LesionesIngresosPage() {
 
   const formatFecha = (d?: Date | null) =>
     d ? d.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  const formatFechaHora = (d?: Date | null) =>
+    d ? d.toLocaleString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
 
   const abrirRevision = (f: Fila) => {
     setRevisando(f);
@@ -343,16 +437,19 @@ export default function LesionesIngresosPage() {
   const puedeGuardar = !!resultado && (resultado === "no_corresponde" || !!categoria);
 
   const guardarRevision = async () => {
-    if (!revisando?.paciente.id || !profile || !puedeGuardar) return;
+    if (!revisando?.id || !profile || !puedeGuardar) return;
     setGuardando(true);
     setErrGuardar(null);
-    const p = revisando.paciente;
+    const f = revisando;
     try {
       const datos = {
-        pacienteId: p.id!,
-        expediente: p.expediente ?? "",
-        pacienteNombre: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
-        fechaIngreso: p.fechaIngreso,
+        pacienteId: f.paciente?.id ?? null,
+        origenPaciente: f.fuente,
+        atencionEmergenciaId: f.atencion?.id ?? null,
+        expediente: f.expediente,
+        pacienteNombre: f.nombre,
+        // Fecha del ingreso o de la atención: es el campo por el que se consulta por rango.
+        fechaIngreso: f.paciente?.fechaIngreso ?? f.atencion?.fechaHoraIngreso ?? f.fecha,
         resultado,
         categoria: resultado === "corresponde" ? categoria : null,
         observacion: observacion.trim() || null,
@@ -361,12 +458,13 @@ export default function LesionesIngresosPage() {
         // Las reglas exigen revisadoEn == request.time: la revisión no se antedata.
         revisadoEn: serverTimestamp(),
       };
-      // El id del documento es el id del INGRESO: revisar dos veces sobrescribe
-      // en vez de duplicar, y dos ingresos del mismo expediente van separados.
-      await setDoc(doc(db, "revisiones_lesiones", p.id!), datos);
+      // El id del documento es el id del INGRESO (o de la ATENCIÓN de
+      // emergencia): revisar dos veces sobrescribe en vez de duplicar, y dos
+      // ingresos del mismo expediente van separados.
+      await setDoc(doc(db, "revisiones_lesiones", f.id), datos);
 
-      const local: RevisionLesion = { ...datos, id: p.id!, revisadoEn: new Date() } as RevisionLesion;
-      setFilas(prev => prev?.map(f => (f.paciente.id === p.id ? { ...f, revision: local } : f)) ?? prev);
+      const local: RevisionLesion = { ...datos, id: f.id, revisadoEn: new Date() } as RevisionLesion;
+      setFilas(prev => prev?.map(x => (x.id === f.id ? { ...x, revision: local } : x)) ?? prev);
       setRevisando(null);
     } catch (e) {
       setErrGuardar(e instanceof Error ? e.message : "No se pudo guardar la revisión.");
@@ -392,15 +490,17 @@ export default function LesionesIngresosPage() {
     }
     setGuardandoSolicitud(true);
     setErrSolicitud(null);
-    const p = solicitando.paciente;
+    const f = solicitando;
     try {
       await addDoc(collection(db, "solicitudes_notificacion_lesion"), {
-        pacienteId: p.id ?? null,
-        expediente: p.expediente ?? "",
-        pacienteNombre: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
-        servicio: p.servicioActual || p.servicioIngreso || "",
+        pacienteId: f.paciente?.id ?? null,
+        origenPaciente: f.fuente,
+        atencionEmergenciaId: f.atencion?.id ?? null,
+        expediente: f.expediente,
+        pacienteNombre: f.nombre,
+        servicio: f.servicio,
         origen: "tamizaje",
-        categoriaSugerida: solicitando.revision?.categoria ?? solicitando.analisis.sugerida ?? null,
+        categoriaSugerida: f.revision?.categoria ?? f.analisis.sugerida ?? null,
         nota: nota || null,
         estado: "pendiente",
         creadoPor: profile.uid,
@@ -408,7 +508,7 @@ export default function LesionesIngresosPage() {
         // Las reglas exigen creadoEn == request.time: la solicitud no se antedata.
         creadoEn: serverTimestamp(),
       });
-      setFilas(prev => prev?.map(f => (f.paciente.id === p.id ? { ...f, solicitada: true } : f)) ?? prev);
+      setFilas(prev => prev?.map(x => (x.id === f.id ? { ...x, solicitada: true } : x)) ?? prev);
       setSolicitando(null);
     } catch (e) {
       setErrSolicitud(e instanceof Error ? e.message : "No se pudo enviar la solicitud.");
@@ -417,30 +517,33 @@ export default function LesionesIngresosPage() {
     }
   };
 
+  const estadoDeFila = (f: Fila) =>
+    f.fuente === "emergencia"
+      ? "Fallecido en emergencia"
+      : (f.paciente ? (ESTADO_PACIENTE_LABEL[f.paciente.estado] ?? f.paciente.estado ?? "") : "");
+
   const exportar = async () => {
     setExportando(true);
     try {
       const XLSX = await import("xlsx");
-      const rows = displayList.map(f => {
-        const p = f.paciente;
-        return {
-          EXPEDIENTE: p.expediente ?? "",
-          PACIENTE: `${p.apellidos ?? ""}, ${p.nombres ?? ""}`.trim(),
-          EDAD: calcularEdad(toDate(p.fechaNacimiento)) ?? "",
-          "FECHA DE INGRESO": formatFecha(toDate(p.fechaIngreso)),
-          "SERVICIO": p.servicioActual || p.servicioIngreso || "",
-          "GRUPO CIE-10": GRUPO_LESION_LABEL[f.analisis.grupo],
-          "CODIGO CIE-10": f.analisis.codigo,
-          DIAGNOSTICO: f.analisis.descripcion,
-          "TOMADO DE": f.analisis.origen,
-          "ESTADO DEL PACIENTE": ESTADO_PACIENTE_LABEL[p.estado] ?? p.estado ?? "",
-          REVISION: f.revision ? (f.revision.resultado === "corresponde" ? "Corresponde" : "No corresponde") : "Pendiente",
-          "TIPO DE CASO": f.revision?.categoria ? TIPO_CASO_LABEL[f.revision.categoria] : "",
-          "OBSERVACION": f.revision?.observacion ?? "",
-          "REVISADO POR": f.revision?.revisadoPorNombre ?? "",
-          "TIENE AVISO CONAPINA/FGR": f.tieneAviso ? "SI" : "NO",
-        };
-      });
+      const rows = displayList.map(f => ({
+        EXPEDIENTE: f.expediente,
+        PACIENTE: f.nombre,
+        EDAD: f.edad ?? "",
+        FUENTE: ORIGEN_PACIENTE_LABEL[f.fuente],
+        "FECHA DE INGRESO": formatFecha(f.fecha),
+        "SERVICIO": f.servicio,
+        "GRUPO": GRUPO_LESION_LABEL[f.analisis.grupo],
+        "CODIGO CIE-10": f.analisis.codigo,
+        DIAGNOSTICO: f.analisis.descripcion,
+        "TOMADO DE": f.analisis.origen,
+        "ESTADO DEL PACIENTE": estadoDeFila(f),
+        REVISION: f.revision ? (f.revision.resultado === "corresponde" ? "Corresponde" : "No corresponde") : "Pendiente",
+        "TIPO DE CASO": f.revision?.categoria ? TIPO_CASO_LABEL[f.revision.categoria] : "",
+        "OBSERVACION": f.revision?.observacion ?? "",
+        "REVISADO POR": f.revision?.revisadoPorNombre ?? "",
+        "TIENE AVISO CONAPINA/FGR": f.tieneAviso ? "SI" : "NO",
+      }));
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Ingresos lesiones");
@@ -468,7 +571,7 @@ export default function LesionesIngresosPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Ingresos por lesiones intencionales</h1>
-          <p className="mt-0.5 text-xs text-slate-500">Tamizaje de expedientes con diagnóstico de lesión, para revisar caso por caso</p>
+          <p className="mt-0.5 text-xs text-slate-500">Tamizaje de expedientes con diagnóstico de lesión y fallecidos en emergencia, para revisar caso por caso</p>
         </div>
       </div>
 
@@ -479,7 +582,8 @@ export default function LesionesIngresosPage() {
           <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Buscar ingresos con lesión</h2>
           <p className="mt-0.5 text-xs text-slate-500">
             La lista es de <strong>candidatos</strong>: todo ingreso con diagnóstico de traumatismo, intoxicación o causa
-            externa. Revise cada uno para decidir si el hecho fue accidente de tránsito, violencia o autoinfligido.
+            externa, más quienes fallecieron en emergencia sin llegar a ingresar. Revise cada uno para decidir si el
+            hecho fue accidente de tránsito, violencia o autoinfligido.
           </p>
         </div>
 
@@ -559,7 +663,7 @@ export default function LesionesIngresosPage() {
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-400">Grupo CIE-10:</span>
+              <span className="text-xs text-slate-400">Grupo:</span>
               {(["todos", ...GRUPOS_LESION] as const).map(g => (
                 <button key={g} onClick={() => setGrupo(g)}
                   className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -574,13 +678,18 @@ export default function LesionesIngresosPage() {
 
             <p className="mt-3 flex items-start gap-1.5 text-xs leading-5 text-slate-500">
               <Info size={13} className="mt-0.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
-              {alcance && alcance.leidos !== null
-                ? <>Se revisaron {alcance.leidos} ingresos del periodo y {todas.length} tienen diagnóstico de lesión.{" "}</>
-                : <>{todas.length} ingresos del periodo tienen diagnóstico de lesión.{" "}</>}
-              La causa externa se define hasta el egreso, por eso el tamizaje va por el diagnóstico y hay que
-              investigar cada caso. Un ingreso marcado &quot;Corresponde&quot; que no tenga aviso significa que el
-              médico no lo notificó.
-              {alcance?.tope && <strong className="ml-1 text-amber-700 dark:text-amber-400">Se alcanzó el tope de {MAX_INGRESOS} ingresos: acorta el rango para no perder registros.</strong>}
+              <span>
+                {alcance && alcance.leidos !== null
+                  ? <>Se revisaron {alcance.leidos} ingresos del periodo y {todas.length - (alcance?.fallecidosEmergencia ?? 0)} tienen diagnóstico de lesión</>
+                  : <>{todas.length - (alcance?.fallecidosEmergencia ?? 0)} ingresos del periodo tienen diagnóstico de lesión</>}
+                {alcance?.fallecidosEmergencia
+                  ? <>; además, {alcance.fallecidosEmergencia === 1 ? "1 paciente falleció" : `${alcance.fallecidosEmergencia} pacientes fallecieron`} en emergencia sin llegar a ingresar.{" "}</>
+                  : <>.{" "}</>}
+                La causa externa se define hasta el egreso, por eso el tamizaje va por el diagnóstico y hay que
+                investigar cada caso. Un caso marcado &quot;Corresponde&quot; que no tenga aviso significa que el
+                médico no lo notificó.
+                {alcance?.tope && <strong className="ml-1 text-amber-700 dark:text-amber-400">Se alcanzó el tope de {MAX_INGRESOS} ingresos: acorta el rango para no perder registros.</strong>}
+              </span>
             </p>
           </>
         )}
@@ -596,7 +705,7 @@ export default function LesionesIngresosPage() {
                   <th className={thCls}>Expediente</th>
                   <th className={thCls}>Paciente</th>
                   <th className={thCls}>Edad</th>
-                  <th className={thCls}>Ingreso</th>
+                  <th className={thCls}>Ingreso / atención</th>
                   <th className={thCls}>Servicio</th>
                   <th className={thCls}>Diagnóstico</th>
                   <th className={thCls}>Estado</th>
@@ -606,21 +715,19 @@ export default function LesionesIngresosPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginados.map(f => {
-                  const p = f.paciente;
-                  const edad = calcularEdad(toDate(p.fechaNacimiento));
                   const cat = f.revision?.categoria;
                   const Icono = cat ? ICONO_CASO[cat] : null;
                   const faltaAviso = f.revision?.resultado === "corresponde" && !f.tieneAviso;
                   return (
-                    <tr key={p.id} onClick={() => abrirRevision(f)}
+                    <tr key={f.id} onClick={() => abrirRevision(f)}
                       className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 ${faltaAviso ? "bg-rose-50/50 dark:bg-rose-950/20" : ""}`}>
-                      <td className="px-3 py-2.5 font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{p.expediente}</td>
-                      <td className="px-3 py-2.5 font-medium text-slate-900 dark:text-slate-100">{p.apellidos}, {p.nombres}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">{f.expediente}</td>
+                      <td className="px-3 py-2.5 font-medium text-slate-900 dark:text-slate-100">{f.nombre}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
-                        {edad !== null ? (
+                        {f.edad !== null ? (
                           <span className="flex items-center gap-1.5">
-                            <span className="text-slate-700 dark:text-slate-300">{edad}</span>
-                            {esMenorDeEdad(edad) && (
+                            <span className="text-slate-700 dark:text-slate-300">{f.edad}</span>
+                            {esMenorDeEdad(f.edad) && (
                               <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
                                 Menor
                               </span>
@@ -628,11 +735,21 @@ export default function LesionesIngresosPage() {
                           </span>
                         ) : <span className="text-slate-400">s/d</span>}
                       </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{formatFecha(toDate(p.fechaIngreso))}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">{p.servicioActual || p.servicioIngreso || "—"}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
+                        {f.fuente === "emergencia" ? formatFechaHora(f.fecha) : formatFecha(f.fecha)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
+                        {f.fuente === "emergencia" ? (
+                          <span className="inline-flex items-center gap-1 font-medium text-rose-700 dark:text-rose-400">
+                            <Ambulance size={12} /> Emergencia
+                          </span>
+                        ) : (f.servicio || "—")}
+                      </td>
                       <td className="max-w-[280px] px-3 py-2.5">
                         <span className="flex items-baseline gap-1.5">
-                          <span className="shrink-0 font-mono text-[11px] font-semibold text-blue-700 dark:text-blue-300">{f.analisis.codigo}</span>
+                          {f.analisis.codigo && (
+                            <span className="shrink-0 font-mono text-[11px] font-semibold text-blue-700 dark:text-blue-300">{f.analisis.codigo}</span>
+                          )}
                           <span className="line-clamp-2 text-xs text-slate-700 dark:text-slate-300">{f.analisis.descripcion}</span>
                         </span>
                         <span className="mt-0.5 block text-[11px] text-slate-400">
@@ -640,16 +757,22 @@ export default function LesionesIngresosPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${ESTADO_BADGE[p.estado] ?? ""}`}>
-                          {ESTADO_PACIENTE_LABEL[p.estado] ?? p.estado}
-                        </span>
+                        {f.fuente === "emergencia" ? (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${CONDICION_EMERGENCIA_BADGE.fallecido}`}>
+                            Fallecido en emergencia
+                          </span>
+                        ) : f.paciente ? (
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${ESTADO_BADGE[f.paciente.estado] ?? ""}`}>
+                            {ESTADO_PACIENTE_LABEL[f.paciente.estado] ?? f.paciente.estado}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         {!f.revision ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                             <ClipboardCheck size={12} /> Por revisar
                             {f.analisis.sugerida && (
-                              <span title={`Sugerido por el código ${f.analisis.codigo}`}
+                              <span title={f.analisis.codigo ? `Sugerido por el código ${f.analisis.codigo}` : "Sugerido por el texto del diagnóstico"}
                                 className="ml-1 inline-flex items-center gap-0.5 rounded border border-slate-200 bg-slate-100 px-1 py-px text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800">
                                 {TIPO_CASO_LABEL[f.analisis.sugerida]}
                               </span>
@@ -707,7 +830,7 @@ export default function LesionesIngresosPage() {
 
           {paginados.length === 0 && (
             <p className="py-12 text-center text-sm text-slate-500">
-              No hay ingresos con lesión para estos criterios.
+              No hay casos con lesión para estos criterios.
             </p>
           )}
 
@@ -741,24 +864,28 @@ export default function LesionesIngresosPage() {
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
               <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 font-heading">
-                <ClipboardCheck size={16} className="text-cyan-500" /> Revisar ingreso
+                <ClipboardCheck size={16} className="text-cyan-500" />
+                {revisando.fuente === "emergencia" ? "Revisar fallecido en emergencia" : "Revisar ingreso"}
               </h2>
               <button onClick={() => setRevisando(null)} className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"><X size={16} /></button>
             </div>
 
             <div className="space-y-4 p-5 text-sm">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">
-                  {revisando.paciente.apellidos}, {revisando.paciente.nombres}
-                </p>
-                <p className="mt-0.5 font-mono text-xs text-slate-500">Exp. {revisando.paciente.expediente}</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{revisando.nombre}</p>
+                <p className="mt-0.5 font-mono text-xs text-slate-500">Exp. {revisando.expediente}</p>
                 <p className="mt-1.5 text-xs text-slate-500">
-                  Ingreso {formatFecha(toDate(revisando.paciente.fechaIngreso))} · {revisando.paciente.servicioActual || revisando.paciente.servicioIngreso || "—"}
+                  {revisando.fuente === "emergencia"
+                    ? <>Atendido en emergencia el {formatFechaHora(revisando.fecha)} · falleció sin llegar a ingresar</>
+                    : <>Ingreso {formatFecha(revisando.fecha)} · {revisando.servicio || "—"}</>}
                 </p>
                 <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{revisando.analisis.origen}</p>
                   <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">
-                    <span className="font-mono font-semibold text-blue-700 dark:text-blue-300">{revisando.analisis.codigo}</span> · {revisando.analisis.descripcion}
+                    {revisando.analisis.codigo && (
+                      <><span className="font-mono font-semibold text-blue-700 dark:text-blue-300">{revisando.analisis.codigo}</span> · </>
+                    )}
+                    {revisando.analisis.descripcion}
                   </p>
                 </div>
                 {!revisando.tieneAviso && (
@@ -813,7 +940,9 @@ export default function LesionesIngresosPage() {
                   </div>
                   {revisando.analisis.sugerida && (
                     <p className="mt-2 text-xs text-slate-500">
-                      El código {revisando.analisis.codigo} sugiere {TIPO_CASO_LABEL[revisando.analisis.sugerida]}.
+                      {revisando.analisis.codigo
+                        ? `El código ${revisando.analisis.codigo} sugiere ${TIPO_CASO_LABEL[revisando.analisis.sugerida]}.`
+                        : `El texto del diagnóstico sugiere ${TIPO_CASO_LABEL[revisando.analisis.sugerida]}.`}
                     </p>
                   )}
                   {!revisando.tieneAviso && (
@@ -872,10 +1001,13 @@ export default function LesionesIngresosPage() {
             </div>
             <div className="space-y-4 p-5 text-sm">
               <div className="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900/60 dark:bg-orange-950/20">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">
-                  {solicitando.paciente.apellidos}, {solicitando.paciente.nombres}
-                </p>
-                <p className="mt-0.5 font-mono text-xs text-slate-500">Exp. {solicitando.paciente.expediente}</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{solicitando.nombre}</p>
+                <p className="mt-0.5 font-mono text-xs text-slate-500">Exp. {solicitando.expediente}</p>
+                {solicitando.fuente === "emergencia" && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-rose-700 dark:text-rose-400">
+                    <Ambulance size={12} /> Falleció en emergencia sin ingresar · {formatFechaHora(solicitando.fecha)}
+                  </p>
+                )}
                 {(solicitando.revision?.categoria ?? solicitando.analisis.sugerida) && (
                   <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                     Se sugerirá al médico:
