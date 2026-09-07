@@ -23,6 +23,13 @@ export default function SolicitudUsuarioSisPage() {
   const [submitting, setSubmitting] = useState(false);
   const [enviada, setEnviada] = useState(false);
   const set = (field: keyof typeof EMPTY, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+  const esMedicoInterno = form.cargo === "medico_interno";
+  const cambiarCargo = (cargo: string) => setForm((prev) => ({
+    ...prev,
+    cargo,
+    // Un médico interno está en formación: SIS no le asigna especialidad.
+    especialidad: cargo === "medico_interno" ? "" : prev.especialidad,
+  }));
 
   const enviar = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -61,11 +68,11 @@ export default function SolicitudUsuarioSisPage() {
                 <Campo label={form.tipoDocumento === "dui" ? "DUI (9 dígitos)" : "N° de documento"} className="lg:col-span-2"><input value={form.numeroDocumento} onChange={(e) => set("numeroDocumento", form.tipoDocumento === "dui" ? normalizarDui(e.target.value) : e.target.value.toUpperCase())} required disabled={!form.tipoDocumento} inputMode={form.tipoDocumento === "dui" ? "numeric" : "text"} className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-60`} placeholder={form.tipoDocumento === "dui" ? "00000000-0" : "Escribe el número de documento"} /></Campo>
                 <Campo label="Correo electrónico" className="lg:col-span-2"><input value={form.correo} onChange={(e) => set("correo", e.target.value)} required type="email" autoComplete="email" className={inputCls} placeholder="nombre@correo.com" /></Campo>
                 <Campo label="Teléfono" className="lg:col-span-2"><input value={form.telefono} onChange={(e) => set("telefono", e.target.value.replace(/\D/g, "").slice(0, 8))} required inputMode="tel" className={inputCls} placeholder="00000000" /></Campo>
-                <Campo label="Tipo de empleado" className="lg:col-span-3"><select value={form.cargo} onChange={(e) => set("cargo", e.target.value)} required className={inputCls}><option value="">Seleccionar...</option>{CARGOS_USUARIO_SIS.map((cargo) => <option key={cargo.value} value={cargo.value}>{cargo.label}</option>)}</select></Campo>
+                <Campo label="Tipo de empleado" className="lg:col-span-3"><select value={form.cargo} onChange={(e) => cambiarCargo(e.target.value)} required className={inputCls}><option value="">Seleccionar...</option>{CARGOS_USUARIO_SIS.map((cargo) => <option key={cargo.value} value={cargo.value}>{cargo.label}</option>)}</select></Campo>
                 <Campo label="Número de junta médica / registro profesional" className="lg:col-span-3"><input value={form.numeroJunta} onChange={(e) => set("numeroJunta", e.target.value.toUpperCase())} required className={inputCls} placeholder="Ej. 19711" /></Campo>
                 <Campo label="¿Ya ha tenido usuario en SIS?" className="lg:col-span-3"><select value={form.yaTuvoUsuario} onChange={(e) => set("yaTuvoUsuario", e.target.value)} required className={inputCls}><option value="">Seleccionar...</option>{RESPUESTAS_SI_NO.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></Campo>
                 <Campo label="¿Es médico residente?" className="lg:col-span-3"><select value={form.esResidente} onChange={(e) => set("esResidente", e.target.value)} required className={inputCls}><option value="">Seleccionar...</option>{RESPUESTAS_SI_NO.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></Campo>
-                <Campo label="Especialidad con la que trabajará" className="lg:col-span-3"><select value={form.especialidad} onChange={(e) => set("especialidad", e.target.value)} required className={inputCls}><option value="">Seleccionar especialidad...</option>{ESPECIALIDADES_SIS.map((especialidad) => <option key={especialidad} value={especialidad}>{especialidad}</option>)}</select></Campo>
+                {esMedicoInterno ? <div className="lg:col-span-3 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 text-sm text-cyan-800 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-200"><p className="font-medium">Especialidad no aplica</p><p className="mt-0.5 text-xs">El médico interno está en formación. Selecciona únicamente el servicio asignado.</p></div> : <Campo label="Especialidad con la que trabajará" className="lg:col-span-3"><select value={form.especialidad} onChange={(e) => set("especialidad", e.target.value)} required className={inputCls}><option value="">Seleccionar especialidad...</option>{ESPECIALIDADES_SIS.map((especialidad) => <option key={especialidad} value={especialidad}>{especialidad}</option>)}</select></Campo>}
                 <Campo label="Servicio al que será asignado" className="lg:col-span-3">
                   <select value={form.servicio} onChange={(e) => set("servicio", e.target.value)} required disabled={cargandoServicios} className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-60`}>
                     <option value="">{cargandoServicios ? "Cargando servicios habilitados..." : "Seleccionar servicio..."}</option>
