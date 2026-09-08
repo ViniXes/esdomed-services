@@ -825,7 +825,7 @@ export default function CuidadosCriticosMedicoPage() {
           })}
           {selected && selectedEstanciaId && (
             <div className="col-span-full flex justify-end">
-              <div className={`w-full max-w-sm rounded-lg border px-3 py-2 text-left ${creandoNuevaFicha ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200" : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"}`}>
+              <div className={`rounded-lg border px-3 py-2 text-left ${creandoNuevaFicha ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200" : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"}`}>
                 <p className="text-[11px] font-semibold uppercase tracking-wide">
                   {creandoNuevaFicha ? "Creando nueva ficha" : "Editando registro existente"}
                 </p>
