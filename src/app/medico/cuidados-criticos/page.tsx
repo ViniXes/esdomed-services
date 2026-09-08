@@ -823,7 +823,19 @@ export default function CuidadosCriticosMedicoPage() {
               </button>
             );
           })}
-          {totalResultadosBusqueda === 0 && (
+          {selected && selectedEstanciaId && (
+            <div className={`rounded-lg border px-3 py-2 text-left ${creandoNuevaFicha ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200" : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide">
+                {creandoNuevaFicha ? "Creando nueva ficha" : "Editando registro existente"}
+              </p>
+              <p className="mt-1 text-[11px] leading-snug opacity-90">
+                {creandoNuevaFicha
+                  ? "Al guardar se revisaran posibles duplicados por mes y fecha de ingreso."
+                  : "Guardar aqui actualiza la ficha seleccionada; no crea otro registro."}
+              </p>
+            </div>
+          )}
+          {totalResultadosBusqueda === 0 && !selectedEstanciaId && (
             <p className="col-span-full py-10 text-center text-sm text-slate-400">
               {debeBuscarOFiltrar
                 ? "Busca por expediente, cama o nombre, o elige un servicio para cargar sus pacientes."
@@ -900,29 +912,17 @@ export default function CuidadosCriticosMedicoPage() {
       )}
 
       {selected && selectedEstanciaId ? (
-        <>
-          <div className={`rounded-2xl border p-4 text-sm ${creandoNuevaFicha ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200" : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"}`}>
-            <p className="font-semibold">
-              {creandoNuevaFicha ? "Creando nueva ficha UCI/UCIN" : "Editando registro existente"}
-            </p>
-            <p className="mt-1 text-xs opacity-90">
-              {creandoNuevaFicha
-                ? "Al guardar, el sistema revisara si este expediente ya tiene una ficha en el mismo mes o con la misma fecha de ingreso."
-                : `Estas modificando una ficha ya guardada${fichaSeleccionada?.id ? ` (${fichaSeleccionada.id})` : ""}; guardar aqui no crea otro registro.`}
-            </p>
-          </div>
-          <FichaMatrizCuidadosCriticos
-            key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
-            paciente={selected}
-            tipo={tipoFormulario}
-            servicioEstancia={servicioCanonicoCuidadosCriticos(fichaSeleccionada?.servicio ?? selected.servicioActual)}
-            numeroEstancia={numeroEstancia}
-            datosGuardados={fichaSeleccionada?.datos}
-            saving={saving}
-            puedeEditarAutomaticos={profile?.role === "admin"}
-            onSave={guardarFicha}
-          />
-        </>
+        <FichaMatrizCuidadosCriticos
+          key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
+          paciente={selected}
+          tipo={tipoFormulario}
+          servicioEstancia={servicioCanonicoCuidadosCriticos(fichaSeleccionada?.servicio ?? selected.servicioActual)}
+          numeroEstancia={numeroEstancia}
+          datosGuardados={fichaSeleccionada?.datos}
+          saving={saving}
+          puedeEditarAutomaticos={profile?.role === "admin"}
+          onSave={guardarFicha}
+        />
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 py-16 text-center text-sm text-slate-500 dark:border-slate-700">
           Selecciona un paciente para abrir o iniciar una estancia UCI / UCIN.
