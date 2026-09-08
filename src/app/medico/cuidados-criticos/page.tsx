@@ -41,6 +41,7 @@ import {
   aplicarValoresPorDefectoMatriz,
   esValorRegistrado,
   fichaCerradaSinDiagnosticoEgresoCuidadosCriticos,
+  MESES,
   valorComoTexto,
   type DatosMatrizCuidadosCriticos,
 } from "@/lib/matrizCuidadosCriticos";
@@ -131,6 +132,26 @@ function textoCoincideBusqueda(texto: string, term: string) {
   if (tokens.length === 0) return false;
   const normalizado = normalizarTextoBusqueda(`${texto} ${texto.replace(/-/g, "")}`);
   return tokens.every(token => normalizado.includes(token));
+}
+
+function mesMatrizDesdeDatos(datos?: DatosMatrizCuidadosCriticos) {
+  const mesTexto = valorComoTexto(datos?.mes);
+  const mesCatalogo = MESES.find(mes => normalizarTextoBusqueda(mes) === normalizarTextoBusqueda(mesTexto));
+  if (mesCatalogo) return mesCatalogo;
+
+  const fechaIngreso = valorComoTexto(datos?.fecha_ingreso_al_servicio);
+  const match = fechaIngreso.match(/^\d{4}-(\d{1,2})-\d{1,2}$/);
+  if (!match) return "";
+  const mesIndex = Number(match[1]) - 1;
+  return MESES[mesIndex] ?? "";
+}
+
+function detalleFichaDuplicadaMes(ficha: FichaCuidadosCriticos) {
+  const ingreso = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "sin fecha de ingreso";
+  const servicio = servicioCanonicoCuidadosCriticos(ficha.servicio) || "servicio no registrado";
+  const estado = fichaEgresada(ficha) ? "cerrada" : "activa";
+  const creador = valorComoTexto(ficha.creadoPorNombre);
+  return `${servicio} · ingreso ${ingreso} · ${estado}${creador ? ` · creada por ${creador}` : ""}`;
 }
 
 function estadoPacienteLabel(estado: Paciente["estado"]) {
@@ -507,7 +528,29 @@ export default function CuidadosCriticosMedicoPage() {
       ...aplicarValoresPorDefectoMatriz(datos, tipoRegistroGuardar),
       especialidad: servicioFicha,
     };
-    const registroActivoExistente = fichasPaciente.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
+    let fichasPacienteActualizadas = fichasPaciente;
+    if (!fichaSeleccionada?.id) {
+      const [pacienteDoc, fichasPacienteSnap] = await Promise.all([
+        getDoc(doc(db, "pacientes", selected.id)),
+        getDocs(query(
+          collection(db, "fichas_cuidados_criticos"),
+          where("pacienteExpediente", "==", selected.expediente),
+          limit(50),
+        )),
+      ]);
+      if (!pacienteDoc.exists()) {
+        const message = "No se puede crear el registro porque el expediente no existe en el sistema de pacientes.";
+        setError(message);
+        setSaving(false);
+        throw new Error(message);
+      }
+      const fichasRemotasPaciente = fichasPacienteSnap.docs
+        .map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos))
+        .filter(ficha => servicioEnLista(ficha.servicio, servicios));
+      fichasPacienteActualizadas = ordenarFichas(unirFichas(fichasPaciente, fichasRemotasPaciente));
+      setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, fichasRemotasPaciente).filter(item => servicioEnLista(item.servicio, servicios))));
+    }
+    const registroActivoExistente = fichasPacienteActualizadas.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
     if (!fichaSeleccionada?.id && registroActivoExistente) {
       const message = "Este paciente ya tiene un registro activo. Cierra el registro actual antes de crear uno nuevo.";
       setError(message);
@@ -515,12 +558,32 @@ export default function CuidadosCriticosMedicoPage() {
       throw new Error(message);
     }
     if (!fichaSeleccionada?.id) {
-      const pacienteDoc = await getDoc(doc(db, "pacientes", selected.id));
-      if (!pacienteDoc.exists()) {
-        const message = "No se puede crear el registro porque el expediente no existe en el sistema de pacientes.";
-        setError(message);
-        setSaving(false);
-        throw new Error(message);
+      const mesSeleccionado = mesMatrizDesdeDatos(datosParaGuardar);
+      const duplicadasMismoMes = mesSeleccionado
+        ? fichasPacienteActualizadas.filter(ficha =>
+          ficha.id !== fichaSeleccionada?.id
+          && ficha.pacienteExpediente === selected.expediente
+          && mesMatrizDesdeDatos(ficha.datos) === mesSeleccionado
+        )
+        : [];
+
+      if (duplicadasMismoMes.length > 0) {
+        const detalleDuplicadas = duplicadasMismoMes
+          .slice(0, 3)
+          .map(detalleFichaDuplicadaMes)
+          .join("\n");
+        const continuar = window.confirm([
+          `Advertencia: este paciente ya tiene ${duplicadasMismoMes.length} registro${duplicadasMismoMes.length === 1 ? "" : "s"} UCI/UCIN en ${mesSeleccionado}.`,
+          detalleDuplicadas ? `Registros encontrados:\n${detalleDuplicadas}` : "",
+          "Si es una nueva estancia real, puedes continuar. Si solo ibas a completar una ficha existente, cancela y abre el registro ya guardado.",
+          "Deseas crear otra ficha de todas formas?",
+        ].filter(Boolean).join("\n\n"));
+        if (!continuar) {
+          const message = "No se creo otra ficha porque ya existe un registro de este paciente en el mes seleccionado.";
+          setError(message);
+          setSaving(false);
+          throw new Error(message);
+        }
       }
     }
 
