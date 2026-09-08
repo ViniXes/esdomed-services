@@ -146,6 +146,28 @@ function mesMatrizDesdeDatos(datos?: DatosMatrizCuidadosCriticos) {
   return MESES[mesIndex] ?? "";
 }
 
+function fechaIngresoMatrizDesdeDatos(datos?: DatosMatrizCuidadosCriticos) {
+  const valorFecha = datos?.fecha_ingreso_al_servicio;
+  const texto = valorComoTexto(valorFecha).trim();
+  const iso = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  }
+  const latino = texto.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (latino) {
+    const year = latino[3].length === 2 ? `20${latino[3]}` : latino[3];
+    return `${year}-${latino[2].padStart(2, "0")}-${latino[1].padStart(2, "0")}`;
+  }
+
+  const fecha = fechaCuidadosCriticos(valorFecha);
+  if (!fecha) return "";
+  return [
+    fecha.getFullYear(),
+    String(fecha.getMonth() + 1).padStart(2, "0"),
+    String(fecha.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 function detalleFichaDuplicadaMes(ficha: FichaCuidadosCriticos) {
   const ingreso = valorComoTexto(ficha.datos?.fecha_ingreso_al_servicio) || "sin fecha de ingreso";
   const servicio = servicioCanonicoCuidadosCriticos(ficha.servicio) || "servicio no registrado";
@@ -529,26 +551,56 @@ export default function CuidadosCriticosMedicoPage() {
       especialidad: servicioFicha,
     };
     let fichasPacienteActualizadas = fichasPaciente;
+    try {
+      const fichasPacienteSnap = await getDocs(query(
+        collection(db, "fichas_cuidados_criticos"),
+        where("pacienteExpediente", "==", selected.expediente),
+        limit(50),
+      ));
+      const fichasRemotasPaciente = fichasPacienteSnap.docs
+        .map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos))
+        .filter(ficha => servicioEnLista(ficha.servicio, servicios));
+      fichasPacienteActualizadas = ordenarFichas(unirFichas(fichasPaciente, fichasRemotasPaciente));
+      setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, fichasRemotasPaciente).filter(item => servicioEnLista(item.servicio, servicios))));
+    } catch {
+      // Si la consulta puntual falla, se conserva el flujo actual con las fichas ya cargadas.
+    }
     if (!fichaSeleccionada?.id) {
-      const [pacienteDoc, fichasPacienteSnap] = await Promise.all([
-        getDoc(doc(db, "pacientes", selected.id)),
-        getDocs(query(
-          collection(db, "fichas_cuidados_criticos"),
-          where("pacienteExpediente", "==", selected.expediente),
-          limit(50),
-        )),
-      ]);
+      const pacienteDoc = await getDoc(doc(db, "pacientes", selected.id));
       if (!pacienteDoc.exists()) {
         const message = "No se puede crear el registro porque el expediente no existe en el sistema de pacientes.";
         setError(message);
         setSaving(false);
         throw new Error(message);
       }
-      const fichasRemotasPaciente = fichasPacienteSnap.docs
-        .map(item => ({ id: item.id, ...item.data() } as FichaCuidadosCriticos))
-        .filter(ficha => servicioEnLista(ficha.servicio, servicios));
-      fichasPacienteActualizadas = ordenarFichas(unirFichas(fichasPaciente, fichasRemotasPaciente));
-      setFichasBusqueda(prev => ordenarFichas(unirFichas(prev, fichasRemotasPaciente).filter(item => servicioEnLista(item.servicio, servicios))));
+    }
+    const fechaIngresoSeleccionada = fechaIngresoMatrizDesdeDatos(datosParaGuardar);
+    const duplicadasMismaFecha = fechaIngresoSeleccionada
+      ? fichasPacienteActualizadas.filter(ficha =>
+        ficha.id !== fichaSeleccionada?.id
+        && ficha.pacienteExpediente === selected.expediente
+        && fechaIngresoMatrizDesdeDatos(ficha.datos) === fechaIngresoSeleccionada
+      )
+      : [];
+    if (duplicadasMismaFecha.length > 0) {
+      const detalleDuplicadas = duplicadasMismaFecha
+        .slice(0, 3)
+        .map(detalleFichaDuplicadaMes)
+        .join("\n");
+      const continuar = window.confirm([
+        `Advertencia: este paciente ya tiene ${duplicadasMismaFecha.length} registro${duplicadasMismaFecha.length === 1 ? "" : "s"} UCI/UCIN con la misma fecha de ingreso: ${fechaIngresoSeleccionada}.`,
+        detalleDuplicadas ? `Registros encontrados:\n${detalleDuplicadas}` : "",
+        "Si estas completando una ficha duplicada por error, cancela y abre el registro correcto. Si es una estancia real separada, puedes continuar.",
+        fichaSeleccionada?.id ? "Deseas guardar esta ficha de todas formas?" : "Deseas crear otra ficha de todas formas?",
+      ].filter(Boolean).join("\n\n"));
+      if (!continuar) {
+        const message = fichaSeleccionada?.id
+          ? "No se guardo la ficha porque ya existe otro registro de este paciente con la misma fecha de ingreso."
+          : "No se creo otra ficha porque ya existe un registro de este paciente con la misma fecha de ingreso.";
+        setError(message);
+        setSaving(false);
+        throw new Error(message);
+      }
     }
     const registroActivoExistente = fichasPacienteActualizadas.find(ficha => !fichaEgresada(ficha) && ficha.id !== fichaSeleccionada?.id);
     if (!fichaSeleccionada?.id && registroActivoExistente) {
@@ -557,7 +609,7 @@ export default function CuidadosCriticosMedicoPage() {
       setSaving(false);
       throw new Error(message);
     }
-    if (!fichaSeleccionada?.id) {
+    if (!fichaSeleccionada?.id && duplicadasMismaFecha.length === 0) {
       const mesSeleccionado = mesMatrizDesdeDatos(datosParaGuardar);
       const duplicadasMismoMes = mesSeleccionado
         ? fichasPacienteActualizadas.filter(ficha =>
