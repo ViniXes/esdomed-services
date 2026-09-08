@@ -197,6 +197,25 @@ export function filaDesdeUsuario(u: Pick<UserProfile, "uid" | "nombre" | "codigo
   });
 }
 
+export interface OpcionesSincronizarFilas {
+  /**
+   * Conserva las filas del plan cuyo usuario ya no está en el roster (dado de
+   * baja, rol cambiado o usuario eliminado). Es lo correcto al abrir un mes que
+   * YA existe: la persona trabajó ese mes y su fila es historial para RH; sin
+   * esto, cualquier re-guardado del mes la hacía desaparecer en silencio.
+   * Un mes NUEVO se arma solo con el roster vigente (prepararFilasNuevoPeriodo),
+   * así que ahí no aplica y los dados de baja no se heredan.
+   */
+  conservarFilasSinUsuario?: boolean;
+}
+
+/** Ajusta el largo de asignaciones al mes (por si cambió de febrero a marzo). */
+function ajustarAsignaciones(asignaciones: string[] | undefined, dias: number): string[] {
+  return Array(dias)
+    .fill("")
+    .map((_, i) => asignaciones?.[i] ?? "");
+}
+
 /**
  * Mezcla el roster actual de usuarios con un plan existente: conserva las
  * asignaciones ya guardadas y agrega filas nuevas para usuarios sin fila.
@@ -206,6 +225,7 @@ export function sincronizarFilas(
   usuarios: Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">[],
   filasPrevias: FilaPlanTrabajo[],
   dias: number,
+  opciones: OpcionesSincronizarFilas = {},
 ): FilaPlanTrabajo[] {
   const porUid = new Map(filasPrevias.filter((f) => f.uid).map((f) => [f.uid, f]));
   const porCodigo = new Map(
@@ -213,28 +233,35 @@ export function sincronizarFilas(
       .filter((f) => f.codigoMarcacion)
       .map((f) => [normalizarCodigoMarcacion(f.codigoMarcacion), f]),
   );
+  const emparejadas = new Set<FilaPlanTrabajo>();
 
-  return usuarios.map((u) => {
+  const filas = usuarios.map((u) => {
     const previa =
       (u.uid && porUid.get(u.uid)) ||
       (u.codigoMarcacion && porCodigo.get(normalizarCodigoMarcacion(u.codigoMarcacion))) ||
       null;
     if (previa) {
-      // Ajusta el largo de asignaciones al mes (por si cambió de febrero a marzo).
-      const asignaciones = Array(dias)
-        .fill("")
-        .map((_, i) => previa.asignaciones[i] ?? "");
+      emparejadas.add(previa);
       return normalizarMetadatosFilaPlan({
         ...previa,
         uid: u.uid,
         nombre: u.nombre,
         puesto: u.puesto?.trim() || previa.puesto || "",
         codigoMarcacion: u.codigoMarcacion?.trim() || previa.codigoMarcacion || "",
-        asignaciones,
+        asignaciones: ajustarAsignaciones(previa.asignaciones, dias),
       });
     }
     return filaDesdeUsuario(u, dias);
   });
+
+  if (!opciones.conservarFilasSinUsuario) return filas;
+
+  // Filas guardadas sin usuario vigente: se conservan tal cual (el orden visible
+  // lo decide compararFilasPlan por grupo/orden, no la posición en el arreglo).
+  const sinUsuario = filasPrevias
+    .filter((f) => !emparejadas.has(f))
+    .map((f) => normalizarMetadatosFilaPlan({ ...f, asignaciones: ajustarAsignaciones(f.asignaciones, dias) }));
+  return [...filas, ...sinUsuario];
 }
 
 type UsuarioRosterPlan = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;

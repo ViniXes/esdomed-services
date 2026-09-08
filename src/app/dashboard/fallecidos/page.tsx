@@ -128,8 +128,12 @@ export default function DashboardFallecidosPage() {
       query(collection(db, "notificaciones_fallecidos"), where("tramiteDesbloqueado", "==", true)),
       s => setDesbloqueados(s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionFallecido))),
     );
+    // Solo personal vigente: los dados de baja no deben ofrecerse en los
+    // selectores de "quién lo hizo" (los registros históricos guardan el nombre).
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
-      .then(snap => setPersonal(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))));
+      .then(snap => setPersonal(
+        snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)).filter(u => u.activo !== false),
+      ));
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["psicologia", "trabajo_social"])))
       .then(snap => setPersonalPsTs(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))));
     return () => { u1(); u2(); };

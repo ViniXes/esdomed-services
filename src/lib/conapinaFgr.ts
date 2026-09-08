@@ -2,6 +2,7 @@ import type {
   EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, InstanciaAviso,
   CondicionPacienteAviso, NotificacionConapinaFgr, DiagnosticoCIE,
   EstadoSolicitudNotificacion, OrigenSolicitudNotificacion,
+  OrigenPacienteLesion,
 } from "@/types";
 
 // Catálogo y reglas de validación del módulo Lesiones intencionales
@@ -103,6 +104,12 @@ export const INSTANCIA_CHIP: Record<InstanciaAviso, string> = {
 export const CONDICION_LABEL: Record<CondicionPacienteAviso, string> = {
   vivo: "Vivo",
   fallecido: "Fallecido",
+};
+
+// De dónde sale el paciente del caso (ver OrigenPacienteLesion en types).
+export const ORIGEN_PACIENTE_LABEL: Record<OrigenPacienteLesion, string> = {
+  ingreso: "Hospitalización",
+  emergencia: "Emergencia",
 };
 
 // Un paciente menor de edad implica aviso a CONAPINA además de la FGR. NO se

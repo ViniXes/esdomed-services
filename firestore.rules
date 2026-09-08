@@ -265,6 +265,12 @@ service cloud.firestore {
                     && request.resource.data.creadoEn == request.time
                     && request.resource.data.avisoInstancia in ['conapina', 'fiscalia', 'ambos']
                     && request.resource.data.condicionPaciente in ['vivo', 'fallecido']
+                    // Origen del paciente (opcional; ausente = ingreso hospitalario).
+                    // Un caso de emergencia debe traer la atención a la que pertenece.
+                    && (!('origenPaciente' in request.resource.data)
+                        || request.resource.data.origenPaciente in ['ingreso', 'emergencia'])
+                    && (request.resource.data.get('origenPaciente', 'ingreso') != 'emergencia'
+                        || request.resource.data.atencionEmergenciaId is string)
                     && request.resource.data.avisoFecha is timestamp
                     && request.resource.data.avisoRecibidoPor is string
                     && request.resource.data.avisoRecibidoPor.size() >= 3
@@ -346,6 +352,9 @@ service cloud.firestore {
                     && request.resource.data.expediente is string
                     && request.resource.data.expediente.size() > 0
                     && request.resource.data.origen in ['tamizaje', 'manual']
+                    // Origen del paciente (opcional; ausente = ingreso hospitalario).
+                    && (!('origenPaciente' in request.resource.data)
+                        || request.resource.data.origenPaciente in ['ingreso', 'emergencia'])
                     && !request.resource.data.keys().hasAny([
                          'notificacionId', 'notificadoPor', 'notificadoPorNombre', 'notificadoEn',
                          'canceladoPor', 'canceladoPorNombre', 'canceladoEn', 'motivoCancelacion']);

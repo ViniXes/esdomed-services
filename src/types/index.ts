@@ -6,6 +6,10 @@ export const ISBM_ROLES: UserRole[] = ["isbm_tecnico", "isbm_supervisor", "isbm_
 export const esRolIsbm = (role?: UserRole) => !!role && ISBM_ROLES.includes(role);
 export type TipoMedicoCuidadosCriticos = "uci" | "ucin" | "uci_ucin" | "jefe_uci_ucin";
 
+// Tipo de baja de un usuario (ver UserProfile.baja). Catálogo y helpers en
+// src/lib/bajaUsuarios.ts.
+export type TipoBajaUsuario = "fallecimiento" | "retiro" | "traslado" | "otro";
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -28,6 +32,23 @@ export interface UserProfile {
   // se pide además, no en vez de, la primera vez que se entra a /dashboard/simmow.
   // Si la versión no coincide con TERMINOS_SIMMOW_VERSION, se vuelve a pedir.
   terminosSimmowAceptados?: { version: string; fecha: Date };
+  // Baja del usuario (fallecimiento, retiro, traslado a otra institución).
+  // Dar de baja NO borra nada: el documento y todo su historial (filas en planes
+  // de trabajo, trámites, trazabilidad de quién hizo qué) se conservan. Lo que
+  // cambia: la cuenta queda deshabilitada en Firebase Auth (no puede iniciar
+  // sesión), y deja de aparecer en los listados de personal VIGENTE (roster al
+  // crear un mes nuevo del plan, selectores de "quién lo hizo").
+  // Ausente o true = vigente; false = dado de baja. Se escribe solo desde la API
+  // de usuarios (firebase-admin), nunca desde el cliente.
+  activo?: boolean;
+  baja?: {
+    fecha: string;            // fecha efectiva de la baja, "YYYY-MM-DD" (fecha calendario, sin hora)
+    tipo?: TipoBajaUsuario;   // catálogo en src/lib/bajaUsuarios.ts; "fallecimiento" => "En memoria" en Personal de trabajo
+    motivo?: string;          // texto libre, ej. "Fallecimiento"
+    registradaPorId: string;
+    registradaPorNombre: string;
+    registradaEn: Date;
+  };
   createdAt: Date;
 }
 
@@ -203,6 +224,25 @@ export interface ConfigIndicadoresCuidadosCriticos {
 
 export type EstadoTraslado = "pendiente" | "en_revision" | "aprobado" | "rechazado";
 
+// Reversión administrativa de una aprobación dada por error (solo rol admin):
+// el traslado vuelve a "rechazado" (o a "pendiente" para reprocesarlo) y se
+// deshace lo que la aprobación propagó a pacientes y fichas UCI/UCIN.
+// Lo escribe POST /api/esdomed/traslados/{id}/revertir con firebase-admin.
+export interface ReversionTraslado {
+  estadoAnterior: "aprobado";
+  estadoNuevo: "rechazado" | "pendiente";
+  motivo: string;
+  aprobadoPorId?: string | null;      // quién había aprobado por error
+  aprobadoPorNombre?: string | null;
+  aprobadoEn?: Date | null;
+  porId: string;                      // admin que revirtió
+  porNombre: string;
+  en: Date;
+  pacientesRestaurados: { expediente: string; pacienteId: string; ubicacionRestaurada: boolean }[];
+  fichasReabiertas: string[];
+  fichasNoReabiertas: { id: string; motivo: string }[];
+}
+
 export interface SolicitudTraslado {
   id?: string;
   medicoId: string;
@@ -230,6 +270,7 @@ export interface SolicitudTraslado {
   revisadoPorNombre?: string;
   notasEsdomed?: string;
   respuestaMedico?: string;   // respuesta del médico a una observación (estado en_revision)
+  reversion?: ReversionTraslado; // presente si un admin revirtió una aprobación errónea
 }
 
 // ============================================================================
@@ -288,6 +329,14 @@ export type TipoCasoConapinaFgr = "violencia" | "accidente_transito" | "intento_
 export type InstanciaAviso = "conapina" | "fiscalia" | "ambos";
 export type CondicionPacienteAviso = "vivo" | "fallecido";
 
+// De dónde sale el paciente de un caso de lesiones: de un INGRESO hospitalario
+// (colección pacientes) o de una ATENCIÓN DE EMERGENCIA sin ingreso (colección
+// atenciones_emergencia: el paciente egresó o falleció en emergencia sin llegar
+// a un servicio). Ausente = ingreso (registros anteriores al 2026-09-07).
+// Se llama `origenPaciente` en las tres colecciones del módulo (notificación,
+// revisión, solicitud) porque `origen` ya significa otra cosa en la solicitud.
+export type OrigenPacienteLesion = "ingreso" | "emergencia";
+
 // Oficio de egreso escaneado. Lo adjunta el comité al caso ya recibido.
 export interface OficioEgreso {
   url: string;
@@ -303,7 +352,9 @@ export interface NotificacionConapinaFgr {
   medicoServicio: string;
   medicoJvpm?: string;
 
-  pacienteId?: string;            // doc id en /pacientes
+  pacienteId?: string;            // doc id en /pacientes (null si el caso viene de emergencia)
+  origenPaciente?: OrigenPacienteLesion;
+  atencionEmergenciaId?: string | null; // doc id en /atenciones_emergencia (si origenPaciente = emergencia)
   pacienteNombre: string;
   pacienteExpediente: string;
   // Edad al momento de notificar (snapshot). Menor de 18 → también CONAPINA.
@@ -406,7 +457,9 @@ export type OrigenSolicitudNotificacion = "tamizaje" | "manual";
 
 export interface SolicitudNotificacionLesion {
   id?: string;
-  pacienteId?: string | null;     // docId del ingreso en /pacientes
+  pacienteId?: string | null;     // docId del ingreso en /pacientes (null si viene de emergencia)
+  origenPaciente?: OrigenPacienteLesion;
+  atencionEmergenciaId?: string | null; // docId en /atenciones_emergencia (si origenPaciente = emergencia)
   expediente: string;             // la llave del cierre automático
   pacienteNombre: string;
   servicio?: string;              // ubicación al solicitar (snapshot)

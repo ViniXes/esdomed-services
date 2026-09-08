@@ -10,7 +10,7 @@ import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, EstadoTraslado, Paciente, MovimientoPaciente } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History, Inbox } from "lucide-react";
+import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History, Inbox, Undo2, CheckCircle2 } from "lucide-react";
 
 const FILTROS: { label: string; value: EstadoTraslado | "todos" }[] = [
   { label: "Todos", value: "todos" },
@@ -55,6 +55,14 @@ export default function DashboardTrasladosPage() {
   const [selected, setSelected] = useState<SolicitudTraslado | null>(null);
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Reversión de una aprobación errónea — solo admin (ver revertirAprobacion).
+  const isAdmin = profile?.role === "admin";
+  const [revMotivo, setRevMotivo] = useState("");
+  const [revEstado, setRevEstado] = useState<"rechazado" | "pendiente">("rechazado");
+  const [revirtiendo, setRevirtiendo] = useState(false);
+  const [revError, setRevError] = useState("");
+  const [aviso, setAviso] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "traslados"), orderBy("creadoEn", "desc"), limit(LIVE_LIMIT));
@@ -167,6 +175,47 @@ export default function DashboardTrasladosPage() {
     setSaving(false); setSelected(null); setNotas("");
   };
 
+  // Deshace una aprobación dada por error: el servidor (firebase-admin) valida el
+  // rol admin, devuelve al paciente a su cama de origen si sigue en el destino,
+  // quita el movimiento de su historial y reabre la ficha UCI/UCIN si este
+  // traslado la había cerrado. Todo queda auditado en traslado.reversion.
+  const revertirAprobacion = async () => {
+    if (!selected?.id || !user || !isAdmin) return;
+    const id = selected.id;
+    setRevirtiendo(true); setRevError("");
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/esdomed/traslados/${id}/revertir`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo: revMotivo.trim(), estadoNuevo: revEstado }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "No se pudo revertir el traslado.");
+
+      const restaurados = (data.pacientesRestaurados ?? []) as { expediente: string; ubicacionRestaurada: boolean }[];
+      const partes = [
+        `Traslado marcado como ${revEstado === "pendiente" ? "pendiente" : "rechazado"}.`,
+        restaurados.length === 0
+          ? "El paciente no estaba en el censo, no había ubicación que devolver."
+          : restaurados.every(p => p.ubicacionRestaurada)
+            ? "Paciente devuelto a su cama de origen."
+            : "El paciente ya se había movido después: se quitó el movimiento pero se conservó su ubicación actual.",
+      ];
+      if ((data.fichasReabiertas ?? []).length > 0) partes.push("Ficha UCI/UCIN reabierta.");
+      if ((data.fichasNoReabiertas ?? []).length > 0) partes.push("Había una ficha UCI/UCIN que no se pudo reabrir: revisá la Matriz.");
+      setAviso(partes.join(" "));
+
+      // La bandeja en vivo se actualiza sola; los resultados de búsqueda son una foto.
+      setResultados(prev => prev?.map(t => (t.id === id ? { ...t, estado: revEstado, notasEsdomed: revMotivo.trim() } : t)) ?? prev);
+      setSelected(null); setNotas(""); setRevMotivo(""); setRevEstado("rechazado");
+    } catch (e) {
+      setRevError((e as Error).message);
+    } finally {
+      setRevirtiendo(false);
+    }
+  };
+
   const getTipoLabel = (tipo?: string) => {
     if (tipo === "servicio_cama") return { label: "Servicio a Servicio", color: "text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 border-blue-200 dark:border-blue-800", icon: Building2 };
     if (tipo === "interno") return { label: "Interno", color: "text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 border-purple-200 dark:border-purple-800", icon: ArrowRightLeft };
@@ -174,7 +223,10 @@ export default function DashboardTrasladosPage() {
     return { label: "Traslado", color: "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700", icon: ArrowRightLeft };
   };
 
-  const abrir = (t: SolicitudTraslado) => { setSelected(t); setNotas(t.notasEsdomed ?? ""); };
+  const abrir = (t: SolicitudTraslado) => {
+    setSelected(t); setNotas(t.notasEsdomed ?? "");
+    setRevMotivo(""); setRevEstado("rechazado"); setRevError("");
+  };
 
   const renderTraslado = (t: SolicitudTraslado) => {
     const typeInfo = getTipoLabel(t.tipoTraslado);
@@ -228,6 +280,11 @@ export default function DashboardTrasladosPage() {
                   Médico respondió
                 </span>
               )}
+              {t.reversion && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 dark:bg-amber-900/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  <Undo2 size={10} /> Aprobación revertida
+                </span>
+              )}
             </div>
           </div>
           <Badge estado={t.estado} />
@@ -250,6 +307,14 @@ export default function DashboardTrasladosPage() {
           {pendientesLive.length} pendiente(s)
         </div>
       </div>
+
+      {aviso && (
+        <div className="flex items-start gap-2 mb-4 px-4 py-3 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950 text-sm text-emerald-800 dark:text-emerald-300">
+          <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+          <p className="flex-1">{aviso}</p>
+          <button onClick={() => setAviso(null)} aria-label="Cerrar aviso" className="p-0.5 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors"><X size={14} /></button>
+        </div>
+      )}
 
       {/* Cambio de vista: bandeja en vivo ⇄ búsqueda histórica */}
       <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl mb-6 w-full sm:w-fit">
@@ -421,6 +486,27 @@ export default function DashboardTrasladosPage() {
                 </div>
               )}
 
+              {selected.reversion && (
+                <div className="bg-amber-50 dark:bg-amber-950/40 rounded-lg p-3 border border-amber-200 dark:border-amber-900/50 space-y-1">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                    <Undo2 size={12} /> Aprobación revertida
+                  </p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                    {selected.reversion.porNombre} · {formatFechaHora(selected.reversion.en)}
+                    {selected.reversion.aprobadoPorNombre && <> · había aprobado: {selected.reversion.aprobadoPorNombre}</>}
+                  </p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selected.reversion.motivo}</p>
+                  <p className="text-xs text-slate-500">
+                    {selected.reversion.pacientesRestaurados.length === 0
+                      ? "Sin cambios en el censo."
+                      : selected.reversion.pacientesRestaurados.every(p => p.ubicacionRestaurada)
+                        ? "Paciente devuelto a la cama de origen."
+                        : "Movimiento eliminado; el paciente ya se había movido después, se conservó su ubicación."}
+                    {selected.reversion.fichasReabiertas.length > 0 && " Ficha UCI/UCIN reabierta."}
+                  </p>
+                </div>
+              )}
+
               {/* Una vez aprobado/rechazado el traslado es terminal: notas en solo lectura. */}
               {selected.estado === "aprobado" || selected.estado === "rechazado" ? (
                 selected.notasEsdomed && (
@@ -435,6 +521,45 @@ export default function DashboardTrasladosPage() {
                   <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}
                     placeholder="Observaciones o motivo de rechazo..."
                     className={inputCls} />
+                </div>
+              )}
+
+              {/* Solo admin: deshacer una aprobación dada por error. */}
+              {selected.estado === "aprobado" && isAdmin && (
+                <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                    <Undo2 size={13} /> Revertir aprobación
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Devuelve al paciente a su cama de origen (si sigue en el destino), borra este movimiento de su historial y
+                    reabre la ficha UCI/UCIN si este traslado la cerró. Queda registrado quién lo revirtió y por qué.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { value: "rechazado", label: "Dejar como rechazado" },
+                      { value: "pendiente", label: "Volver a pendiente" },
+                    ] as const).map(op => (
+                      <label key={op.value}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                          revEstado === op.value
+                            ? "bg-white dark:bg-slate-900 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-300"
+                            : "border-amber-200 dark:border-amber-800 text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-900/60"
+                        }`}>
+                        <input type="radio" name="revEstado" value={op.value} checked={revEstado === op.value}
+                          onChange={() => setRevEstado(op.value)} className="accent-amber-600" />
+                        {op.label}
+                      </label>
+                    ))}
+                  </div>
+                  <textarea value={revMotivo} onChange={e => setRevMotivo(e.target.value)} rows={2}
+                    placeholder="Justificación (el médico la verá como nota de ESDOMED)..."
+                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-400" />
+                  {revError && <p className="text-xs text-red-600 dark:text-red-400">{revError}</p>}
+                  <button onClick={revertirAprobacion} disabled={revMotivo.trim().length < 5 || revirtiendo}
+                    className="w-full py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                    <Undo2 size={14} />
+                    {revirtiendo ? "Revirtiendo..." : "Revertir aprobación"}
+                  </button>
                 </div>
               )}
             </div>

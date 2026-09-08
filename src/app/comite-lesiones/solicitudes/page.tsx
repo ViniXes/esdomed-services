@@ -8,6 +8,9 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BuscadorIngresoPorExpediente } from "@/components/pacientes/BuscadorIngresoPorExpediente";
 import {
+  condicionEgreso, CONDICION_LABEL as CONDICION_EMERGENCIA_LABEL, CONDICION_BADGE as CONDICION_EMERGENCIA_BADGE,
+} from "@/lib/emergencia/helpers";
+import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP,
   SOLICITUD_ESTADO_LABEL, SOLICITUD_ESTADO_CHIP, SOLICITUD_NOTA_MAX,
 } from "@/lib/conapinaFgr";
@@ -15,7 +18,9 @@ import {
   Megaphone, ShieldAlert, Car, HeartCrack, X, CheckCircle2, AlertCircle, AlertTriangle,
   Info, Ban, ArrowLeft, Clock3, Send,
 } from "lucide-react";
-import type { Paciente, TipoCasoConapinaFgr, NotificacionConapinaFgr, SolicitudNotificacionLesion } from "@/types";
+import type {
+  Paciente, AtencionEmergencia, TipoCasoConapinaFgr, NotificacionConapinaFgr, SolicitudNotificacionLesion,
+} from "@/types";
 
 // Difusión al área médica: el comité pide aquí que un caso se notifique. La
 // solicitud aparece en la bandeja CONAPINA/FGR de TODOS los médicos (con globo
@@ -54,6 +59,10 @@ export default function SolicitudesNotificacionPage() {
 
   // Nueva solicitud
   const [paciente, setPaciente] = useState<Paciente | null>(null);
+  // Atención de emergencia sin ingreso (excluyente con `paciente`): el caso de
+  // quien egresó o falleció en emergencia sin llegar a un servicio.
+  const [atencion, setAtencion] = useState<AtencionEmergencia | null>(null);
+  const expedienteSel = paciente?.expediente ?? atencion?.expediente ?? "";
   const [categoria, setCategoria] = useState<TipoCasoConapinaFgr | "">("");
   const [nota, setNota] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -82,13 +91,13 @@ export default function SolicitudesNotificacionPage() {
   // pedir lo que ya está notificado). El reset a null se hace al seleccionar
   // (en onSelect / limpiarFormulario), no aquí: el efecto solo consulta.
   useEffect(() => {
-    if (!paciente?.expediente) return;
+    if (!expedienteSel) return;
     let cancel = false;
     (async () => {
       try {
         const snap = await getDocs(query(
           collection(db, "notificaciones_conapina_fgr"),
-          where("pacienteExpediente", "==", paciente.expediente),
+          where("pacienteExpediente", "==", expedienteSel),
         ));
         if (cancel) return;
         setAvisosExistentes(
@@ -99,7 +108,7 @@ export default function SolicitudesNotificacionPage() {
       }
     })();
     return () => { cancel = true; };
-  }, [paciente?.expediente]);
+  }, [expedienteSel]);
 
   const notaLimpia = nota.trim();
   const errorNota = notaLimpia.length > SOLICITUD_NOTA_MAX
@@ -107,13 +116,14 @@ export default function SolicitudesNotificacionPage() {
     : null;
 
   // Duplicado contra la lista ya cargada: 0 lecturas extra.
-  const pendienteDelExpediente = paciente
+  const pendienteDelExpediente = expedienteSel
     ? solicitudes.find(s => s.estado === "pendiente"
-        && s.expediente.trim().toLowerCase() === paciente.expediente.trim().toLowerCase())
+        && s.expediente.trim().toLowerCase() === expedienteSel.trim().toLowerCase())
     : undefined;
 
   const limpiarFormulario = () => {
     setPaciente(null);
+    setAtencion(null);
     setCategoria("");
     setNota("");
     setErrCrear(null);
@@ -121,15 +131,19 @@ export default function SolicitudesNotificacionPage() {
   };
 
   const crear = async () => {
-    if (!paciente || !profile || errorNota || pendienteDelExpediente) return;
+    if ((!paciente && !atencion) || !profile || errorNota || pendienteDelExpediente) return;
+    const nombre = paciente ? `${paciente.apellidos}, ${paciente.nombres}` : (atencion?.pacienteNombre ?? "");
     setGuardando(true);
     setErrCrear(null);
     try {
       await addDoc(collection(db, "solicitudes_notificacion_lesion"), {
-        pacienteId: paciente.id ?? null,
-        expediente: paciente.expediente,
-        pacienteNombre: `${paciente.apellidos}, ${paciente.nombres}`,
-        servicio: paciente.servicioActual || paciente.servicioIngreso || "",
+        pacienteId: paciente?.id ?? null,
+        // Caso de emergencia sin ingreso: se referencia la atención en vez del ingreso.
+        origenPaciente: paciente ? "ingreso" : "emergencia",
+        atencionEmergenciaId: atencion?.id ?? null,
+        expediente: expedienteSel,
+        pacienteNombre: nombre,
+        servicio: paciente ? (paciente.servicioActual || paciente.servicioIngreso || "") : "Emergencia",
         origen: "manual",
         categoriaSugerida: categoria || null,
         nota: notaLimpia || null,
@@ -139,7 +153,7 @@ export default function SolicitudesNotificacionPage() {
         // Las reglas exigen creadoEn == request.time: la solicitud no se antedata.
         creadoEn: serverTimestamp(),
       });
-      setCreada(`${paciente.apellidos}, ${paciente.nombres} · Exp. ${paciente.expediente}`);
+      setCreada(`${nombre} · Exp. ${expedienteSel}`);
       limpiarFormulario();
     } catch (err) {
       setErrCrear(err instanceof Error ? err.message : "No se pudo enviar la solicitud.");
@@ -192,23 +206,42 @@ export default function SolicitudesNotificacionPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700 dark:text-orange-300">Nueva solicitud</p>
           <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Pedir la notificación de un expediente</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Sirve para cualquier ingreso que requiera aviso. La solicitud se cierra sola cuando un
-            médico notifica el expediente.
+            Sirve para cualquier ingreso, o atención de emergencia sin ingreso, que requiera aviso. La
+            solicitud se cierra sola cuando un médico notifica el expediente.
           </p>
         </div>
 
-        {!paciente ? (
-          <BuscadorIngresoPorExpediente value={paciente} onSelect={p => { setAvisosExistentes(null); setPaciente(p); }} />
+        {!paciente && !atencion ? (
+          <BuscadorIngresoPorExpediente
+            value={paciente}
+            onSelect={p => { setAvisosExistentes(null); setPaciente(p); if (p) setAtencion(null); }}
+            atencionValue={atencion}
+            onSelectAtencion={a => { setAvisosExistentes(null); setAtencion(a); if (a) setPaciente(null); }}
+          />
         ) : (
           <div className="space-y-4">
             <div className="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900/60 dark:bg-orange-950/20">
-              <p className="font-semibold text-slate-900 dark:text-slate-100">{paciente.apellidos}, {paciente.nombres}</p>
+              <p className="font-semibold text-slate-900 dark:text-slate-100">
+                {paciente ? `${paciente.apellidos}, ${paciente.nombres}` : atencion?.pacienteNombre}
+              </p>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600 dark:text-slate-300">
-                <span className="font-mono font-medium">Exp. {paciente.expediente}</span>
-                {(paciente.servicioActual || paciente.servicioIngreso) && (
-                  <span>· {paciente.servicioActual || paciente.servicioIngreso}</span>
+                <span className="font-mono font-medium">Exp. {expedienteSel}</span>
+                {paciente ? (
+                  <>
+                    {(paciente.servicioActual || paciente.servicioIngreso) && (
+                      <span>· {paciente.servicioActual || paciente.servicioIngreso}</span>
+                    )}
+                    <span>· Ingresó el {formatDia(paciente.fechaIngreso)}</span>
+                  </>
+                ) : atencion && (
+                  <>
+                    <span>· Emergencia, sin ingreso</span>
+                    <span>· Atendido el {formatDia(atencion.fechaHoraIngreso)}</span>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${CONDICION_EMERGENCIA_BADGE[condicionEgreso(atencion.tipoEgreso)]}`}>
+                      {CONDICION_EMERGENCIA_LABEL[condicionEgreso(atencion.tipoEgreso)]}
+                    </span>
+                  </>
                 )}
-                <span>· Ingresó el {formatDia(paciente.fechaIngreso)}</span>
               </p>
               <button type="button" onClick={limpiarFormulario}
                 className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-orange-700 transition-colors hover:text-orange-900 dark:text-orange-300 dark:hover:text-orange-100">

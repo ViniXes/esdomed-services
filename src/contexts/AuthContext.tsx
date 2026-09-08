@@ -38,7 +38,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // perfil; y si las reglas negaran la lectura, no debe colgar la carga.
         try {
           const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-          setProfile(snap.exists() ? { uid: firebaseUser.uid, ...snap.data() } as UserProfile : null);
+          const data = snap.exists() ? snap.data() : null;
+          // Usuario dado de baja: la cuenta ya está deshabilitada en Auth, pero
+          // una sesión abierta antes de la baja sigue viva hasta que expire su
+          // token. Se cierra aquí y /login muestra el aviso.
+          if (data?.activo === false) {
+            try { sessionStorage.setItem("esdomed:session_expired", "baja"); } catch { /* noop */ }
+            setProfile(null);
+            setLoading(false);
+            await signOut(auth);
+            return;
+          }
+          setProfile(data ? { uid: firebaseUser.uid, ...data } as UserProfile : null);
         } catch {
           setProfile(null);
         }

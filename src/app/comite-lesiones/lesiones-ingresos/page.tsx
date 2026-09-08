@@ -259,8 +259,11 @@ export default function LesionesIngresosPage() {
         .map(d => d.data() as NotificacionConapinaFgr)
         .filter(n => n.estado !== "anulado");
       const conAvisoPorIngreso = new Set(avisos.map(n => n.pacienteId).filter(Boolean));
+      // Un aviso de un caso de EMERGENCIA (trae atencionEmergenciaId, sin
+      // ingreso) pertenece a esa atención, no a un ingreso del mismo expediente:
+      // no entra al respaldo por expediente, que solo cubre avisos sin referencia.
       const conAvisoPorExpediente = new Set(
-        avisos.filter(n => !n.pacienteId).map(n => (n.pacienteExpediente ?? "").trim().toLowerCase()),
+        avisos.filter(n => !n.pacienteId && !n.atencionEmergenciaId).map(n => (n.pacienteExpediente ?? "").trim().toLowerCase()),
       );
       const tieneAviso = (p: Paciente) =>
         conAvisoPorIngreso.has(p.id) || conAvisoPorExpediente.has((p.expediente ?? "").trim().toLowerCase());
@@ -272,8 +275,10 @@ export default function LesionesIngresosPage() {
       // por expediente si quedara alguna sin pacienteId.
       const solicitudesPend = snapSolicitudes.docs.map(d => d.data() as SolicitudNotificacionLesion);
       const solicitadaPorIngreso = new Set(solicitudesPend.map(s => s.pacienteId).filter(Boolean));
+      // Igual que los avisos: una solicitud de un caso de emergencia no cuenta
+      // para los ingresos del mismo expediente.
       const solicitadaPorExpediente = new Set(
-        solicitudesPend.filter(s => !s.pacienteId).map(s => (s.expediente ?? "").trim().toLowerCase()),
+        solicitudesPend.filter(s => !s.pacienteId && !s.atencionEmergenciaId).map(s => (s.expediente ?? "").trim().toLowerCase()),
       );
       const estaSolicitada = (p: Paciente) =>
         solicitadaPorIngreso.has(p.id) || solicitadaPorExpediente.has((p.expediente ?? "").trim().toLowerCase());

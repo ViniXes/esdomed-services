@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, getDoc, deleteField, Timestamp } from "@/lib/firestoreMeter";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, Upload, X, CheckCircle2, Clock, File, Pencil, AlertTriangle, Paperclip, CalendarDays, ChevronLeft, Wallet, WalletCards, Check } from "lucide-react";
+import { FileText, Plus, Upload, X, CheckCircle2, Clock, File, Pencil, AlertTriangle, Paperclip, CalendarDays, ChevronLeft, Wallet, WalletCards, Check, Trash2 } from "lucide-react";
 import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal, PlanTrabajo, FilaPlanTrabajo } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { getHorario, esMarcaEspecial, labelMarca } from "@/lib/esdomed/horarios";
@@ -97,6 +97,20 @@ const subirArchivos = async (uid: string, lista: File[]): Promise<{ url: string;
   return subidos;
 };
 
+// Borra de Storage los archivos que ya no están en el trámite. Es de mejor
+// esfuerzo: el registro en Firestore es la fuente de verdad y ya quedó
+// actualizado antes de llamar aquí; un archivo que no se pudo borrar solo
+// queda huérfano (no se muestra en ningún lado).
+const eliminarArchivos = async (docs: { url: string }[]) => {
+  await Promise.all(docs.map(async (d) => {
+    try {
+      await deleteObject(ref(storage, d.url));
+    } catch {
+      /* huérfano tolerado */
+    }
+  }));
+};
+
 // Periodos visibles en el selector de turnos: mes anterior (permisos diferidos),
 // actual y siguiente.
 const PERIODOS_WIZARD = (() => {
@@ -137,8 +151,11 @@ export default function MisTramitesPage() {
   const [fechaFin, setFechaFin] = useState("");
   const [horas, setHoras] = useState("");
 
-  // "Agregar documentos" a un trámite ya aprobado (no cambia el estado).
+  // Documentos de un trámite ya aprobado (no cambia el estado): se agregan o
+  // se quitan. `docsAdjuntar` es la lista de trabajo de los ya subidos (los que
+  // el dueño quite desaparecen de aquí y se borran al guardar).
   const [adjuntarA, setAdjuntarA] = useState<TramitePersonal | null>(null);
+  const [docsAdjuntar, setDocsAdjuntar] = useState<{ url: string; nombre: string }[]>([]);
   const [filesAdjuntar, setFilesAdjuntar] = useState<File[]>([]);
   const adjuntarInputRef = useRef<HTMLInputElement>(null);
 
@@ -317,6 +334,11 @@ export default function MisTramitesPage() {
           tipoSolicitud: datos ? clasificarSolicitud(aLocalInput(datos.inicio)) : deleteField(),
           actualizadoEn: Timestamp.now(),
         });
+        // Adjuntos quitados durante la edición: se borran de Storage (mejor esfuerzo).
+        const original = tramites.find(t => t.id === editId);
+        if (original) {
+          await eliminarArchivos(docsDe(original).filter(d => !documentos.some(a => a.url === d.url)));
+        }
       } else {
         const payload: Record<string, unknown> = {
           categoria,
@@ -352,31 +374,55 @@ export default function MisTramitesPage() {
     }
   };
 
-  // Adjuntar documentos a un trámite APROBADO: el estado no cambia; solo se
-  // reclasifica ordinario/diferido según el día en que se sube el documento
-  // respecto a la fecha del permiso.
+  const abrirAdjuntar = (t: TramitePersonal) => {
+    setAdjuntarA(t);
+    setDocsAdjuntar(docsDe(t));
+    setFilesAdjuntar([]);
+    if (adjuntarInputRef.current) adjuntarInputRef.current.value = "";
+  };
+
+  const cerrarAdjuntar = () => {
+    setAdjuntarA(null);
+    setDocsAdjuntar([]);
+    setFilesAdjuntar([]);
+  };
+
+  // Documentos de un trámite APROBADO: se agregan o se quitan sin que el estado
+  // cambie. Solo se reclasifica ordinario/diferido cuando se AGREGA un documento,
+  // según el día en que se sube respecto a la fecha del permiso; quitar uno no
+  // mueve la clasificación.
   const guardarAdjuntos = async () => {
-    if (!adjuntarA?.id || !user || filesAdjuntar.length === 0) return;
+    if (!adjuntarA?.id || !user) return;
+    const quitados = docsDe(adjuntarA).filter(d => !docsAdjuntar.some(a => a.url === d.url));
+    if (filesAdjuntar.length === 0 && quitados.length === 0) return;
     setSaving(true);
     try {
       const subidos = await subirArchivos(user.uid, filesAdjuntar);
-      const documentos = [...docsDe(adjuntarA), ...subidos];
+      const documentos = [...docsAdjuntar, ...subidos];
       const payload: Record<string, unknown> = {
-        documentos,
+        documentos: documentos.length ? documentos : deleteField(),
         documentoUrl: deleteField(),
         documentoNombre: deleteField(),
         actualizadoEn: Timestamp.now(),
       };
-      if (REQUIERE_APROBACION(adjuntarA.categoria) && adjuntarA.fechaInicio) {
+      if (subidos.length > 0 && REQUIERE_APROBACION(adjuntarA.categoria) && adjuntarA.fechaInicio) {
         payload.tipoSolicitud = clasificarSolicitud(toLocalInput(adjuntarA.fechaInicio));
       }
       await updateDoc(doc(db, "tramites_personal", adjuntarA.id), payload);
-      setAdjuntarA(null);
-      setFilesAdjuntar([]);
-      setFeedback({ tipo: "exito", mensaje: "Documentos agregados. El trámite sigue aprobado." });
+      // Los archivos quitados se borran de Storage DESPUÉS de actualizar el
+      // registro: si el borrado falla, el trámite ya quedó bien.
+      await eliminarArchivos(quitados);
+      cerrarAdjuntar();
+      const mensaje =
+        subidos.length > 0 && quitados.length > 0
+          ? "Documentos actualizados."
+          : subidos.length > 0
+            ? (subidos.length === 1 ? "Documento agregado." : `${subidos.length} documentos agregados.`)
+            : (quitados.length === 1 ? "Documento eliminado." : `${quitados.length} documentos eliminados.`);
+      setFeedback({ tipo: "exito", mensaje: `${mensaje} El trámite sigue aprobado.` });
     } catch (err) {
       console.error(err);
-      setFeedback({ tipo: "error", mensaje: "No se pudieron subir los documentos. Intenta de nuevo." });
+      setFeedback({ tipo: "error", mensaje: "No se pudieron guardar los documentos. Intenta de nuevo." });
     } finally {
       setSaving(false);
     }
@@ -534,13 +580,14 @@ export default function MisTramitesPage() {
                     </span>
                   )}
                   {t.estado === "aprobado" ? (
-                    // Un trámite aprobado ya no se reabre: solo se le agrega el
-                    // respaldo físico escaneado (antes o después del permiso).
+                    // Un trámite aprobado ya no se reabre: solo se gestiona el
+                    // respaldo físico escaneado (agregar o quitar, antes o después
+                    // del permiso).
                     <button
-                      onClick={() => { setAdjuntarA(t); setFilesAdjuntar([]); }}
+                      onClick={() => abrirAdjuntar(t)}
                       className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto"
                     >
-                      <Paperclip size={14} /> Agregar documentos
+                      <Paperclip size={14} /> {docs.length > 0 ? "Gestionar documentos" : "Agregar documentos"}
                     </button>
                   ) : (
                     <button
@@ -908,89 +955,122 @@ export default function MisTramitesPage() {
         </div>
       )}
 
-      {/* ── Modal: agregar documentos a un trámite aprobado ── */}
-      {adjuntarA && (
-        <div className="fixed inset-0 z-50 flex justify-center items-start pt-10 px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden mb-10">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-emerald-50 dark:bg-emerald-950/20">
-              <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
-                <Paperclip size={20} /> Agregar documentos
-              </h2>
-              <button onClick={() => setAdjuntarA(null)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-5">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[adjuntarA.categoria]}</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  El trámite <span className="font-bold text-emerald-600 dark:text-emerald-400">sigue aprobado</span>; solo se agrega el respaldo. Si lo subes después de la fecha del permiso, quedará como <span className="font-bold">diferido</span>; si es antes o el mismo día, como <span className="font-bold">ordinario</span>.
-                </p>
+      {/* ── Modal: documentos de un trámite aprobado (agregar o quitar) ── */}
+      {adjuntarA && (() => {
+        const quitados = docsDe(adjuntarA).filter(d => !docsAdjuntar.some(a => a.url === d.url));
+        const total = docsAdjuntar.length + filesAdjuntar.length;
+        const hayCambios = filesAdjuntar.length > 0 || quitados.length > 0;
+        return (
+          <div className="fixed inset-0 z-50 flex justify-center items-start pt-10 px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden mb-10">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-emerald-50 dark:bg-emerald-950/20">
+                <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
+                  <Paperclip size={20} /> Documentos del trámite
+                </h2>
+                <button onClick={cerrarAdjuntar} disabled={saving} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
               </div>
+              <div className="p-6 space-y-5">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[adjuntarA.categoria]}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    El trámite <span className="font-bold text-emerald-600 dark:text-emerald-400">sigue aprobado</span>; aquí solo se gestiona el respaldo:
+                    puedes agregar archivos o quitar los que ya no correspondan. Si agregas uno después de la fecha del permiso,
+                    quedará como <span className="font-bold">diferido</span>; si es antes o el mismo día, como <span className="font-bold">ordinario</span>.
+                  </p>
+                </div>
 
-              {docsDe(adjuntarA).length > 0 && (
-                <ul className="space-y-1.5">
-                  {docsDe(adjuntarA).map((docu, i) => (
-                    <li key={i} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
-                      <File size={14} className="text-blue-500 shrink-0" />
-                      <a href={docu.url} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-700 dark:text-slate-300 truncate flex-1 hover:underline">{docu.nombre}</a>
-                    </li>
-                  ))}
-                  {filesAdjuntar.map((f, i) => (
-                    <li key={`n-${i}`} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
-                      <Upload size={14} className="text-emerald-500 shrink-0" />
-                      <span className="text-xs text-slate-700 dark:text-slate-300 truncate flex-1">{f.name}</span>
-                      <button type="button" onClick={() => setFilesAdjuntar(prev => prev.filter((_, idx) => idx !== i))} className="p-1 text-slate-400 hover:text-rose-500 transition-colors shrink-0" aria-label="Quitar archivo">
-                        <X size={14} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Adjuntos</span>
+                    <span className="text-[11px] font-semibold text-slate-400">{total}/{MAX_ADJUNTOS}</span>
+                  </div>
 
-              {docsDe(adjuntarA).length + filesAdjuntar.length < MAX_ADJUNTOS ? (
-                <input
-                  type="file"
-                  multiple
-                  ref={adjuntarInputRef}
-                  onChange={(e) => {
-                    const elegidos = Array.from(e.target.files ?? []);
-                    if (adjuntarInputRef.current) adjuntarInputRef.current.value = "";
-                    const espacio = MAX_ADJUNTOS - docsDe(adjuntarA).length - filesAdjuntar.length;
-                    setFilesAdjuntar(prev => [...prev, ...elegidos.slice(0, Math.max(0, espacio))]);
-                  }}
-                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 transition-colors file:cursor-pointer cursor-pointer"
-                />
-              ) : (
-                <p className="text-[11px] text-slate-500">Llegaste al máximo de {MAX_ADJUNTOS} adjuntos.</p>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAdjuntarA(null)}
-                  disabled={saving}
-                  className="px-5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={guardarAdjuntos}
-                  disabled={saving || filesAdjuntar.length === 0}
-                  className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {total === 0 ? (
+                    <p className="text-xs text-slate-500 italic bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg px-3 py-3 text-center">
+                      {quitados.length > 0
+                        ? "Quitaste todos los documentos. Al guardar, el trámite quedará sin adjuntos."
+                        : "Este trámite aún no tiene documentos. Elige los archivos abajo."}
+                    </p>
                   ) : (
-                    "Subir Documentos"
+                    <ul className="space-y-1.5">
+                      {docsAdjuntar.map((docu, i) => (
+                        <li key={`a-${docu.url}`} className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                          <File size={14} className="text-blue-500 shrink-0" />
+                          <a href={docu.url} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-700 dark:text-slate-300 truncate flex-1 hover:underline">{docu.nombre}</a>
+                          <button type="button" onClick={() => setDocsAdjuntar(prev => prev.filter((_, idx) => idx !== i))}
+                            className="p-1 text-slate-400 hover:text-rose-500 transition-colors shrink-0" aria-label="Quitar documento" title="Quitar este documento">
+                            <Trash2 size={14} />
+                          </button>
+                        </li>
+                      ))}
+                      {filesAdjuntar.map((f, i) => (
+                        <li key={`n-${i}`} className="flex items-center gap-2 bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 rounded-lg px-3 py-2">
+                          <Upload size={14} className="text-emerald-500 shrink-0" />
+                          <span className="text-xs text-slate-700 dark:text-slate-300 truncate flex-1">{f.name}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 shrink-0">Nuevo</span>
+                          <button type="button" onClick={() => setFilesAdjuntar(prev => prev.filter((_, idx) => idx !== i))}
+                            className="p-1 text-slate-400 hover:text-rose-500 transition-colors shrink-0" aria-label="Quitar archivo">
+                            <X size={14} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </button>
+
+                  {quitados.length > 0 && (
+                    <p className="mt-2 text-[11px] text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                      <AlertTriangle size={12} className="shrink-0" />
+                      {quitados.length === 1 ? "1 documento se eliminará" : `${quitados.length} documentos se eliminarán`} al guardar.
+                    </p>
+                  )}
+                </div>
+
+                {total < MAX_ADJUNTOS ? (
+                  <input
+                    type="file"
+                    multiple
+                    ref={adjuntarInputRef}
+                    onChange={(e) => {
+                      const elegidos = Array.from(e.target.files ?? []);
+                      if (adjuntarInputRef.current) adjuntarInputRef.current.value = "";
+                      const espacio = MAX_ADJUNTOS - docsAdjuntar.length - filesAdjuntar.length;
+                      setFilesAdjuntar(prev => [...prev, ...elegidos.slice(0, Math.max(0, espacio))]);
+                    }}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 transition-colors file:cursor-pointer cursor-pointer"
+                  />
+                ) : (
+                  <p className="text-[11px] text-slate-500">Llegaste al máximo de {MAX_ADJUNTOS} adjuntos. Quita uno para agregar otro.</p>
+                )}
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={cerrarAdjuntar}
+                    disabled={saving}
+                    className="px-5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={guardarAdjuntos}
+                    disabled={saving || !hayCambios}
+                    className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      "Guardar cambios"
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal de feedback (éxito / error) */}
       {feedback && (

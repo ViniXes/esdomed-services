@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Pencil, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { TipoBajaUsuario, TipoMedicoCuidadosCriticos, UserProfile, UserRole } from "@/types";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, KeyRound, Pencil, Search, Trash2, UserCheck, UserMinus, UserPlus, Users, X } from "lucide-react";
 
 const PAGE_SIZE = 10;
 import { useServicios } from "@/contexts/ServiciosContext";
@@ -12,6 +12,18 @@ import {
   serviciosPorTipoMedico,
   TIPO_MEDICO_CRITICO_LABEL,
 } from "@/lib/cuidadosCriticos";
+import { DateField } from "@/components/ui/DateField";
+import { TIPOS_BAJA, TIPO_BAJA_LABEL } from "@/lib/bajaUsuarios";
+
+// "YYYY-MM-DD" → "DD/MM/YYYY" (fecha calendario de la baja, sin hora).
+const fechaCorta = (iso: string) => iso.split("-").reverse().join("/");
+const hoyISO = () => {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+type FiltroEstado = "vigentes" | "baja" | "todos";
 
 interface NuevoUsuario {
   nombre: string;
@@ -159,6 +171,14 @@ export default function DashboardUsuariosPage() {
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroRol, setFiltroRol] = useState<FiltroRol>("");
   const [pagina, setPagina] = useState(1);
+  // Estado del usuario: vigentes (default), dados de baja o ambos.
+  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("vigentes");
+  // Modal de baja / reactivación (null = cerrado).
+  const [accionBaja, setAccionBaja] = useState<{ tipo: "baja" | "reactivar"; u: UserProfile } | null>(null);
+  const [fechaBaja, setFechaBaja] = useState("");
+  const [tipoBaja, setTipoBaja] = useState<TipoBajaUsuario | "">("");
+  const [motivoBaja, setMotivoBaja] = useState("");
+  const [procesandoBaja, setProcesandoBaja] = useState(false);
 
   const getToken = async () => (await user?.getIdToken()) ?? "";
 
@@ -335,6 +355,49 @@ export default function DashboardUsuariosPage() {
     setResettingUid(null);
   };
 
+  // Dar de baja / reactivar. La baja deshabilita el acceso y conserva todo el
+  // historial (a diferencia de Eliminar); ver UserProfile.baja en src/types.
+  const abrirBaja = (tipo: "baja" | "reactivar", u: UserProfile) => {
+    setFechaBaja(hoyISO());
+    setTipoBaja("");
+    setMotivoBaja("");
+    setError("");
+    setAccionBaja({ tipo, u });
+  };
+
+  const confirmarBaja = async () => {
+    if (!accionBaja) return;
+    const { tipo, u } = accionBaja;
+    if (tipo === "baja" && !tipoBaja) {
+      setError("Indica el tipo de baja.");
+      return;
+    }
+    if (tipo === "baja" && !fechaBaja) {
+      setError("Indica la fecha efectiva de la baja.");
+      return;
+    }
+    setProcesandoBaja(true);
+    setError("");
+    const token = await getToken();
+    const res = await fetch(`/api/usuarios/${u.uid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(
+        tipo === "baja"
+          ? { baja: true, tipoBaja, fechaBaja, motivoBaja: motivoBaja.trim() }
+          : { reactivar: true },
+      ),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? (tipo === "baja" ? "No se pudo dar de baja al usuario" : "No se pudo reactivar al usuario"));
+    } else {
+      setAccionBaja(null);
+      if (filtroRol) await fetchUsuarios(filtroRol);
+    }
+    setProcesandoBaja(false);
+  };
+
   const openEditUser = (u: UserProfile) => {
     const serviciosActuales = u.servicios?.length ? u.servicios : u.servicio ? [u.servicio] : [];
     setEditingUser(u);
@@ -425,19 +488,24 @@ export default function DashboardUsuariosPage() {
   // ── Búsqueda de texto + paginación ──
   // El rol ya viene acotado desde el servidor (fetchUsuarios); aquí solo se
   // filtra por texto dentro de ese conjunto ya cargado.
+  const totalBajas = useMemo(() => usuarios.filter(u => u.activo === false).length, [usuarios]);
+
   const usuariosFiltrados = useMemo(() => {
     const q = filtroNombre.trim().toLowerCase();
-    if (!q) return usuarios;
-    return usuarios.filter(u =>
+    const porEstado = usuarios.filter(u =>
+      filtroEstado === "todos" ? true : filtroEstado === "baja" ? u.activo === false : u.activo !== false,
+    );
+    if (!q) return porEstado;
+    return porEstado.filter(u =>
       u.nombre?.toLowerCase().includes(q) ||
       u.email?.toLowerCase().includes(q) ||
       u.username?.toLowerCase().includes(q) ||
       u.codigoMarcacion?.toLowerCase().includes(q)
     );
-  }, [usuarios, filtroNombre]);
+  }, [usuarios, filtroNombre, filtroEstado]);
 
   // Al cambiar filtros, volver a la página 1 (ajuste en render, sin efecto).
-  const filtrosKey = `${filtroNombre}|${filtroRol}`;
+  const filtrosKey = `${filtroNombre}|${filtroRol}|${filtroEstado}`;
   const [prevFiltros, setPrevFiltros] = useState(filtrosKey);
   if (filtrosKey !== prevFiltros) {
     setPrevFiltros(filtrosKey);
@@ -450,7 +518,7 @@ export default function DashboardUsuariosPage() {
 
   // Con el rol ya acotado en el servidor, "hay filtros" ahora solo se refiere
   // a la búsqueda de texto dentro de ese conjunto.
-  const hayFiltros = filtroNombre.trim() !== "";
+  const hayFiltros = filtroNombre.trim() !== "" || filtroEstado !== "vigentes";
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto">
@@ -677,6 +745,16 @@ export default function DashboardUsuariosPage() {
           )}
         </div>
         <select
+          value={filtroEstado}
+          onChange={e => setFiltroEstado(e.target.value as FiltroEstado)}
+          title="Estado del usuario"
+          className="sm:w-44 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="vigentes">Vigentes</option>
+          <option value="baja">Dados de baja{totalBajas ? ` (${totalBajas})` : ""}</option>
+          <option value="todos">Vigentes y bajas</option>
+        </select>
+        <select
           value={filtroRol}
           onChange={e => setFiltroRol(e.target.value as FiltroRol)}
           className="sm:w-64 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -722,11 +800,27 @@ export default function DashboardUsuariosPage() {
                 </td></tr>
               )}
               {usuariosPagina.map(u => (
-                <tr key={u.uid} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                <tr key={u.uid} className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${u.activo === false ? "bg-slate-50/60 dark:bg-slate-800/20" : ""}`}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900 dark:text-slate-100">{u.nombre}</p>
                     {u.username && (
                       <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5 font-mono">@{u.username}</p>
+                    )}
+                    {u.activo === false && (
+                      <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300"
+                          title={u.baja?.registradaPorNombre ? `Baja registrada por ${u.baja.registradaPorNombre}` : undefined}
+                        >
+                          <UserMinus size={11} />
+                          Baja{u.baja?.fecha ? ` · ${fechaCorta(u.baja.fecha)}` : ""}
+                        </span>
+                        {(u.baja?.tipo || u.baja?.motivo) && (
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                            {[u.baja?.tipo ? TIPO_BAJA_LABEL[u.baja.tipo] : "", u.baja?.motivo ?? ""].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+                      </p>
                     )}
                     {u.role === "medico" && (
                       <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-mono">
@@ -750,11 +844,24 @@ export default function DashboardUsuariosPage() {
                         className="p-1 text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors">
                         <Pencil size={15} />
                       </button>
-                      <button onClick={() => handleResetPassword(u.uid, u.nombre)} disabled={resettingUid === u.uid}
-                        title={`Restablecer clave a ${DEFAULT_PASSWORD}`}
+                      <button onClick={() => handleResetPassword(u.uid, u.nombre)} disabled={resettingUid === u.uid || u.activo === false}
+                        title={u.activo === false ? "Usuario dado de baja: reactívalo antes de restablecer la clave" : `Restablecer clave a ${DEFAULT_PASSWORD}`}
                         className="p-1 text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 disabled:opacity-40 transition-colors">
                         <KeyRound size={15} />
                       </button>
+                      {u.activo === false ? (
+                        <button onClick={() => abrirBaja("reactivar", u)}
+                          title="Reactivar usuario (vuelve a poder iniciar sesión)"
+                          className="p-1 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                          <UserCheck size={15} />
+                        </button>
+                      ) : (
+                        <button onClick={() => abrirBaja("baja", u)} disabled={u.uid === profile?.uid}
+                          title={u.uid === profile?.uid ? "No puedes darte de baja a ti mismo" : "Dar de baja (deshabilita el acceso y conserva su historial)"}
+                          className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-40 transition-colors">
+                          <UserMinus size={15} />
+                        </button>
+                      )}
                       <button onClick={() => handleDelete(u.uid, u.nombre)} disabled={deletingUid === u.uid}
                         title="Eliminar usuario"
                         className="p-1 text-red-500 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-40 transition-colors">
@@ -1007,6 +1114,119 @@ export default function DashboardUsuariosPage() {
                   }`}
                 >
                   {procesando ? "Procesando..." : aprobar ? "Aprobar" : "Rechazar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal: dar de baja / reactivar un usuario. */}
+      {accionBaja && (() => {
+        const { tipo, u } = accionBaja;
+        const esBaja = tipo === "baja";
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className={`w-11 h-11 flex-shrink-0 rounded-full flex items-center justify-center border ${
+                  esBaja
+                    ? "bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900"
+                    : "bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900"
+                }`}>
+                  {esBaja
+                    ? <UserMinus size={20} className="text-rose-600 dark:text-rose-400" />
+                    : <UserCheck size={20} className="text-emerald-600 dark:text-emerald-400" />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">
+                    {esBaja ? "Dar de baja" : "Reactivar usuario"}
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    {esBaja
+                      ? "Se deshabilita su acceso y se cierran sus sesiones. No se borra nada: sus filas en los planes de trabajo, sus trámites y sus registros se conservan como historial. Dejará de aparecer en los listados de personal vigente."
+                      : "Vuelve a poder iniciar sesión y a aparecer en los listados de personal vigente."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-4 py-3 mb-4 text-sm">
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{u.nombre}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {u.email}
+                  {u.codigoMarcacion ? ` · ${u.codigoMarcacion}` : ""}
+                  {` · ${displayRole(u)}`}
+                </p>
+                {!esBaja && u.baja?.fecha && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Baja del {fechaCorta(u.baja.fecha)}
+                    {u.baja.tipo ? ` · ${TIPO_BAJA_LABEL[u.baja.tipo]}` : ""}
+                    {u.baja.motivo ? ` · ${u.baja.motivo}` : ""}
+                  </p>
+                )}
+              </div>
+
+              {esBaja && (
+                <div className="space-y-3 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de baja</label>
+                    <select
+                      value={tipoBaja}
+                      onChange={e => setTipoBaja(e.target.value as TipoBajaUsuario | "")}
+                      className={inputCls}
+                    >
+                      <option value="" disabled>Selecciona el tipo...</option>
+                      {TIPOS_BAJA.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    {tipoBaja === "fallecimiento" && (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Aparecerá &ldquo;En memoria&rdquo; con tarjeta dorada en Personal de trabajo.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Fecha efectiva de la baja</label>
+                    <DateField value={fechaBaja} onChange={setFechaBaja} placeholder="Seleccionar fecha" ariaLabel="Fecha efectiva de la baja" />
+                    <p className="mt-1 text-[11px] text-slate-400">Ej. fecha de fallecimiento, de retiro o de traslado.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Motivo (opcional)</label>
+                    <input
+                      type="text"
+                      value={motivoBaja}
+                      onChange={e => setMotivoBaja(e.target.value)}
+                      maxLength={300}
+                      placeholder="Ej: Fallecimiento, renuncia, traslado..."
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <p className="mb-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAccionBaja(null); setError(""); }}
+                  disabled={procesandoBaja}
+                  className="flex-1 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarBaja}
+                  disabled={procesandoBaja || (esBaja && (!fechaBaja || !tipoBaja))}
+                  className={`flex-1 py-2.5 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition-colors ${
+                    esBaja ? "bg-rose-600 hover:bg-rose-500" : "bg-emerald-600 hover:bg-emerald-500"
+                  }`}
+                >
+                  {procesandoBaja ? "Procesando..." : esBaja ? "Dar de baja" : "Reactivar"}
                 </button>
               </div>
             </div>
