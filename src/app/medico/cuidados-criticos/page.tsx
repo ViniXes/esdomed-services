@@ -582,7 +582,7 @@ export default function CuidadosCriticosMedicoPage() {
         && fechaIngresoMatrizDesdeDatos(ficha.datos) === fechaIngresoSeleccionada
       )
       : [];
-    if (duplicadasMismaFecha.length > 0) {
+    if (!fichaSeleccionada?.id && duplicadasMismaFecha.length > 0) {
       const detalleDuplicadas = duplicadasMismaFecha
         .slice(0, 3)
         .map(detalleFichaDuplicadaMes)
@@ -591,12 +591,10 @@ export default function CuidadosCriticosMedicoPage() {
         `Advertencia: este paciente ya tiene ${duplicadasMismaFecha.length} registro${duplicadasMismaFecha.length === 1 ? "" : "s"} UCI/UCIN con la misma fecha de ingreso: ${fechaIngresoSeleccionada}.`,
         detalleDuplicadas ? `Registros encontrados:\n${detalleDuplicadas}` : "",
         "Si estas completando una ficha duplicada por error, cancela y abre el registro correcto. Si es una estancia real separada, puedes continuar.",
-        fichaSeleccionada?.id ? "Deseas guardar esta ficha de todas formas?" : "Deseas crear otra ficha de todas formas?",
+        "Deseas crear otra ficha de todas formas?",
       ].filter(Boolean).join("\n\n"));
       if (!continuar) {
-        const message = fichaSeleccionada?.id
-          ? "No se guardo la ficha porque ya existe otro registro de este paciente con la misma fecha de ingreso."
-          : "No se creo otra ficha porque ya existe un registro de este paciente con la misma fecha de ingreso.";
+        const message = "No se creo otra ficha porque ya existe un registro de este paciente con la misma fecha de ingreso.";
         setError(message);
         setSaving(false);
         throw new Error(message);
@@ -711,6 +709,7 @@ export default function CuidadosCriticosMedicoPage() {
   const fichasConsultadas = Boolean(consultadoEn) || fichas.length > 0;
   const registrosGuardadosValor = fichasConsultadas ? fichas.length : "Sin consultar";
   const registrosActivosValor = fichasConsultadas ? fichas.filter(item => !fichaEgresada(item)).length : "Sin consultar";
+  const creandoNuevaFicha = selectedEstanciaId === NUEVA_ESTANCIA && !fichaSeleccionada?.id;
 
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6">
@@ -901,17 +900,29 @@ export default function CuidadosCriticosMedicoPage() {
       )}
 
       {selected && selectedEstanciaId ? (
-        <FichaMatrizCuidadosCriticos
-          key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
-          paciente={selected}
-          tipo={tipoFormulario}
-          servicioEstancia={servicioCanonicoCuidadosCriticos(fichaSeleccionada?.servicio ?? selected.servicioActual)}
-          numeroEstancia={numeroEstancia}
-          datosGuardados={fichaSeleccionada?.datos}
-          saving={saving}
-          puedeEditarAutomaticos={profile?.role === "admin"}
-          onSave={guardarFicha}
-        />
+        <>
+          <div className={`rounded-2xl border p-4 text-sm ${creandoNuevaFicha ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200" : "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"}`}>
+            <p className="font-semibold">
+              {creandoNuevaFicha ? "Creando nueva ficha UCI/UCIN" : "Editando registro existente"}
+            </p>
+            <p className="mt-1 text-xs opacity-90">
+              {creandoNuevaFicha
+                ? "Al guardar, el sistema revisara si este expediente ya tiene una ficha en el mismo mes o con la misma fecha de ingreso."
+                : `Estas modificando una ficha ya guardada${fichaSeleccionada?.id ? ` (${fichaSeleccionada.id})` : ""}; guardar aqui no crea otro registro.`}
+            </p>
+          </div>
+          <FichaMatrizCuidadosCriticos
+            key={`${selected.expediente}-${selectedEstanciaId}-${toDate(fichaSeleccionada?.actualizadoEn)?.getTime() ?? ""}`}
+            paciente={selected}
+            tipo={tipoFormulario}
+            servicioEstancia={servicioCanonicoCuidadosCriticos(fichaSeleccionada?.servicio ?? selected.servicioActual)}
+            numeroEstancia={numeroEstancia}
+            datosGuardados={fichaSeleccionada?.datos}
+            saving={saving}
+            puedeEditarAutomaticos={profile?.role === "admin"}
+            onSave={guardarFicha}
+          />
+        </>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 py-16 text-center text-sm text-slate-500 dark:border-slate-700">
           Selecciona un paciente para abrir o iniciar una estancia UCI / UCIN.
