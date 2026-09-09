@@ -185,7 +185,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? [{ href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA }]
       : []),
     ...(verCuidadosCriticos
-      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA, exact: true }]
+      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, badge: pendientes.cuidadosCriticosEliminacion, group: G_MEDICINA_CRITICA, exact: true }]
       : []),
     ...(verCuidadosCriticos
       ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, group: G_MEDICINA_CRITICA }]
@@ -275,7 +275,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         ]
       : []),
     ...(verSimmow
-      ? [{ href: "/dashboard/simmow", label: "SIMMOW", icon: FileCode2, group: G_DOCUMENTOS }]
+      ? [{ href: "/dashboard/simmow", label: "SIMMOW", icon: FileCode2, badge: pendientes.simmowReportes, group: G_DOCUMENTOS }]
       : []),
 
     // ── Reportes ──

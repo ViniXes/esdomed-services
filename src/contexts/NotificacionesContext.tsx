@@ -20,7 +20,7 @@ import type { NotificacionFallecido } from "@/types";
 export type TipoNotif =
   | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
   | "incapacidad" | "anexo5" | "impresion" | "recepcion" | "conapina"
-  | "solicitud_lesion";
+  | "solicitud_lesion" | "uci_eliminacion" | "simmow_reporte";
 
 export interface NotifToast {
   id: string;
@@ -41,6 +41,9 @@ interface Pendientes {
   conapina: number;
   // Solicitudes de notificación del comité difundidas al área médica.
   solicitudesLesion: number;
+  // Solicitudes administrativas pendientes.
+  cuidadosCriticosEliminacion: number;
+  simmowReportes: number;
   total: number;
 }
 
@@ -51,7 +54,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, cuidadosCriticosEliminacion: 0, simmowReportes: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -67,7 +70,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
 
   const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
-    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0,
+    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, cuidadosCriticosEliminacion: 0, simmowReportes: 0,
   });
   const [toasts, setToasts] = useState<NotifToast[]>([]);
 
@@ -305,9 +308,64 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [esMedico, addToast, setCount]);
 
+  // ── Admin: solicitudes de eliminación de fichas UCI/UCIN ──
+  const knownEliminacionesCriticas = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!profile || profile.role !== "admin") return;
+    knownEliminacionesCriticas.current = null;
+    const q = query(collection(db, "fichas_cuidados_criticos"), where("solicitudEliminacion.estado", "==", "pendiente"));
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownEliminacionesCriticas.current === null) {
+        knownEliminacionesCriticas.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownEliminacionesCriticas.current!.has(doc.id)) {
+            const d = doc.data();
+            const solicitud = d.solicitudEliminacion as Doc | undefined;
+            addToast({
+              tipo: "uci_eliminacion",
+              titulo: "Solicitud de eliminación UCI/UCIN",
+              mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}${solicitud?.solicitadoPorNombre ? ` · ${s(solicitud.solicitadoPorNombre)}` : ""}`,
+            });
+          }
+        });
+        knownEliminacionesCriticas.current = ids;
+      }
+      setCount("cuidadosCriticosEliminacion", snap.size);
+    });
+  }, [profile, addToast, setCount]);
+
+  // ── Admin: reportes técnicos pendientes de SIMMOW (Vault Boy) ──
+  const knownReportesSimmow = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!profile || profile.role !== "admin") return;
+    knownReportesSimmow.current = null;
+    const q = query(collection(db, "reportes_bugs_simmow"), where("estado", "==", "pendiente"));
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownReportesSimmow.current === null) {
+        knownReportesSimmow.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownReportesSimmow.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "simmow_reporte",
+              titulo: "Nuevo reporte técnico SIMMOW",
+              mensaje: `${s(d.nombreUsuario)}${s(d.expediente) ? ` · Exp. ${s(d.expediente)}` : ""}`,
+            });
+          }
+        });
+        knownReportesSimmow.current = ids;
+      }
+      setCount("simmowReportes", snap.size);
+    });
+  }, [profile, addToast, setCount]);
+
   const pendientes: Pendientes = {
     ...counts,
-    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion,
+    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion + counts.cuidadosCriticosEliminacion + counts.simmowReportes,
   };
 
   return (
