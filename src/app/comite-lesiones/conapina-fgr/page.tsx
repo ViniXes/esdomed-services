@@ -36,7 +36,7 @@ const ICONO_INSTANCIA: Record<InstanciaAviso, React.ElementType | null> = {
 function ChipInstancia({ instancia, size = 10 }: { instancia: InstanciaAviso; size?: number }) {
   const Icono = ICONO_INSTANCIA[instancia];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${INSTANCIA_CHIP[instancia]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${INSTANCIA_CHIP[instancia]}`}>
       {Icono
         ? <Icono size={size} />
         : <span className="flex items-center gap-px"><Baby size={size} /><Scale size={size} /></span>}
@@ -65,6 +65,16 @@ export default function ComiteConapinaFgrPage() {
   const [items, setItems] = useState<NotificacionConapinaFgr[]>([]);
   const [cargando, setCargando] = useState(true);
   const [sinPermiso, setSinPermiso] = useState(false);
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [orden, setOrden] = useState("antiguos");
+  const [ahora, setAhora] = useState<number | null>(null);
+
+  useEffect(() => {
+    const actualizar = () => setAhora(Date.now());
+    actualizar();
+    const timer = window.setInterval(actualizar, 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const [vista, setVista] = useState<Vista>("bandeja");
   const [filtro, setFiltro] = useState<EstadoNotificacionConapinaFgr | "todos">("pendiente");
@@ -93,12 +103,15 @@ export default function ComiteConapinaFgrPage() {
       s => {
         const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as NotificacionConapinaFgr));
         setItems(docs);
+        setSinPermiso(false);
+        setErrorCarga(false);
         // El modal debe reflejar el estado nuevo tras recibir el caso, sin cerrarse.
         setSelected(prev => (prev?.id ? docs.find(d => d.id === prev.id) ?? prev : prev));
         setCargando(false);
       },
       err => {
         setCargando(false);
+        setErrorCarga(true);
         if ((err as { code?: string }).code === "permission-denied") setSinPermiso(true);
       },
     );
@@ -148,7 +161,7 @@ export default function ComiteConapinaFgrPage() {
   });
 
   // Reinicio de paginación al cambiar los filtros (ajuste de estado en render).
-  const filtrosKey = `${vista}|${filtro}|${tipo}|${busqueda}|${fechaDesde}|${fechaHasta}`;
+  const filtrosKey = `${vista}|${filtro}|${tipo}|${busqueda}|${fechaDesde}|${fechaHasta}|${orden}`;
   const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
   if (filtrosPrevios !== filtrosKey) {
     setFiltrosPrevios(filtrosKey);
@@ -157,7 +170,11 @@ export default function ComiteConapinaFgrPage() {
 
   const totalPaginas = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
   const paginaActual = Math.min(page, totalPaginas);
-  const paginados = displayList.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
+  const ordenados = [...displayList].sort((a, b) => {
+    const diferencia = (aDate(a.creadoEn)?.getTime() ?? 0) - (aDate(b.creadoEn)?.getTime() ?? 0);
+    return orden === "antiguos" ? diferencia : -diferencia;
+  });
+  const paginados = ordenados.slice((paginaActual - 1) * PAGE_SIZE, paginaActual * PAGE_SIZE);
 
   const porRecibir = items.filter(n => n.estado === "pendiente").length;
   const recibidas = items.filter(n => n.estado === "confirmado").length;
@@ -299,61 +316,54 @@ export default function ComiteConapinaFgrPage() {
     : [];
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Header del área */}
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-6 dark:border-slate-700">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
             <ShieldAlert size={17} className="text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 font-heading">
               Avisos CONAPINA / FGR
             </h1>
-            <p className="mt-0.5 text-xs text-slate-500">Lesiones intencionales · comité de género y violencia</p>
+            <p className="mt-2 text-sm text-slate-500">Recepción y consulta de los avisos del área médica.</p>
           </div>
         </div>
-        {porRecibir > 0 && (
-          <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400">
-            <Clock3 size={14} />
-            {porRecibir} por recibir
-          </div>
-        )}
       </div>
 
       {/* Vistas */}
       <div className="mb-4 inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
         {([
-          { v: "bandeja" as const, label: "Bandeja", icon: Inbox, badge: porRecibir },
-          { v: "registro" as const, label: "Avisos notificados", icon: LayoutList, badge: 0 },
-        ]).map(({ v, label, icon: Icono, badge }) => (
-          <button key={v} onClick={() => { setVista(v); setFiltro(v === "registro" ? "todos" : "pendiente"); }}
+          { v: "bandeja" as const, label: "Bandeja de trabajo", icon: Inbox },
+          { v: "registro" as const, label: "Avisos notificados", icon: LayoutList },
+        ]).map(({ v, label, icon: Icono }) => (
+          <button key={v} aria-pressed={vista === v} onClick={() => { setVista(v); setFiltro(v === "registro" ? "todos" : "pendiente"); }}
             className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
               vista === v
                 ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
                 : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
             }`}>
             <Icono size={14} /> {label}
-            {badge > 0 && (
-              <span className="ml-0.5 rounded-full bg-rose-500 px-1.5 py-px text-[10px] font-bold text-white">{badge}</span>
-            )}
+
           </button>
         ))}
       </div>
 
       {sinPermiso && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-          Sin permisos para leer estas notificaciones. Pide al administrador que despliegue las reglas de{" "}
-          <strong className="font-mono">notificaciones_conapina_fgr</strong>.
+          No tiene acceso a estos avisos. Contacte al administrador para revisar los permisos de su cuenta.
         </div>
       )}
 
+      {errorCarga && !sinPermiso && <p role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No se pudieron cargar los avisos. Compruebe su conexión y vuelva a cargar la página.</p>}
+
       {/* Panel: contadores + filtros */}
-      <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
+      <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">
-              {vista === "bandeja" ? "Bandeja" : "Registro auditado"}
+              {vista === "bandeja" ? "Recepción del comité" : "Consulta de avisos"}
             </p>
             <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
               {vista === "bandeja" ? "Casos notificados" : "Avisos notificados"}
@@ -361,7 +371,7 @@ export default function ComiteConapinaFgrPage() {
             <p className="mt-0.5 text-xs text-slate-500">
               {vista === "bandeja"
                 ? "El médico da el aviso y lo declara al notificar. Aquí se recibe el caso para dejarlo registrado."
-                : "Base completa para el comité. El rango de fechas filtra por fecha del aviso."}
+                : "El rango de fechas corresponde a la fecha del aviso externo."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -375,15 +385,16 @@ export default function ComiteConapinaFgrPage() {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          <Tile n={items.length} label="Notificadas" icon={FileText} tone="cyan" />
-          <Tile n={porRecibir} label="Por recibir" icon={Clock3} tone="amber" />
-          <Tile n={recibidas} label="Recibidas" icon={CheckCircle2} tone="emerald" />
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Tile n={cargando || errorCarga ? null : porRecibir} label="Por recibir" icon={Clock3} tone="amber" onClick={() => { setVista("bandeja"); setFiltro("pendiente"); }} />
+          <Tile n={cargando || errorCarga ? null : recibidas} label="Recibidas" icon={CheckCircle2} tone="emerald" onClick={() => { setVista("bandeja"); setFiltro("confirmado"); }} />
+          <Tile n={cargando || errorCarga ? null : items.filter(n => n.estado !== "anulado").length} label="Avisos vigentes" icon={FileText} tone="cyan" onClick={() => setVista("registro")} />
         </div>
+        <p className="mb-4 text-xs leading-5 text-slate-500">Contadores generales de los avisos cargados; no cambian con los filtros. {items.length >= 400 ? "Se muestran los 400 avisos más recientes. La búsqueda y Excel abarcan únicamente estos registros." : "Los avisos vigentes excluyen las anulaciones."}</p>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {vista === "bandeja" && FILTROS.map(f => (
-            <button key={f.value} onClick={() => setFiltro(f.value)}
+            <button key={f.value} aria-pressed={filtro === f.value} onClick={() => setFiltro(f.value)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 filtro === f.value
                   ? "bg-blue-600 text-white"
@@ -392,27 +403,18 @@ export default function ComiteConapinaFgrPage() {
               {f.label}
             </button>
           ))}
-          {vista === "bandeja" && <span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" />}
-          {(["todos", ...TIPOS_CASO] as const).map(t => {
-            const Icono = t === "todos" ? null : ICONO_CASO[t];
-            return (
-              <button key={t} onClick={() => setTipo(t)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  tipo === t
-                    ? "bg-amber-700 text-white"
-                    : "border border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                }`}>
-                {Icono && <Icono size={13} />}
-                {t === "todos" ? "Todo motivo" : TIPO_CASO_LABEL[t]}
-              </button>
-            );
-          })}
+          <label className="ml-auto flex items-center gap-2 text-sm text-slate-500">Motivo
+            <select value={tipo} onChange={e => setTipo(e.target.value as TipoCasoConapinaFgr | "todos")} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              <option value="todos">Todos los motivos</option>
+              {TIPOS_CASO.map(t => <option key={t} value={t}>{TIPO_CASO_LABEL[t]}</option>)}
+            </select>
+          </label>
         </div>
 
         <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input type="text" placeholder="Buscar por expediente, paciente, diagnóstico, médico o quien recibió..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            <input type="text" aria-label="Buscar avisos" placeholder="Buscar expediente, paciente o médico…" value={busqueda} onChange={e => setBusqueda(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400" />
           </div>
           <div className="flex items-center gap-1.5">
@@ -423,8 +425,8 @@ export default function ComiteConapinaFgrPage() {
             <span className="text-xs text-slate-500 shrink-0">Hasta</span>
             <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Fecha hasta" />
           </div>
-          {(busqueda || fechaDesde || fechaHasta) && (
-            <button onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); }}
+          {(busqueda || fechaDesde || fechaHasta || tipo !== "todos") && (
+            <button onClick={() => { setBusqueda(""); setFechaDesde(""); setFechaHasta(""); setTipo("todos"); }}
               className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100">
               <X size={12} /> Limpiar
             </button>
@@ -433,7 +435,11 @@ export default function ComiteConapinaFgrPage() {
       </section>
 
       {/* Tabla */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
+          <div><h2 className="text-sm font-semibold">{vista === "bandeja" ? "Lista de trabajo" : "Registro de avisos"}</h2><p className="mt-1 text-xs text-slate-500">{cargando ? "Cargando avisos…" : `${displayList.length} resultados con los filtros actuales`}</p></div>
+          <label className="flex items-center gap-2 text-xs text-slate-500">Orden de notificación<select value={orden} onChange={e => setOrden(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><option value="antiguos">Más antiguos primero</option><option value="recientes">Más recientes primero</option></select></label>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50/80 dark:bg-slate-800/50">
@@ -442,8 +448,8 @@ export default function ComiteConapinaFgrPage() {
                 <th className={thCls}>Paciente</th>
                 <th className={thCls}>Edad</th>
                 <th className={thCls}>Motivo del aviso</th>
-                <th className={thCls}>Diagnóstico</th>
-                <th className={thCls}>Médico que notifica</th>
+                {vista === "registro" && <th className={thCls}>Diagnóstico</th>}
+                {vista === "registro" && <th className={thCls}>Médico que notifica</th>}
                 {vista === "registro" ? (
                   <>
                     <th className={thCls}>Avisado en</th>
@@ -460,6 +466,7 @@ export default function ComiteConapinaFgrPage() {
                   </>
                 )}
                 <th className={thCls}>Estado</th>
+                <th className={thCls}><span className="sr-only">Acción</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -491,7 +498,7 @@ export default function ComiteConapinaFgrPage() {
                         <span className="flex items-center gap-1.5">
                           <span className="text-slate-700 dark:text-slate-300">{n.pacienteEdad}</span>
                           {esMenorDeEdad(n.pacienteEdad) && (
-                            <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
+                            <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
                               Menor
                             </span>
                           )}
@@ -499,12 +506,12 @@ export default function ComiteConapinaFgrPage() {
                       ) : <span title="El expediente no tiene fecha de nacimiento" className="text-slate-400">s/d</span>}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[n.tipoCaso]}`}>
+                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${TIPO_CASO_CHIP[n.tipoCaso]}`}>
                         <Icono size={11} /> {TIPO_CASO_LABEL[n.tipoCaso]}
                       </span>
                       {n.fechaHecho && <span className="mt-1 block text-[11px] text-slate-400">Hecho: {formatFecha(n.fechaHecho)}</span>}
                     </td>
-                    <td className="max-w-[260px] px-3 py-2.5">
+                    {vista === "registro" && <td className="max-w-[260px] px-3 py-2.5">
                       {n.diagnostico?.codigo ? (
                         <span className="flex items-baseline gap-1.5">
                           <span className="shrink-0 font-mono text-[11px] font-semibold text-blue-700 dark:text-blue-300">{n.diagnostico.codigo}</span>
@@ -519,8 +526,8 @@ export default function ComiteConapinaFgrPage() {
                       {n.causaExterna?.codigo && (
                         <span className="mt-0.5 block font-mono text-[11px] text-slate-400">Causa externa: {n.causaExterna.codigo}</span>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">{n.medicoNombre}</td>
+                    </td>}
+                    {vista === "registro" && <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">{n.medicoNombre}</td>}
 
                     {vista === "registro" ? (
                       <>
@@ -552,7 +559,7 @@ export default function ComiteConapinaFgrPage() {
                         <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
                           {n.servicio || "—"}{n.cama ? ` / ${n.cama}` : ""}
                         </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-500">{formatFecha(n.creadoEn)}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-500">{formatFecha(n.creadoEn)}{n.estado === "pendiente" && ahora !== null && aDate(n.creadoEn) && <span className="mt-1 block font-medium text-amber-700 dark:text-amber-300">{Math.max(0, Math.floor((ahora - aDate(n.creadoEn)!.getTime()) / 86400000))} días en espera</span>}</td>
                       </>
                     )}
 
@@ -561,6 +568,7 @@ export default function ComiteConapinaFgrPage() {
                         {ESTADO_LABEL[n.estado]}
                       </span>
                     </td>
+                    <td className="px-3 py-2.5"><button onClick={e => { e.stopPropagation(); abrir(n); }} aria-label={`Ver caso de ${n.pacienteNombre || n.pacienteExpediente}`} className="whitespace-nowrap rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-300 dark:hover:bg-slate-800">Ver caso</button></td>
                   </tr>
                 );
               })}
@@ -570,7 +578,7 @@ export default function ComiteConapinaFgrPage() {
 
         {paginados.length === 0 && (
           <p className="py-12 text-center text-sm text-slate-500">
-            {cargando ? "Cargando..." : items.length === 0 ? "Aún no hay avisos registrados." : "Sin resultados para los filtros aplicados."}
+            {cargando ? "Cargando..." : errorCarga ? "Avisos no disponibles. No se pudo comprobar la bandeja." : items.length === 0 ? "Aún no hay avisos registrados." : "Sin resultados para los filtros aplicados."}
           </p>
         )}
 
@@ -633,7 +641,7 @@ export default function ComiteConapinaFgrPage() {
                         <span className="text-xs text-amber-700 dark:text-amber-400">· edad no registrada en el expediente</span>
                       )}
                       {esMenorDeEdad(selected.pacienteEdad) && (
-                        <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
+                        <span className="rounded border border-violet-200 bg-violet-100 px-1.5 py-0.5 text-xs font-medium text-violet-700 dark:border-violet-800 dark:bg-violet-900/50 dark:text-violet-300">
                           Menor de edad · corresponde CONAPINA
                         </span>
                       )}
@@ -664,7 +672,7 @@ export default function ComiteConapinaFgrPage() {
                 <section className="space-y-1.5">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">El caso</p>
                   <Row label="Motivo" value={
-                    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${TIPO_CASO_CHIP[selected.tipoCaso]}`}>
+                    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${TIPO_CASO_CHIP[selected.tipoCaso]}`}>
                       {TIPO_CASO_LABEL[selected.tipoCaso]}
                     </span>
                   } />
@@ -832,18 +840,18 @@ const TONOS = {
   emerald: { borde: "border-emerald-100 dark:border-emerald-900/60", fondo: "bg-emerald-50/70 dark:bg-emerald-950/25", icono: "bg-emerald-500" },
 } as const;
 
-function Tile({ n, label, icon: Icono, tone }: {
-  n: number; label: string; icon: React.ElementType; tone: keyof typeof TONOS;
+function Tile({ n, label, icon: Icono, tone, onClick }: {
+  n: number | null; label: string; icon: React.ElementType; tone: keyof typeof TONOS; onClick: () => void;
 }) {
   const t = TONOS[tone];
   return (
-    <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${t.borde} ${t.fondo}`}>
+    <button onClick={onClick} className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors hover:border-blue-400 sm:flex-row sm:items-center ${t.borde} ${t.fondo}`}>
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${t.icono}`}><Icono size={16} /></span>
       <div className="min-w-0">
-        <p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{n}</p>
-        <p className="mt-1 truncate text-[11px] font-medium text-slate-500">{label}</p>
+        <p className="text-3xl font-semibold tracking-tight leading-none text-slate-900 dark:text-white">{n ?? "—"}</p>
+        <p className="mt-2 text-sm font-medium text-slate-500">{label}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
