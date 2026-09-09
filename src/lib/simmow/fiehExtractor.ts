@@ -1253,6 +1253,115 @@ const OBLIGATORIOS: [CampoSimmow, string][] = [
   ["JVPM_MEDICO_NUMERO", "No se detectó número JVPM del médico."],
 ];
 
+// ─── Departamento / Municipio / Cantón ──────────────────────────────────────
+
+/** Los 14 departamentos de El Salvador — lista fija, no cambia. */
+const DEPARTAMENTOS_EL_SALVADOR = [
+  "Ahuachapán",
+  "Santa Ana",
+  "Sonsonate",
+  "Chalatenango",
+  "La Libertad",
+  "San Salvador",
+  "Cuscatlán",
+  "La Paz",
+  "Cabañas",
+  "San Vicente",
+  "Usulután",
+  "San Miguel",
+  "Morazán",
+  "La Unión",
+] as const;
+
+function esDepartamentoConocido(valor: string): boolean {
+  const norm = sinAcentos(valor).toLowerCase().trim();
+  return DEPARTAMENTOS_EL_SALVADOR.some((d) => sinAcentos(d).toLowerCase() === norm);
+}
+
+interface DepartamentoMunicipio {
+  departamento: string;
+  distrito: string;
+  canton: string;
+}
+
+/**
+ * Fila "Departamento: / Municipio: / Cantón:" (bloque A) por coordenadas.
+ * Mismo bug que ya se resolvió para "Traslado a:" y "Servicio en la que
+ * ingresa": cuando el valor de Departamento envuelve a una segunda línea
+ * (los tres departamentos compuestos — "La Libertad", "La Paz", "La
+ * Unión" — envuelven dejando "La"/"San"/etc. en la fila y la segunda
+ * palabra una línea más abajo), el aplanado a texto corrido coloca esa
+ * segunda línea DESPUÉS de toda la fila (aparecía tras "Cantón: N/A" en
+ * vez de pegada al departamento) — el regex sobre texto plano leía
+ * Departamento="La" y arrastraba "Libertad" hacia Cantón. Se resuelve
+ * leyendo por columnas (límite = posición de la siguiente etiqueta) y,
+ * solo si el valor de una sola línea no es uno de los 14 departamentos
+ * reales de El Salvador, completándolo con la línea de abajo en esa misma
+ * columna — la validación contra la lista fija evita arrastrar contenido
+ * de la fila siguiente (Área/Nacionalidad/Teléfono, que comparte la misma
+ * grilla de columnas) cuando el departamento NO envolvió.
+ */
+function extraerDepartamentoMunicipioPorCoordenadas(doc: DocumentoExtraido): DepartamentoMunicipio | null {
+  const LINEA_ABAJO_MIN = 6;
+  const LINEA_ABAJO_MAX = 16;
+
+  for (const pagina of doc.paginas) {
+    const itemDept = pagina.items.find(
+      (it) => sinAcentos(it.str).trim().toLowerCase() === "departamento:"
+    );
+    if (!itemDept) continue;
+
+    const y0 = itemDept.y;
+    const fila0 = pagina.items.filter((it) => Math.abs(it.y - y0) <= 3).sort((a, b) => a.x - b.x);
+
+    const itemMuni = fila0.find((it) => sinAcentos(it.str).trim().toLowerCase() === "municipio:");
+    const itemCant = fila0.find((it) => /^cant[oó]n:$/i.test(sinAcentos(it.str).trim()));
+    if (!itemMuni || !itemCant) continue;
+
+    const finDept = itemDept.x + itemDept.w;
+    const finMuni = itemMuni.x + itemMuni.w;
+    const finCant = itemCant.x + itemCant.w;
+
+    const enColumna = (linea: typeof fila0, desde: number, hasta: number) =>
+      linea.filter((it) => it.x > desde + 2 && it.x < hasta - 2);
+
+    const valorDept0 = enColumna(fila0, finDept, itemMuni.x);
+    const valorMuni0 = enColumna(fila0, finMuni, itemCant.x);
+    const valorCant0 = enColumna(fila0, finCant, finCant + 200);
+
+    let departamento = limpiarDato(juntarPalabras(valorDept0));
+
+    if (!esDepartamentoConocido(departamento)) {
+      const itemsAbajo = pagina.items.filter(
+        (it) => y0 - it.y >= LINEA_ABAJO_MIN && y0 - it.y <= LINEA_ABAJO_MAX
+      );
+      if (itemsAbajo.length) {
+        const y1 = itemsAbajo[0].y;
+        const fila1 = pagina.items.filter((it) => Math.abs(it.y - y1) <= 3).sort((a, b) => a.x - b.x);
+        const valorDept1 = enColumna(fila1, finDept, itemMuni.x);
+        if (valorDept1.length) {
+          // Se unen las DOS líneas por separado (cada una ya en orden con
+          // juntarPalabras) y luego con un espacio explícito entre ambas —
+          // no reordenar por X el conjunto combinado: comparten columna,
+          // así que sus X caen en el mismo rango y "La" (línea 1) terminaría
+          // pegado a "Libertad" (línea 2) sin espacio.
+          departamento = limpiarDato(
+            [juntarPalabras(valorDept0), juntarPalabras(valorDept1)].filter(Boolean).join(" ")
+          );
+        }
+      }
+    }
+
+    const distrito = limpiarDato(juntarPalabras(valorMuni0));
+    const canton = limpiarNA(juntarPalabras(valorCant0));
+
+    if (!departamento && !distrito) continue;
+    return { departamento, distrito, canton };
+  }
+
+  return null;
+}
+
 // ─── Extractor principal ────────────────────────────────────────────────────
 
 export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
@@ -1354,12 +1463,19 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
   // Igual que arriba: "Área geográfica:" puede partirse en dos líneas
   // ("Área" ... "geográfica:"), por eso el cierre del bloque corta solo en
   // "Área" y el resto de la etiqueta queda opcional.
-  const depMun = plano.match(
-    /Departamento:\s*(.*?)\s*Municipio:\s*(.*?)\s*Cant[oó]n:\s*(.*?)\s*[ÁA]rea\b/i
-  );
-  datos.DEPARTAMENTO = depMun ? limpiarDato(depMun[1]) : "";
-  datos.DISTRITO = depMun ? limpiarDato(depMun[2]) : "";
-  datos.CANTON = depMun ? limpiarNA(depMun[3]) : "";
+  const depMunCoords = extraerDepartamentoMunicipioPorCoordenadas(doc);
+  if (depMunCoords) {
+    datos.DEPARTAMENTO = depMunCoords.departamento;
+    datos.DISTRITO = depMunCoords.distrito;
+    datos.CANTON = depMunCoords.canton;
+  } else {
+    const depMun = plano.match(
+      /Departamento:\s*(.*?)\s*Municipio:\s*(.*?)\s*Cant[oó]n:\s*(.*?)\s*[ÁA]rea\b/i
+    );
+    datos.DEPARTAMENTO = depMun ? limpiarDato(depMun[1]) : "";
+    datos.DISTRITO = depMun ? limpiarDato(depMun[2]) : "";
+    datos.CANTON = depMun ? limpiarNA(depMun[3]) : "";
+  }
 
   // "Área geográfica:" puede partirse igual que las demás etiquetas de dos
   // palabras; "geográfica:" se vuelve opcional para cubrir ambos casos.
