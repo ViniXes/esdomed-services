@@ -128,8 +128,8 @@ export async function POST(req: NextRequest) {
     cargo,
     numeroJunta: numeroJunta || null,
     yaTuvoUsuario,
-    // El médico interno se encuentra en formación; el servicio es su única
-    // asignación clínica y no debe enviarse una especialidad a SIS.
+    // El médico interno usa el servicio como asignación clínica y no debe
+    // enviarse una especialidad a SIS.
     especialidad: esMedicoInterno ? "" : especialidad,
     esResidente,
     servicio,
@@ -146,6 +146,26 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const rol = await obtenerRolLector(req);
   if (!rol) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+
+  // Resumen liviano para el centro global de notificaciones. Conserva los
+  // datos completos en la bandeja y evita conceder lectura directa de esta
+  // colección desde el navegador.
+  if (new URL(req.url).searchParams.get("resumen") === "pendientes") {
+    const snap = await adminDb
+      .collection(SOLICITUDES)
+      .where("estado", "==", "pendiente")
+      .get();
+    const solicitudes = snap.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nombre: texto(data.nombre, 120),
+        servicio: texto(data.servicio, 160),
+        creadoEn: fechaIso(data.creadoEn),
+      };
+    });
+    return NextResponse.json({ pendientes: solicitudes.length, solicitudes });
+  }
 
   // DIMES consulta la misma bandeja completa que Administración. Su permiso es
   // solo de lectura: el endpoint PATCH continúa reservado exclusivamente al admin.

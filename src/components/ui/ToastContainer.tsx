@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, ShieldAlert, Megaphone, X, Trash2, FileCode2 } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, ClipboardList, Printer, Inbox, Building2, ShieldAlert, Megaphone, X, Trash2, FileCode2, UserPlus } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -62,6 +62,11 @@ const CONFIG: Record<
     icon: Megaphone,
     borderColor: "border-l-orange-500",
     iconColor: "text-orange-400",
+  },
+  solicitud_usuario_sis: {
+    icon: UserPlus,
+    borderColor: "border-l-rose-500",
+    iconColor: "text-rose-400",
   },
   uci_eliminacion: {
     icon: Trash2,
