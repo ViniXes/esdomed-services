@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (!/^\S+@\S+\.\S+$/.test(correo)) return NextResponse.json({ error: "Escribe un correo electrónico válido." }, { status: 400 });
   if (!/^\d{8}$/.test(telefono)) return NextResponse.json({ error: "El teléfono debe tener 8 dígitos." }, { status: 400 });
   if (!cargosValidos.has(cargo)) return NextResponse.json({ error: "Selecciona el cargo o función." }, { status: 400 });
-  if (!esMedicoInterno && !especialidadesValidas.has(especialidad)) return NextResponse.json({ error: "Selecciona la especialidad solicitada." }, { status: 400 });
+  if (especialidad && !especialidadesValidas.has(especialidad)) return NextResponse.json({ error: "Selecciona una especialidad válida." }, { status: 400 });
   if (!esResidente || !yaTuvoUsuario) return NextResponse.json({ error: "Completa las preguntas de usuario previo y residencia." }, { status: 400 });
   if (!servicio) return NextResponse.json({ error: "Indica el servicio al que será asignado." }, { status: 400 });
   if (!(await obtenerServiciosHabilitados()).has(servicio)) {
