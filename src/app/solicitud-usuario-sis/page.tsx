@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FilePlus2 } from "lucide-react";
 import { normalizarDui } from "@/lib/dui";
 import { CARGOS_USUARIO_SIS, ESPECIALIDADES_SIS, JEFATURAS_AUTORIZADORAS_SIS, normalizarNombrePersona, RESPUESTAS_SI_NO, TIPOS_DOCUMENTO_SIS } from "@/lib/solicitudesUsuarioSis";
@@ -17,11 +18,17 @@ const EMPTY = {
 };
 
 export default function SolicitudUsuarioSisPage() {
+  return <Suspense fallback={null}><SolicitudUsuarioSisFormulario /></Suspense>;
+}
+
+function SolicitudUsuarioSisFormulario() {
+  const searchParams = useSearchParams();
   const { servicios, loading: cargandoServicios } = useServicios();
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [enviada, setEnviada] = useState(false);
+  const vistaPrevia = searchParams.get("vista") === "confirmacion";
   const set = (field: keyof typeof EMPTY, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
   const esMedicoInterno = form.cargo === "medico_interno";
   const cambiarCargo = (cargo: string) => setForm((prev) => ({
@@ -56,7 +63,7 @@ export default function SolicitudUsuarioSisPage() {
           <div className="mt-4 flex items-center gap-2"><div className="h-px w-8 bg-slate-300 dark:bg-slate-700" /><p className="text-[11px] uppercase tracking-widest text-slate-500">Solicitud de usuario SIS</p><div className="h-px w-8 bg-slate-300 dark:bg-slate-700" /></div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-black/10 dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-          {enviada ? (
+          {enviada || vistaPrevia ? (
             <div className="mx-auto max-w-md py-4 text-center">
               <CheckCircle2 size={42} className="mx-auto mb-3 text-emerald-500" />
               <h1 className="mb-2 text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud registrada</h1>
