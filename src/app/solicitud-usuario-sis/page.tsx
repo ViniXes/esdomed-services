@@ -62,15 +62,15 @@ export default function SolicitudUsuarioSisPage() {
               <h1 className="mb-2 text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud registrada</h1>
               <p className="text-sm text-slate-500">Tus datos fueron enviados para la creación de usuario en SIS.</p>
               <div className="my-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left dark:border-amber-900 dark:bg-amber-950/40">
-                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Paso obligatorio: acércate a ESDOMED</p>
-                <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-300">Después de enviar esta solicitud, debes presentarte en ESDOMED para continuar el proceso de creación de tu usuario en el Sistema Integrado de Salud (SIS). Sin este paso no se dará seguimiento a la solicitud.</p>
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Paso obligatorio para dar seguimiento</p>
+                <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-300">Después de enviar esta solicitud, acércate a ESDOMED para darle seguimiento y terminar el proceso de creación de tu usuario en SIS (Sistema Integrado de Salud). Sin este paso no se dará seguimiento a la solicitud.</p>
               </div>
               <p className="mb-6 text-xs text-slate-500">Este formulario no crea una cuenta de acceso a ESDOMED.</p>
               <Link prefetch={false} href="/login" className="inline-block w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600">Volver a iniciar sesión</Link>
             </div>
           ) : (
             <>
-              <div className="mb-6 flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a4e70] to-[#2b8ca8] text-white"><FilePlus2 size={21} /></span><div><h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud de creación de usuario SIS</h1><p className="mt-1 text-xs text-slate-500">Completa los datos solicitados por SIS. Después de enviarlos, acércate a ESDOMED para finalizar la gestión.</p></div></div>
+              <div className="mb-6 flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a4e70] to-[#2b8ca8] text-white"><FilePlus2 size={21} /></span><div><h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud de creación de usuario SIS</h1><p className="mt-1 text-xs text-slate-500">Completa los datos solicitados por SIS. Después de enviarlos, acércate a ESDOMED para dar seguimiento a tu solicitud y finalizar la creación de tu usuario.</p></div></div>
               <form onSubmit={enviar} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
                 <Campo label="Institución" className="lg:col-span-6"><input value="Hospital Nacional El Salvador" readOnly className={`${inputCls} cursor-not-allowed opacity-70`} /></Campo>
                 <Campo label="Nombre completo según DUI o documento" className="lg:col-span-6"><input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} onBlur={(e) => set("nombre", normalizarNombrePersona(e.target.value))} required minLength={5} autoComplete="name" className={inputCls} placeholder="Nombres y apellidos completos" /><p className="mt-1.5 text-[11px] text-slate-500">Escríbelo exactamente como aparece en el DUI o documento de identidad.</p></Campo>
