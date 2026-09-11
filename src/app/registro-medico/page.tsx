@@ -117,7 +117,7 @@ export default function RegistroMedicoPage() {
                 Crear cuenta en ESDOMED Services
               </h1>
               <p className="text-xs text-slate-500 mb-6">
-                Este formulario crea tu cuenta de acceso a ESDOMED Services; no corresponde a una solicitud de usuario SIS. La cuenta debe ser aprobada por ESDOMED antes de poder ingresar.
+                Tu cuenta de acceso a ESDOMED Services debe ser aprobada por ESDOMED antes de poder ingresar.
               </p>
 
               <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
