@@ -26,7 +26,9 @@ export function pacienteDesdeIncapacidad(inc: SolicitudIncapacidad): Paciente {
     responsable: dc.responsable,
     // Reposición: el ingreso "original" es el del FIEH, aunque fechaDesde ya
     // traiga una corrección de ESDOMED (así la corrección se puede revertir).
-    fechaIngreso: inc.reposicion?.fiehFechaIngreso ?? inc.fechaDesde ?? new Date(),
+    // toDate() por si el documento llegó sin pasar por mapIncapacidadData y el
+    // bloque `reposicion` trae Timestamps crudos.
+    fechaIngreso: toDate(inc.reposicion?.fiehFechaIngreso) ?? toDate(inc.fechaDesde) ?? new Date(),
     servicioIngreso: inc.servicioPaciente,
     servicioActual: inc.servicioPaciente,
     camaActual: inc.camaPaciente,

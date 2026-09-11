@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { ArrowLeft, Printer, Ambulance, FileClock, Info, CheckCircle2, Save } from "lucide-react";
 import type { DatosConstancia, Genero, Paciente, SolicitudIncapacidad } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
-import { pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
+import { mapIncapacidadData, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
 import { ConstanciaPrintLayout } from "@/components/incapacidades/ConstanciaPrintLayout";
 
 const inputCls =
@@ -58,18 +58,9 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
         const incSnap = await getDoc(doc(db, "incapacidades", id));
         if (cancelado) return;
         if (!incSnap.exists()) { setError("Solicitud no encontrada"); setLoading(false); return; }
-        const incData = incSnap.data();
-        const inc: SolicitudIncapacidad = {
-          id: incSnap.id,
-          ...incData,
-          fechaAlta: toDate(incData.fechaAlta) ?? new Date(),
-          fechaDesde: toDate(incData.fechaDesde) ?? new Date(),
-          fechaHasta: toDate(incData.fechaHasta) ?? new Date(),
-          creadoEn: toDate(incData.creadoEn) ?? new Date(),
-          emitidaEn: toDate(incData.emitidaEn),
-          fechaExpedicion: toDate(incData.fechaExpedicion),
-          fechaIngresoCorregida: toDate(incData.fechaIngresoCorregida),
-        } as SolicitudIncapacidad;
+        // Mapeo compartido: convierte TODAS las fechas (incluidas las del bloque
+        // `reposicion`, que la constancia usa como fecha de ingreso).
+        const inc = mapIncapacidadData(incSnap.id, incSnap.data());
         setIncapacidad(inc);
 
         // Semilla del formulario: lo ya guardado + lo poco que trae la atención.
