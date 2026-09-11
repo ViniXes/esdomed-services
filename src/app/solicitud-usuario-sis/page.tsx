@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, FilePlus2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FilePlus2 } from "lucide-react";
 import { normalizarDui } from "@/lib/dui";
 import { CARGOS_USUARIO_SIS, ESPECIALIDADES_SIS, JEFATURAS_AUTORIZADORAS_SIS, normalizarNombrePersona, RESPUESTAS_SI_NO, TIPOS_DOCUMENTO_SIS } from "@/lib/solicitudesUsuarioSis";
 import { useServicios } from "@/contexts/ServiciosContext";
@@ -66,11 +66,11 @@ export default function SolicitudUsuarioSisPage() {
                 <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-300">Después de enviar esta solicitud, acércate a ESDOMED para darle seguimiento y terminar el proceso de creación de tu usuario en SIS (Sistema Integrado de Salud). Sin este paso no se dará seguimiento a la solicitud.</p>
               </div>
               <p className="mb-6 text-xs text-slate-500">Este formulario no crea una cuenta de acceso a ESDOMED.</p>
-              <Link prefetch={false} href="/login" className="inline-block w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600">Volver a iniciar sesión</Link>
+              <Link prefetch={false} href="/login" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"><ArrowLeft size={16} />Volver</Link>
             </div>
           ) : (
             <>
-              <div className="mb-6 flex items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a4e70] to-[#2b8ca8] text-white"><FilePlus2 size={21} /></span><div><h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud de creación de usuario SIS</h1><p className="mt-1 text-xs text-slate-500">Completa los datos solicitados por SIS. Después de enviarlos, acércate a ESDOMED para dar seguimiento a tu solicitud y finalizar la creación de tu usuario.</p></div></div>
+              <div className="mb-6 flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#1a4e70] to-[#2b8ca8] text-white"><FilePlus2 size={21} /></span><div><h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud de creación de usuario SIS</h1><p className="mt-1 text-xs text-slate-500">Completa los datos solicitados por SIS. Después de enviarlos, acércate a ESDOMED para dar seguimiento a tu solicitud y finalizar la creación de tu usuario.</p></div></div><Link prefetch={false} href="/login" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-blue-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-cyan-300"><ArrowLeft size={14} />Volver</Link></div>
               <form onSubmit={enviar} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
                 <Campo label="Institución" className="lg:col-span-6"><input value="Hospital Nacional El Salvador" readOnly className={`${inputCls} cursor-not-allowed opacity-70`} /></Campo>
                 <Campo label="Nombre completo según DUI o documento" className="lg:col-span-6"><input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} onBlur={(e) => set("nombre", normalizarNombrePersona(e.target.value))} required minLength={5} autoComplete="name" className={inputCls} placeholder="Nombres y apellidos completos" /><p className="mt-1.5 text-[11px] text-slate-500">Escríbelo exactamente como aparece en el DUI o documento de identidad.</p></Campo>
@@ -91,7 +91,7 @@ export default function SolicitudUsuarioSisPage() {
                 </Campo>
                 <Campo label="Jefatura que autoriza" className="lg:col-span-3"><select value={form.autorizadoPor} onChange={(e) => set("autorizadoPor", e.target.value)} required className={inputCls}><option value="">Seleccionar jefatura...</option>{JEFATURAS_AUTORIZADORAS_SIS.map((jefatura) => <option key={jefatura} value={jefatura}>{jefatura}</option>)}</select></Campo>
                 {error && <div className="lg:col-span-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"><AlertTriangle size={16} className="mt-0.5 shrink-0" />{error}</div>}
-                <div className="lg:col-span-6"><button disabled={submitting} type="submit" className="w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:opacity-50">{submitting ? "Enviando solicitud..." : "Enviar solicitud a Administración"}</button><p className="mt-3 text-center text-xs text-slate-500">¿Ya tienes una cuenta ESDOMED? <Link prefetch={false} href="/login" className="font-medium text-blue-600 hover:underline dark:text-blue-400">Iniciar sesión</Link></p></div>
+                <div className="lg:col-span-6"><button disabled={submitting} type="submit" className="w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:opacity-50">{submitting ? "Enviando solicitud..." : "Enviar solicitud"}</button></div>
               </form>
             </>
           )}

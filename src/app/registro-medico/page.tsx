@@ -87,7 +87,7 @@ export default function RegistroMedicoPage() {
           />
           <div className="mt-4 flex items-center gap-2">
             <div className="h-px w-8 bg-slate-300 dark:bg-slate-700" />
-            <p className="text-[11px] text-slate-500 uppercase tracking-widest">Registro de médicos</p>
+            <p className="text-[11px] text-slate-500 uppercase tracking-widest">Registro en ESDOMED Services</p>
             <div className="h-px w-8 bg-slate-300 dark:bg-slate-700" />
           </div>
         </div>
@@ -114,10 +114,10 @@ export default function RegistroMedicoPage() {
           ) : (
             <>
               <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading mb-1">
-                Crear cuenta de médico
+                Crear cuenta en ESDOMED Services
               </h1>
               <p className="text-xs text-slate-500 mb-6">
-                Tu cuenta debe ser aprobada por ESDOMED antes de poder ingresar.
+                Tu cuenta de acceso a ESDOMED Services debe ser aprobada por ESDOMED antes de poder ingresar.
               </p>
 
               <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
