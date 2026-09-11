@@ -165,6 +165,7 @@ function NavExpandable({
             <Icon size={16} strokeWidth={active ? 2.5 : 2} />
           </span>
           <span className="flex-1 truncate">{label}</span>
+          <Badge count={item.badge ?? 0} />
         </Link>
         <button
           type="button"

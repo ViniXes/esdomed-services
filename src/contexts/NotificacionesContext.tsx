@@ -20,7 +20,7 @@ import type { NotificacionFallecido } from "@/types";
 export type TipoNotif =
   | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
   | "incapacidad" | "anexo5" | "impresion" | "recepcion" | "conapina"
-  | "solicitud_lesion";
+  | "solicitud_lesion" | "reposicion";
 
 export interface NotifToast {
   id: string;
@@ -41,6 +41,8 @@ interface Pendientes {
   conapina: number;
   // Solicitudes de notificación del comité difundidas al área médica.
   solicitudesLesion: number;
+  // Reposiciones de incapacidad que ESDOMED asignó a este médico y siguen por completar.
+  reposiciones: number;
   total: number;
 }
 
@@ -51,7 +53,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, reposiciones: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -67,7 +69,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
 
   const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
-    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0,
+    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, reposiciones: 0,
   });
   const [toasts, setToasts] = useState<NotifToast[]>([]);
 
@@ -305,9 +307,43 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [esMedico, addToast, setCount]);
 
+  // ── Médicos: reposiciones de incapacidad asignadas por ESDOMED, por completar ──
+  // Consulta pequeña acotada por uid (solo igualdades → sin índice compuesto):
+  // contador vivo del globo + toast cuando ESDOMED asigna una nueva.
+  const knownReposiciones = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!esMedico || !psUid) return;
+    knownReposiciones.current = null;
+    const q = query(
+      collection(db, "incapacidades"),
+      where("medicoId", "==", psUid),
+      where("origen", "==", "reposicion"),
+      where("estado", "==", "pendiente_medico"),
+    );
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownReposiciones.current === null) {
+        knownReposiciones.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownReposiciones.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "reposicion",
+              titulo: "Reposición de incapacidad asignada",
+              mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}`,
+            });
+          }
+        });
+        knownReposiciones.current = ids;
+      }
+      setCount("reposiciones", snap.size);
+    });
+  }, [esMedico, psUid, addToast, setCount]);
+
   const pendientes: Pendientes = {
     ...counts,
-    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion,
+    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion + counts.reposiciones,
   };
 
   return (

@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import { ArrowLeft, Printer, Ambulance, Info, CheckCircle2, Save } from "lucide-react";
+import { ArrowLeft, Printer, Ambulance, FileClock, Info, CheckCircle2, Save } from "lucide-react";
 import type { DatosConstancia, Genero, Paciente, SolicitudIncapacidad } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
@@ -134,6 +134,10 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
   }
 
   const esEmergencia = incapacidad.origen === "emergencia";
+  // Reposición: igual que emergencia, el paciente no está en el padrón; lo que
+  // el FIEH no trae (ocupación, teléfono...) se escribe aquí a mano.
+  const esReposicion = incapacidad.origen === "reposicion";
+  const sinPadron = esEmergencia || esReposicion;
   // El paciente que se imprime = base + lo escrito a mano (solo campos con valor).
   const pacienteImpreso = { ...paciente, ...soloDefinidos(datos) } as Paciente;
 
@@ -154,21 +158,29 @@ export default function ImprimirIncapacidadPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Datos personales a mano (solo emergencia, oculto al imprimir) */}
-      {esEmergencia && (
+      {/* Datos personales a mano (emergencia y reposición, oculto al imprimir) */}
+      {sinPadron && (
         <div className="print:hidden max-w-5xl mx-auto px-4 pt-4">
           <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
             {/* Encabezado */}
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900 shrink-0">
-                <Ambulance size={17} className="text-rose-600 dark:text-rose-400" />
-              </div>
+              {esReposicion ? (
+                <div className="w-9 h-9 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900 shrink-0">
+                  <FileClock size={17} className="text-blue-600 dark:text-blue-400" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900 shrink-0">
+                  <Ambulance size={17} className="text-rose-600 dark:text-rose-400" />
+                </div>
+              )}
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
                   Completar datos del paciente
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Atención de emergencia sin ingreso — escribe los datos para la constancia.
+                  {esReposicion
+                    ? "Reposición cargada del FIEH — complete lo que el FIEH no trae (ocupación, teléfono) para la constancia."
+                    : "Atención de emergencia sin ingreso — escribe los datos para la constancia."}
                 </p>
               </div>
             </div>

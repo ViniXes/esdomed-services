@@ -9,7 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, CheckCircle2, Clock, Pencil, Trash2, Search, ChevronLeft, ChevronRight, X, User, Users, History, RefreshCw } from "lucide-react";
+import { FileText, FileClock, Plus, CheckCircle2, Clock, Pencil, Trash2, Search, ChevronLeft, ChevronRight, X, User, Users, History, RefreshCw } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { toDate, formatFecha } from "@/lib/pacientes/helpers";
 
@@ -211,7 +211,8 @@ export default function MedicoIncapacidadesPage() {
     [vista, resultados, solicitudes],
   );
 
-  const pendientes = base.filter((s) => s.estado === "pendiente").length;
+  // Las reposiciones "por completar" (pendiente_medico) cuentan como pendientes.
+  const pendientes = base.filter((s) => s.estado !== "emitida").length;
   const emitidas = base.filter((s) => s.estado === "emitida").length;
 
   const filtradas = useMemo(() => {
@@ -220,7 +221,8 @@ export default function MedicoIncapacidadesPage() {
     const desde = fechaDesde ? new Date(fechaDesde + "T00:00:00") : null;
     const hasta = fechaHasta ? new Date(fechaHasta + "T23:59:59") : null;
     return base.filter((s) => {
-      if (filtroEstado !== "todos" && s.estado !== filtroEstado) return false;
+      if (filtroEstado === "pendiente" && s.estado === "emitida") return false;
+      if (filtroEstado === "emitida" && s.estado !== "emitida") return false;
       if (desde && s.fechaAlta < desde) return false;
       if (hasta && s.fechaAlta > hasta) return false;
       if (t && !(
@@ -484,13 +486,22 @@ export default function MedicoIncapacidadesPage() {
                     <p className="font-semibold text-slate-900 dark:text-slate-100 text-[15px]">
                       {s.pacienteNombre}
                     </p>
-                    {s.estado === "pendiente" ? (
+                    {s.estado === "pendiente_medico" ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
+                        <Pencil size={10} /> Por completar
+                      </span>
+                    ) : s.estado === "pendiente" ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
                         <Clock size={10} /> Pendiente
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 px-2 py-0.5 rounded-full">
                         <CheckCircle2 size={10} /> Emitida
+                      </span>
+                    )}
+                    {s.origen === "reposicion" && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 px-2 py-0.5 rounded-full">
+                        <FileClock size={10} /> Reposición
                       </span>
                     )}
                   </div>
@@ -516,6 +527,15 @@ export default function MedicoIncapacidadesPage() {
                     </p>
                   )}
                 </div>
+                {esMia && s.estado === "pendiente_medico" && (
+                  <Link prefetch={false}
+                    href={`/medico/incapacidades/${s.id}/editar`}
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-sm flex-shrink-0"
+                  >
+                    <Pencil size={12} />
+                    Completar
+                  </Link>
+                )}
                 {esMia && s.estado === "pendiente" && (
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link prefetch={false}
@@ -525,7 +545,8 @@ export default function MedicoIncapacidadesPage() {
                       <Pencil size={12} />
                       Editar
                     </Link>
-                    {confirmandoId === s.id ? (
+                    {/* Las reposiciones las cargó ESDOMED: el médico no las borra. */}
+                    {s.origen === "reposicion" ? null : confirmandoId === s.id ? (
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => eliminar(s.id!)}

@@ -270,7 +270,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verIncapacidades
       ? [
-          { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS },
+          {
+            href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS,
+            // Reposición: constancias de egresos anteriores a la app, cargadas del FIEH y asignadas a un médico.
+            children: [{ href: "/dashboard/incapacidades/reposicion", label: "Reposición de incapacidad", icon: FileClock }],
+          },
           { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, badge: pendientes.anexo5, group: G_DOCUMENTOS },
         ]
       : []),

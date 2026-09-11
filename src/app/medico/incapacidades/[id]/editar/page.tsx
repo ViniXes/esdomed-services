@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc, Timestamp, updateDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, AlertTriangle, Save, User2, Lock } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Save, User2, Lock, FileClock, Info, Send } from "lucide-react";
 import type { Paciente, SolicitudIncapacidad } from "@/types";
 import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput, pacienteDesdeIncapacidad } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput, pacienteDesdeIncapacidad, mapIncapacidadData } from "@/lib/incapacidades/helpers";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -51,24 +51,17 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
           setLoading(false);
           return;
         }
-        const data = snap.data();
-        const inc: SolicitudIncapacidad = {
-          id: snap.id,
-          ...data,
-          fechaAlta: toDate(data.fechaAlta) ?? new Date(),
-          fechaDesde: toDate(data.fechaDesde) ?? new Date(),
-          fechaHasta: toDate(data.fechaHasta) ?? new Date(),
-          creadoEn: toDate(data.creadoEn) ?? new Date(),
-          emitidaEn: toDate(data.emitidaEn),
-        } as SolicitudIncapacidad;
+        const inc = mapIncapacidadData(snap.id, snap.data());
 
         // Validaciones de acceso
         if (inc.medicoId !== user.uid) {
-          setBloqueoMotivo("Solo el médico que creó la solicitud puede editarla.");
+          setBloqueoMotivo(inc.origen === "reposicion"
+            ? "Esta reposición está asignada a otro médico."
+            : "Solo el médico que creó la solicitud puede editarla.");
           setLoading(false);
           return;
         }
-        if (inc.estado !== "pendiente") {
+        if (inc.estado !== "pendiente" && inc.estado !== "pendiente_medico") {
           setBloqueoMotivo("Esta incapacidad ya fue emitida por ESDOMED y no se puede editar.");
           setLoading(false);
           return;
@@ -76,14 +69,16 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
 
         setIncapacidad(inc);
         // Emergencia: el campo "días" es el TOTAL prescrito. Hospitalización: días
-        // adicionales = fechaHasta - fechaAlta.
+        // adicionales = fechaHasta - fechaAlta. Reposición por completar: ESDOMED
+        // no puso días adicionales, así que el campo arranca vacío para que el
+        // médico lo escriba (no un "0" que parezca decidido).
         const esEmerg = inc.origen === "emergencia";
         const diasExtrasGuardados = esEmerg
           ? inc.diasIncapacidad
           : Math.round((inc.fechaHasta.getTime() - inc.fechaAlta.getTime()) / (1000 * 60 * 60 * 24));
         setForm({
           fechaAlta: toDateInput(inc.fechaAlta),
-          diasExtras: String(Math.max(0, diasExtrasGuardados)),
+          diasExtras: inc.estado === "pendiente_medico" ? "" : String(Math.max(0, diasExtrasGuardados)),
           diagnosticoEgreso: inc.diagnosticoEgreso,
           tratamientoAlta: inc.tratamientoAlta,
           condicionEgreso: inc.condicionEgreso,
@@ -118,6 +113,10 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
     return () => { cancelado = true; };
   }, [id, user]);
 
+  const esReposicion = incapacidad?.origen === "reposicion";
+  const porCompletar = incapacidad?.estado === "pendiente_medico";
+  const rutaVolver = esReposicion ? "/medico/incapacidades/reposicion" : "/medico/incapacidades";
+
   const guardar = async () => {
     if (!incapacidad?.id) return;
     const diasExtras = parseInt(form.diasExtras, 10);
@@ -138,7 +137,9 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         diasTotal = diasExtras;
         fHasta = calcularFechaHasta(fAlta, diasExtras - 1);
       } else {
-        fDesde = paciente?.fechaIngreso ?? incapacidad.fechaDesde;
+        // Si ESDOMED corrigió la fecha de ingreso, esa prevalece (igual que en
+        // el detalle y en la constancia); si no, la del expediente / FIEH.
+        fDesde = incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso ?? incapacidad.fechaDesde;
         // Por día calendario: mismo día de ingreso y alta es válido (alta voluntaria).
         if (altaAntesDelIngreso(fAlta, fDesde)) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
         diasTotal = calcularDiasHospitalizacion(fDesde, fAlta) + diasExtras;
@@ -162,9 +163,15 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         diasCorregidosEn: null,
         diasAclaracion: null,
       };
+      // Reposición por completar: al guardar vuelve a ESDOMED como "pendiente"
+      // de emitir, igual que una solicitud normal.
+      if (incapacidad.estado === "pendiente_medico") {
+        update.estado = "pendiente";
+        update["reposicion.completadaEn"] = Timestamp.now();
+      }
 
       await updateDoc(doc(db, "incapacidades", incapacidad.id), update);
-      router.push("/medico/incapacidades");
+      router.push(esReposicion ? "/medico/incapacidades/reposicion" : "/medico/incapacidades");
     } catch (e) {
       setError(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);
       setGuardando(false);
@@ -206,19 +213,46 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link prefetch={false}
-          href="/medico/incapacidades"
+          href={rutaVolver}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
           aria-label="Volver"
         >
           <ArrowLeft size={16} />
         </Link>
         <div>
-          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium">Editar incapacidad</p>
+          <p className="text-[11px] text-slate-400 uppercase tracking-widest font-medium">
+            {porCompletar ? "Completar reposición de incapacidad" : esReposicion ? "Editar reposición de incapacidad" : "Editar incapacidad"}
+          </p>
           <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
             {incapacidad.pacienteNombre}
           </h1>
         </div>
       </div>
+
+      {/* Reposición: contexto de lo que cargó ESDOMED */}
+      {esReposicion && (
+        <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 dark:border-blue-900/60 dark:bg-blue-950/30">
+          <FileClock size={16} className="mt-0.5 shrink-0 text-blue-700 dark:text-blue-300" />
+          <div className="text-xs text-blue-900 dark:text-blue-100 space-y-1">
+            <p className="font-semibold text-sm">
+              {porCompletar ? "ESDOMED le asignó esta reposición" : "Reposición cargada por ESDOMED"}
+            </p>
+            <p>
+              Egreso anterior a la app. Los datos del paciente y las fechas de ingreso y egreso se tomaron del
+              {incapacidad.reposicion?.cargaManual ? " FIEH físico" : " FIEH"}
+              {incapacidad.reposicion?.creadaPorNombre && <> por <span className="font-medium">{incapacidad.reposicion.creadaPorNombre}</span></>}
+              {" "}el {formatFecha(incapacidad.creadoEn)}.
+              {porCompletar && " Indique los días adicionales, el tratamiento al alta y revise el diagnóstico sugerido; al guardar vuelve a ESDOMED para emitirla."}
+            </p>
+            {incapacidad.reposicion?.fiehMedicoAlta && (
+              <p className="flex items-center gap-1 text-blue-800/80 dark:text-blue-200/80">
+                <Info size={11} /> Médico responsable del alta según el FIEH: {incapacidad.reposicion.fiehMedicoAlta}
+                {incapacidad.reposicion.fiehJvpm && <> · JVPM {incapacidad.reposicion.fiehJvpm}</>}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Paciente — bloqueado (informativo) */}
       <section className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
@@ -240,6 +274,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
               {paciente.servicioActual}
               {paciente.camaActual && <> · Cama {paciente.camaActual}</>}
               {" · Ingreso: "}{formatFecha(paciente.fechaIngreso)}
+              {esReposicion && <span className="ml-1 inline-flex items-center gap-0.5 text-slate-400"><Lock size={10} /> del FIEH</span>}
             </p>
           </>
         ) : (
@@ -254,7 +289,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
       <IncapacidadFormFields
         value={form}
         onChange={setForm}
-        fechaIngreso={paciente?.fechaIngreso ?? incapacidad.fechaDesde}
+        fechaIngreso={incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso ?? incapacidad.fechaDesde}
         emergencia={incapacidad.origen === "emergencia"}
       />
 
@@ -268,7 +303,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         )}
         <div className="flex items-center gap-3 justify-end">
           <Link prefetch={false}
-            href="/medico/incapacidades"
+            href={rutaVolver}
             className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
           >
             Cancelar
@@ -278,8 +313,8 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
             disabled={guardando}
             className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
           >
-            <Save size={15} />
-            {guardando ? "Guardando..." : "Guardar cambios"}
+            {porCompletar ? <Send size={15} /> : <Save size={15} />}
+            {guardando ? "Guardando..." : porCompletar ? "Completar y enviar a ESDOMED" : "Guardar cambios"}
           </button>
         </div>
       </div>

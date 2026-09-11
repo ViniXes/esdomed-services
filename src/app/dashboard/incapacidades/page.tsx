@@ -7,7 +7,7 @@ import {
   limit, Timestamp, QueryConstraint, QueryDocumentSnapshot, DocumentData,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import { FileText, Clock, CheckCircle2, Search, X, AlertTriangle, History } from "lucide-react";
+import { FileText, FileClock, Clock, CheckCircle2, Search, X, AlertTriangle, History, Stethoscope } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
 import { formatFecha, toDate } from "@/lib/pacientes/helpers";
 import { DateField } from "@/components/ui/DateField";
@@ -238,6 +238,11 @@ export default function IncapacidadesPage() {
                           <AlertTriangle size={9} /> Duplicado
                         </span>
                       )}
+                      {s.origen === "reposicion" && (
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-900 px-1.5 py-0.5 rounded-full">
+                          <FileClock size={9} /> Reposición
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-800 dark:text-slate-200">{s.pacienteNombre}</p>
@@ -255,7 +260,11 @@ export default function IncapacidadesPage() {
                       {formatFecha(s.fechaAlta)}
                     </td>
                     <td className="px-4 py-3">
-                      {s.estado === "pendiente" ? (
+                      {s.estado === "pendiente_medico" ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
+                          <Stethoscope size={10} /> Con el médico
+                        </span>
+                      ) : s.estado === "pendiente" ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
                           <Clock size={10} /> Pendiente
                         </span>

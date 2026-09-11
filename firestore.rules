@@ -576,13 +576,21 @@ service cloud.firestore {
       // todas las incapacidades (vista pública en /medico/incapacidades). La edición
       // y el borrado siguen restringidos al dueño (o staff/admin).
       allow read:   if isAuth() && (isStaff() || isMedico());
-      allow create: if isMedico();
+      // Los médicos crean las suyas. ESDOMED/admin solo crean REPOSICIONES
+      // (egresos anteriores al arranque de la app, cargados desde el FIEH y
+      // asignados a un médico, que las completa desde su bandeja).
+      allow create: if isMedico()
+                    || ((isEsdomed() || isAdmin())
+                        && request.resource.data.origen == 'reposicion'
+                        && request.resource.data.estado == 'pendiente_medico');
       allow update: if isAuth() && (isStaff() || (isMedico() && resource.data.medicoId == uid()));
       // ESDOMED/admin pueden borrar cualquiera; el médico solo las propias y
-      // mientras sigan pendientes (p. ej. para quitar un duplicado).
+      // mientras sigan pendientes (p. ej. para quitar un duplicado). Las
+      // reposiciones las cargó ESDOMED: el médico no las borra.
       allow delete: if isEsdomed() || isAdmin()
                     || (isMedico() && resource.data.medicoId == uid()
-                        && resource.data.estado == 'pendiente');
+                        && resource.data.estado == 'pendiente'
+                        && resource.data.origen != 'reposicion');
     }
 
     // ─── Recepciones (psicología / trabajo social) ────────────────────────────

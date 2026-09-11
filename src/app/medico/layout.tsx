@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText, ShieldAlert } from "lucide-react";
+import { Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileClock, FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
@@ -30,7 +30,17 @@ const baseNavItems: NavItem[] = [
   { href: "/medico/fallecidos",      label: "Fallecidos",      icon: HeartPulse, tone: "rose" },
   { href: "/medico/conapina-fgr",    label: "CONAPINA / FGR",  icon: ShieldAlert, tone: "blue" },
   { href: "/medico/impresiones",     label: "Impresiones",     icon: Printer, tone: "violet" },
-  { href: "/medico/incapacidades",   label: "Incapacidades",   icon: FileText, tone: "blue" },
+  {
+    href: "/medico/incapacidades",
+    label: "Incapacidades",
+    icon: FileText,
+    tone: "blue",
+    // Bandeja de reposiciones: incapacidades de egresos anteriores a la app que
+    // ESDOMED cargó del FIEH y asignó a este médico para que las complete.
+    children: [
+      { href: "/medico/incapacidades/reposicion", label: "Reposición de incapacidad", icon: FileClock },
+    ],
+  },
   { href: "/medico/anexo5/nueva",    label: "Anexo 5",         icon: ClipboardList, tone: "cyan" },
 ];
 
@@ -56,8 +66,19 @@ function MedicoContent({ children }: { children: React.ReactNode }) {
       ]
     : baseNavItems
   // El globo del ítem CONAPINA/FGR son las solicitudes de notificación que el
-  // comité difunde a todos los médicos y siguen pendientes.
-  ).map(i => (i.href === "/medico/conapina-fgr" ? { ...i, badge: pendientes.solicitudesLesion } : i));
+  // comité difunde a todos los médicos y siguen pendientes. El de Incapacidades
+  // (y su subítem) son las reposiciones asignadas a este médico por completar.
+  ).map(i => {
+    if (i.href === "/medico/conapina-fgr") return { ...i, badge: pendientes.solicitudesLesion };
+    if (i.href === "/medico/incapacidades") {
+      return {
+        ...i,
+        badge: pendientes.reposiciones,
+        children: i.children?.map(c => (c.href === "/medico/incapacidades/reposicion" ? { ...c, badge: pendientes.reposiciones } : c)),
+      };
+    }
+    return i;
+  });
   const roleLabel = tipoMedicoNavegacion
     ? TIPO_MEDICO_CRITICO_LABEL[tipoMedicoNavegacion]
     : "Portal Médico";

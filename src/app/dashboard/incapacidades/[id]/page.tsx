@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, CheckCircle2, Clock, FileText, Printer, AlertTriangle,
-  User2, Stethoscope, Trash2, Pencil,
+  User2, Stethoscope, Trash2, Pencil, FileClock, UserCheck, Search,
 } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import type {
@@ -19,8 +19,9 @@ import {
 } from "@/lib/pacientes/helpers";
 import {
   altaAntesDelIngreso, calcularDiasHospitalizacion, formatFechaConstanciaCorta,
-  numeroALetras, pacienteDesdeIncapacidad,
+  numeroALetras, pacienteDesdeIncapacidad, mapIncapacidadData,
 } from "@/lib/incapacidades/helpers";
+import { cargarMedicosAsignables, type MedicoAsignable } from "@/lib/incapacidades/reposicion";
 
 const INSTITUCIONES: InstitucionProvisional[] = ["CRECER", "CONFIA", "INPEP", "IPSFA", "ISSS"];
 const BANCOS: BancoDeposito[] = ["Promerica", "Atlantida"];
@@ -53,6 +54,13 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   const [aclaracionDias, setAclaracionDias] = useState("");
   const [guardandoDias, setGuardandoDias] = useState(false);
 
+  // Reposición: reasignar el médico que debe completarla (mientras siga con él).
+  const [reasignando, setReasignando] = useState(false);
+  const [medicos, setMedicos] = useState<MedicoAsignable[] | null>(null);
+  const [filtroMedico, setFiltroMedico] = useState("");
+  const [medicoNuevoId, setMedicoNuevoId] = useState("");
+  const [guardandoReasignacion, setGuardandoReasignacion] = useState(false);
+
   const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
   const puedeEliminar = esEsdomed;
 
@@ -64,20 +72,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
         setLoading(false);
         return;
       }
-      const data = snap.data();
-      const inc: SolicitudIncapacidad = {
-        id: snap.id,
-        ...data,
-        fechaAlta: toDate(data.fechaAlta) ?? new Date(),
-        fechaDesde: toDate(data.fechaDesde) ?? new Date(),
-        fechaHasta: toDate(data.fechaHasta) ?? new Date(),
-        creadoEn: toDate(data.creadoEn) ?? new Date(),
-        emitidaEn: toDate(data.emitidaEn),
-        fechaExpedicion: toDate(data.fechaExpedicion),
-        fechaIngresoCorregida: toDate(data.fechaIngresoCorregida),
-        fechaIngresoCorregidaEn: toDate(data.fechaIngresoCorregidaEn),
-        diasCorregidosEn: toDate(data.diasCorregidosEn),
-      } as SolicitudIncapacidad;
+      const inc = mapIncapacidadData(snap.id, snap.data());
       setIncapacidad(inc);
       setInstitucion(inc.institucionProvisional ?? "");
       setBanco(inc.bancoDeposito ?? "");
@@ -323,7 +318,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
     setError(null);
     try {
       await deleteDoc(doc(db, "incapacidades", incapacidad.id));
-      router.push("/dashboard/incapacidades");
+      router.push(incapacidad.origen === "reposicion" ? "/dashboard/incapacidades/reposicion" : "/dashboard/incapacidades");
     } catch (e) {
       setError(`Error al eliminar: ${e instanceof Error ? e.message : "desconocido"}`);
       setEliminando(false);
@@ -331,6 +326,52 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   };
 
   const yaEmitida = incapacidad.estado === "emitida";
+
+  // Reposición (egreso anterior a la app): mientras esté "pendiente_medico" la
+  // tiene el médico asignado; no se emite ni se imprime hasta que la complete.
+  const esReposicion = incapacidad.origen === "reposicion";
+  const conElMedico = incapacidad.estado === "pendiente_medico";
+  const rutaVolver = esReposicion ? "/dashboard/incapacidades/reposicion" : "/dashboard/incapacidades";
+
+  const abrirReasignar = async () => {
+    setMedicoNuevoId("");
+    setFiltroMedico("");
+    setReasignando(true);
+    if (medicos === null) {
+      try { setMedicos(await cargarMedicosAsignables()); } catch { setMedicos([]); }
+    }
+  };
+
+  const guardarReasignacion = async () => {
+    if (!incapacidad.id || !profile || !medicoNuevoId) return;
+    const m = (medicos ?? []).find((x) => x.uid === medicoNuevoId);
+    if (!m) return;
+    setError(null);
+    setGuardandoReasignacion(true);
+    try {
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+        medicoId: m.uid,
+        medicoNombre: m.nombre,
+        medicoJvpm: m.jvpm ?? null,
+        "reposicion.asignadaEn": Timestamp.now(),
+        "reposicion.asignadaPorNombre": profile.nombre,
+      });
+      setReasignando(false);
+    } catch (e) {
+      setError(`Error al reasignar: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoReasignacion(false);
+    }
+  };
+
+  const medicosFiltrados = (() => {
+    const t = filtroMedico.trim().toLowerCase();
+    const lista = medicos ?? [];
+    if (!t) return lista;
+    return lista.filter((m) =>
+      m.nombre.toLowerCase().includes(t) || (m.jvpm ?? "").toLowerCase().includes(t) || (m.servicio ?? "").toLowerCase().includes(t),
+    );
+  })();
 
   // Validación en vivo de la fecha corregida: la estancia no puede ser negativa.
   const fechaIngresoEditInvalida = !esEmergenciaInc && editandoIngreso && !!fechaIngresoEdit &&
@@ -353,7 +394,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
       {/* Header */}
       <div className="flex items-start gap-3">
         <button
-          onClick={() => router.push("/dashboard/incapacidades")}
+          onClick={() => router.push(rutaVolver)}
           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
           aria-label="Volver"
         >
@@ -361,10 +402,16 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">Solicitud de incapacidad</p>
+            <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">
+              {esReposicion ? "Reposición de incapacidad" : "Solicitud de incapacidad"}
+            </p>
             {yaEmitida ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 px-2 py-0.5 rounded-full">
                 <CheckCircle2 size={10} /> Emitida
+              </span>
+            ) : conElMedico ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
+                <Stethoscope size={10} /> Con el médico
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
@@ -381,14 +428,127 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
             {incapacidad.camaPaciente && ` · Cama ${incapacidad.camaPaciente}`}
           </p>
         </div>
-        <button
-          onClick={abrirImprimir}
-          className="flex items-center gap-1.5 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex-shrink-0"
-        >
-          <Printer size={14} />
-          Imprimir constancia
-        </button>
+        {!conElMedico && (
+          <button
+            onClick={abrirImprimir}
+            className="flex items-center gap-1.5 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex-shrink-0"
+          >
+            <Printer size={14} />
+            Imprimir constancia
+          </button>
+        )}
       </div>
+
+      {/* Reposición: trazabilidad de la carga y del médico asignado */}
+      {esReposicion && (
+        <Card icon={FileClock} title="Reposición (egreso anterior a la app)">
+          <div className="grid md:grid-cols-2 gap-3 gap-x-6">
+            <Row
+              label="Cargada por"
+              value={incapacidad.reposicion
+                ? `${incapacidad.reposicion.creadaPorNombre} · ${formatFechaHora(incapacidad.creadoEn)}`
+                : formatFechaHora(incapacidad.creadoEn)}
+            />
+            <Row
+              label="Fuente"
+              value={incapacidad.reposicion?.cargaManual
+                ? "Carga a mano (sin PDF digital)"
+                : `FIEH${incapacidad.reposicion?.archivoNombre ? ` · ${incapacidad.reposicion.archivoNombre}` : ""}`}
+            />
+            {incapacidad.reposicion?.fiehFechaIngreso && (
+              <Row label="Ingreso (FIEH)" value={formatFecha(incapacidad.reposicion.fiehFechaIngreso)} />
+            )}
+            {incapacidad.reposicion?.fiehFechaEgreso && (
+              <Row label="Egreso (FIEH)" value={formatFecha(incapacidad.reposicion.fiehFechaEgreso)} />
+            )}
+            {incapacidad.reposicion?.fiehServicio && (
+              <Row label="Servicio (FIEH)" value={incapacidad.reposicion.fiehServicio} />
+            )}
+            {incapacidad.reposicion?.fiehMedicoAlta && (
+              <Row
+                label="Médico del alta (FIEH)"
+                value={`${incapacidad.reposicion.fiehMedicoAlta}${incapacidad.reposicion.fiehJvpm ? ` · JVPM ${incapacidad.reposicion.fiehJvpm}` : ""}`}
+              />
+            )}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="text-sm">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Médico asignado</p>
+                <p className="font-medium text-slate-800 dark:text-slate-200">
+                  Dr. {incapacidad.medicoNombre}
+                  {incapacidad.medicoJvpm && <span className="text-xs text-slate-500 font-mono ml-2">JVPM {incapacidad.medicoJvpm}</span>}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {incapacidad.reposicion?.completadaEn
+                    ? `Completó los datos clínicos el ${formatFechaHora(incapacidad.reposicion.completadaEn)}.`
+                    : incapacidad.reposicion
+                      ? `Asignada el ${formatFechaHora(incapacidad.reposicion.asignadaEn)}${incapacidad.reposicion.asignadaPorNombre ? ` por ${incapacidad.reposicion.asignadaPorNombre}` : ""}. Aún no la completa.`
+                      : ""}
+                </p>
+              </div>
+              {esEsdomed && conElMedico && !reasignando && (
+                <button
+                  onClick={abrirReasignar}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <UserCheck size={12} /> Reasignar médico
+                </button>
+              )}
+            </div>
+
+            {reasignando && (
+              <div className="mt-3 space-y-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={filtroMedico}
+                      onChange={(e) => setFiltroMedico(e.target.value)}
+                      placeholder="Buscar por nombre, JVPM o servicio…"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <select
+                    value={medicoNuevoId}
+                    onChange={(e) => setMedicoNuevoId(e.target.value)}
+                    disabled={medicos === null}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">{medicos === null ? "Cargando médicos…" : "— Elija el nuevo médico"}</option>
+                    {medicosFiltrados.filter((m) => m.uid !== incapacidad.medicoId).map((m) => (
+                      <option key={m.uid} value={m.uid}>
+                        {m.nombre}{m.jvpm ? ` · JVPM ${m.jvpm}` : ""}{m.servicio ? ` · ${m.servicio}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  La reposición desaparece de la bandeja del médico actual y aparece en la del nuevo.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={guardarReasignacion}
+                    disabled={guardandoReasignacion || !medicoNuevoId}
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {guardandoReasignacion ? "Guardando..." : "Reasignar"}
+                  </button>
+                  <button
+                    onClick={() => setReasignando(false)}
+                    disabled={guardandoReasignacion}
+                    className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {yaEmitida && (
         <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -529,7 +689,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
       {/* Datos clínicos */}
       <Card icon={Stethoscope} title="Datos de la incapacidad">
         <div className="grid md:grid-cols-3 gap-3 gap-x-6">
-          <Row label="Médico" value={`Dr. ${incapacidad.medicoNombre}`} />
+          <Row label={esReposicion ? "Médico asignado" : "Médico"} value={`Dr. ${incapacidad.medicoNombre}`} />
           <Row label="JVPM" value={incapacidad.medicoJvpm} mono />
           <Row label="Servicio" value={incapacidad.medicoServicio} />
 
@@ -643,8 +803,14 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
           </div>
         )}
         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
-          <BlockRow label="Diagnóstico de egreso" value={incapacidad.diagnosticoEgreso} />
-          <BlockRow label="Tratamiento al alta" value={incapacidad.tratamientoAlta} />
+          {conElMedico && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
+              Días adicionales, tratamiento y seguimiento los completará el médico asignado. El diagnóstico y las
+              recomendaciones de abajo son la sugerencia tomada del FIEH.
+            </p>
+          )}
+          <BlockRow label="Diagnóstico de egreso" value={incapacidad.diagnosticoEgreso || "—"} />
+          <BlockRow label="Tratamiento al alta" value={incapacidad.tratamientoAlta || "—"} />
           {incapacidad.recomendaciones && <BlockRow label="Recomendaciones" value={incapacidad.recomendaciones} />}
           {incapacidad.seguimiento && <BlockRow label="Seguimiento" value={incapacidad.seguimiento} />}
         </div>
@@ -712,7 +878,20 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
             <span>{error}</span>
           </div>
         )}
-        {!yaEmitida ? (
+        {conElMedico ? (
+          <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl px-4 py-3">
+            <Stethoscope size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">
+                Esperando al Dr. {incapacidad.medicoNombre}
+              </p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+                Cuando complete los datos clínicos desde su bandeja de reposición, esta incapacidad pasará a
+                “Pendiente de emitir” y podrá emitirse e imprimirse aquí.
+              </p>
+            </div>
+          </div>
+        ) : !yaEmitida ? (
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
             <button
               onClick={abrirImprimir}

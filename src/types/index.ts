@@ -653,8 +653,37 @@ export interface SolicitudAnexo5 {
 // Incapacidades — constancias de hospitalización / incapacidad
 // ============================================================================
 
-export type EstadoIncapacidad = "pendiente" | "emitida";
+// Estados:
+//  - pendiente_medico: solo en reposiciones. ESDOMED cargó los datos del FIEH y
+//    la asignó a un médico; falta que él complete días, tratamiento, etc.
+//  - pendiente: lista para que ESDOMED la emita (flujo normal, o reposición ya
+//    completada por el médico).
+//  - emitida: ESDOMED la emitió e imprimió.
+export type EstadoIncapacidad = "pendiente_medico" | "pendiente" | "emitida";
 export type CondicionEgresoIncapacidad = "vivo" | "muerto";
+export type OrigenIncapacidad = "hospitalizacion" | "emergencia" | "reposicion";
+
+// Reposición de incapacidad: constancia de un egreso ANTERIOR al arranque de
+// ESDOMED Services (23/06/2026), que no existe en /pacientes. ESDOMED la carga
+// desde el FIEH (o a mano si solo hay escaneo), la asigna a un médico y este
+// completa los datos clínicos; después sigue el circuito normal de emisión.
+export interface ReposicionIncapacidad {
+  creadaPorId: string;
+  creadaPorNombre: string;
+  asignadaEn: Date;               // última asignación / reasignación
+  asignadaPorNombre?: string;     // quién hizo la última reasignación (si hubo)
+  completadaEn?: Date;            // cuándo el médico completó los datos clínicos
+  cargaManual: boolean;           // true = sin PDF digital (se tecleó todo)
+  archivoNombre?: string;         // nombre del FIEH subido
+  // Lo que decía el FIEH (digital o físico). fiehFechaIngreso es el ingreso
+  // "original": fechaDesde puede cambiar si ESDOMED lo corrige desde el detalle,
+  // y con este valor la corrección se puede mostrar y revertir.
+  fiehFechaIngreso?: Date;
+  fiehFechaEgreso?: Date;
+  fiehServicio?: string;          // crudo del FIEH
+  fiehMedicoAlta?: string;        // "Nombre del médico responsable del alta"
+  fiehJvpm?: string;
+}
 export type InstitucionProvisional = "CRECER" | "CONFIA" | "INPEP" | "IPSFA" | "ISSS";
 export type BancoDeposito = "Promerica" | "Atlantida";
 
@@ -692,9 +721,11 @@ export interface SolicitudIncapacidad {
   pacienteDui?: string;      // snapshot (emergencia trae DUI en la atención)
   pacienteGenero?: Genero;   // snapshot (para el recuadro de sexo de la constancia)
 
-  // ── Origen: hospitalización (ingreso en /pacientes) o emergencia (atención) ──
-  origen?: "hospitalizacion" | "emergencia";
+  // ── Origen: hospitalización (ingreso en /pacientes), emergencia (atención)
+  //    o reposición (egreso anterior a la app, cargado por ESDOMED desde el FIEH) ──
+  origen?: OrigenIncapacidad;
   atencionEmergenciaId?: string;
+  reposicion?: ReposicionIncapacidad;
   // Datos personales completados al imprimir (Hoja de Identificación, ver arriba).
   datosConstancia?: DatosConstancia;
 

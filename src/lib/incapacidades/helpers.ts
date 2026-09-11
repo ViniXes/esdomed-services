@@ -1,4 +1,5 @@
-import type { Paciente, SolicitudIncapacidad } from "@/types";
+import type { Paciente, ReposicionIncapacidad, SolicitudIncapacidad } from "@/types";
+import { toDate } from "@/lib/pacientes/helpers";
 
 /**
  * Construye un `Paciente` para la constancia a partir de la incapacidad cuando no
@@ -23,7 +24,9 @@ export function pacienteDesdeIncapacidad(inc: SolicitudIncapacidad): Paciente {
     municipio: dc.municipio,
     departamento: dc.departamento,
     responsable: dc.responsable,
-    fechaIngreso: inc.fechaDesde ?? new Date(),
+    // Reposición: el ingreso "original" es el del FIEH, aunque fechaDesde ya
+    // traiga una corrección de ESDOMED (así la corrección se puede revertir).
+    fechaIngreso: inc.reposicion?.fiehFechaIngreso ?? inc.fechaDesde ?? new Date(),
     servicioIngreso: inc.servicioPaciente,
     servicioActual: inc.servicioPaciente,
     camaActual: inc.camaPaciente,
@@ -167,4 +170,44 @@ export function numeroALetras(n: number): string {
   const milesStr = miles === 1 ? "mil" : `${_0_999(miles)} mil`;
   if (resto === 0) return milesStr;
   return `${milesStr} ${_0_999(resto)}`;
+}
+
+// ── Firestore → SolicitudIncapacidad ─────────────────────────────────────────
+
+/** Convierte el bloque `reposicion` crudo de Firestore (Timestamps) a fechas. */
+export function reposicionDesdeData(raw: unknown): ReposicionIncapacidad | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  return {
+    creadaPorId: String(r.creadaPorId ?? ""),
+    creadaPorNombre: String(r.creadaPorNombre ?? ""),
+    asignadaEn: toDate(r.asignadaEn) ?? new Date(),
+    asignadaPorNombre: r.asignadaPorNombre ? String(r.asignadaPorNombre) : undefined,
+    completadaEn: toDate(r.completadaEn),
+    cargaManual: r.cargaManual === true,
+    archivoNombre: r.archivoNombre ? String(r.archivoNombre) : undefined,
+    fiehFechaIngreso: toDate(r.fiehFechaIngreso),
+    fiehFechaEgreso: toDate(r.fiehFechaEgreso),
+    fiehServicio: r.fiehServicio ? String(r.fiehServicio) : undefined,
+    fiehMedicoAlta: r.fiehMedicoAlta ? String(r.fiehMedicoAlta) : undefined,
+    fiehJvpm: r.fiehJvpm ? String(r.fiehJvpm) : undefined,
+  };
+}
+
+/** Mapea un documento de /incapacidades convirtiendo todas las fechas a Date. */
+export function mapIncapacidadData(id: string, data: Record<string, unknown>): SolicitudIncapacidad {
+  return {
+    ...(data as object),
+    id,
+    fechaAlta: toDate(data.fechaAlta) ?? new Date(),
+    fechaDesde: toDate(data.fechaDesde) ?? new Date(),
+    fechaHasta: toDate(data.fechaHasta) ?? new Date(),
+    creadoEn: toDate(data.creadoEn) ?? new Date(),
+    emitidaEn: toDate(data.emitidaEn),
+    fechaExpedicion: toDate(data.fechaExpedicion),
+    fechaIngresoCorregida: toDate(data.fechaIngresoCorregida),
+    fechaIngresoCorregidaEn: toDate(data.fechaIngresoCorregidaEn),
+    diasCorregidosEn: toDate(data.diasCorregidosEn),
+    reposicion: reposicionDesdeData(data.reposicion),
+  } as SolicitudIncapacidad;
 }
