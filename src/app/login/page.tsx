@@ -191,7 +191,6 @@ export default function LoginPage() {
             </Link>
           </p>
           <p className="mt-3 text-center text-xs text-slate-500">
-            ¿Eres nuevo y necesitas un usuario SIS?{" "}
             <Link prefetch={false} href="/solicitud-usuario-sis" className="font-medium text-cyan-700 hover:underline dark:text-cyan-300">
               Formulario para la creación de usuario en SIS
             </Link>
