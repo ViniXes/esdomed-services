@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Download, Loader2, RefreshCw, Search, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { collection, doc, serverTimestamp, updateDoc, writeBatch } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +56,7 @@ export function LienzoMatrizCuidadosCriticos({
     ...ficha,
     datos: aplicarCalculosBasicos(ficha.datos ?? {}),
   })), [fichasOriginales]);
+  const mostrarCreador = Boolean(fichas);
   const busquedaNormalizada = normalizarBusqueda(busqueda);
   const filasFiltradas = useMemo(() => {
     if (!busquedaNormalizada) return filas;
@@ -81,11 +82,22 @@ export function LienzoMatrizCuidadosCriticos({
     try {
       setExportando(true);
       const XLSX = await import("xlsx");
-      const registros = filasFiltradas.map(fila =>
-        Object.fromEntries(campos.map(campo => [campo.label, valorCampo(fila, campo)]))
-      );
+      const registros = filasFiltradas.map(fila => {
+        const registro: Record<string, string> = {};
+        campos.forEach(campo => {
+          registro[campo.label] = valorCampo(fila, campo);
+          if (mostrarCreador && campo.key === "registro") {
+            registro["CREADO POR"] = valorCreadorFicha(fila);
+          }
+        });
+        return registro;
+      });
       const hoja = XLSX.utils.json_to_sheet(registros);
-      hoja["!cols"] = campos.map(campo => ({ wch: Math.min(Math.max(campo.label.length + 2, 14), 38) }));
+      hoja["!cols"] = campos.flatMap(campo => {
+        const cols = [{ wch: Math.min(Math.max(campo.label.length + 2, 14), 38) }];
+        if (mostrarCreador && campo.key === "registro") cols.push({ wch: 28 });
+        return cols;
+      });
 
       const libro = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(libro, hoja, "Matriz UCI UCIN");
@@ -170,14 +182,20 @@ export function LienzoMatrizCuidadosCriticos({
                 const esPrimera = campoIndex === 0;
                 const esUltima = campoIndex === campos.length - 1;
                 return (
-                  <th
-                    key={campo.key}
-                    className={`max-w-56 border-t border-r border-slate-200 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${
-                      esPrimera ? "border-l rounded-tl-xl" : ""
-                    } ${esUltima ? "rounded-tr-xl" : ""}`}
-                  >
-                    {campo.label}
-                  </th>
+                  <Fragment key={campo.key}>
+                    <th
+                      className={`max-w-56 border-t border-r border-slate-200 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 ${
+                        esPrimera ? "border-l rounded-tl-xl" : ""
+                      } ${esUltima ? "rounded-tr-xl" : ""}`}
+                    >
+                      {campo.label}
+                    </th>
+                    {mostrarCreador && campo.key === "registro" && (
+                      <th className="max-w-56 border-t border-r border-slate-200 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        CREADO POR
+                      </th>
+                    )}
+                  </Fragment>
                 );
               })}
             </tr>
@@ -203,27 +221,33 @@ export function LienzoMatrizCuidadosCriticos({
                   const esPrimera = campoIndex === 0;
                   const esUltima = campoIndex === campos.length - 1;
                   return (
-                    <td
-                      key={campo.key}
-                      className={`max-w-56 border-r border-t border-slate-200 bg-white px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${
-                        esPrimera ? `border-l${esUltimaFila ? " rounded-bl-xl" : ""}` : ""
-                      } ${esUltima && esUltimaFila ? "rounded-br-xl" : ""}`}
-                    >
-                      {href ? (
-                        <Link prefetch={false}
-                          href={href}
-                          className={`block max-h-20 overflow-hidden whitespace-pre-wrap font-semibold underline-offset-2 hover:underline ${
-                            expedientePendiente
-                              ? "text-rose-500 dark:text-rose-300"
-                              : "text-blue-600 dark:text-blue-300"
-                          }`}
-                        >
-                          {valor}
-                        </Link>
-                      ) : (
-                        <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valor}</span>
+                    <Fragment key={campo.key}>
+                      <td
+                        className={`max-w-56 border-r border-t border-slate-200 bg-white px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${
+                          esPrimera ? `border-l${esUltimaFila ? " rounded-bl-xl" : ""}` : ""
+                        } ${esUltima && esUltimaFila ? "rounded-br-xl" : ""}`}
+                      >
+                        {href ? (
+                          <Link prefetch={false}
+                            href={href}
+                            className={`block max-h-20 overflow-hidden whitespace-pre-wrap font-semibold underline-offset-2 hover:underline ${
+                              expedientePendiente
+                                ? "text-rose-500 dark:text-rose-300"
+                                : "text-blue-600 dark:text-blue-300"
+                            }`}
+                          >
+                            {valor}
+                          </Link>
+                        ) : (
+                          <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valor}</span>
+                        )}
+                      </td>
+                      {mostrarCreador && campo.key === "registro" && (
+                        <td className="max-w-56 border-r border-t border-slate-200 bg-white px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                          <span className="block max-h-20 overflow-hidden whitespace-pre-wrap">{valorCreadorFicha(fila)}</span>
+                        </td>
                       )}
-                    </td>
+                    </Fragment>
                   );
                 })}
               </tr>
@@ -231,7 +255,7 @@ export function LienzoMatrizCuidadosCriticos({
             })}
             {filasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={campos.length + (mostrarAcciones ? 1 : 0)} className="rounded-b-xl border-x border-b border-t border-slate-200 bg-white px-4 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900">
+                <td colSpan={campos.length + (mostrarCreador ? 1 : 0) + (mostrarAcciones ? 1 : 0)} className="rounded-b-xl border-x border-b border-t border-slate-200 bg-white px-4 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900">
                   {filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
                 </td>
               </tr>
@@ -693,9 +717,13 @@ function valorCampo(fila: FichaCuidadosCriticos, campo: CampoMatrizCuidadosCriti
   return VALOR_NO_REGISTRADO;
 }
 
+function valorCreadorFicha(fila: FichaCuidadosCriticos) {
+  return valorComoTexto(fila.creadoPorNombre) || VALOR_NO_REGISTRADO;
+}
+
 function textoBusquedaFila(fila: FichaCuidadosCriticos, campos: ReturnType<typeof camposMatrizPorTipo>) {
   const valores = campos.map(campo => valorCampo(fila, campo));
-  valores.push(fila.pacienteExpediente, fila.pacienteNombre, fila.servicio, fila.cama ?? "");
+  valores.push(fila.pacienteExpediente, fila.pacienteNombre, fila.servicio, fila.cama ?? "", valorCreadorFicha(fila));
   return normalizarBusqueda(valores.join(" "));
 }
 

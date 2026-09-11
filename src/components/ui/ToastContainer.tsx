@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, FileClock, ClipboardList, Printer, Inbox, Building2, ShieldAlert, Megaphone, X } from "lucide-react";
+import { ArrowRightLeft, HeartPulse, LogIn, BookCheck, FileText, FileClock, ClipboardList, Printer, Inbox, Building2, ShieldAlert, Megaphone, X, Trash2, FileCode2, UserPlus } from "lucide-react";
 import { useNotificaciones, type NotifToast } from "@/contexts/NotificacionesContext";
 
 const CONFIG: Record<
@@ -65,6 +65,21 @@ const CONFIG: Record<
   },
   reposicion: {
     icon: FileClock,
+    borderColor: "border-l-amber-500",
+    iconColor: "text-amber-400",
+  },
+  solicitud_usuario_sis: {
+    icon: UserPlus,
+    borderColor: "border-l-rose-500",
+    iconColor: "text-rose-400",
+  },
+  uci_eliminacion: {
+    icon: Trash2,
+    borderColor: "border-l-rose-500",
+    iconColor: "text-rose-400",
+  },
+  simmow_reporte: {
+    icon: FileCode2,
     borderColor: "border-l-amber-500",
     iconColor: "text-amber-400",
   },

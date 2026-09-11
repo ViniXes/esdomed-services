@@ -20,7 +20,7 @@ import type { NotificacionFallecido } from "@/types";
 export type TipoNotif =
   | "fallecido" | "traslado" | "traslado_externo" | "alta" | "psicologia"
   | "incapacidad" | "anexo5" | "impresion" | "recepcion" | "conapina"
-  | "solicitud_lesion" | "reposicion";
+  | "solicitud_lesion" | "reposicion" | "solicitud_usuario_sis" | "uci_eliminacion" | "simmow_reporte";
 
 export interface NotifToast {
   id: string;
@@ -43,6 +43,11 @@ interface Pendientes {
   solicitudesLesion: number;
   // Reposiciones de incapacidad que ESDOMED asignó a este médico y siguen por completar.
   reposiciones: number;
+  // Solicitudes de creación de usuario SIS todavía sin gestionar.
+  solicitudesSis: number;
+  // Solicitudes administrativas pendientes.
+  cuidadosCriticosEliminacion: number;
+  simmowReportes: number;
   total: number;
 }
 
@@ -53,7 +58,7 @@ interface NotificacionesContextType {
 }
 
 const Ctx = createContext<NotificacionesContextType>({
-  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, reposiciones: 0, total: 0 },
+  pendientes: { fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, reposiciones: 0, solicitudesSis: 0, cuidadosCriticosEliminacion: 0, simmowReportes: 0, total: 0 },
   toasts: [],
   dismissToast: () => {},
 });
@@ -66,10 +71,10 @@ type Doc = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? "" : String(v));
 
 export function NotificacionesProvider({ children }: { children: ReactNode }) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   const [counts, setCounts] = useState<Omit<Pendientes, "total">>({
-    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, reposiciones: 0,
+    fallecidos: 0, traslados: 0, trasladosExternos: 0, altas: 0, incapacidades: 0, anexo5: 0, impresiones: 0, recepciones: 0, conapina: 0, solicitudesLesion: 0, reposiciones: 0, solicitudesSis: 0, cuidadosCriticosEliminacion: 0, simmowReportes: 0,
   });
   const [toasts, setToasts] = useState<NotifToast[]>([]);
 
@@ -79,6 +84,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esPsicologia = profile?.role === "psicologia";
   const esTS         = profile?.role === "trabajo_social";
   const esComiteLesiones = profile?.role === "comite_lesiones";
+  const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes";
   // Psicología apoya el trámite del comité: comparte sus vistas y su bandeja.
   const cuentaConapina = esComiteLesiones || esPsicologia;
   // Psicología y Trabajo Social comparten la revisión de fallecidos (confirmar "visto").
@@ -341,9 +347,122 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     });
   }, [esMedico, psUid, addToast, setCount]);
 
+  // ── Administración / DIMES: solicitudes SIS pendientes ──
+  // Esta colección se consulta por API autenticada, igual que su bandeja,
+  // para no exponer datos personales en las reglas de Firestore del cliente.
+  // Mantiene el contador del menú y usa los mismos avisos temporales del resto
+  // de módulos. La carga inicial solo muestra el contador, sin repetir avisos.
+  const knownSolicitudesSis = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!puedeVerSolicitudesSis || !user) return;
+    let activo = true;
+    knownSolicitudesSis.current = null;
+
+    type ResumenSis = {
+      pendientes: number;
+      solicitudes: { id: string; nombre: string; servicio: string }[];
+    };
+
+    const refrescar = async () => {
+      try {
+        const token = await user.getIdToken();
+        const res = await fetch("/api/solicitudes-usuarios-sis?resumen=pendientes", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json() as ResumenSis;
+        if (!activo) return;
+
+        const ids = new Set(data.solicitudes.map((solicitud) => solicitud.id));
+        if (knownSolicitudesSis.current === null) {
+          knownSolicitudesSis.current = ids;
+        } else {
+          data.solicitudes.forEach((solicitud) => {
+            if (!knownSolicitudesSis.current!.has(solicitud.id)) {
+              addToast({
+                tipo: "solicitud_usuario_sis",
+                titulo: "Nueva solicitud de usuario SIS",
+                mensaje: `${solicitud.nombre} · ${solicitud.servicio || "Servicio sin indicar"}`,
+              });
+            }
+          });
+          knownSolicitudesSis.current = ids;
+        }
+        setCount("solicitudesSis", Number(data.pendientes) || 0);
+      } catch {
+        // El contador no debe interrumpir el resto del panel si hay un fallo temporal.
+      }
+    };
+
+    void refrescar();
+    const onFocus = () => { void refrescar(); };
+    window.addEventListener("focus", onFocus);
+    const iv = window.setInterval(() => { void refrescar(); }, POLL_MS);
+    return () => {
+      activo = false;
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(iv);
+    };
+  }, [puedeVerSolicitudesSis, user, addToast, setCount]);
+
+  // ── Admin: solicitudes de eliminación de fichas UCI/UCIN ──
+  const knownEliminacionesCriticas = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!profile || profile.role !== "admin") return;
+    knownEliminacionesCriticas.current = null;
+    const q = query(collection(db, "fichas_cuidados_criticos"), where("solicitudEliminacion.estado", "==", "pendiente"));
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownEliminacionesCriticas.current === null) {
+        knownEliminacionesCriticas.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownEliminacionesCriticas.current!.has(doc.id)) {
+            const d = doc.data();
+            const solicitud = d.solicitudEliminacion as Doc | undefined;
+            addToast({
+              tipo: "uci_eliminacion",
+              titulo: "Solicitud de eliminación UCI/UCIN",
+              mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}${solicitud?.solicitadoPorNombre ? ` · ${s(solicitud.solicitadoPorNombre)}` : ""}`,
+            });
+          }
+        });
+        knownEliminacionesCriticas.current = ids;
+      }
+      setCount("cuidadosCriticosEliminacion", snap.size);
+    });
+  }, [profile, addToast, setCount]);
+
+  // ── Admin: reportes técnicos pendientes de SIMMOW (Vault Boy) ──
+  const knownReportesSimmow = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!profile || profile.role !== "admin") return;
+    knownReportesSimmow.current = null;
+    const q = query(collection(db, "reportes_bugs_simmow"), where("estado", "==", "pendiente"));
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownReportesSimmow.current === null) {
+        knownReportesSimmow.current = ids;
+      } else {
+        snap.docs.forEach(doc => {
+          if (!knownReportesSimmow.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "simmow_reporte",
+              titulo: "Nuevo reporte técnico SIMMOW",
+              mensaje: `${s(d.nombreUsuario)}${s(d.expediente) ? ` · Exp. ${s(d.expediente)}` : ""}`,
+            });
+          }
+        });
+        knownReportesSimmow.current = ids;
+      }
+      setCount("simmowReportes", snap.size);
+    });
+  }, [profile, addToast, setCount]);
+
   const pendientes: Pendientes = {
     ...counts,
-    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion + counts.reposiciones,
+    total: counts.fallecidos + counts.traslados + counts.trasladosExternos + counts.altas + counts.incapacidades + counts.anexo5 + counts.impresiones + counts.recepciones + counts.conapina + counts.solicitudesLesion + counts.reposiciones + counts.solicitudesSis + counts.cuidadosCriticosEliminacion + counts.simmowReportes,
   };
 
   return (
