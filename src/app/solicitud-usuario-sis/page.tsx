@@ -67,12 +67,10 @@ function SolicitudUsuarioSisFormulario() {
             <div className="mx-auto max-w-md py-4 text-center">
               <CheckCircle2 size={42} className="mx-auto mb-3 text-emerald-500" />
               <h1 className="mb-2 text-lg font-bold text-slate-900 dark:text-slate-100">Solicitud registrada</h1>
-              <p className="text-sm text-slate-500">Tus datos fueron enviados para la creación de usuario en SIS.</p>
               <div className="my-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left dark:border-amber-900 dark:bg-amber-950/40">
-                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Paso obligatorio para dar seguimiento</p>
-                <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-300">Después de enviar esta solicitud, acércate a ESDOMED para darle seguimiento y terminar el proceso de creación de tu usuario en SIS (Sistema Integrado de Salud). Sin este paso no se dará seguimiento a la solicitud.</p>
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Siguiente paso</p>
+                <p className="mt-1 text-sm leading-relaxed text-amber-800 dark:text-amber-300">Después de enviar tu solicitud, acércate a ESDOMED para finalizar con la creación de tu usuario.</p>
               </div>
-              <p className="mb-6 text-xs text-slate-500">Este formulario no crea una cuenta de acceso a ESDOMED.</p>
               <Link prefetch={false} href="/login" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600"><ArrowLeft size={16} />Volver</Link>
             </div>
           ) : (
