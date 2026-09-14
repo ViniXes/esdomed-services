@@ -15,11 +15,11 @@ import type {
   BancoDeposito, InstitucionProvisional, Paciente, SolicitudIncapacidad,
 } from "@/types";
 import {
-  calcularEdad, formatFecha, formatFechaHora, nombreCompleto, toDate,
+  calcularEdad, formatDuracion, formatFecha, formatFechaHora, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
 import {
   altaAntesDelIngreso, calcularDiasHospitalizacion, formatFechaConstanciaCorta,
-  numeroALetras, pacienteDesdeIncapacidad, mapIncapacidadData,
+  numeroALetras, pacienteDesdeIncapacidad, mapIncapacidadData, recibidaEnEsdomed,
 } from "@/lib/incapacidades/helpers";
 import { cargarMedicosAsignables, type MedicoAsignable } from "@/lib/incapacidades/reposicion";
 
@@ -427,6 +427,15 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
             {" · "}{incapacidad.servicioPaciente}
             {incapacidad.camaPaciente && ` · Cama ${incapacidad.camaPaciente}`}
           </p>
+          {/* Hora exacta de envío: para auditar cuándo llegó a ESDOMED. */}
+          <p className="inline-flex items-center gap-1 text-xs text-slate-500 mt-1">
+            <Clock size={11} className="text-slate-400 flex-shrink-0" />
+            {esReposicion
+              ? incapacidad.reposicion?.completadaEn
+                ? `Completada por el médico el ${formatFechaHora(incapacidad.reposicion.completadaEn)}`
+                : `Cargada por ESDOMED el ${formatFechaHora(incapacidad.creadoEn)}`
+              : `Enviada por el médico el ${formatFechaHora(incapacidad.creadoEn)}`}
+          </p>
         </div>
         {!conElMedico && (
           <button
@@ -559,6 +568,8 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
             </p>
             <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
               {incapacidad.emitidaEn && formatFechaHora(incapacidad.emitidaEn)}
+              {incapacidad.emitidaEn &&
+                ` · ${formatDuracion(incapacidad.emitidaEn.getTime() - recibidaEnEsdomed(incapacidad).getTime())} después de recibirla`}
             </p>
           </div>
         </div>

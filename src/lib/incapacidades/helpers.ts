@@ -2,6 +2,17 @@ import type { Paciente, ReposicionIncapacidad, SolicitudIncapacidad } from "@/ty
 import { toDate } from "@/lib/pacientes/helpers";
 
 /**
+ * Momento en que la incapacidad llegó a la bandeja de ESDOMED para emitir.
+ * Flujo normal: cuando el médico la envió (`creadoEn`). Reposición: cuando el
+ * médico completó los datos clínicos (`reposicion.completadaEn`); antes de eso
+ * la había cargado ESDOMED y estaba "con el médico", así que `creadoEn` no
+ * mide la espera de ESDOMED. Sirve para auditar horas de envío vs. emisión.
+ */
+export function recibidaEnEsdomed(s: SolicitudIncapacidad): Date {
+  return toDate(s.reposicion?.completadaEn) ?? s.creadoEn;
+}
+
+/**
  * Construye un `Paciente` para la constancia a partir de la incapacidad cuando no
  * hay un ingreso en /pacientes (caso emergencia). Usa el snapshot de la incapacidad
  * y `datosConstancia` (completado al imprimir desde la Hoja de Identificación, sin
