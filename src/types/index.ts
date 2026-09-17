@@ -19,6 +19,10 @@ export interface UserProfile {
   servicio?: string;    // solo médicos — campo legacy (un servicio)
   servicios?: string[]; // solo médicos — multi-servicio (campo nuevo)
   tipoMedico?: TipoMedicoCuidadosCriticos; // médicos de cuidados críticos
+  // Médico que además apoya al Comité de Lesiones Intencionales: ve el módulo
+  // completo de /comite-lesiones desde su portal. Se marca POR PERSONA desde
+  // /dashboard/usuarios (la API lo escribe; las reglas lo leen del perfil).
+  apoyaComiteLesiones?: boolean;
   jvpm?: string;        // solo médicos — sello/firma
   dui?: string;         // solo médicos — documento único de identidad (########-#)
   codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")

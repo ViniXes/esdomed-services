@@ -192,6 +192,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
     update.jvpm = puedeTenerJvpm(targetRole) && jvpm ? jvpm : FieldValue.delete();
   }
 
+  // Apoyo al Comité de Lesiones: marca por persona, solo para médicos. Si el
+  // usuario deja de ser médico, la marca se borra aunque no venga en el cuerpo.
+  if ("apoyaComiteLesiones" in body || (nextRole && nextRole !== "medico")) {
+    update.apoyaComiteLesiones = targetRole === "medico" && body.apoyaComiteLesiones === true
+      ? true
+      : FieldValue.delete();
+  }
+
   if ("codigoMarcacion" in body || nextRole) {
     const codigo = String(body.codigoMarcacion ?? "").trim();
     update.codigoMarcacion = puedeTenerCodigoPlan(targetRole) && codigo ? codigo : FieldValue.delete();

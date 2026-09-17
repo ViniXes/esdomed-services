@@ -25,11 +25,20 @@ service cloud.firestore {
     // ingresos por lesión; antes ese trámite lo llevaba Psicología.
     function isComiteLesiones() { return isAuth() && getRole() == 'comite_lesiones'; }
     function isTrabajoSocial(){ return isAuth() && getRole() == 'trabajo_social'; }
-    // Psicología y Trabajo Social apoyan el trámite del comité: usan sus mismas
-    // vistas (Psicología todas salvo Reportes; Trabajo Social solo avisos,
-    // ingresos por lesión y solicitudes a médicos), así que comparten los
-    // permisos del módulo de lesiones. Lo que cada área NO ve es veto de UI.
-    function isComiteOApoyo() { return isComiteLesiones() || isPsicologia() || isTrabajoSocial(); }
+    // Médico marcado POR PERSONA (perfil.apoyaComiteLesiones, lo escribe la API
+    // de usuarios) para apoyar al comité: ve el módulo completo desde su portal.
+    function apoyaComiteLesiones() {
+      return isMedico()
+        && get(/databases/$(database)/documents/usuarios/$(uid())).data.get('apoyaComiteLesiones', false) == true;
+    }
+    // Psicología, Trabajo Social y los médicos marcados apoyan el trámite del
+    // comité: usan sus mismas vistas (Psicología todas salvo Reportes; Trabajo
+    // Social solo avisos, ingresos por lesión y solicitudes a médicos; los
+    // médicos marcados todo), así que comparten los permisos del módulo de
+    // lesiones. Lo que cada área NO ve es veto de UI.
+    function isComiteOApoyo() {
+      return isComiteLesiones() || isPsicologia() || isTrabajoSocial() || apoyaComiteLesiones();
+    }
     function isEnfermeria()   { return isAuth() && getRole() == 'enfermeria'; }
     function isRrhh()         { return isAuth() && getRole() == 'rrhh'; }
     function isTransporte()   { return isAuth() && getRole() == 'transporte'; }

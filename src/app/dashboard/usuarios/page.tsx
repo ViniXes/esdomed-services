@@ -32,6 +32,8 @@ interface NuevoUsuario {
   password: string;
   userRole: UserRole;
   tipoMedico: TipoMedicoCuidadosCriticos | "";
+  // Solo médicos: además apoya al Comité de Lesiones (ve el módulo completo).
+  apoyaComiteLesiones: boolean;
   servicios: string[];
   jvpm: string;
   codigoMarcacion: string;
@@ -62,6 +64,7 @@ const EMPTY_FORM: NuevoUsuario = {
   password: DEFAULT_PASSWORD,
   userRole: "medico",
   tipoMedico: "",
+  apoyaComiteLesiones: false,
   servicios: [],
   jvpm: "",
   codigoMarcacion: "",
@@ -407,6 +410,7 @@ export default function DashboardUsuariosPage() {
       username: u.username ?? "",
       userRole: u.role,
       tipoMedico: u.tipoMedico ?? "",
+      apoyaComiteLesiones: u.apoyaComiteLesiones === true,
       servicios: serviciosActuales,
       jvpm: u.jvpm ?? "",
       codigoMarcacion: u.codigoMarcacion ?? "",
@@ -446,10 +450,12 @@ export default function DashboardUsuariosPage() {
     return "-";
   };
 
-  const displayRole = (u: UserProfile) =>
-    u.role === "medico" && u.tipoMedico
+  const displayRole = (u: UserProfile) => {
+    const base = u.role === "medico" && u.tipoMedico
       ? TIPO_MEDICO_CRITICO_LABEL[u.tipoMedico]
       : roleLabels[u.role] || "Medico";
+    return u.role === "medico" && u.apoyaComiteLesiones ? `${base} · Comité de Lesiones` : base;
+  };
 
   const renderServiciosPicker = (
     selected: string[],
@@ -644,6 +650,16 @@ export default function DashboardUsuariosPage() {
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">JVPM (sello)</label>
                   <input type="text" value={form.jvpm} onChange={setField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
                 </div>
+                <label className="sm:col-span-2 flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 cursor-pointer hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/50">
+                  <input type="checkbox"
+                    checked={form.apoyaComiteLesiones}
+                    onChange={e => setForm(prev => ({ ...prev, apoyaComiteLesiones: e.target.checked }))}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                  <span>
+                    Apoya al Comité de Lesiones
+                    <span className="block text-xs text-slate-500">Ve el módulo completo del comité desde su portal (submenú &quot;Comité de lesiones&quot;).</span>
+                  </span>
+                </label>
 
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">
@@ -969,6 +985,16 @@ export default function DashboardUsuariosPage() {
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">JVPM (sello)</label>
                     <input type="text" value={editForm.jvpm} onChange={setEditField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
                   </div>
+                  <label className="sm:col-span-2 flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 cursor-pointer hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/50">
+                    <input type="checkbox"
+                      checked={editForm.apoyaComiteLesiones}
+                      onChange={e => { const v = e.target.checked; setEditForm(prev => prev ? { ...prev, apoyaComiteLesiones: v } : prev); }}
+                      className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+                    <span>
+                      Apoya al Comité de Lesiones
+                      <span className="block text-xs text-slate-500">Ve el módulo completo del comité desde su portal (submenú &quot;Comité de lesiones&quot;).</span>
+                    </span>
+                  </label>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium text-slate-500 mb-1.5">
                       {editForm.tipoMedico ? "Servicios asignados automaticamente" : "Servicios del medico"}

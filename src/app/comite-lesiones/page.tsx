@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Inbox, Activity, Megaphone, Users, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { veComiteCompleto } from "@/lib/accesoComiteLesiones";
 
 const tareas = [
   { href: "conapina-fgr", icon: Inbox, title: "Recibir avisos", description: "Revise lo notificado por el área médica y deje constancia de la recepción.", action: "Abrir bandeja" },
@@ -12,10 +13,11 @@ const tareas = [
 
 export default function ComiteLesionesHome() {
   const { profile } = useAuth();
-  // Consulta y análisis: Ingresos adolescentes es del comité y Psicología;
-  // Reportes solo del comité. Trabajo Social no ve ninguno de los dos.
-  const verAdolescentes = profile?.role === "comite_lesiones" || profile?.role === "psicologia";
-  const verReportes = profile?.role === "comite_lesiones";
+  // Consulta y análisis: Ingresos adolescentes es del comité (y de los médicos
+  // que lo apoyan) y de Psicología; Reportes solo del comité y esos médicos.
+  // Trabajo Social no ve ninguno de los dos.
+  const verAdolescentes = veComiteCompleto(profile) || profile?.role === "psicologia";
+  const verReportes = veComiteCompleto(profile);
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8 lg:p-10">
       <header className="mb-8 border-b border-slate-200 pb-6 dark:border-slate-700">

@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   const role = await getCallerRole(req);
   if (!isSuperAdmin(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, codigoMarcacion, puesto, username: usernameRaw } = await req.json();
+  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, apoyaComiteLesiones, codigoMarcacion, puesto, username: usernameRaw } = await req.json();
 
   if (!nombre || !email || !password || !userRole) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -150,6 +150,8 @@ export async function POST(req: NextRequest) {
     servicios: serviciosArr,
     servicio: serviciosArr[0] ?? "",
     ...(tipoMedicoValido ? { tipoMedico: tipoMedicoValido } : {}),
+    // Apoyo al Comité de Lesiones: marca por persona, solo para médicos.
+    ...(userRole === "medico" && apoyaComiteLesiones === true ? { apoyaComiteLesiones: true } : {}),
     ...(puedeTenerJvpm(userRole as UserRole) && jvpm ? { jvpm } : {}),
     ...(conCodigoPlan && codigoMarcacion ? { codigoMarcacion: String(codigoMarcacion).trim() } : {}),
     ...(conCodigoPlan && puesto ? { puesto: String(puesto).trim() } : {}),
