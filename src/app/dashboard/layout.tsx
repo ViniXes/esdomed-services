@@ -9,14 +9,12 @@ import {
   BarChart3,
   BedDouble,
   Building2,
-  CheckCheck,
   ClipboardCheck,
   ClipboardList,
   FileClock,
   FileText,
   HeartPulse,
   History,
-  Inbox,
   LayoutDashboard,
   LayoutGrid,
   ListChecks,
@@ -30,7 +28,6 @@ import {
   Table2,
   TrendingUp,
   Users,
-  DoorOpen,
   CalendarClock,
   CalendarRange,
   NotebookPen,
@@ -45,6 +42,7 @@ import { Sidebar, type NavItem } from "@/components/Sidebar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import { esJefeCuidadosCriticos, puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { navItemsTrabajoSocial } from "@/lib/navTrabajoSocial";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
@@ -97,7 +95,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const verControlIngresos = esEsdomed || esAdmin;
   const verPacientes       = esEsdomed || esAdmin;
   const verIncapacidades   = esEsdomed || esAdmin;
-  const verAltasVivos = esEsdomed || esAdmin || esTS;
+  const verAltasVivos = esEsdomed || esAdmin;
   const verConfiguracion = esAdmin;
   const verUsuarios = esAdmin;
   const verBusquedaTelefono = esAdmin;
@@ -114,47 +112,24 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
-  const G_PROCESOS_ESDOMED = "Procesos con ESDOMED";
   const G_MEDICINA_CRITICA = "Medicina crítica";
   const G_TRABAJO_SOCIAL = "Trabajo Social";
-  const G_GESTIONES_ALTAS = "Gestiones de Altas";
   const G_DOCUMENTOS = "Documentos";
   const G_REPORTES = "Reportes";
   const G_PERSONAL = "Mi área";
   const G_ADMIN = "Administración";
 
+  // Trabajo Social tiene su menú completo en navTrabajoSocial: lo comparte con
+  // el layout de /comite-lesiones, donde apoya el trámite del Comité de
+  // Lesiones, para que el cruce entre áreas sea transparente. No usa el inicio
+  // (panel de ESDOMED); entra directo a sus vistas.
   const navItems: NavItem[] = esDimes
     ? [{ href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN, exact: true }]
+    : esTS
+    ? navItemsTrabajoSocial(pendientes)
     : [
-    // Trabajo Social no usa el inicio (panel de ESDOMED); entra directo a sus vistas.
-    ...(!esTS && !esJefeMedicinaCritica
+    ...(!esJefeMedicinaCritica
       ? [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }]
-      : []),
-
-    // ── Procesos con ESDOMED (solo Trabajo Social) ──
-    // Flujos de TS que dependen de o responden a ESDOMED. Los demás roles
-    // conservan estos mismos ítems dentro de sus grupos habituales.
-    ...(esTS
-      ? [
-          { href: "/dashboard/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, group: G_PROCESOS_ESDOMED },
-          {
-            // TS usa la vista de revisión (estilo Psicología), no la de ESDOMED.
-            href: "/dashboard/defunciones",
-            label: "Defunciones",
-            icon: HeartPulse,
-            tone: "rose" as const,
-            badge: pendientes.fallecidos,
-            group: G_PROCESOS_ESDOMED,
-          },
-          { href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PROCESOS_ESDOMED },
-          {
-            href: "/dashboard/altas-vivos",
-            label: "Verificación de Altas",
-            icon: LogIn,
-            badge: pendientes.altas,
-            group: G_PROCESOS_ESDOMED,
-          },
-        ]
       : []),
 
     // ── Gestión de pacientes ──
@@ -193,43 +168,21 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verBusquedaTelefono
       ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
       : []),
-    ...(!esTS
-      ? [{
-          href: "/dashboard/traslados",
-          label: "Traslados",
-          icon: ArrowRightLeft,
-          badge: pendientes.traslados,
-          group: G_PACIENTES,
-        }]
-      : []),
-    ...(!esTS
-      ? [{
-          href: "/dashboard/traslados-externos",
-          label: "Traslado a otro hospital",
-          icon: Building2,
-          badge: pendientes.trasladosExternos,
-          group: G_PACIENTES,
-        }]
-      : []),
-    // ── Gestiones de Altas (TS agrupa Notificación + Verificación) ──
-    ...(esTS
-      ? [
-          {
-            href: "/dashboard/notificacion-altas",
-            label: "Notificación de Prealta",
-            icon: ClipboardCheck,
-            group: G_GESTIONES_ALTAS,
-          },
-          {
-            href: "/dashboard/confirmacion-alta",
-            label: "Confirmación de Alta",
-            icon: CheckCheck,
-            group: G_GESTIONES_ALTAS,
-          },
-        ]
-      : []),
-    // Para TS este ítem vive en "Procesos con ESDOMED" (arriba).
-    ...(verAltasVivos && !esTS
+    {
+      href: "/dashboard/traslados",
+      label: "Traslados",
+      icon: ArrowRightLeft,
+      badge: pendientes.traslados,
+      group: G_PACIENTES,
+    },
+    {
+      href: "/dashboard/traslados-externos",
+      label: "Traslado a otro hospital",
+      icon: Building2,
+      badge: pendientes.trasladosExternos,
+      group: G_PACIENTES,
+    },
+    ...(verAltasVivos
       ? [{
           href: "/dashboard/altas-vivos",
           label: "Verificación de Altas",
@@ -238,19 +191,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           group: G_PACIENTES,
         }]
       : []),
-    ...(!esTS
-      ? [{
-          href: "/dashboard/fallecidos",
-          label: "Fallecidos",
-          icon: HeartPulse,
-          tone: "rose" as const,
-          badge: pendientes.fallecidos,
-          group: G_PACIENTES,
-        }]
-      : []),
+    {
+      href: "/dashboard/fallecidos",
+      label: "Fallecidos",
+      icon: HeartPulse,
+      tone: "rose" as const,
+      badge: pendientes.fallecidos,
+      group: G_PACIENTES,
+    },
 
-    // ── Trabajo Social ── cada flujo con entrada propia (antes: 1 ítem + tabs).
-    ...(esTS || esAdmin
+    // ── Trabajo Social ── el admin ve las vistas de gestiones (el menú de TS
+    // propiamente dicho vive en navTrabajoSocial).
+    ...(esAdmin
       ? [
           { href: "/dashboard/gestiones/asignaciones", label: "Asignaciones", icon: UserCheck, group: G_TRABAJO_SOCIAL },
           { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar, group: G_TRABAJO_SOCIAL },
@@ -260,14 +212,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           { href: "/dashboard/gestiones/bitacora", label: "Bitácora", icon: FileClock, group: G_TRABAJO_SOCIAL },
         ]
       : []),
-    ...(esTS
-      ? [{ href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_TRABAJO_SOCIAL }]
-      : []),
 
     // ── Documentos ──
-    ...(!esTS
-      ? [{ href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, badge: pendientes.impresiones, group: G_DOCUMENTOS }]
-      : []),
+    { href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, badge: pendientes.impresiones, group: G_DOCUMENTOS },
     ...(verIncapacidades
       ? [
           {

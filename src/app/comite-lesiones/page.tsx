@@ -12,6 +12,10 @@ const tareas = [
 
 export default function ComiteLesionesHome() {
   const { profile } = useAuth();
+  // Consulta y análisis: Ingresos adolescentes es del comité y Psicología;
+  // Reportes solo del comité. Trabajo Social no ve ninguno de los dos.
+  const verAdolescentes = profile?.role === "comite_lesiones" || profile?.role === "psicologia";
+  const verReportes = profile?.role === "comite_lesiones";
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8 lg:p-10">
       <header className="mb-8 border-b border-slate-200 pb-6 dark:border-slate-700">
@@ -33,11 +37,15 @@ export default function ComiteLesionesHome() {
           </Link>
         ))}
       </div>
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Consulta y análisis</h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link href="/comite-lesiones/ingresos-adolescentes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><Users size={21} className="text-slate-500" />Ingresos de adolescentes<ArrowUpRight size={16} className="ml-auto" /></Link>
-        {profile?.role === "comite_lesiones" && <Link href="/comite-lesiones/reportes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><BarChart3 size={21} className="text-slate-500" />Reportes del comité<ArrowUpRight size={16} className="ml-auto" /></Link>}
-      </div>
+      {(verAdolescentes || verReportes) && (
+        <>
+          <h2 className="mb-4 mt-8 text-lg font-semibold">Consulta y análisis</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {verAdolescentes && <Link href="/comite-lesiones/ingresos-adolescentes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><Users size={21} className="text-slate-500" />Ingresos de adolescentes<ArrowUpRight size={16} className="ml-auto" /></Link>}
+            {verReportes && <Link href="/comite-lesiones/reportes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><BarChart3 size={21} className="text-slate-500" />Reportes del comité<ArrowUpRight size={16} className="ml-auto" /></Link>}
+          </div>
+        </>
+      )}
     </div>
   );
 }

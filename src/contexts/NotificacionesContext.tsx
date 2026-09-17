@@ -85,8 +85,9 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esTS         = profile?.role === "trabajo_social";
   const esComiteLesiones = profile?.role === "comite_lesiones";
   const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes";
-  // Psicología apoya el trámite del comité: comparte sus vistas y su bandeja.
-  const cuentaConapina = esComiteLesiones || esPsicologia;
+  // Psicología y Trabajo Social apoyan el trámite del comité: comparten sus
+  // vistas y su bandeja de avisos.
+  const cuentaConapina = esComiteLesiones || esPsicologia || esTS;
   // Psicología y Trabajo Social comparten la revisión de fallecidos (confirmar "visto").
   const revisaFallecidos = esPsicologia || esTS;
   const psUid        = profile?.uid;
