@@ -39,8 +39,8 @@ export default function SolicitudesUsuariosSisPage() {
   const [usuarioSis, setUsuarioSis] = useState("");
   const [notaAdmin, setNotaAdmin] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const soloLectura = profile?.role === "medico_licenciado_dimes" || profile?.role === "asistente_esdomed";
-  const puedeAcceder = profile?.role === "admin" || soloLectura;
+  const soloLectura = profile?.role === "medico_licenciado_dimes";
+  const puedeAcceder = profile?.role === "admin" || profile?.role === "asistente_esdomed" || soloLectura;
 
   const cargar = async () => {
     if (!user) return;

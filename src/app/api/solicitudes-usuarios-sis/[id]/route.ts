@@ -12,7 +12,7 @@ async function getAdmin(req: NextRequest): Promise<{ uid: string; nombre: string
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const data = (await adminDb.collection("usuarios").doc(decoded.uid).get()).data();
-    if (data?.role !== "admin") return null;
+    if (data?.role !== "admin" && data?.role !== "asistente_esdomed") return null;
     return { uid: decoded.uid, nombre: String(data.nombre ?? "") };
   } catch {
     return null;
