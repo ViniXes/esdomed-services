@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Inbox, Activity, Megaphone, Users, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { veComiteCompleto } from "@/lib/accesoComiteLesiones";
 
 const tareas = [
   { href: "conapina-fgr", icon: Inbox, title: "Recibir avisos", description: "Revise lo notificado por el área médica y deje constancia de la recepción.", action: "Abrir bandeja" },
@@ -12,6 +13,11 @@ const tareas = [
 
 export default function ComiteLesionesHome() {
   const { profile } = useAuth();
+  // Consulta y análisis: Ingresos adolescentes es del comité (y de los médicos
+  // que lo apoyan) y de Psicología; Reportes solo del comité y esos médicos.
+  // Trabajo Social no ve ninguno de los dos.
+  const verAdolescentes = veComiteCompleto(profile) || profile?.role === "psicologia";
+  const verReportes = veComiteCompleto(profile);
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8 lg:p-10">
       <header className="mb-8 border-b border-slate-200 pb-6 dark:border-slate-700">
@@ -33,11 +39,15 @@ export default function ComiteLesionesHome() {
           </Link>
         ))}
       </div>
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Consulta y análisis</h2>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link href="/comite-lesiones/ingresos-adolescentes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><Users size={21} className="text-slate-500" />Ingresos de adolescentes<ArrowUpRight size={16} className="ml-auto" /></Link>
-        {profile?.role === "comite_lesiones" && <Link href="/comite-lesiones/reportes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><BarChart3 size={21} className="text-slate-500" />Reportes del comité<ArrowUpRight size={16} className="ml-auto" /></Link>}
-      </div>
+      {(verAdolescentes || verReportes) && (
+        <>
+          <h2 className="mb-4 mt-8 text-lg font-semibold">Consulta y análisis</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {verAdolescentes && <Link href="/comite-lesiones/ingresos-adolescentes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><Users size={21} className="text-slate-500" />Ingresos de adolescentes<ArrowUpRight size={16} className="ml-auto" /></Link>}
+            {verReportes && <Link href="/comite-lesiones/reportes" className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium dark:border-slate-700 dark:bg-slate-900"><BarChart3 size={21} className="text-slate-500" />Reportes del comité<ArrowUpRight size={16} className="ml-auto" /></Link>}
+          </div>
+        </>
+      )}
     </div>
   );
 }

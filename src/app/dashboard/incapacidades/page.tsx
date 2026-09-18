@@ -9,7 +9,8 @@ import {
 import { db } from "@/lib/firebase";
 import { FileText, FileClock, Clock, CheckCircle2, Search, X, AlertTriangle, History, Stethoscope } from "lucide-react";
 import type { EstadoIncapacidad, SolicitudIncapacidad } from "@/types";
-import { formatFecha, toDate } from "@/lib/pacientes/helpers";
+import { formatDuracion, formatFecha, formatFechaHora, formatHora } from "@/lib/pacientes/helpers";
+import { mapIncapacidadData, recibidaEnEsdomed } from "@/lib/incapacidades/helpers";
 import { DateField } from "@/components/ui/DateField";
 
 type Filtro = EstadoIncapacidad | "todos";
@@ -25,18 +26,10 @@ const FILTROS: { value: Filtro; label: string }[] = [
   { value: "todos",     label: "Todas" },
 ];
 
-function mapDoc(d: QueryDocumentSnapshot<DocumentData>): SolicitudIncapacidad {
-  const data = d.data();
-  return {
-    id: d.id,
-    ...data,
-    fechaAlta: toDate(data.fechaAlta) ?? new Date(),
-    fechaDesde: toDate(data.fechaDesde) ?? new Date(),
-    fechaHasta: toDate(data.fechaHasta) ?? new Date(),
-    creadoEn: toDate(data.creadoEn) ?? new Date(),
-    emitidaEn: toDate(data.emitidaEn),
-  } as SolicitudIncapacidad;
-}
+// Mapeo compartido: convierte todas las fechas (incluido reposicion.completadaEn,
+// que hace falta para saber cuándo llegó a ESDOMED una reposición).
+const mapDoc = (d: QueryDocumentSnapshot<DocumentData>): SolicitudIncapacidad =>
+  mapIncapacidadData(d.id, d.data());
 
 export default function IncapacidadesPage() {
   const router = useRouter();
@@ -59,6 +52,13 @@ export default function IncapacidadesPage() {
   const [errorBusqueda, setErrorBusqueda] = useState("");
 
   const [totalHoy, setTotalHoy] = useState<number | null>(null);
+
+  // Reloj para el "hace X" de las pendientes: se refresca cada minuto, sin lecturas.
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   // Solo las pendientes, en vivo. Sin orderBy en la consulta para no exigir
   // índice compuesto (estado + creadoEn); se ordena en cliente.
@@ -212,6 +212,7 @@ export default function IncapacidadesPage() {
                 <Th>Médico solicitante</Th>
                 <Th>Días</Th>
                 <Th>Fecha alta</Th>
+                <Th>Enviada</Th>
                 <Th>Estado</Th>
                 <th className="px-4 py-3" />
               </tr>
@@ -219,6 +220,7 @@ export default function IncapacidadesPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {listaMostrada.map((s) => {
                 const esDuplicado = duplicadoKeys.has(dupKey(s));
+                const recibida = recibidaEnEsdomed(s);
                 return (
                   <tr
                     key={s.id}
@@ -259,6 +261,17 @@ export default function IncapacidadesPage() {
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
                       {formatFecha(s.fechaAlta)}
                     </td>
+                    {/* Hora exacta en que llegó a ESDOMED (envío del médico o, en
+                        reposiciones, cuando el médico la completó). */}
+                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                      <p className="font-semibold font-mono text-slate-800 dark:text-slate-200">{formatHora(recibida)}</p>
+                      <p className="text-slate-500 mt-0.5">{formatFecha(recibida)}</p>
+                      {s.estado === "pendiente" && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                          hace {formatDuracion(ahora - recibida.getTime())}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {s.estado === "pendiente_medico" ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-0.5 rounded-full">
@@ -269,9 +282,18 @@ export default function IncapacidadesPage() {
                           <Clock size={10} /> Pendiente
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 px-2 py-0.5 rounded-full">
-                          <CheckCircle2 size={10} /> Emitida
-                        </span>
+                        <>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-900 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 size={10} /> Emitida
+                          </span>
+                          {s.emitidaEn && (
+                            <span className="block text-[10px] text-slate-500 mt-1 leading-snug">
+                              {formatFechaHora(s.emitidaEn)}
+                              {" · "}{formatDuracion(s.emitidaEn.getTime() - recibida.getTime())} después
+                              {s.emitidaPorNombre && <span className="block">{s.emitidaPorNombre}</span>}
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">

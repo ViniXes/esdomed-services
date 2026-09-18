@@ -14,6 +14,7 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { apoyaComiteLesiones } from "@/lib/accesoComiteLesiones";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import type { NotificacionFallecido } from "@/types";
 
@@ -85,8 +86,9 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esTS         = profile?.role === "trabajo_social";
   const esComiteLesiones = profile?.role === "comite_lesiones";
   const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes";
-  // Psicología apoya el trámite del comité: comparte sus vistas y su bandeja.
-  const cuentaConapina = esComiteLesiones || esPsicologia;
+  // Psicología, Trabajo Social y los médicos marcados apoyan el trámite del
+  // comité: comparten sus vistas y su bandeja de avisos.
+  const cuentaConapina = esComiteLesiones || esPsicologia || esTS || apoyaComiteLesiones(profile);
   // Psicología y Trabajo Social comparten la revisión de fallecidos (confirmar "visto").
   const revisaFallecidos = esPsicologia || esTS;
   const psUid        = profile?.uid;

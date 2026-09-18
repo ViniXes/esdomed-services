@@ -266,7 +266,7 @@ function SidebarBody({
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${medical ? "text-slate-400 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-500 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-300" : "text-blue-900 dark:text-cyan-300/80 hover:text-cyan-700 dark:hover:text-cyan-200 hover:bg-blue-50/70 dark:hover:bg-slate-800/70"}`}
+                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${medical ? "text-blue-800 hover:bg-cyan-50 hover:text-cyan-700 dark:text-cyan-300/80 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-200" : "text-blue-900 dark:text-cyan-300/80 hover:text-cyan-700 dark:hover:text-cyan-200 hover:bg-blue-50/70 dark:hover:bg-slate-800/70"}`}
               >
                 <ChevronDown
                   size={12}
