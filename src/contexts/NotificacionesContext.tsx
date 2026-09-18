@@ -85,7 +85,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esPsicologia = profile?.role === "psicologia";
   const esTS         = profile?.role === "trabajo_social";
   const esComiteLesiones = profile?.role === "comite_lesiones";
-  const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes";
+  const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes" || profile?.role === "asistente_esdomed";
   // Psicología, Trabajo Social y los médicos marcados apoyan el trámite del
   // comité: comparten sus vistas y su bandeja de avisos.
   const cuentaConapina = esComiteLesiones || esPsicologia || esTS || apoyaComiteLesiones(profile);

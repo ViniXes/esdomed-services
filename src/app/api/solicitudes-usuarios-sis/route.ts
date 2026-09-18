@@ -43,13 +43,13 @@ async function obtenerServiciosHabilitados() {
   return new Set<string>(SERVICIOS_HOSPITALARIOS);
 }
 
-async function obtenerRolLector(req: NextRequest): Promise<"admin" | "medico_licenciado_dimes" | null> {
+async function obtenerRolLector(req: NextRequest): Promise<"admin" | "medico_licenciado_dimes" | "asistente_esdomed" | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const role = (await adminDb.collection("usuarios").doc(decoded.uid).get()).data()?.role;
-    return role === "admin" || role === "medico_licenciado_dimes" ? role : null;
+    return role === "admin" || role === "medico_licenciado_dimes" || role === "asistente_esdomed" ? role : null;
   } catch {
     return null;
   }

@@ -258,6 +258,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           { href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN },
         ]
       : []),
+    ...(esAsistente
+      ? [{ href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN }]
+      : []),
     ...(verAprobacionTramites
       ? [{ href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck, group: G_ADMIN }]
       : []),
