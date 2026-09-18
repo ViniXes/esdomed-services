@@ -820,6 +820,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ─── Evaluaciones y amonestaciones de personal ─────────────────────────────
+    // Archivero permanente del expediente de cada empleado ESDOMED. Solo el
+    // admin registra y elimina; cada empleado consulta ÚNICAMENTE las suyas
+    // (no es ético que el personal esdomed vea las notas de un compañero). El
+    // admin sí ve y gestiona las de todos.
+    match /evaluaciones_personal/{id} {
+      allow read:   if isAdmin() || (isAuth() && resource.data.empleadoId == uid());
+      allow create, update, delete: if isAdmin();
+    }
+
     // ─── Configuración global ────────────────────────────────────────────────
     // Servicios y camas: lectura pública (no es dato sensible), escritura solo admin.
     match /configuracion/{docId} {

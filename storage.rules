@@ -68,6 +68,20 @@ service firebase.storage {
                    && request.auth.uid == userId;
     }
 
+    // Adjuntos del archivero de evaluaciones/amonestaciones de personal
+    // (evaluaciones_personal en Firestore). A diferencia de las rutas de
+    // arriba, aquí quien SUBE (admin) no es dueño de la carpeta — el dueño es
+    // el empleado evaluado — así que no se exige request.auth.uid == userId.
+    // El control real vive en Firestore: solo el admin puede crear el
+    // documento que expone esta URL, y cada empleado solo lee el suyo.
+    match /evaluaciones_personal/{empleadoUid}/{fileName} {
+      allow read:  if request.auth != null;
+      allow create, update: if request.auth != null
+                   && tamanoValido()
+                   && request.resource.contentType.matches('application/pdf|image/.*');
+      allow delete: if request.auth != null;
+    }
+
     // Cualquier otra ruta queda denegada.
     match /{allPaths=**} {
       allow read, write: if false;

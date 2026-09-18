@@ -1672,6 +1672,23 @@ export interface TramitePersonal {
   comentariosRevision?: string;
 }
 
+// Archivero permanente del expediente de cada empleado ESDOMED: evaluaciones
+// (ej. Norma Técnica de Hechos Vitales) y amonestaciones por algún
+// procedimiento. Solo el admin registra/elimina; cada empleado consulta
+// únicamente las suyas (ver firestore.rules, colección evaluaciones_personal).
+export interface EvaluacionPersonal {
+  id?: string;
+  empleadoId: string;
+  empleadoNombre: string;
+  tipo: string; // catálogo abierto, ver TIPOS_EVALUACION_PERSONAL en src/lib/evaluacionesPersonal.ts
+  notas?: string;
+  archivos?: AdjuntoBitacora[];
+  fecha: Date; // fecha de la evaluación/amonestación (no necesariamente hoy)
+  registradaPorId: string;
+  registradaPorNombre: string;
+  creadoEn: Date;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Transporte institucional
 // ─────────────────────────────────────────────────────────────────────────────
