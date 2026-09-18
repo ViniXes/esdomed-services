@@ -439,7 +439,7 @@ export default function ProductividadEsdomedPage() {
       <ProductividadTabs />
 
       <div className="flex flex-wrap items-center gap-3">
-        <input type="month" value={mes} onChange={e => setMes(e.target.value)} className={selectCls} />
+        <input type="month" value={mes} onChange={e => { if (e.target.value) setMes(e.target.value); }} className={selectCls} />
         {!loading && (
           <button
             onClick={exportarExcel}
