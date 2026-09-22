@@ -177,6 +177,7 @@ export async function GET(req: NextRequest) {
       creadoEn: fechaIso(data.creadoEn),
       actualizadoEn: fechaIso(data.actualizadoEn),
       estadoActualizadoEn: fechaIso(data.estadoActualizadoEn),
+      llavesSisEnviadasEn: fechaIso(data.llavesSisEnviadasEn),
     };
   }).sort((a, b) => String(b.creadoEn ?? "").localeCompare(String(a.creadoEn ?? "")));
   return NextResponse.json(solicitudes);

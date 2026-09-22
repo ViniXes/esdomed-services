@@ -41,13 +41,20 @@ export async function GET(req: NextRequest) {
   // con el día laboral que ve el personal.
   const inicio = new Date(Date.UTC(anio, numeroMes - 1, 1, 6));
   const fin = new Date(Date.UTC(anio, numeroMes, 1, 5, 59, 59, 999));
-  const snap = await adminDb
-    .collection(SOLICITUDES)
-    .where("usuarioSisCreadoEn", ">=", inicio)
-    .where("usuarioSisCreadoEn", "<=", fin)
-    .get();
+  const [creacionesSnap, llavesSnap] = await Promise.all([
+    adminDb
+      .collection(SOLICITUDES)
+      .where("usuarioSisCreadoEn", ">=", inicio)
+      .where("usuarioSisCreadoEn", "<=", fin)
+      .get(),
+    adminDb
+      .collection(SOLICITUDES)
+      .where("llavesSisEnviadasEn", ">=", inicio)
+      .where("llavesSisEnviadasEn", "<=", fin)
+      .get(),
+  ]);
 
-  const registros = snap.docs
+  const registros = creacionesSnap.docs
     .map((doc) => {
       const data = doc.data();
       return {
@@ -62,5 +69,20 @@ export async function GET(req: NextRequest) {
     .filter((registro) => registro.creadoPorId && registro.creadoPorNombre && registro.creadoEn)
     .sort((a, b) => String(b.creadoEn).localeCompare(String(a.creadoEn)));
 
-  return NextResponse.json({ registros });
+  const llavesEnviadas = llavesSnap.docs
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        solicitante: String(data.nombre ?? ""),
+        usuarioSis: String(data.usuarioSis ?? ""),
+        enviadoPorId: String(data.llavesSisEnviadasPorId ?? ""),
+        enviadoPorNombre: String(data.llavesSisEnviadasPorNombre ?? ""),
+        enviadoEn: fechaIso(data.llavesSisEnviadasEn),
+      };
+    })
+    .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn)
+    .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
+
+  return NextResponse.json({ registros, llavesEnviadas });
 }
