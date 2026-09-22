@@ -42,7 +42,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const ref = adminDb.collection(SOLICITUDES).doc(id);
-  if (!(await ref.get()).exists) return NextResponse.json({ error: "La solicitud ya no existe." }, { status: 404 });
+  const solicitudActual = await ref.get();
+  if (!solicitudActual.exists) return NextResponse.json({ error: "La solicitud ya no existe." }, { status: 404 });
+
+  // La autoría se fija exclusivamente en la transición hacia “creado”. Así,
+  // una nota o cambio posterior no puede adjudicarse la creación a otra persona.
+  const datosActuales = solicitudActual.data();
+  const registrarCreadorSis =
+    estado === "creado" &&
+    datosActuales?.estado !== "creado" &&
+    !datosActuales?.usuarioSisCreadoPorId;
 
   await ref.update({
     estado,
@@ -52,6 +61,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     estadoActualizadoPorNombre: admin.nombre,
     estadoActualizadoEn: FieldValue.serverTimestamp(),
     actualizadoEn: FieldValue.serverTimestamp(),
+    ...(registrarCreadorSis
+      ? {
+          usuarioSisCreadoPorId: admin.uid,
+          usuarioSisCreadoPorNombre: admin.nombre,
+          usuarioSisCreadoEn: FieldValue.serverTimestamp(),
+        }
+      : {}),
   });
   return NextResponse.json({ ok: true });
 }

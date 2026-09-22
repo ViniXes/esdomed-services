@@ -127,6 +127,11 @@ export interface SolicitudUsuarioSis {
   estadoActualizadoEn?: Date;
   estadoActualizadoPorId?: string;
   estadoActualizadoPorNombre?: string;
+  // Autoría inmutable de la creación efectiva del usuario en SIS. A diferencia
+  // del último estado actualizado, estos campos no se modifican después.
+  usuarioSisCreadoPorId?: string;
+  usuarioSisCreadoPorNombre?: string;
+  usuarioSisCreadoEn?: Date;
 }
 
 export type TipoAtencionCuidadosCriticos =

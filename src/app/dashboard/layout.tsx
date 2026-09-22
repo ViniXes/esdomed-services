@@ -274,6 +274,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ...(verProductividad
       ? [{ href: "/dashboard/productividad/esdomed", label: "Productividad", icon: TrendingUp, group: G_ADMIN, exact: true }]
       : []),
+    ...(esAdmin
+      ? [{ href: "/dashboard/productividad/administracion", label: "Productividad administrativa", icon: TrendingUp, group: G_ADMIN }]
+      : []),
   ];
 
   return (

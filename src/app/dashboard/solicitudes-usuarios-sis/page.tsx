@@ -11,6 +11,7 @@ type Solicitud = {
   yaTuvoUsuario: string; especialidad: string; otraEspecialidad?: string | null; otroCargo?: string | null; esResidente: string; servicio: string; autorizadoPor: string;
   estado: EstadoSolicitudSis; usuarioSis?: string | null; notaAdmin?: string | null; creadoEn: string | null; actualizadoEn: string | null;
   estadoActualizadoPorNombre?: string | null; estadoActualizadoEn?: string | null;
+  usuarioSisCreadoPorNombre?: string | null; usuarioSisCreadoEn?: string | null;
 };
 
 const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";

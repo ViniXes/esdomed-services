@@ -2,18 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Stethoscope } from "lucide-react";
+import { ShieldCheck, Stethoscope } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
-const TABS = [
+const TABS_OPERATIVOS = [
   { href: "/dashboard/productividad/esdomed", label: "ESDOMED", icon: Stethoscope },
 ] as const;
 
 /** Sub-navegación compartida entre las vistas del módulo de Productividad. */
 export function ProductividadTabs() {
   const pathname = usePathname();
+  const { profile } = useAuth();
+  const tabs = profile?.role === "admin"
+    ? [...TABS_OPERATIVOS, { href: "/dashboard/productividad/administracion", label: "Administración", icon: ShieldCheck }]
+    : TABS_OPERATIVOS;
   return (
     <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl">
-      {TABS.map(({ href, label, icon: Icon }) => {
+      {tabs.map(({ href, label, icon: Icon }) => {
         const activo = pathname === href;
         return (
           <Link prefetch={false}
