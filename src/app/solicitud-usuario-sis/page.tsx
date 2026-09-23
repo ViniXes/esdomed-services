@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FilePlus2 } from "lucide-react";
 import { normalizarDui } from "@/lib/dui";
-import { CARGOS_USUARIO_SIS, ESPECIALIDADES_SIS, JEFATURAS_AUTORIZADORAS_SIS, normalizarNombrePersona, RESPUESTAS_SI_NO, TIPOS_DOCUMENTO_SIS } from "@/lib/solicitudesUsuarioSis";
+import { CARGOS_USUARIO_SIS, ESPECIALIDADES_SIS, JEFATURAS_SIS, etiquetaJefaturaSis, normalizarNombrePersona, RESPUESTAS_SI_NO, TIPOS_DOCUMENTO_SIS } from "@/lib/solicitudesUsuarioSis";
 import { useServicios } from "@/contexts/ServiciosContext";
 
 const inputCls = "w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-transparent transition";
@@ -94,7 +94,7 @@ function SolicitudUsuarioSisFormulario() {
                     {servicios.map((servicio) => <option key={servicio} value={servicio}>{servicio}</option>)}
                   </select>
                 </Campo>
-                <Campo label="Jefatura que autoriza" className="lg:col-span-3"><select value={form.autorizadoPor} onChange={(e) => set("autorizadoPor", e.target.value)} required className={inputCls}><option value="">Seleccionar jefatura...</option>{JEFATURAS_AUTORIZADORAS_SIS.map((jefatura) => <option key={jefatura} value={jefatura}>{jefatura}</option>)}</select></Campo>
+                <Campo label="Jefatura que autoriza" className="lg:col-span-3"><select value={form.autorizadoPor} onChange={(e) => set("autorizadoPor", e.target.value)} required className={inputCls}><option value="">Seleccionar jefatura...</option>{JEFATURAS_SIS.map((jefatura) => <option key={jefatura.nombre} value={jefatura.nombre}>{etiquetaJefaturaSis(jefatura)}</option>)}</select></Campo>
                 {error && <div className="lg:col-span-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"><AlertTriangle size={16} className="mt-0.5 shrink-0" />{error}</div>}
                 <div className="lg:col-span-6"><button disabled={submitting} type="submit" className="w-full rounded-xl bg-blue-700 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:opacity-50">{submitting ? "Enviando solicitud..." : "Enviar solicitud"}</button></div>
               </form>
