@@ -57,18 +57,18 @@ export function normalizarNombrePersona(valor: unknown): string {
 // (ej. "Jefe de ESDOMED") es solo la etiqueta que ve quien llena el formulario
 // para reconocer a su jefe: lo que se guarda y valida es siempre `nombre`.
 export const JEFATURAS_SIS: { nombre: string; cargo?: string }[] = [
-  { nombre: "Rudy Armando Bonilla Carranza" },
-  { nombre: "Werner Stanley Posada Soriano" },
-  { nombre: "Francisco Alexander Ruiz Zelaya" },
-  { nombre: "Josue Mauricio Delgado Ramirez" },
-  { nombre: "Nataly Raquel Varela Ramos" },
-  { nombre: "Carlos Eduardo Calderón Ávalos" },
+  { nombre: "Rudy Armando Bonilla Carranza", cargo: "Subdirección Administrativa" },
+  { nombre: "Werner Stanley Posada Soriano", cargo: "Jefe de Dirección Médica" },
+  { nombre: "Francisco Alexander Ruiz Zelaya", cargo: "Jefe de la Unidad de Cuidados Intensivos" },
+  { nombre: "Josue Mauricio Delgado Ramirez", cargo: "Jefe de Enfermería" },
+  { nombre: "Nataly Raquel Varela Ramos", cargo: "Jefe de la Unidad de Bienestar Magisterial" },
+  { nombre: "Carlos Eduardo Calderón Ávalos", cargo: "Jefe de Medicina Interna" },
   { nombre: "Jesica Mariadela Salguero Romero" },
   { nombre: "Patricia Gloria Estrella Cabrera Romero" },
-  { nombre: "Maria Jose Coto Silezar" },
-  { nombre: "William Francisco Huezo Vasquez" },
-  { nombre: "Maria Fernanda Cruz Zelaya" },
-  { nombre: "Laura Estela Miranda Iraheta" },
+  { nombre: "Maria Jose Coto Silezar", cargo: "Jefe del Servicio de Cirugía" },
+  { nombre: "William Francisco Huezo Vasquez", cargo: "Jefe de la Unidad de Epidemiología" },
+  { nombre: "Maria Fernanda Cruz Zelaya", cargo: "Jefe de Emergencia" },
+  { nombre: "Laura Estela Miranda Iraheta", cargo: "Directora del Hospital Nacional El Salvador" },
   { nombre: "Rosa Carolina Beltran Henriquez" },
   { nombre: "Heber Benjamin Cardoza Guevara", cargo: "Jefe de ESDOMED" },
 ];
