@@ -171,9 +171,28 @@ export async function GET(req: NextRequest) {
   const snap = await adminDb.collection(SOLICITUDES).orderBy("creadoEn", "desc").limit(300).get();
   const solicitudes = snap.docs.map((doc) => {
     const data = doc.data();
+    const {
+      llaveSisArchivoStoragePath: _rutaLlaveSis,
+      llaveSisArchivoNombre: _nombreLlaveSis,
+      llaveSisArchivoTamano: _tamanoLlaveSis,
+      llaveSisArchivoTipo: _tipoLlaveSis,
+      llaveSisArchivoSubidoPorId: _subidoPorLlaveSis,
+      llaveSisArchivoSubidoPorNombre: _subidoPorNombreLlaveSis,
+      llaveSisArchivoSubidoEn: _subidoEnLlaveSis,
+      ...datosSolicitud
+    } = data;
+    const llaveSis = rol === "admin"
+      ? {
+          llaveSisArchivoNombre: texto(_nombreLlaveSis, 180) || null,
+          llaveSisArchivoTamano: Number(_tamanoLlaveSis ?? 0) || null,
+          llaveSisArchivoSubidoPorNombre: texto(_subidoPorNombreLlaveSis, 120) || null,
+          llaveSisArchivoSubidoEn: fechaIso(_subidoEnLlaveSis),
+        }
+      : {};
     return {
       id: doc.id,
-      ...data,
+      ...datosSolicitud,
+      ...llaveSis,
       creadoEn: fechaIso(data.creadoEn),
       actualizadoEn: fechaIso(data.actualizadoEn),
       estadoActualizadoEn: fechaIso(data.estadoActualizadoEn),
