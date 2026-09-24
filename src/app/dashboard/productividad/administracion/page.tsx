@@ -121,7 +121,7 @@ export default function ProductividadAdministracionPage() {
         <div>
           <div className="mb-1 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><ShieldCheck size={13} /> Productividad</div>
           <h1 className="font-heading text-xl font-bold text-slate-900 dark:text-slate-100">Administración · Usuarios SIS</h1>
-          <p className="mt-0.5 text-xs text-slate-500">Creaciones y envío de llaves atribuidos de forma permanente a quien realizó cada etapa.</p>
+          <p className="mt-0.5 text-xs text-slate-500">Creaciones y entrega de llaves, incluidas las reposiciones, atribuidas de forma permanente a quien realizó cada etapa.</p>
         </div>
         <div className="flex items-center gap-2">
           <input aria-label="Mes de productividad" type="month" value={mes} onChange={(event) => setMes(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" />
@@ -135,7 +135,7 @@ export default function ProductividadAdministracionPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <Resumen icon={Users} etiqueta="Usuarios SIS creados" valor={registros.length} tono="text-cyan-600 dark:text-cyan-300" />
-        <Resumen icon={ClipboardCheck} etiqueta="Llaves SIS enviadas" valor={llavesEnviadas.length} tono="text-violet-600 dark:text-violet-300" />
+        <Resumen icon={ClipboardCheck} etiqueta="Llaves SIS entregadas" valor={llavesEnviadas.length} tono="text-violet-600 dark:text-violet-300" />
         <Resumen icon={ShieldCheck} etiqueta="Responsables con productividad" valor={responsables} tono="text-indigo-600 dark:text-indigo-300" />
         <Resumen icon={ClipboardCheck} etiqueta="Día con más actividades" valor={Math.max(0, ...porDia.map((dato) => dato.valor))} tono="text-emerald-600 dark:text-emerald-300" />
       </div>
@@ -143,7 +143,7 @@ export default function ProductividadAdministracionPage() {
       {cargando ? <div className="flex justify-center py-20"><div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" /></div> : <>
         <div className="grid gap-5 xl:grid-cols-2">
           <GraficoBarras titulo="Usuarios SIS creados por administrador" datos={porAdministrador} color="#0891b2" />
-          <GraficoBarras titulo="Llaves SIS enviadas por administrador" datos={porLlaves} color="#7c3aed" />
+          <GraficoBarras titulo="Llaves SIS entregadas por administrador" datos={porLlaves} color="#7c3aed" />
         </div>
         <div className="grid gap-5 xl:grid-cols-2">
           <GraficoPastel titulo="Participación en creaciones" datos={porAdministrador} />
@@ -156,8 +156,8 @@ export default function ProductividadAdministracionPage() {
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800"><ClipboardCheck size={16} className="text-violet-600 dark:text-violet-300" /><h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Detalle de llaves SIS enviadas</h2></div>
-          {llavesEnviadas.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No hay envíos de llaves SIS registrados en este mes.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400"><tr><th className="px-4 py-3">Solicitante</th><th className="px-4 py-3">Usuario SIS</th><th className="px-4 py-3">Enviado por</th><th className="px-4 py-3">Fecha y hora</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{llavesEnviadas.map((registro) => <tr key={registro.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40"><td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{registro.solicitante}</td><td className="px-4 py-3 font-mono text-xs text-violet-700 dark:text-violet-300">{registro.usuarioSis || "—"}</td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{registro.enviadoPorNombre}</td><td className="px-4 py-3 text-slate-500 dark:text-slate-400">{etiquetaFecha(registro.enviadoEn)}</td></tr>)}</tbody></table></div>}
+          <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800"><ClipboardCheck size={16} className="text-violet-600 dark:text-violet-300" /><h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Detalle de llaves SIS entregadas</h2></div>
+          {llavesEnviadas.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No hay entregas de llaves SIS registradas en este mes.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm"><thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500 dark:bg-slate-800/60 dark:text-slate-400"><tr><th className="px-4 py-3">Solicitante</th><th className="px-4 py-3">Usuario SIS</th><th className="px-4 py-3">Entregado por</th><th className="px-4 py-3">Fecha y hora</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{llavesEnviadas.map((registro) => <tr key={registro.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40"><td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{registro.solicitante}</td><td className="px-4 py-3 font-mono text-xs text-violet-700 dark:text-violet-300">{registro.usuarioSis || "—"}</td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{registro.enviadoPorNombre}</td><td className="px-4 py-3 text-slate-500 dark:text-slate-400">{etiquetaFecha(registro.enviadoEn)}</td></tr>)}</tbody></table></div>}
         </section>
       </>}
     </div>

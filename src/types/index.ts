@@ -134,6 +134,41 @@ export interface SolicitudUsuarioSis {
   usuarioSisCreadoEn?: Date;
 }
 
+// ============================================================================
+// Solicitudes de llave SIS — exclusivamente desde el portal médico
+// ============================================================================
+// La firma digital (.p12) se genera fuera de ESDOMED. Aquí se registra el
+// pedido, su avance y el respaldo privado que solamente administra el rol admin.
+export type EstadoSolicitudLlaveSis = "pendiente" | "en_proceso" | "llave_generada" | "entregada" | "rechazada";
+
+export interface SolicitudLlaveSis {
+  id?: string;
+  medicoId: string;
+  medicoNombre: string;
+  medicoJvpm?: string | null;
+  medicoServicios: string[];
+  tipo: "reposicion";
+  estado: EstadoSolicitudLlaveSis;
+  creadoEn: Date;
+  actualizadoEn?: Date;
+  estadoActualizadoPorId?: string;
+  estadoActualizadoPorNombre?: string;
+  notaAdmin?: string | null;
+  llaveGeneradaPorId?: string;
+  llaveGeneradaPorNombre?: string;
+  llaveGeneradaEn?: Date;
+  llaveSisEntregadaPorId?: string;
+  llaveSisEntregadaPorNombre?: string;
+  llaveSisEntregadaEn?: Date;
+  llaveSisArchivoNombre?: string;
+  llaveSisArchivoTamano?: number;
+  llaveSisArchivoTipo?: string;
+  llaveSisArchivoStoragePath?: string;
+  llaveSisArchivoSubidoPorId?: string;
+  llaveSisArchivoSubidoPorNombre?: string;
+  llaveSisArchivoSubidoEn?: Date;
+}
+
 export type TipoAtencionCuidadosCriticos =
   | "evaluacion_ingreso"
   | "seguimiento_clinico"

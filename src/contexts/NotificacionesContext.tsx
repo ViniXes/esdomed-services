@@ -362,7 +362,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
 
     type ResumenSis = {
       pendientes: number;
-      solicitudes: { id: string; nombre: string; servicio: string }[];
+      solicitudes: { id: string; nombre: string; servicio: string; tipo?: "usuario" | "reposicion_llave" }[];
     };
 
     const refrescar = async () => {
@@ -381,9 +381,10 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
         } else {
           data.solicitudes.forEach((solicitud) => {
             if (!knownSolicitudesSis.current!.has(solicitud.id)) {
+              const esReposicion = solicitud.tipo === "reposicion_llave";
               addToast({
                 tipo: "solicitud_usuario_sis",
-                titulo: "Nueva solicitud de usuario SIS",
+                titulo: esReposicion ? "Nueva reposición de firma médica" : "Nueva solicitud de usuario SIS",
                 mensaje: `${solicitud.nombre} · ${solicitud.servicio || "Servicio sin indicar"}`,
               });
             }

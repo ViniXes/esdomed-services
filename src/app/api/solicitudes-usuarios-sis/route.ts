@@ -150,19 +150,33 @@ export async function GET(req: NextRequest) {
   // datos completos en la bandeja y evita conceder lectura directa de esta
   // colección desde el navegador.
   if (new URL(req.url).searchParams.get("resumen") === "pendientes") {
-    const snap = await adminDb
-      .collection(SOLICITUDES)
-      .where("estado", "==", "pendiente")
-      .get();
-    const solicitudes = snap.docs.map((doc) => {
+    const [usuariosSnap, reposicionesSnap] = await Promise.all([
+      adminDb.collection(SOLICITUDES).where("estado", "==", "pendiente").get(),
+      rol === "admin"
+        ? adminDb.collection("solicitudes_reposicion_llave_sis").where("estado", "==", "pendiente").get()
+        : Promise.resolve(null),
+    ]);
+    const solicitudesUsuarios = usuariosSnap.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
         nombre: texto(data.nombre, 120),
         servicio: texto(data.servicio, 160),
         creadoEn: fechaIso(data.creadoEn),
+        tipo: "usuario",
       };
     });
+    const solicitudesReposicion = (reposicionesSnap?.docs ?? []).map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nombre: texto(data.medicoNombre, 120),
+        servicio: Array.isArray(data.medicoServicios) ? data.medicoServicios.map((item) => texto(item, 100)).filter(Boolean).join(" / ") : "",
+        creadoEn: fechaIso(data.creadoEn),
+        tipo: "reposicion_llave",
+      };
+    });
+    const solicitudes = [...solicitudesUsuarios, ...solicitudesReposicion];
     return NextResponse.json({ pendientes: solicitudes.length, solicitudes });
   }
 

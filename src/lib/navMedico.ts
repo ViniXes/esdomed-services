@@ -2,6 +2,7 @@ import {
   Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileClock,
   FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText,
   ShieldAlert, Megaphone, Users,
+  KeyRound,
 } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
@@ -33,6 +34,7 @@ const baseNavItems: NavItem[] = [
   { href: "/medico/fallecidos",      label: "Fallecidos",      icon: HeartPulse, tone: "rose" },
   { href: "/medico/conapina-fgr",    label: "CONAPINA / FGR",  icon: ShieldAlert, tone: "blue" },
   { href: "/medico/impresiones",     label: "Impresiones",     icon: Printer, tone: "violet" },
+  { href: "/medico/reposicion-llave-sis", label: "Reposición de llave SIS", icon: KeyRound, tone: "violet" },
   {
     href: "/medico/incapacidades",
     label: "Incapacidades",

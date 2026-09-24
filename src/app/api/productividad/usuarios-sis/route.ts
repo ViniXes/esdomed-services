@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   // con el día laboral que ve el personal.
   const inicio = new Date(Date.UTC(anio, numeroMes - 1, 1, 6));
   const fin = new Date(Date.UTC(anio, numeroMes, 1, 5, 59, 59, 999));
-  const [creacionesSnap, llavesSnap] = await Promise.all([
+  const [creacionesSnap, llavesSnap, reposicionesSnap] = await Promise.all([
     adminDb
       .collection(SOLICITUDES)
       .where("usuarioSisCreadoEn", ">=", inicio)
@@ -51,6 +51,11 @@ export async function GET(req: NextRequest) {
       .collection(SOLICITUDES)
       .where("llavesSisEnviadasEn", ">=", inicio)
       .where("llavesSisEnviadasEn", "<=", fin)
+      .get(),
+    adminDb
+      .collection("solicitudes_reposicion_llave_sis")
+      .where("llaveSisEntregadaEn", ">=", inicio)
+      .where("llaveSisEntregadaEn", "<=", fin)
       .get(),
   ]);
 
@@ -69,7 +74,7 @@ export async function GET(req: NextRequest) {
     .filter((registro) => registro.creadoPorId && registro.creadoPorNombre && registro.creadoEn)
     .sort((a, b) => String(b.creadoEn).localeCompare(String(a.creadoEn)));
 
-  const llavesEnviadas = llavesSnap.docs
+  const llavesEnviadasUsuarios = llavesSnap.docs
     .map((doc) => {
       const data = doc.data();
       return {
@@ -82,6 +87,23 @@ export async function GET(req: NextRequest) {
       };
     })
     .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn)
+    .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
+
+  const llavesEnviadasReposicion = reposicionesSnap.docs
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        id: `reposicion-${doc.id}`,
+        solicitante: String(data.medicoNombre ?? ""),
+        usuarioSis: "",
+        enviadoPorId: String(data.llaveSisEntregadaPorId ?? ""),
+        enviadoPorNombre: String(data.llaveSisEntregadaPorNombre ?? ""),
+        enviadoEn: fechaIso(data.llaveSisEntregadaEn),
+      };
+    })
+    .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn);
+
+  const llavesEnviadas = [...llavesEnviadasUsuarios, ...llavesEnviadasReposicion]
     .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
 
   return NextResponse.json({ registros, llavesEnviadas });
