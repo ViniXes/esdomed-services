@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  collection, query, where, orderBy, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, Timestamp,
+  collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, Timestamp,
 } from "@/lib/firestoreMeter";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
@@ -79,23 +79,31 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Sin orderBy en la consulta: where + orderBy exige un índice compuesto
+    // que no existe en el proyecto. Son pocas entradas por empleado, así que
+    // se ordena aquí.
     const q = query(
       collection(db, "evaluaciones_personal"),
       where("empleadoId", "==", empleadoId),
-      orderBy("fecha", "desc"),
     );
     const unsub = onSnapshot(
       q,
-      (snap) => setEntradas(snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          ...data,
-          fecha: toDate(data.fecha),
-          creadoEn: toDate(data.creadoEn),
-        } as EvaluacionPersonal;
-      })),
-      () => setErrorCarga("No se pudo cargar el archivero de evaluaciones."),
+      (snap) => {
+        setErrorCarga(null);
+        setEntradas(snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            fecha: toDate(data.fecha),
+            creadoEn: toDate(data.creadoEn),
+          } as EvaluacionPersonal;
+        }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime()));
+      },
+      (err) => {
+        console.error("evaluaciones_personal:", err);
+        setErrorCarga("No se pudo cargar el archivero de evaluaciones.");
+      },
     );
     return unsub;
   }, [empleadoId]);
