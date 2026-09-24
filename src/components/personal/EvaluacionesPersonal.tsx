@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp, Timestamp,
+  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
 } from "@/lib/firestoreMeter";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AdjuntoBitacora, EvaluacionPersonal } from "@/types";
 import { TIPOS_EVALUACION_PERSONAL } from "@/lib/evaluacionesPersonal";
 import {
-  Paperclip, FilePlus2, Trash2, FileText, Loader2, X, ExternalLink, ImageOff, ClipboardCheck,
+  Paperclip, FilePlus2, Trash2, FileText, Loader2, X, ExternalLink, ImageOff, ClipboardCheck, Download, RefreshCw,
 } from "lucide-react";
 
 // Archivero permanente de evaluaciones/amonestaciones de un empleado ESDOMED
@@ -50,6 +50,29 @@ const hoyInput = () => {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
+};
+
+const subirAdjunto = (empleadoId: string, file: File, onBytes: (bytes: number) => void) => {
+  const storagePath = `evaluaciones_personal/${empleadoId}/${Date.now()}_${nombreSeguro(file.name)}`;
+  const tarea = uploadBytesResumable(storageRef(storage, storagePath), file, {
+    contentType: file.type || (tipoDeArchivo(file) === "pdf" ? "application/pdf" : undefined),
+  });
+  return new Promise<AdjuntoBitacora>((resolve, reject) => {
+    tarea.on("state_changed",
+      (snap) => onBytes(snap.bytesTransferred),
+      reject,
+      async () => {
+        try {
+          resolve({
+            url: await getDownloadURL(tarea.snapshot.ref),
+            nombre: file.name,
+            tipo: tipoDeArchivo(file) ?? "imagen",
+            tamano: file.size,
+            storagePath,
+          });
+        } catch (err) { reject(err); }
+      });
+  });
 };
 
 interface Props {
@@ -141,28 +164,9 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       const totalBytes = archivos.reduce((a, f) => a + f.size, 0);
       let acumulado = 0;
       for (const file of archivos) {
-        const storagePath = `evaluaciones_personal/${empleadoId}/${Date.now()}_${nombreSeguro(file.name)}`;
-        const tarea = uploadBytesResumable(storageRef(storage, storagePath), file, {
-          contentType: file.type || (tipoDeArchivo(file) === "pdf" ? "application/pdf" : undefined),
-        });
-        await new Promise<void>((resolve, reject) => {
-          tarea.on("state_changed",
-            (snap) => setProgreso(Math.round(((acumulado + snap.bytesTransferred) / totalBytes) * 100)),
-            reject,
-            async () => {
-              try {
-                subidos.push({
-                  url: await getDownloadURL(tarea.snapshot.ref),
-                  nombre: file.name,
-                  tipo: tipoDeArchivo(file) ?? "imagen",
-                  tamano: file.size,
-                  storagePath,
-                });
-                acumulado += file.size;
-                resolve();
-              } catch (err) { reject(err); }
-            });
-        });
+        subidos.push(await subirAdjunto(empleadoId, file,
+          (bytes) => setProgreso(Math.round(((acumulado + bytes) / totalBytes) * 100))));
+        acumulado += file.size;
       }
 
       const entrada: Record<string, unknown> = {
@@ -205,6 +209,28 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
     } finally {
       setBorrando(null);
       setABorrar(null);
+    }
+  };
+
+  // Cambia o quita UN adjunto de una entrada ya registrada. Solo toca el
+  // arreglo `archivos`: tipo, fecha, notas y quién la registró se conservan.
+  // El archivo viejo se borra de Storage solo después de guardar el documento.
+  const cambiarAdjunto = async (entrada: EvaluacionPersonal, idx: number, nuevo: File | null) => {
+    if (!entrada.id || !entrada.archivos) return;
+    const viejo = entrada.archivos[idx];
+    if (nuevo) {
+      if (!tipoDeArchivo(nuevo)) throw new Error(`${nuevo.name}: solo PDF o imagen.`);
+      if (nuevo.size >= MAX_BYTES) throw new Error(`${nuevo.name}: supera 20 MB.`);
+    }
+    let subido: AdjuntoBitacora | null = null;
+    try {
+      if (nuevo) subido = await subirAdjunto(empleadoId, nuevo, () => {});
+      const archivosNuevos = entrada.archivos.flatMap((a, i) => (i !== idx ? [a] : subido ? [subido] : []));
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { archivos: archivosNuevos });
+      if (viejo?.storagePath) await deleteObject(storageRef(storage, viejo.storagePath)).catch(() => {});
+    } catch (err) {
+      if (subido) await deleteObject(storageRef(storage, subido.storagePath)).catch(() => {});
+      throw err; // lo muestra la tarjeta del adjunto
     }
   };
 
@@ -354,7 +380,12 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
 
               {!!e.archivos?.length && (
                 <ul className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {e.archivos.map((a, i) => <AdjuntoCard key={`${a.url}-${i}`} adjunto={a} />)}
+                  {e.archivos.map((a, i) => (
+                    <AdjuntoCard key={`${a.url}-${i}`} adjunto={a} entradaId={e.id!} indice={i}
+                      puedeGestionar={puedeGestionar}
+                      onReemplazar={(f) => cambiarAdjunto(e, i, f)}
+                      onQuitar={() => cambiarAdjunto(e, i, null)} />
+                  ))}
                 </ul>
               )}
             </li>
@@ -365,30 +396,129 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
   );
 }
 
-function AdjuntoCard({ adjunto }: { adjunto: AdjuntoBitacora }) {
+// Miniatura con el visor de PDF del navegador: sin barra ni panel lateral,
+// ajustado al ancho. Storage no manda CORS, así que no se puede rasterizar con
+// pdfjs; un iframe no lo necesita. El iframe es más ancho que la tarjeta para
+// esconder la barra de desplazamiento.
+const urlMiniaturaPdf = (url: string) => `${url}#toolbar=0&navpanes=0&view=FitH`;
+
+// Pide a la API una URL firmada que fuerza la descarga (ver
+// api/evaluaciones-personal/[id]/descargar).
+async function descargarAdjunto(entradaId: string, indice: number) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`/api/evaluaciones-personal/${entradaId}/descargar?i=${indice}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.url) throw new Error(body.error || "No se pudo descargar el archivo.");
+  window.location.href = body.url;
+}
+
+interface AdjuntoCardProps {
+  adjunto: AdjuntoBitacora;
+  entradaId: string;
+  indice: number;
+  puedeGestionar: boolean;
+  onReemplazar: (file: File) => Promise<void>;
+  onQuitar: () => Promise<void>;
+}
+
+function AdjuntoCard({ adjunto, entradaId, indice, puedeGestionar, onReemplazar, onQuitar }: AdjuntoCardProps) {
   const [imgError, setImgError] = useState(false);
+  const [ocupado, setOcupado] = useState<null | "descargar" | "reemplazar" | "quitar">(null);
+  const [confirmarQuitar, setConfirmarQuitar] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+  const reemplazoRef = useRef<HTMLInputElement>(null);
   const esImagen = adjunto.tipo === "imagen" && !imgError;
 
+  const ejecutar = async (accion: "descargar" | "reemplazar" | "quitar", fn: () => Promise<void>) => {
+    setOcupado(accion);
+    setErrorDescarga(null);
+    try { await fn(); }
+    catch (err) { setErrorDescarga(err instanceof Error ? err.message : "No se pudo completar la acción."); }
+    finally { setOcupado(null); setConfirmarQuitar(false); }
+  };
+
+  const elegirReemplazo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (reemplazoRef.current) reemplazoRef.current.value = "";
+    if (file) ejecutar("reemplazar", () => onReemplazar(file));
+  };
+
+  const boton = "flex items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-semibold rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+
   return (
-    <li>
-      <a href={adjunto.url} target="_blank" rel="noopener noreferrer"
-        className="group block rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800/60 hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-        title={adjunto.nombre}>
+    <li className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800/60">
+      <a href={adjunto.url} target="_blank" rel="noopener noreferrer" title={`Abrir ${adjunto.nombre} en otra pestaña`}
+        className="group block hover:opacity-90 transition-opacity">
         {esImagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={adjunto.url} alt={adjunto.nombre} loading="lazy" onError={() => setImgError(true)}
-            className="w-full h-24 object-cover bg-slate-100 dark:bg-slate-800" />
+            className="w-full h-40 object-cover bg-slate-100 dark:bg-slate-800" />
+        ) : adjunto.tipo === "pdf" ? (
+          // Si el navegador no incrusta PDFs (algunos móviles), queda visible el ícono de atrás.
+          <div className="relative w-full h-40 overflow-hidden bg-white">
+            <div className="absolute inset-0 flex items-center justify-center text-blue-600">
+              <FileText size={28} />
+            </div>
+            <iframe src={urlMiniaturaPdf(adjunto.url)} title={adjunto.nombre} loading="lazy" tabIndex={-1}
+              className="relative h-full w-[calc(100%+20px)] pointer-events-none border-0" />
+          </div>
         ) : (
-          <div className="w-full h-24 flex items-center justify-center text-blue-600 dark:text-blue-400">
-            {adjunto.tipo === "pdf" ? <FileText size={28} /> : <ImageOff size={28} />}
+          <div className="w-full h-40 flex items-center justify-center text-blue-600 dark:text-blue-400">
+            <ImageOff size={28} />
           </div>
         )}
-        <div className="px-2 py-1.5 flex items-center gap-1.5">
+        <div className="px-2 py-1.5 flex items-center gap-1.5 border-t border-slate-200 dark:border-slate-700">
           <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate flex-1">{adjunto.nombre}</span>
           <span className="text-[10px] text-slate-400 shrink-0">{formatTamano(adjunto.tamano)}</span>
-          <ExternalLink size={11} className="text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 shrink-0" />
         </div>
       </a>
+
+      <div className="flex gap-1 px-1.5 pb-1.5">
+        <a href={adjunto.url} target="_blank" rel="noopener noreferrer"
+          className={`${boton} flex-1 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950`}>
+          <ExternalLink size={12} /> Ver
+        </a>
+        <button type="button" disabled={!!ocupado}
+          onClick={() => ejecutar("descargar", () => descargarAdjunto(entradaId, indice))}
+          className={`${boton} flex-1 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950`}>
+          {ocupado === "descargar" ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Descargar
+        </button>
+      </div>
+
+      {puedeGestionar && (
+        <div className="flex gap-1 px-1.5 pb-1.5">
+          <input ref={reemplazoRef} type="file" accept="application/pdf,image/*" onChange={elegirReemplazo} className="hidden" />
+          {confirmarQuitar ? (
+            <>
+              <span className="flex-1 self-center text-[11px] text-slate-500 text-center">¿Quitar archivo?</span>
+              <button type="button" disabled={!!ocupado} onClick={() => ejecutar("quitar", onQuitar)}
+                className={`${boton} text-white bg-rose-600 hover:bg-rose-500`}>
+                {ocupado === "quitar" ? "…" : "Sí"}
+              </button>
+              <button type="button" disabled={!!ocupado} onClick={() => setConfirmarQuitar(false)}
+                className={`${boton} text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700`}>
+                No
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" disabled={!!ocupado} onClick={() => reemplazoRef.current?.click()}
+                title="Subir el archivo correcto en lugar de este (se conservan fecha y notas)"
+                className={`${boton} flex-1 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800`}>
+                {ocupado === "reemplazar" ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Reemplazar
+              </button>
+              <button type="button" disabled={!!ocupado} onClick={() => setConfirmarQuitar(true)}
+                className={`${boton} flex-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950`}>
+                <Trash2 size={12} /> Quitar
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {errorDescarga && <p className="px-2 pb-1.5 text-[11px] text-rose-600 dark:text-rose-400">{errorDescarga}</p>}
     </li>
   );
 }
