@@ -43,13 +43,13 @@ async function obtenerServiciosHabilitados() {
   return new Set<string>(SERVICIOS_HOSPITALARIOS);
 }
 
-async function obtenerRolLector(req: NextRequest): Promise<"admin" | "medico_licenciado_dimes" | null> {
+async function obtenerRolLector(req: NextRequest): Promise<"admin" | "medico_licenciado_dimes" | "asistente_esdomed" | null> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return null;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const role = (await adminDb.collection("usuarios").doc(decoded.uid).get()).data()?.role;
-    return role === "admin" || role === "medico_licenciado_dimes" ? role : null;
+    return role === "admin" || role === "medico_licenciado_dimes" || role === "asistente_esdomed" ? role : null;
   } catch {
     return null;
   }
@@ -150,19 +150,33 @@ export async function GET(req: NextRequest) {
   // datos completos en la bandeja y evita conceder lectura directa de esta
   // colección desde el navegador.
   if (new URL(req.url).searchParams.get("resumen") === "pendientes") {
-    const snap = await adminDb
-      .collection(SOLICITUDES)
-      .where("estado", "==", "pendiente")
-      .get();
-    const solicitudes = snap.docs.map((doc) => {
+    const [usuariosSnap, reposicionesSnap] = await Promise.all([
+      adminDb.collection(SOLICITUDES).where("estado", "==", "pendiente").get(),
+      rol === "admin"
+        ? adminDb.collection("solicitudes_reposicion_llave_sis").where("estado", "==", "pendiente").get()
+        : Promise.resolve(null),
+    ]);
+    const solicitudesUsuarios = usuariosSnap.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
         nombre: texto(data.nombre, 120),
         servicio: texto(data.servicio, 160),
         creadoEn: fechaIso(data.creadoEn),
+        tipo: "usuario",
       };
     });
+    const solicitudesReposicion = (reposicionesSnap?.docs ?? []).map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        nombre: texto(data.medicoNombre, 120),
+        servicio: Array.isArray(data.medicoServicios) ? data.medicoServicios.map((item) => texto(item, 100)).filter(Boolean).join(" / ") : "",
+        creadoEn: fechaIso(data.creadoEn),
+        tipo: "reposicion_llave",
+      };
+    });
+    const solicitudes = [...solicitudesUsuarios, ...solicitudesReposicion];
     return NextResponse.json({ pendientes: solicitudes.length, solicitudes });
   }
 
@@ -171,12 +185,32 @@ export async function GET(req: NextRequest) {
   const snap = await adminDb.collection(SOLICITUDES).orderBy("creadoEn", "desc").limit(300).get();
   const solicitudes = snap.docs.map((doc) => {
     const data = doc.data();
+    const {
+      llaveSisArchivoStoragePath: _rutaLlaveSis,
+      llaveSisArchivoNombre: _nombreLlaveSis,
+      llaveSisArchivoTamano: _tamanoLlaveSis,
+      llaveSisArchivoTipo: _tipoLlaveSis,
+      llaveSisArchivoSubidoPorId: _subidoPorLlaveSis,
+      llaveSisArchivoSubidoPorNombre: _subidoPorNombreLlaveSis,
+      llaveSisArchivoSubidoEn: _subidoEnLlaveSis,
+      ...datosSolicitud
+    } = data;
+    const llaveSis = rol === "admin"
+      ? {
+          llaveSisArchivoNombre: texto(_nombreLlaveSis, 180) || null,
+          llaveSisArchivoTamano: Number(_tamanoLlaveSis ?? 0) || null,
+          llaveSisArchivoSubidoPorNombre: texto(_subidoPorNombreLlaveSis, 120) || null,
+          llaveSisArchivoSubidoEn: fechaIso(_subidoEnLlaveSis),
+        }
+      : {};
     return {
       id: doc.id,
-      ...data,
+      ...datosSolicitud,
+      ...llaveSis,
       creadoEn: fechaIso(data.creadoEn),
       actualizadoEn: fechaIso(data.actualizadoEn),
       estadoActualizadoEn: fechaIso(data.estadoActualizadoEn),
+      llavesSisEnviadasEn: fechaIso(data.llavesSisEnviadasEn),
     };
   }).sort((a, b) => String(b.creadoEn ?? "").localeCompare(String(a.creadoEn ?? "")));
   return NextResponse.json(solicitudes);

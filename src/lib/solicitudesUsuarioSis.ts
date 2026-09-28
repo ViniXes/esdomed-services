@@ -53,22 +53,30 @@ export function normalizarNombrePersona(valor: unknown): string {
 }
 
 // Jefaturas autorizadoras vigentes para la creación de usuarios SIS.
-// Para agregar una nueva persona basta con incorporarla a esta lista.
-export const JEFATURAS_AUTORIZADORAS_SIS = [
-  "Rudy Armando Bonilla Carranza",
-  "Werner Stanley Posada Soriano",
-  "Francisco Alexander Ruiz Zelaya",
-  "Josue Mauricio Delgado Ramirez",
-  "Nataly Raquel Varela Ramos",
-  "Carlos Eduardo Calderón Ávalos",
-  "Jesica Mariadela Salguero Romero",
-  "Patricia Gloria Estrella Cabrera Romero",
-  "Maria Jose Coto Silezar",
-  "William Francisco Huezo Vasquez",
-  "Maria Fernanda Cruz Zelaya",
-  "Laura Estela Miranda Iraheta",
-  "Rosa Carolina Beltran Henriquez",
-] as const;
+// Para agregar una nueva persona basta con incorporarla a esta lista. `cargo`
+// (ej. "Jefe de ESDOMED") es solo la etiqueta que ve quien llena el formulario
+// para reconocer a su jefe: lo que se guarda y valida es siempre `nombre`.
+export const JEFATURAS_SIS: { nombre: string; cargo?: string }[] = [
+  { nombre: "Rudy Armando Bonilla Carranza", cargo: "Subdirector del Hospital Nacional El Salvador" },
+  { nombre: "Werner Stanley Posada Soriano", cargo: "Jefe de Dirección Médica" },
+  { nombre: "Francisco Alexander Ruiz Zelaya", cargo: "Jefe de la Unidad de Cuidados Intensivos" },
+  { nombre: "Josue Mauricio Delgado Ramirez", cargo: "Jefe de Enfermería" },
+  { nombre: "Nataly Raquel Varela Ramos", cargo: "Jefe de la Unidad de Bienestar Magisterial" },
+  { nombre: "Carlos Eduardo Calderón Ávalos", cargo: "Jefe de Medicina Interna" },
+  { nombre: "Jesica Mariadela Salguero Romero" },
+  { nombre: "Patricia Gloria Estrella Cabrera Romero" },
+  { nombre: "Maria Jose Coto Silezar", cargo: "Jefe del Servicio de Cirugía" },
+  { nombre: "William Francisco Huezo Vasquez", cargo: "Jefe de la Unidad de Epidemiología" },
+  { nombre: "Maria Fernanda Cruz Zelaya", cargo: "Jefe de Emergencia" },
+  { nombre: "Laura Estela Miranda Iraheta", cargo: "Directora del Hospital Nacional El Salvador" },
+  { nombre: "Rosa Carolina Beltran Henriquez" },
+  { nombre: "Heber Benjamin Cardoza Guevara", cargo: "Jefe de ESDOMED" },
+];
+
+export const JEFATURAS_AUTORIZADORAS_SIS: string[] = JEFATURAS_SIS.map((j) => j.nombre);
+
+export const etiquetaJefaturaSis = (j: { nombre: string; cargo?: string }) =>
+  j.cargo ? `${j.nombre} — ${j.cargo}` : j.nombre;
 
 export const ESPECIALIDADES_SIS = [
   "Referido Externo-Referido-MINSAL",

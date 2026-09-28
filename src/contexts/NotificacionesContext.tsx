@@ -85,7 +85,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   const esPsicologia = profile?.role === "psicologia";
   const esTS         = profile?.role === "trabajo_social";
   const esComiteLesiones = profile?.role === "comite_lesiones";
-  const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes";
+  const puedeVerSolicitudesSis = profile?.role === "admin" || profile?.role === "medico_licenciado_dimes" || profile?.role === "asistente_esdomed";
   // Psicología, Trabajo Social y los médicos marcados apoyan el trámite del
   // comité: comparten sus vistas y su bandeja de avisos.
   const cuentaConapina = esComiteLesiones || esPsicologia || esTS || apoyaComiteLesiones(profile);
@@ -362,7 +362,7 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
 
     type ResumenSis = {
       pendientes: number;
-      solicitudes: { id: string; nombre: string; servicio: string }[];
+      solicitudes: { id: string; nombre: string; servicio: string; tipo?: "usuario" | "reposicion_llave" }[];
     };
 
     const refrescar = async () => {
@@ -381,9 +381,10 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
         } else {
           data.solicitudes.forEach((solicitud) => {
             if (!knownSolicitudesSis.current!.has(solicitud.id)) {
+              const esReposicion = solicitud.tipo === "reposicion_llave";
               addToast({
                 tipo: "solicitud_usuario_sis",
-                titulo: "Nueva solicitud de usuario SIS",
+                titulo: esReposicion ? "Nueva reposición de firma médica" : "Nueva solicitud de usuario SIS",
                 mensaje: `${solicitud.nombre} · ${solicitud.servicio || "Servicio sin indicar"}`,
               });
             }

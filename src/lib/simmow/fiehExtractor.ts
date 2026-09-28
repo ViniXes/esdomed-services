@@ -929,13 +929,12 @@ function extraerServicioHospitalario(doc: DocumentoExtraido, texto: string): Ser
 // ─── Días UCI ────────────────────────────────────────────────────────────────
 // Réplica del cálculo manual que ya hace ESDOMED: se arma la línea de tiempo
 // completa del paciente (servicio de ingreso → cada traslado de la Ruta de
-// Movimiento → egreso) y se suma, por cada tramo en un servicio de UCI, la
-// cantidad de días de cama ocupada — inclusivo en ambos extremos, porque el
-// costo del día se cuenta completo sin importar la hora de entrada/salida
-// (ej. tramo del 1 al 5 = 5 días, no 4). Un mismo día puede contarse en dos
-// tramos consecutivos (el de salida de un servicio y el de entrada al
-// siguiente): así se factura en SIMMOW, cada servicio cobra el día completo
-// en el que tuvo al paciente.
+// Movimiento → egreso) y se cuentan los DÍAS CALENDARIO distintos en los que
+// el paciente estuvo en alguna UCI, inclusivo en ambos extremos (tramo del 1
+// al 5 = 5 días). SIMMOW no cobra por día-cama de cada servicio sino por día:
+// si en un mismo día pasó por varias UCI (o el traslado UCI→UCI cae a mitad
+// de día), ese día cuenta UNA sola vez. Ej.: UCI del 16 al 18 y luego otra UCI
+// del 18 al 21 = 6 días (16 al 21), no 7.
 //
 // mapearServicioSIMMOW() ya colapsa las 7 unidades de cuidados intensivos
 // (aisladas, quirúrgicos, general 1, coronarios/posquirúrgicos
@@ -952,13 +951,15 @@ function serialSoloFecha(fecha: string): number {
   return serialFechaHora(fecha, "");
 }
 
-/** Días de cama ocupada entre dos fechas, inclusivo en ambos extremos. */
-function diasCamaInclusive(fechaInicio: string, fechaFin: string): number {
+/** Índices de día calendario entre dos fechas, inclusivo en ambos extremos. */
+function diasCalendarioInclusive(fechaInicio: string, fechaFin: string): number[] {
   const ini = serialSoloFecha(fechaInicio);
   const fin = serialSoloFecha(fechaFin);
-  if (!ini || !fin) return 0;
-  const dias = Math.round((fin - ini) / 86400000) + 1;
-  return dias > 0 ? dias : 0;
+  if (!ini || !fin) return [];
+  const cantidad = Math.round((fin - ini) / 86400000) + 1;
+  if (cantidad <= 0) return [];
+  const base = Math.round(ini / 86400000);
+  return Array.from({ length: cantidad }, (_, k) => base + k);
 }
 
 function calcularDiasUci(
@@ -985,14 +986,14 @@ function calcularDiasUci(
   if (ingreso.origen) puntos.push({ fecha: fechaIngreso, valor: valorIngreso });
   for (const mov of movimientos) puntos.push({ fecha: mov.fecha, valor: mov.valor });
 
-  let total = 0;
+  const diasUci = new Set<number>();
   for (let i = 0; i < puntos.length; i++) {
     if (!esValorUci(puntos[i].valor)) continue;
     const finTramo = i + 1 < puntos.length ? puntos[i + 1].fecha : fechaEgreso;
-    total += diasCamaInclusive(puntos[i].fecha, finTramo);
+    for (const d of diasCalendarioInclusive(puntos[i].fecha, finTramo)) diasUci.add(d);
   }
 
-  return { dias: total, ingresoNoDetectado: !ingreso.origen };
+  return { dias: diasUci.size, ingresoNoDetectado: !ingreso.origen };
 }
 
 // ─── Diagnósticos complementarios ───────────────────────────────────────────

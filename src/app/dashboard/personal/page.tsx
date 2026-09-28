@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Star, UsersRound } from "lucide-react";
 import { collection, doc, getDoc, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
@@ -176,7 +177,13 @@ export default function PersonalTrabajoPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {personas.map((u) => (
-                    <TarjetaPersona key={u.uid} persona={u} estiloAvatar={estilo?.badge} esYo={u.uid === miUid} />
+                    <TarjetaPersona
+                      key={u.uid}
+                      persona={u}
+                      estiloAvatar={estilo?.badge}
+                      esYo={u.uid === miUid}
+                      puedeAbrir={role === "admin" || u.uid === miUid}
+                    />
                   ))}
                 </div>
               </section>
@@ -192,19 +199,23 @@ function TarjetaPersona({
   persona,
   estiloAvatar,
   esYo,
+  puedeAbrir,
 }: {
   persona: Persona;
   estiloAvatar?: string;
   esYo: boolean;
+  puedeAbrir: boolean;
 }) {
-  return (
-    <div
-      className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
-        esYo
-          ? "border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-950/30"
-          : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
-      }`}
-    >
+  const className = `flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
+    puedeAbrir ? "hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer" : ""
+  } ${
+    esYo
+      ? "border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-950/30"
+      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+  }`;
+
+  const contenido = (
+    <>
       <div
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
           estiloAvatar ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
@@ -226,7 +237,13 @@ function TarjetaPersona({
           {persona.puesto || "Sin puesto"}
         </p>
       </div>
-    </div>
+    </>
+  );
+
+  return puedeAbrir ? (
+    <Link href={`/dashboard/personal/${persona.uid}`} className={className}>{contenido}</Link>
+  ) : (
+    <div className={className}>{contenido}</div>
   );
 }
 

@@ -268,6 +268,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           { href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN },
         ]
       : []),
+    ...(esAsistente
+      ? [{ href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN }]
+      : []),
     ...(verAprobacionTramites
       ? [{ href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck, group: G_ADMIN }]
       : []),
@@ -280,6 +283,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       : []),
     ...(verProductividad
       ? [{ href: "/dashboard/productividad/esdomed", label: "Productividad", icon: TrendingUp, group: G_ADMIN, exact: true }]
+      : []),
+    ...(esAdmin
+      ? [{ href: "/dashboard/productividad/administracion", label: "Productividad administrativa", icon: TrendingUp, group: G_ADMIN }]
       : []),
   ];
 
