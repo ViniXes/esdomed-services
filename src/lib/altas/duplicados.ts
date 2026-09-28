@@ -26,6 +26,31 @@ export async function notificacionAltaAbierta(pacienteId: string): Promise<Dupli
   return { por: data.notificadoPorNombre, cuando: toDate(data.creadoEn), estado: String(data.estado) };
 }
 
+// Notificaciones de alta vivo abiertas de un grupo de pacientes (p. ej. las camas
+// de un servicio), indexadas por pacienteId. Consulta por lotes de 30 (límite de
+// `in`), así solo se leen las notificaciones de esos pacientes.
+export async function altasAbiertasDe(pacienteIds: string[]): Promise<Record<string, NonNullable<DuplicadoInfo>>> {
+  const ids = [...new Set(pacienteIds.filter(Boolean))];
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += 30) lotes.push(ids.slice(i, i + 30));
+  const snaps = await Promise.all(
+    lotes.map(l => getDocs(query(collection(db, "notificaciones_altas"), where("pacienteId", "in", l)))),
+  );
+  const abiertas: Record<string, NonNullable<DuplicadoInfo>> = {};
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      const data = d.data();
+      if (!ESTADOS_ABIERTOS_ALTA.includes(String(data.estado))) continue;
+      abiertas[String(data.pacienteId)] = {
+        por: data.notificadoPorPersona || data.notificadoPorNombre,
+        cuando: toDate(data.creadoEn),
+        estado: String(data.estado),
+      };
+    }
+  }
+  return abiertas;
+}
+
 // Prealta existente del paciente en esa fecha (excluyendo un id al editar), o null.
 export async function prealtaExistente(pacienteId: string, fecha: string, excluirId?: string): Promise<DuplicadoInfo> {
   if (!pacienteId || !fecha) return null;
