@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   collection,
   onSnapshot,
@@ -17,6 +18,9 @@ import {
   CheckCircle2,
   Clock3,
   History,
+  Info,
+  Loader2,
+  LogIn,
   Pencil,
   RotateCcw,
   Search,
@@ -48,14 +52,14 @@ const TIPO_LABEL: Record<TipoAltaVivo, string> = {
   referido: "Referido",
   fuga: "Fuga",
   in_extremis: "In extremis",
-  deposito: "En deposito",
+  deposito: "En depósito",
   suspendida: "Suspendida",
 };
 
 const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   pendiente: "Pendiente ESDOMED",
-  observada: "Requiere correccion",
-  deposito: "En deposito",
+  observada: "Requiere corrección",
+  deposito: "En depósito",
   suspendida: "Suspendida",
   procesada: "Alta efectiva",
   recibida: "Acusada de recibido",
@@ -64,33 +68,47 @@ const ESTADO_LABEL: Record<EstadoNotificacionAlta, string> = {
   rechazada: "Rechazada por ESDOMED",
 };
 
+// Solo familias semánticas: ámbar = en espera, rosa/rojo = corregir o rechazo,
+// esmeralda = alta efectiva; lo informativo va en el azul/acento institucional.
 const ESTADO_COLOR: Record<EstadoNotificacionAlta, string> = {
-  pendiente: "bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900",
-  observada: "bg-rose-50/70 dark:bg-rose-950/40 text-slate-800 dark:text-rose-100 border-rose-200/80 dark:border-rose-900/70",
+  pendiente: "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900",
+  observada: "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900",
   deposito: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
-  suspendida: "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
-  procesada: "bg-blue-50 dark:bg-[var(--color-institutional-navy)] text-[#1c1e4d] dark:text-[#dce6ff] border-[#c9a892]/60 dark:border-[#c9a892]/40",
-  recibida: "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900",
+  suspendida: "bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
+  procesada: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900",
+  recibida: "bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900",
   duplicada: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
-  revertida: "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900",
-  rechazada: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
+  revertida: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+  rechazada: "bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900",
+};
+
+// Franja lateral de cada tarjeta: el estado se lee antes que el texto.
+const ESTADO_FRANJA: Record<EstadoNotificacionAlta, string> = {
+  pendiente: "bg-amber-400",
+  observada: "bg-rose-500",
+  deposito: "bg-slate-300 dark:bg-slate-600",
+  suspendida: "bg-red-500",
+  procesada: "bg-emerald-500",
+  recibida: "bg-cyan-500",
+  duplicada: "bg-slate-300 dark:bg-slate-600",
+  revertida: "bg-slate-400 dark:bg-slate-500",
+  rechazada: "bg-red-500",
 };
 
 const OBSERVACION_LABEL: Record<MotivoObservacionAlta, string> = {
   cama_expediente: "Datos de cama o expediente no coinciden",
   expediente_duplicado: "Expediente duplicado",
   no_subido_sis: "Pre-alta no registrada en SIS",
-  otro: "Otra situacion a corregir",
+  otro: "Otra situación a corregir",
 };
 
 const inputCls =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1c1e4d]/50 dark:focus:ring-[#c9a892]/60 transition";
+  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
 
-/* Acción primaria institucional: marino con hairline dorado arena. */
-const primaryBtnCls = "bg-[#1c1e4d] hover:bg-[#2f48aa] text-white ring-1 ring-inset ring-[#c9a892]/40 dark:ring-[#c9a892]/50";
+const primaryBtnCls = "bg-blue-700 hover:bg-blue-600 text-white shadow-sm shadow-blue-700/20";
 
-/* Anillo de foco institucional para controles de filtro. */
-const focusRingCls = "focus:outline-none focus:ring-2 focus:ring-[#1c1e4d]/50 dark:focus:ring-[#c9a892]/60";
+const filtroCls =
+  "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 dark:text-slate-100";
 
 const esSoloAcuseRecibido = (tipo: TipoAltaVivo) => tipo === "deposito" || tipo === "suspendida";
 const esEstadoOcultoParaEnfermeria = (n: NotificacionAltaVivo) =>
@@ -132,6 +150,10 @@ function formatFecha(v: unknown) {
     hour12: false,
   });
 }
+
+// En cuentas genéricas (compartidas por servicio) interesa quién la envió de verdad.
+const quienNotifico = (n: NotificacionAltaVivo) =>
+  n.notificadoPorPersona ? `${n.notificadoPorPersona} (${n.notificadoPorNombre})` : n.notificadoPorNombre;
 
 export default function EnfermeriaMovimientosPage() {
   const { user, profile } = useAuth();
@@ -217,6 +239,15 @@ export default function EnfermeriaMovimientosPage() {
     );
   });
 
+  const puedeRectificar = (n: NotificacionAltaVivo) =>
+    (n.estado === "pendiente" || n.estado === "observada") &&
+    !n.rectificacionUsada &&
+    n.notificadoPorId === user?.uid;
+
+  // Devueltas por ESDOMED que esta cuenta todavía puede corregir: lo único que
+  // exige acción de enfermería en esta vista.
+  const porCorregir = registrosVisibles.filter((n) => n.estado === "observada" && puedeRectificar(n)).length;
+
   const abrirRectificacion = (n: NotificacionAltaVivo) => {
     setEditing(n);
     setSelectedPaciente(null);
@@ -238,7 +269,7 @@ export default function EnfermeriaMovimientosPage() {
     e.preventDefault();
     if (!editing || !user || !profile || !tipoAlta) return;
     if ((editing.estado !== "pendiente" && editing.estado !== "observada") || editing.rectificacionUsada) {
-      setError("Esta notificacion ya no puede rectificarse.");
+      setError("Esta notificación ya no puede rectificarse.");
       return;
     }
 
@@ -271,230 +302,288 @@ export default function EnfermeriaMovimientosPage() {
 
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? "No se pudo rectificar la notificacion.");
+        throw new Error(data?.error ?? "No se pudo rectificar la notificación.");
       }
 
       cerrarRectificacion();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo rectificar la notificacion.");
+      setError(err instanceof Error ? err.message : "No se pudo rectificar la notificación.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-[#1c1e4d] dark:bg-[#c9a892] rounded-xl flex items-center justify-center ring-1 ring-[#c9a892]/45 dark:ring-0 shadow-sm">
-          <History size={17} className="text-white dark:text-[#1c2834]" />
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#a67c65] dark:text-[#c9a892]/80">Enfermería · Egresos vivos</p>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
-            Movimientos de altas
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Trazabilidad de notificaciones enviadas por enfermeria
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
-        <SummaryCard label="Pendientes" value={registrosVisibles.filter((n) => n.estado === "pendiente").length} />
-        <SummaryCard label="Con observacion" value={registrosVisibles.filter((n) => n.estado === "observada").length} tone="rose" />
-        <SummaryCard label="Altas efectivas" value={registrosVisibles.filter((n) => n.estado === "procesada").length} tone="navy" />
-        <SummaryCard label="Rectificadas" value={registrosVisibles.filter((n) => n.rectificacionUsada).length} tone="royal" />
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar paciente, expediente o servicio..."
-            className={`w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg ${focusRingCls} text-slate-900 dark:text-slate-100 placeholder-slate-400`}
-          />
-        </div>
-        <select
-          value={filtroEstado}
-          onChange={(e) => setFiltroEstado(e.target.value as EstadoNotificacionAlta | "todos")}
-          className={`px-2 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg ${focusRingCls} text-slate-900 dark:text-slate-100`}
-        >
-          <option value="todos">Todos los estados</option>
-          <option value="pendiente">Pendiente ESDOMED</option>
-          <option value="observada">Requiere correccion</option>
-          <option value="procesada">Alta efectiva</option>
-          <option value="recibida">Acusada de recibido</option>
-          <option value="duplicada">Duplicada</option>
-        </select>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Desde</span>
-          <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-          <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
-        </div>
-        {(busqueda || filtroEstado !== "todos") && (
-          <button
-            onClick={() => {
-              setBusqueda("");
-              setFiltroEstado("todos");
-            }}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      {/* Encabezado */}
+      <section className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/20 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+              <History size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white md:text-2xl font-heading">Movimientos de altas</h1>
+              <p className="mt-1 max-w-xl text-sm text-cyan-50/90">Siga el estado de cada alta que notificó enfermería y corrija las que ESDOMED devuelva.</p>
+            </div>
+          </div>
+          <Link
+            href="/enfermeria/altas"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-900 shadow-sm transition-colors hover:bg-cyan-50"
           >
-            <X size={12} /> Limpiar
+            <LogIn size={16} /> Notificar alta
+          </Link>
+        </div>
+      </section>
+
+      {/* Lo que requiere acción, antes que cualquier otra cosa */}
+      {porCorregir > 0 && filtroEstado !== "observada" && (
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/70 dark:bg-rose-950/30 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-900/60 dark:text-rose-300">
+              <AlertCircle size={18} />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-rose-900 dark:text-rose-100">
+                {porCorregir === 1 ? "ESDOMED devolvió 1 alta para corregir" : `ESDOMED devolvió ${porCorregir} altas para corregir`}
+              </p>
+              <p className="mt-0.5 text-xs text-rose-700/90 dark:text-rose-200/80">Revise la observación y corríjala para que el alta siga su trámite.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltroEstado("observada")}
+            className="shrink-0 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-500"
+          >
+            Ver devueltas
           </button>
+        </div>
+      )}
+
+      <section className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900 md:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">Seguimiento</p>
+            <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Altas notificadas</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {resultadosHistoricos !== null ? "Resultados del rango seleccionado." : "Se actualiza en vivo con las altas de hoy."}
+            </p>
+          </div>
+          <span className="text-xs font-medium text-slate-500">{lista.length} {lista.length === 1 ? "resultado" : "resultados"}</span>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Kpi label="Pendientes" value={registrosVisibles.filter((n) => n.estado === "pendiente").length} icon={Clock3} tone="amber" />
+          <Kpi label="Con observación" value={registrosVisibles.filter((n) => n.estado === "observada").length} icon={AlertCircle} tone="rose" />
+          <Kpi label="Altas efectivas" value={registrosVisibles.filter((n) => n.estado === "procesada").length} icon={CheckCircle2} tone="emerald" />
+          <Kpi label="Rectificadas" value={registrosVisibles.filter((n) => n.rectificacionUsada).length} icon={RotateCcw} tone="cyan" />
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+          <div className="relative min-w-[180px] flex-1">
+            <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar paciente, expediente o servicio..."
+              aria-label="Buscar"
+              className={`${filtroCls} w-full py-1.5 pl-8 pr-3 placeholder-slate-400`}
+            />
+          </div>
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value as EstadoNotificacionAlta | "todos")}
+            aria-label="Estado"
+            className={`${filtroCls} px-2 py-1.5`}
+          >
+            <option value="todos">Todos los estados</option>
+            <option value="pendiente">Pendiente ESDOMED</option>
+            <option value="observada">Requiere corrección</option>
+            <option value="procesada">Alta efectiva</option>
+            <option value="recibida">Acusada de recibido</option>
+            <option value="duplicada">Duplicada</option>
+          </select>
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 text-xs text-slate-500">Desde</span>
+            <DateField value={fechaDesde} onChange={setFechaDesde} placeholder="Desde" ariaLabel="Fecha desde" clearable />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 text-xs text-slate-500">Hasta</span>
+            <DateField value={fechaHasta} onChange={setFechaHasta} placeholder="Hasta" ariaLabel="Fecha hasta" clearable />
+          </div>
+          {(busqueda || filtroEstado !== "todos") && (
+            <button
+              onClick={() => {
+                setBusqueda("");
+                setFiltroEstado("todos");
+              }}
+              className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-slate-100"
+            >
+              <X size={12} /> Limpiar
+            </button>
+          )}
+        </div>
+
+        {/* La vista en vivo solo cubre hoy; para fechas anteriores hay que pedirlo explícitamente */}
+        {fueraDeRangoVivo && resultadosHistoricos === null && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs text-cyan-800 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-cyan-200">
+            <span className="flex items-center gap-1.5"><Info size={14} className="shrink-0" /> Ese rango incluye días anteriores a hoy. Búsquelos para verlos.</span>
+            <button
+              onClick={buscarHistoricos}
+              disabled={buscandoHistoricos}
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-cyan-700 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-cyan-600 disabled:opacity-50"
+            >
+              {buscandoHistoricos ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+              {buscandoHistoricos ? "Buscando..." : "Buscar días anteriores"}
+            </button>
+          </div>
         )}
-      </div>
+        {resultadosHistoricos !== null && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/50">
+            <span>Mostrando altas del rango seleccionado (no se actualiza en vivo).</span>
+            <button
+              onClick={volverARecientes}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+            >
+              <X size={12} /> Volver a hoy
+            </button>
+          </div>
+        )}
+      </section>
 
-      {/* La vista en vivo solo cubre hoy; para fechas anteriores hay que pedirlo explícitamente */}
-      {fueraDeRangoVivo && resultadosHistoricos === null && (
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
-          <span>Ese rango incluye fechas anteriores a hoy, fuera de la vista en vivo.</span>
-          <button
-            onClick={buscarHistoricos}
-            disabled={buscandoHistoricos}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50 transition-colors shrink-0"
-          >
-            <Search size={12} /> {buscandoHistoricos ? "Buscando…" : "Buscar históricos"}
-          </button>
-        </div>
-      )}
-      {resultadosHistoricos !== null && (
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-500">
-          <span>Mostrando resultados históricos para el rango seleccionado.</span>
-          <button
-            onClick={volverARecientes}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors shrink-0"
-          >
-            <X size={12} /> Ver recientes
-          </button>
-        </div>
-      )}
-
-      <div className="space-y-2">
+      <div className="space-y-3">
         {lista.length === 0 && (
-          <p className="text-sm text-slate-500 py-10 text-center">
-            {resultadosHistoricos !== null
-              ? "Sin resultados históricos para ese rango."
-              : registrosVisibles.length === 0
-                ? "No hay movimientos de enfermeria registrados hoy."
-                : "Sin resultados para los filtros aplicados."}
-          </p>
+          <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-10 text-center dark:border-slate-700">
+            <History size={22} className="mx-auto text-slate-300 dark:text-slate-600" />
+            <p className="mt-2 text-sm text-slate-500">
+              {resultadosHistoricos !== null
+                ? "No hay altas notificadas en ese rango."
+                : registrosVisibles.length === 0
+                  ? "Enfermería no ha notificado altas hoy."
+                  : "Ninguna alta coincide con los filtros."}
+            </p>
+          </div>
         )}
 
         {lista.map((n) => {
-          const puedeRectificar =
-            (n.estado === "pendiente" || n.estado === "observada") &&
-            !n.rectificacionUsada &&
-            n.notificadoPorId === user?.uid;
-          const estaCerrada = n.estado === "procesada" || n.estado === "recibida" || n.estado === "duplicada";
+          const rectificable = puedeRectificar(n);
+          // Rechazada es cierre definitivo: no mostrarla "En seguimiento".
+          const estaCerrada = n.estado === "procesada" || n.estado === "recibida" || n.estado === "duplicada" || n.estado === "rechazada";
 
           return (
             <div
               key={n.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 transition-colors hover:border-[#c9a892]/60 dark:hover:border-[#c9a892]/35"
+              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] transition-colors hover:border-cyan-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-cyan-800"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">{n.pacienteNombre}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Exp. {n.pacienteExpediente}
-                    {n.cama && <> - Cama {n.cama}</>}
-                    {" - "}{n.servicio}
-                    <span className="mx-1.5 text-slate-300">|</span>
-                    <span className="font-medium text-slate-600 dark:text-slate-300">{TIPO_LABEL[n.tipoAlta]}</span>
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${estadoBadgeColor(n)}`}>
-                    {n.estado === "procesada" && <CheckCircle2 size={11} className="mr-1" />}
+              <span className={`absolute bottom-0 left-0 top-0 w-1 ${ESTADO_FRANJA[n.estado]}`} />
+              <div className="pl-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{n.pacienteNombre}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      <span className="font-mono font-medium">Exp. {n.pacienteExpediente}</span>
+                      {" · "}{n.servicio}
+                      {n.cama && <> · Cama {n.cama}</>}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-700 dark:text-slate-300">{TIPO_LABEL[n.tipoAlta]}</p>
+                  </div>
+                  <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${estadoBadgeColor(n)}`}>
+                    {n.estado === "procesada" && <CheckCircle2 size={11} />}
                     {estadoBadgeLabel(n)}
                   </span>
                 </div>
-              </div>
 
-              <div className="mt-2 space-y-0.5">
-                <p className="text-xs text-slate-400">
-                  Notificado por <span className="text-slate-500 font-medium">{n.notificadoPorNombre}</span>
-                  {" - "}{formatFecha(n.creadoEn)}
-                </p>
-                {n.rectificacionUsada && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
-                    <RotateCcw size={12} />
-                    Rectificado por {n.rectificadoPorNombre ?? n.modificadoPorNombre} - {formatFecha(n.rectificadoEn ?? n.modificadoEn)}
+                <div className="mt-2 space-y-0.5">
+                  <p className="text-xs text-slate-400">
+                    Notificado por <span className="font-medium text-slate-500 dark:text-slate-400">{quienNotifico(n)}</span>
+                    {" · "}{formatFecha(n.creadoEn)}
                   </p>
-                )}
-                {n.estado === "procesada" && n.procesadoPorNombre && (
-                  <p className="text-xs text-[#1c1e4d] dark:text-[#c9a892] font-medium">
-                    Alta efectiva por ESDOMED - {formatFecha(n.procesadoEn)}
-                  </p>
-                )}
-                {n.estado === "recibida" && n.procesadoPorNombre && (
-                  <p className="text-xs text-sky-600 dark:text-sky-400 font-medium">
-                    Acusada de recibido por ESDOMED - {formatFecha(n.procesadoEn)}
-                  </p>
-                )}
-                {n.estado === "duplicada" && n.duplicadoPorNombre && (
-                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                    Notificacion duplicada cerrada por ESDOMED - {formatFecha(n.duplicadoEn)}
-                  </p>
-                )}
-                {n.estado === "rechazada" && (
-                  <>
-                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                      Rechazada por ESDOMED{n.rechazadoEn ? ` - ${formatFecha(n.rechazadoEn)}` : ""}
+                  {n.notas && (
+                    <p className="text-xs text-slate-500">
+                      <span className="font-medium">Nota:</span> {n.notas}
                     </p>
-                    {n.rechazoNota && (
-                      <p className="text-xs text-slate-600 dark:text-slate-300 rounded-lg border border-red-200/70 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/30 px-3 py-2 mt-1">
-                        <span className="font-semibold">Motivo:</span> {n.rechazoNota}
-                        <span className="block mt-0.5 text-[11px] text-slate-500">Si el alta sí corresponde, envía una notificación nueva.</span>
+                  )}
+                  {n.rectificacionUsada && (
+                    <p className="flex items-center gap-1 text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                      <RotateCcw size={12} />
+                      Rectificado por {n.rectificadoPorNombre ?? n.modificadoPorNombre} · {formatFecha(n.rectificadoEn ?? n.modificadoEn)}
+                    </p>
+                  )}
+                  {n.estado === "procesada" && n.procesadoPorNombre && (
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      Alta efectiva por ESDOMED · {formatFecha(n.procesadoEn)}
+                    </p>
+                  )}
+                  {n.estado === "recibida" && n.procesadoPorNombre && (
+                    <p className="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                      Acusada de recibido por ESDOMED · {formatFecha(n.procesadoEn)}
+                    </p>
+                  )}
+                  {n.estado === "duplicada" && n.duplicadoPorNombre && (
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Notificación duplicada cerrada por ESDOMED · {formatFecha(n.duplicadoEn)}
+                    </p>
+                  )}
+                  {n.estado === "rechazada" && (
+                    <>
+                      <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                        Rechazada por ESDOMED{n.rechazadoEn ? ` · ${formatFecha(n.rechazadoEn)}` : ""}
                       </p>
-                    )}
-                  </>
-                )}
-                {n.observacionEsdomedMotivo && (
-                  <details className="group mt-2 rounded-lg border border-rose-200/70 dark:border-rose-800/70 bg-rose-50/70 dark:bg-rose-950/30 px-3 py-2 text-slate-900 dark:text-slate-100">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold">
-                      <span>Observacion ESDOMED: {OBSERVACION_LABEL[n.observacionEsdomedMotivo]}</span>
-                      <span className="shrink-0 text-[11px] font-medium underline-offset-2 group-open:hidden">Ver detalle</span>
-                      <span className="hidden shrink-0 text-[11px] font-medium underline-offset-2 group-open:inline">Ocultar</span>
-                    </summary>
-                    {n.observacionEsdomedDetalle && (
-                      <p className="mt-2 border-t border-rose-200/80 dark:border-rose-900 pt-2 text-xs leading-relaxed">{n.observacionEsdomedDetalle}</p>
-                    )}
-                    {n.observadoPorNombre && (
-                      <p className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                        Reportado por ESDOMED - {formatFecha(n.observadoEn)}
-                      </p>
-                    )}
-                  </details>
-                )}
-              </div>
+                      {n.rechazoNota && (
+                        <p className="mt-1 rounded-lg border border-red-200/70 bg-red-50/70 px-3 py-2 text-xs text-slate-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-slate-300">
+                          <span className="font-semibold">Motivo:</span> {n.rechazoNota}
+                          <span className="mt-0.5 block text-[11px] text-slate-500">Si el alta sí corresponde, envíe una notificación nueva.</span>
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {n.observacionEsdomedMotivo && (
+                    <details className="group mt-2 rounded-lg border border-rose-200/70 bg-rose-50/70 px-3 py-2 text-slate-900 dark:border-rose-800/70 dark:bg-rose-950/30 dark:text-slate-100">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold">
+                        <span>Observación ESDOMED: {OBSERVACION_LABEL[n.observacionEsdomedMotivo]}</span>
+                        <span className="shrink-0 text-[11px] font-medium text-rose-700 group-open:hidden dark:text-rose-300">Ver detalle</span>
+                        <span className="hidden shrink-0 text-[11px] font-medium text-rose-700 group-open:inline dark:text-rose-300">Ocultar</span>
+                      </summary>
+                      {n.observacionEsdomedDetalle && (
+                        <p className="mt-2 border-t border-rose-200/80 pt-2 text-xs leading-relaxed dark:border-rose-900">{n.observacionEsdomedDetalle}</p>
+                      )}
+                      {n.observadoPorNombre && (
+                        <p className="mt-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                          Reportado por ESDOMED · {formatFecha(n.observadoEn)}
+                        </p>
+                      )}
+                    </details>
+                  )}
+                </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2 items-center">
-                {puedeRectificar ? (
-                  <button
-                    type="button"
-                    onClick={() => abrirRectificacion(n)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold ${primaryBtnCls} rounded-lg transition-colors`}
-                  >
-                    <Pencil size={12} />
-                    {n.estado === "observada" ? "Corregir observacion" : "Rectificar una vez"}
-                  </button>
-                ) : n.rectificacionUsada ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                    <Clock3 size={13} />
-                    Rectificacion utilizada
-                  </span>
-                ) : !estaCerrada ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-                    <Clock3 size={13} />
-                    En seguimiento
-                  </span>
-                ) : null}
+                {(rectificable || n.rectificacionUsada || !estaCerrada) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    {rectificable ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirRectificacion(n)}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          n.estado === "observada" ? "bg-rose-600 text-white hover:bg-rose-500" : primaryBtnCls
+                        }`}
+                      >
+                        <Pencil size={12} />
+                        {n.estado === "observada" ? "Corregir observación" : "Rectificar (una vez)"}
+                      </button>
+                    ) : n.rectificacionUsada ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                        <Clock3 size={13} />
+                        Rectificación utilizada
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                        <Clock3 size={13} />
+                        En seguimiento
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -502,51 +591,68 @@ export default function EnfermeriaMovimientosPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 pt-16 backdrop-blur-sm overflow-y-auto">
-          <form onSubmit={guardarRectificacion} className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16 backdrop-blur-sm">
+          <form onSubmit={guardarRectificacion} className="relative w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <button
               type="button"
               onClick={cerrarRectificacion}
-              className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+              className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
               aria-label="Cerrar"
             >
               <X size={15} />
             </button>
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Rectificacion unica</p>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Actualizar notificacion</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Puedes cambiar paciente, tipo de alta o nota antes de que ESDOMED haga alta efectiva.
-              </p>
+            <div className="flex items-start gap-3 pr-6">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white"><Pencil size={16} /></span>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">
+                  {editing.estado === "observada" ? "Corregir observación" : "Rectificación única"}
+                </p>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">Actualizar notificación</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Puede cambiar el paciente, el tipo de alta o la nota antes de que ESDOMED haga el alta efectiva. Solo se permite una vez.
+                </p>
+              </div>
             </div>
 
+            {editing.observacionEsdomedMotivo && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs dark:border-rose-900/70 dark:bg-rose-950/30">
+                <p className="font-semibold text-rose-900 dark:text-rose-100">ESDOMED indicó: {OBSERVACION_LABEL[editing.observacionEsdomedMotivo]}</p>
+                {editing.observacionEsdomedDetalle && (
+                  <p className="mt-1 leading-relaxed text-rose-800/90 dark:text-rose-200/80">{editing.observacionEsdomedDetalle}</p>
+                )}
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Paciente actual</label>
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-3 py-2">
+              <label className="mb-1.5 block text-xs font-medium text-slate-500">Paciente actual</label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{editing.pacienteNombre}</p>
-                <p className="text-xs text-slate-500">Exp. {editing.pacienteExpediente} - {editing.servicio}</p>
+                <p className="text-xs text-slate-500">
+                  Exp. {editing.pacienteExpediente} · {editing.servicio}{editing.cama ? ` · Cama ${editing.cama}` : ""}
+                </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              <label className="mb-1.5 block text-xs font-medium text-slate-500">
                 Cambiar paciente <span className="font-normal text-slate-400">(opcional)</span>
               </label>
-              <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="navy" />
+              <BuscadorPacienteActivo value={selectedPaciente} onSelect={(p) => setSelectedPaciente(p)} accent="blue" />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de alta</label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-500">Tipo de alta</label>
               <div className="grid grid-cols-2 gap-2">
                 {TIPOS_ALTA.map((t) => (
                   <button
                     key={t.value}
                     type="button"
                     onClick={() => setTipoAlta(t.value)}
-                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                    aria-pressed={tipoAlta === t.value}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
                       tipoAlta === t.value
-                        ? "border-[#1c1e4d] bg-blue-50 text-[#1c1e4d] ring-1 ring-[#c9a892]/45 dark:border-[#c9a892]/50 dark:bg-[var(--color-institutional-navy)] dark:text-white"
-                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-[#c9a892]/70"
+                        ? "border-cyan-300 bg-cyan-50 text-cyan-900 dark:border-cyan-700 dark:bg-cyan-950/35 dark:text-cyan-100"
+                        : "border-slate-200 text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/50 dark:border-slate-700 dark:text-slate-400 dark:hover:border-cyan-800"
                     }`}
                   >
                     {t.label}
@@ -556,15 +662,15 @@ export default function EnfermeriaMovimientosPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">
-                Notas <span className="font-normal text-slate-400">(opcional)</span>
+              <label htmlFor="notas-rect" className="mb-1.5 block text-xs font-medium text-slate-500">
+                Nota <span className="font-normal text-slate-400">(opcional)</span>
               </label>
-              <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className={`${inputCls} resize-none`} />
+              <textarea id="notas-rect" value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className={`${inputCls} resize-none`} />
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
-                <AlertCircle size={14} className="mt-0.5" />
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
                 {error}
               </div>
             )}
@@ -574,16 +680,17 @@ export default function EnfermeriaMovimientosPage() {
                 type="button"
                 onClick={cerrarRectificacion}
                 disabled={saving}
-                className="flex-1 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
+                className="flex-1 rounded-xl py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving || !tipoAlta}
-                className={`flex-1 py-2.5 ${primaryBtnCls} text-sm font-semibold rounded-xl disabled:opacity-50 transition-colors`}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${primaryBtnCls}`}
               >
-                {saving ? "Guardando..." : "Guardar rectificacion"}
+                {saving && <Loader2 size={15} className="animate-spin" />}
+                {saving ? "Guardando..." : "Guardar cambios"}
               </button>
             </div>
           </form>
@@ -593,26 +700,34 @@ export default function EnfermeriaMovimientosPage() {
   );
 }
 
-function SummaryCard({
+const KPI_TONO = {
+  amber: { caja: "border-amber-100 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/25", icono: "bg-amber-500" },
+  rose: { caja: "border-rose-100 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/25", icono: "bg-rose-500" },
+  emerald: { caja: "border-emerald-100 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/25", icono: "bg-emerald-500" },
+  cyan: { caja: "border-cyan-100 bg-cyan-50/70 dark:border-cyan-900/60 dark:bg-cyan-950/25", icono: "bg-cyan-600" },
+} as const;
+
+function Kpi({
   label,
   value,
-  tone = "amber",
+  icon: Icon,
+  tone,
 }: {
   label: string;
   value: number;
-  tone?: "amber" | "rose" | "navy" | "royal";
+  icon: typeof Clock3;
+  tone: keyof typeof KPI_TONO;
 }) {
-  const toneCls = {
-    amber: "border-l-4 border-l-[#c99a2e] text-[#1c1e4d] dark:text-amber-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-    rose: "border-l-4 border-l-[#b76e79] text-[#1c1e4d] dark:text-rose-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-    navy: "border-l-4 border-l-[#1c1e4d] text-[#1c1e4d] dark:text-[#dce6ff] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-    royal: "border-l-4 border-l-[#2f48aa] text-[#1c1e4d] dark:text-blue-200 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700",
-  }[tone];
-
+  const t = KPI_TONO[tone];
   return (
-    <div className={`rounded-xl border px-4 py-3 ${toneCls}`}>
-      <p className="text-2xl font-bold leading-none">{value}</p>
-      <p className="text-xs font-medium mt-1">{label}</p>
+    <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${t.caja}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${t.icono}`}>
+        <Icon size={16} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{value}</p>
+        <p className="mt-1 truncate text-[11px] font-medium text-slate-500">{label}</p>
+      </div>
     </div>
   );
 }
