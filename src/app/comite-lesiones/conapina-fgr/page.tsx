@@ -11,8 +11,9 @@ import { DateField } from "@/components/ui/DateField";
 import {
   ShieldAlert, Car, HeartCrack, Clock3, Search, X, StickyNote, ChevronLeft, ChevronRight,
   FileText, CheckCircle2, AlertCircle, AlertTriangle, Copy, Ban, Landmark, Inbox,
-  LayoutList, Download, Upload, Paperclip, Loader2, Baby, Scale,
+  LayoutList, Download, Upload, Paperclip, Loader2, Baby, Scale, Eye,
 } from "lucide-react";
+import { soloConsultaAvisos } from "@/lib/accesoComiteLesiones";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP,
   ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad, duplicadosDeExpediente,
@@ -62,11 +63,16 @@ const thCls = "px-3 py-2.5 text-left text-[11px] font-semibold uppercase trackin
 
 export default function ComiteConapinaFgrPage() {
   const { user, profile } = useAuth();
+  // ESDOMED entra desde /dashboard/conapina-fgr (re-export de esta página) solo
+  // a consultar: ve todo lo que ha caído, sin recibir casos ni subir oficios.
+  // Por eso arranca con todos los estados y lo más reciente arriba, no con la
+  // cola de trabajo del comité.
+  const soloLectura = soloConsultaAvisos(profile);
   const [items, setItems] = useState<NotificacionConapinaFgr[]>([]);
   const [cargando, setCargando] = useState(true);
   const [sinPermiso, setSinPermiso] = useState(false);
   const [errorCarga, setErrorCarga] = useState(false);
-  const [orden, setOrden] = useState("antiguos");
+  const [orden, setOrden] = useState(soloLectura ? "recientes" : "antiguos");
   const [ahora, setAhora] = useState<number | null>(null);
 
   useEffect(() => {
@@ -77,7 +83,7 @@ export default function ComiteConapinaFgrPage() {
   }, []);
 
   const [vista, setVista] = useState<Vista>("bandeja");
-  const [filtro, setFiltro] = useState<EstadoNotificacionConapinaFgr | "todos">("pendiente");
+  const [filtro, setFiltro] = useState<EstadoNotificacionConapinaFgr | "todos">(soloLectura ? "todos" : "pendiente");
   const [tipo, setTipo] = useState<TipoCasoConapinaFgr | "todos">("todos");
   const [busqueda, setBusqueda] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
@@ -206,7 +212,7 @@ export default function ComiteConapinaFgrPage() {
   // Es la única acción del comité sobre el caso. Los datos del aviso externo los
   // declara el médico al notificar, así que aquí solo se leen.
   const confirmar = async () => {
-    if (!selected?.id || !profile) return;
+    if (!selected?.id || !profile || soloLectura) return;
     setSaving(true);
     setErrAccion(null);
     try {
@@ -231,7 +237,7 @@ export default function ComiteConapinaFgrPage() {
   const subirOficios = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivos = Array.from(e.target.files ?? []);
     if (fileRef.current) fileRef.current.value = "";
-    if (!archivos.length || !selected?.id || !user || !profile) return;
+    if (!archivos.length || !selected?.id || !user || !profile || soloLectura) return;
     const yaHay = selected.oficios?.length ?? 0;
     if (yaHay + archivos.length > MAX_OFICIOS) {
       setErrAccion(`Máximo ${MAX_OFICIOS} oficios por caso.`);
@@ -327,18 +333,27 @@ export default function ComiteConapinaFgrPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 font-heading">
               Avisos CONAPINA / FGR
             </h1>
-            <p className="mt-2 text-sm text-slate-500">Recepción y consulta de los avisos del área médica.</p>
+            <p className="mt-2 text-sm text-slate-500">
+              {soloLectura
+                ? "Consulta de los avisos del área médica. Los recibe el Comité de Lesiones Intencionales."
+                : "Recepción y consulta de los avisos del área médica."}
+            </p>
           </div>
         </div>
+        {soloLectura && (
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <Eye size={13} /> Solo lectura
+          </span>
+        )}
       </div>
 
       {/* Vistas */}
       <div className="mb-4 inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
         {([
-          { v: "bandeja" as const, label: "Bandeja de trabajo", icon: Inbox },
+          { v: "bandeja" as const, label: soloLectura ? "Seguimiento" : "Bandeja de trabajo", icon: Inbox },
           { v: "registro" as const, label: "Avisos notificados", icon: LayoutList },
         ]).map(({ v, label, icon: Icono }) => (
-          <button key={v} aria-pressed={vista === v} onClick={() => { setVista(v); setFiltro(v === "registro" ? "todos" : "pendiente"); }}
+          <button key={v} aria-pressed={vista === v} onClick={() => { setVista(v); setFiltro(v === "registro" || soloLectura ? "todos" : "pendiente"); }}
             className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
               vista === v
                 ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
@@ -363,15 +378,17 @@ export default function ComiteConapinaFgrPage() {
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-300">
-              {vista === "bandeja" ? "Recepción del comité" : "Consulta de avisos"}
+              {vista === "registro" ? "Consulta de avisos" : soloLectura ? "Seguimiento del comité" : "Recepción del comité"}
             </p>
             <h2 className="mt-0.5 text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
               {vista === "bandeja" ? "Casos notificados" : "Avisos notificados"}
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              {vista === "bandeja"
-                ? "El médico da el aviso y lo declara al notificar. Aquí se recibe el caso para dejarlo registrado."
-                : "El rango de fechas corresponde a la fecha del aviso externo."}
+              {vista === "registro"
+                ? "El rango de fechas corresponde a la fecha del aviso externo."
+                : soloLectura
+                ? "El médico da el aviso y lo declara al notificar; el comité lo recibe. Aquí se consulta en qué va cada caso."
+                : "El médico da el aviso y lo declara al notificar. Aquí se recibe el caso para dejarlo registrado."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -437,7 +454,7 @@ export default function ComiteConapinaFgrPage() {
       {/* Tabla */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-700">
-          <div><h2 className="text-sm font-semibold">{vista === "bandeja" ? "Lista de trabajo" : "Registro de avisos"}</h2><p className="mt-1 text-xs text-slate-500">{cargando ? "Cargando avisos…" : `${displayList.length} resultados con los filtros actuales`}</p></div>
+          <div><h2 className="text-sm font-semibold">{vista === "registro" ? "Registro de avisos" : soloLectura ? "Casos" : "Lista de trabajo"}</h2><p className="mt-1 text-xs text-slate-500">{cargando ? "Cargando avisos…" : `${displayList.length} resultados con los filtros actuales`}</p></div>
           <label className="flex items-center gap-2 text-xs text-slate-500">Orden de notificación<select value={orden} onChange={e => setOrden(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><option value="antiguos">Más antiguos primero</option><option value="recientes">Más recientes primero</option></select></label>
         </div>
         <div className="overflow-x-auto">
@@ -664,7 +681,7 @@ export default function ComiteConapinaFgrPage() {
                           </li>
                         ))}
                       </ul>
-                      <p className="mt-1">Verifique si es el mismo caso antes de avisar dos veces.</p>
+                      {!soloLectura && <p className="mt-1">Verifique si es el mismo caso antes de avisar dos veces.</p>}
                     </div>
                   </div>
                 )}
@@ -715,7 +732,7 @@ export default function ComiteConapinaFgrPage() {
                       {selected.avisoObservacion && <Row label="Observación" value={selected.avisoObservacion} />}
                     </div>
                     <p className="mt-2.5 text-[11px] leading-4 text-emerald-800/80 dark:text-emerald-200/70">
-                      Lo declaró el médico al notificar. Si algo no cuadra, anótelo en la observación al recibir.
+                      Lo declaró el médico al notificar.{!soloLectura && " Si algo no cuadra, anótelo en la observación al recibir."}
                     </p>
                   </div>
                 )}
@@ -730,8 +747,16 @@ export default function ComiteConapinaFgrPage() {
                   </div>
                 )}
 
-                {/* 2º tiempo */}
-                {selected.estado === "pendiente" && (
+                {/* 2º tiempo — en solo lectura solo se informa que falta. */}
+                {selected.estado === "pendiente" && soloLectura && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+                    <Clock3 size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs leading-5 text-amber-800 dark:text-amber-200">
+                      <span className="font-semibold">Por recibir.</span> El Comité de Lesiones Intencionales aún no ha recibido este caso.
+                    </p>
+                  </div>
+                )}
+                {selected.estado === "pendiente" && !soloLectura && (
                   <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/25">
                     <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Recibir el caso</p>
                     <p className="mt-0.5 text-xs leading-5 text-blue-800/90 dark:text-blue-200/80">
@@ -787,14 +812,20 @@ export default function ComiteConapinaFgrPage() {
                       </div>
                     )}
 
-                    <input ref={fileRef} type="file" multiple accept="application/pdf,image/*"
-                      onChange={subirOficios} className="hidden" />
-                    <button onClick={() => fileRef.current?.click()}
-                      disabled={subiendo || (selected.oficios?.length ?? 0) >= MAX_OFICIOS}
-                      className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                      {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                      {subiendo ? `Subiendo ${progreso ?? 0}%` : "Subir oficio"}
-                    </button>
+                    {soloLectura ? (
+                      !selected.oficios?.length && <p className="mt-3 text-xs text-slate-400">Sin oficios adjuntos.</p>
+                    ) : (
+                      <>
+                        <input ref={fileRef} type="file" multiple accept="application/pdf,image/*"
+                          onChange={subirOficios} className="hidden" />
+                        <button onClick={() => fileRef.current?.click()}
+                          disabled={subiendo || (selected.oficios?.length ?? 0) >= MAX_OFICIOS}
+                          className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                          {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                          {subiendo ? `Subiendo ${progreso ?? 0}%` : "Subir oficio"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -808,7 +839,7 @@ export default function ComiteConapinaFgrPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-              {selected.estado === "pendiente" ? (
+              {selected.estado === "pendiente" && !soloLectura ? (
                 <>
                   <button onClick={cerrar} disabled={saving}
                     className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">

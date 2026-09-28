@@ -14,3 +14,12 @@ export function apoyaComiteLesiones(profile?: UserProfile | null) {
 export function veComiteCompleto(profile?: UserProfile | null) {
   return profile?.role === "comite_lesiones" || apoyaComiteLesiones(profile);
 }
+
+/**
+ * ESDOMED (y el admin) consultan los avisos CONAPINA/FGR desde su dashboard en
+ * SOLO LECTURA: ven lo que ha caído y en qué va, pero no reciben casos ni suben
+ * oficios. Las reglas les dan únicamente `read`.
+ */
+export function soloConsultaAvisos(profile?: UserProfile | null) {
+  return profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
+}

@@ -24,6 +24,7 @@ import {
   Printer,
   Radar,
   Settings,
+  ShieldAlert,
   Syringe,
   Table2,
   TrendingUp,
@@ -109,10 +110,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
   const verAprobacionTramites = esAdmin || esAsistente;
   const verProductividad = esEsdomed || esAdmin;
+  // Avisos CONAPINA/FGR del Comité de Lesiones: ESDOMED solo los consulta.
+  const verAvisosLesiones = esEsdomed || esAdmin;
 
   // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
   const G_PACIENTES = "Gestión de pacientes";
   const G_MEDICINA_CRITICA = "Medicina crítica";
+  const G_LESIONES = "Lesiones intencionales";
   const G_TRABAJO_SOCIAL = "Trabajo Social";
   const G_DOCUMENTOS = "Documentos";
   const G_REPORTES = "Reportes";
@@ -199,6 +203,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       badge: pendientes.fallecidos,
       group: G_PACIENTES,
     },
+
+    // ── Lesiones intencionales ── consulta de solo lectura (sin globo: ESDOMED
+    // no recibe los casos, los recibe el comité).
+    ...(verAvisosLesiones
+      ? [{ href: "/dashboard/conapina-fgr", label: "Avisos CONAPINA / FGR", icon: ShieldAlert, group: G_LESIONES }]
+      : []),
 
     // ── Trabajo Social ── el admin ve las vistas de gestiones (el menú de TS
     // propiamente dicho vive en navTrabajoSocial).

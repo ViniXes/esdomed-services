@@ -251,16 +251,17 @@ service cloud.firestore {
     // ─── Notificaciones CONAPINA / FGR ────────────────────────────────────────
     // Casos de violencia o accidente de tránsito. El médico notifica; el Comité
     // de Lesiones Intencionales los recibe en su bandeja y los da por recibidos.
-    // Es dato sensible: NO se abre a todo el staff — solo el comité, Psicología
-    // (que apoya el trámite y usa las mismas vistas), el admin y el médico que
-    // lo generó.
+    // Es dato sensible: NO se abre a todo el staff — solo el comité y quienes lo
+    // apoyan (isComiteOApoyo), ESDOMED en SOLO LECTURA (consulta lo que ha caído
+    // desde su dashboard; no aparece en ninguna regla de escritura), el admin y
+    // el médico que lo generó.
     //
     // Los campos van SELLADOS: lo clínico (paciente, diagnóstico, causa externa,
     // nota) Y los datos del aviso externo (instancia, sede, quién lo recibió)
     // solo se escriben al crear y nadie los puede reescribir después; el acuse
     // solo lo escribe el comité y solo sobre lo que sigue "pendiente".
     match /notificaciones_conapina_fgr/{id} {
-      allow read:   if isAuth() && (isComiteOApoyo() || isAdmin()
+      allow read:   if isAuth() && (isComiteOApoyo() || isEsdomed() || isAdmin()
                                     || (isMedico() && resource.data.medicoId == uid()));
 
       // Nace siempre a nombre de quien la crea y en estado pendiente: los campos
