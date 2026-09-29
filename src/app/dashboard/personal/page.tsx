@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Star, UsersRound } from "lucide-react";
+import { ChevronRight, Search, Star, UsersRound, X } from "lucide-react";
 import { collection, doc, getDoc, getDocs, query, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +25,10 @@ const SIN_GRUPO = "Sin grupo asignado este mes";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto" | "role" | "activo" | "baja">;
 
+function normalizarBusqueda(valor: string): string {
+  return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es").trim();
+}
+
 export default function PersonalTrabajoPage() {
   const { profile } = useAuth();
   const role = profile?.role;
@@ -33,6 +37,7 @@ export default function PersonalTrabajoPage() {
   const [plan, setPlan] = useState<PlanTrabajo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [busqueda, setBusqueda] = useState("");
 
   useEffect(() => {
     // Sin rol permitido no se lee nada: el render muestra el aviso de acceso
@@ -106,6 +111,19 @@ export default function PersonalTrabajoPage() {
   }, [personal, grupoDe]);
 
   const totalVigentes = personal.length - enMemoria.length;
+  const palabrasBusqueda = normalizarBusqueda(busqueda).split(/\s+/).filter(Boolean);
+  const coincide = (persona: Persona, grupo: string) => {
+    const texto = normalizarBusqueda([
+      persona.nombre, persona.codigoMarcacion, persona.puesto, grupo,
+    ].filter(Boolean).join(" "));
+    return palabrasBusqueda.every(palabra => texto.includes(palabra));
+  };
+  const memoriaFiltrada = enMemoria.filter(persona => coincide(persona, "En memoria"));
+  const seccionesFiltradas = secciones
+    .map(seccion => ({ ...seccion, personas: seccion.personas.filter(persona => coincide(persona, seccion.grupo)) }))
+    .filter(seccion => seccion.personas.length > 0);
+  const totalResultados = memoriaFiltrada.length + seccionesFiltradas.reduce((total, seccion) => total + seccion.personas.length, 0);
+  const hayBusqueda = palabrasBusqueda.length > 0;
 
   if (role && !ROLES_PERMITIDOS.has(role)) {
     return (
@@ -114,32 +132,60 @@ export default function PersonalTrabajoPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-9 h-9 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900">
-          <UsersRound size={17} className="text-blue-600 dark:text-blue-400" />
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
+      <div className="flex items-center gap-3">
+        <div className="h-11 w-11 shrink-0 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900">
+          <UsersRound size={21} className="text-blue-700 dark:text-blue-300" aria-hidden />
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Personal de trabajo</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Equipo ESDOMED
-            {loading ? "" : ` · ${totalVigentes} ${totalVigentes === 1 ? "persona" : "personas"}`}
-            {!loading && plan ? ` · grupos según el plan de ${labelPeriodo(PERIODO_ACTUAL)}` : ""}
+            {loading || error ? "" : ` · ${totalVigentes} ${totalVigentes === 1 ? "persona vigente" : "personas vigentes"}`}
+            {!loading && !error && plan ? ` · grupos según el plan de ${labelPeriodo(PERIODO_ACTUAL)}` : ""}
           </p>
         </div>
       </div>
+      <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <label htmlFor="buscar-personal" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Buscar personal</label>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-md">
+            <Search size={18} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              id="buscar-personal"
+              type="search"
+              value={busqueda}
+              onChange={event => setBusqueda(event.target.value)}
+              onKeyDown={event => { if (event.key === "Escape") setBusqueda(""); }}
+              placeholder="Nombre, código, puesto o grupo…"
+              disabled={loading || !!error}
+              className="min-h-11 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-12 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {busqueda && (
+              <button type="button" onClick={() => setBusqueda("")} aria-label="Limpiar búsqueda de personal" className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-blue-500 dark:hover:bg-slate-700">
+                <X size={17} aria-hidden />
+              </button>
+            )}
+          </div>
+          {!loading && !error && <p role="status" aria-live="polite" aria-atomic="true" className="text-xs text-slate-500 dark:text-slate-400">
+            {hayBusqueda ? `${totalResultados} de ${personal.length} personas` : `${secciones.length} ${secciones.length === 1 ? "grupo" : "grupos"}${enMemoria.length ? ` · ${enMemoria.length} en memoria` : ""}`}
+          </p>}
+        </div>
+      </div>
+      </div>
 
       {error && (
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3">{error}</p>
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500 text-center py-10">Cargando personal...</p>
-      ) : (
+        <p role="status" className="text-sm text-slate-500 text-center py-10">Cargando personal...</p>
+      ) : !error ? (
         <>
           {/* En memoria */}
-          {enMemoria.length > 0 && (
+          {memoriaFiltrada.length > 0 && (
             <section className="mb-8">
               <div className="flex items-center gap-2 mb-1">
                 <Star size={14} className="fill-[#d4af37] text-[#b8860b]" />
@@ -150,29 +196,33 @@ export default function PersonalTrabajoPage() {
                 Compañeros que formaron parte de este equipo y a quienes recordamos con cariño.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {enMemoria.map((u) => (
+                {memoriaFiltrada.map((u) => (
                   <TarjetaMemorial key={u.uid} persona={u} />
                 ))}
               </div>
             </section>
           )}
 
-          {secciones.length === 0 && enMemoria.length === 0 && (
+          {totalResultados === 0 && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-16 text-center">
               <UsersRound size={28} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
-              <p className="text-sm text-slate-500">No hay personal ESDOMED registrado.</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{hayBusqueda ? "No encontramos personas con esa búsqueda." : "No hay personal ESDOMED registrado."}</p>
+              {hayBusqueda && <>
+                <p className="mt-1 text-xs text-slate-500">Prueba otro nombre, código, puesto o grupo.</p>
+                <button type="button" onClick={() => setBusqueda("")} className="mt-4 min-h-11 rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-blue-500 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">Limpiar búsqueda</button>
+              </>}
             </div>
           )}
 
           {/* Equipo vigente, por grupo del mes */}
-          {secciones.map(({ grupo, personas }) => {
+          {seccionesFiltradas.map(({ grupo, personas }) => {
             const estilo = COLOR_GRUPO[grupo];
             return (
               <section key={grupo} className="mb-7">
                 <div className="flex items-center gap-2 mb-3">
                   {estilo && <span className={`h-2.5 w-2.5 rounded-full ${estilo.dot}`} />}
-                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{grupo}</h2>
-                  <span className="text-[11px] font-medium text-slate-400">{personas.length}</span>
+                  <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{grupo}</h2>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{personas.length}</span>
                   <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -190,7 +240,7 @@ export default function PersonalTrabajoPage() {
             );
           })}
         </>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -207,7 +257,7 @@ function TarjetaPersona({
   puedeAbrir: boolean;
 }) {
   const className = `flex items-center gap-3 rounded-2xl border p-3.5 transition-colors ${
-    puedeAbrir ? "hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer" : ""
+    puedeAbrir ? "hover:border-blue-400 hover:shadow-sm dark:hover:border-blue-600 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" : ""
   } ${
     esYo
       ? "border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-950/30"
@@ -224,19 +274,20 @@ function TarjetaPersona({
         {inicialesNombre(persona.nombre)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-white leading-tight">
-          <span className="truncate" title={persona.nombre}>{persona.nombre}</span>
+        <p className="flex items-start gap-1.5 text-sm font-semibold text-slate-900 dark:text-white leading-snug">
+          <span className="line-clamp-2 break-words" title={persona.nombre}>{persona.nombre}</span>
           {esYo && (
-            <span className="shrink-0 rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">TÚ</span>
+            <span className="shrink-0 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">TÚ</span>
           )}
         </p>
-        <p className="mt-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300">
-          {persona.codigoMarcacion || "Sin código"}
+        <p className="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+          {persona.codigoMarcacion ? `Código ${persona.codigoMarcacion}` : "Sin código"}
         </p>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate" title={persona.puesto}>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-2 break-words" title={persona.puesto}>
           {persona.puesto || "Sin puesto"}
         </p>
       </div>
+      {puedeAbrir && <ChevronRight size={16} className="shrink-0 text-slate-400" aria-hidden />}
     </>
   );
 
