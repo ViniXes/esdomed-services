@@ -73,6 +73,13 @@ const emptyForm = (): FormState => ({
 
 const FILAS_POR_PAGINA = 10;
 
+// Directo = azul institucional, Triage = neutro. Ninguno es semántico: el
+// ámbar queda para advertencias (posible duplicado, modo edición).
+const origenCls = (directo: boolean) =>
+  directo
+    ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"
+    : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
+
 export default function ControlIngresosPage() {
   const router = useRouter();
   const { profile } = useAuth();
@@ -155,6 +162,7 @@ export default function ControlIngresosPage() {
   // Lo que la página ya tiene cargado: vista en vivo (ayer + hoy) y, si se
   // consultaron, los históricos. Contra esto se buscan duplicados.
   const registrosCargados = (): ControlIngreso[] => [...ingresos, ...(resultadosHistoricos ?? [])];
+  const registroEditando = editingId ? registrosCargados().find(i => i.id === editingId) : undefined;
 
   const registrar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -534,10 +542,10 @@ export default function ControlIngresosPage() {
       {detalleIngreso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onClick={() => setDetalleIngreso(null)}>
           <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" role="dialog" aria-modal="true" aria-label="Detalle del ingreso" onClick={e => e.stopPropagation()}>
-            <div className="relative bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-5 py-5 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/40">
+            <div className="relative border-b border-slate-100 bg-slate-50/70 px-5 py-5 dark:border-slate-800 dark:bg-slate-800/40">
               <button type="button" onClick={() => setDetalleIngreso(null)} className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200" aria-label="Cerrar detalle"><Icon icon={closeCircle} width={20} /></button>
               <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#4f5ee8] text-white shadow-lg shadow-blue-500/20"><Icon icon={documentAdd} width={24} /></div>
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-700 text-white shadow-sm"><Icon icon={documentAdd} width={24} /></div>
                 <div className="min-w-0 pr-8">
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Detalle del ingreso</p>
                   <h2 className="mt-1 font-heading text-lg font-bold text-slate-900 dark:text-slate-100">{detalleIngreso.apellidos}, {detalleIngreso.nombres}</h2>
@@ -559,7 +567,7 @@ export default function ControlIngresosPage() {
                 <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Atención</h3>
                 <dl className="space-y-2.5 text-sm">
                   <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Servicio</dt><dd className="max-w-[65%] text-right font-medium text-slate-800 dark:text-slate-200">{detalleIngreso.servicio}</dd></div>
-                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Origen</dt><dd><span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${detalleIngreso.ingresoDirectoServicio ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>{detalleIngreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span></dd></div>
+                  <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Origen</dt><dd><span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${origenCls(detalleIngreso.ingresoDirectoServicio)}`}>{detalleIngreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span></dd></div>
                   <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Registro</dt><dd className="text-right font-medium text-slate-800 dark:text-slate-200">{formatFecha(detalleIngreso.creadoEn)}</dd></div>
                 </dl>
               </section>
@@ -578,39 +586,68 @@ export default function ControlIngresosPage() {
       )}
 
       {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/70 to-indigo-50/80 px-5 py-5 shadow-sm dark:border-blue-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/40 md:px-6">
-        <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full bg-indigo-200/35 blur-2xl dark:bg-indigo-500/10" />
-        <div className="absolute bottom-0 right-28 h-20 w-20 rounded-full bg-cyan-200/35 blur-xl dark:bg-cyan-500/10" />
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 py-5 shadow-lg shadow-cyan-950/15 md:px-7 md:py-6">
+        <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full border border-white/10" />
+        <div className="absolute bottom-[-5.5rem] right-16 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative flex items-center gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[#2b8ca8] to-[#1a4e70] text-white shadow-lg shadow-blue-500/20">
-              <Ambulance size={25} strokeWidth={2.1} />
-            </div>
-            <div className="min-w-0">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Admisión ESDOMED</p>
-              <h1 className="font-heading text-xl font-bold leading-tight text-slate-900 dark:text-slate-100 md:text-2xl">Control de ingresos</h1>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Registra pacientes y consulta los ingresos recientes en tiempo real</p>
-            </div>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+            <Ambulance size={24} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/80">Admisión ESDOMED</p>
+            <h1 className="mt-0.5 font-heading text-xl font-bold text-white md:text-2xl">Control de ingresos</h1>
           </div>
         </div>
-      </div>
+      </section>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.45fr)]">
       {/* Form card */}
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-5">
+      <div className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition-shadow dark:bg-slate-900 lg:sticky lg:top-5 ${editingId ? "border-amber-300 ring-4 ring-amber-400/25 dark:border-amber-700 dark:ring-amber-500/20" : "border-slate-200 dark:border-slate-800"}`}>
 
-        {/* Card header */}
-        <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/60 px-5 py-4 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={documentAdd} width={21} /></div>
-          <div className="min-w-0">
-            <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">
-              {editingId ? "Editar ingreso" : "Nuevo ingreso"}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Responsable: {profile.nombre}</p>
+        {/* Card header — en edición se vuelve una franja ámbar imposible de
+            pasar por alto: sin ella, alguien que abrió "editar" y se distrajo
+            digitaba al siguiente paciente ENCIMA del registro anterior. */}
+        {editingId ? (
+          <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/60 dark:bg-amber-950/40">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-white"><Icon icon={pen} width={19} /></div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Modo edición</p>
+              <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">
+                Editando exp. {registroEditando?.expediente ?? form.expediente}
+              </p>
+              {registroEditando && (
+                <>
+                  <p className="truncate text-xs text-slate-600 dark:text-slate-400" title={`${registroEditando.apellidos}, ${registroEditando.nombres}`}>
+                    {registroEditando.apellidos}, {registroEditando.nombres}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Registrado {cuandoFue(registroEditando.creadoEn)}</p>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={guardando}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-950"
+            >
+              <Icon icon={closeCircle} width={15} /> Cancelar
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><Icon icon={documentAdd} width={21} /></div>
+            <div className="min-w-0">
+              <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">Nuevo ingreso</p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">Responsable: {profile.nombre}</p>
+            </div>
+          </div>
+        )}
 
-        <form onSubmit={registrar} className="space-y-4 p-5">
+        <form
+          onSubmit={registrar}
+          onKeyDown={e => { if (e.key === "Escape" && editingId && !guardando) cancelEdit(); }}
+          className="space-y-4 p-5"
+        >
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1.5">
@@ -740,9 +777,9 @@ export default function ControlIngresosPage() {
             <button
               type="submit"
               disabled={guardando}
-              className="flex-1 rounded-xl bg-[#4f5ee8] py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/25 transition-all hover:bg-[#5b6bf0] active:scale-[0.99] disabled:opacity-50"
+              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 ${editingId ? "bg-amber-600 hover:bg-amber-500" : "bg-blue-700 hover:bg-blue-600"}`}
             >
-              {guardando ? (editingId ? "Actualizando..." : "Registrando...") : (editingId ? "Actualizar ingreso" : "Registrar ingreso")}
+              {guardando ? (editingId ? "Guardando cambios..." : "Registrando...") : (editingId ? `Guardar cambios del exp. ${registroEditando?.expediente ?? form.expediente}` : "Registrar ingreso")}
             </button>
           </div>
         </form>
@@ -750,9 +787,9 @@ export default function ControlIngresosPage() {
 
       {/* Lista de registros */}
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/60 px-4 py-3.5 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60">
+        <div className="px-4 py-3.5">
           <div className="mb-3 flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={calendar} width={18} /></div>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><Icon icon={calendar} width={18} /></div>
             <div className="min-w-0 flex-1">
               <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">{resultadosHistoricos !== null ? "Resultados históricos" : "Ingresos de ayer y hoy"}</p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">{lista.length} registro(s) mostrados</p>
@@ -836,8 +873,10 @@ export default function ControlIngresosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {registrosPagina.map(ingreso => (
-                  <tr key={ingreso.id} onClick={() => setDetalleIngreso(ingreso)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetalleIngreso(ingreso); } }} tabIndex={0} role="button" aria-label={`Ver detalle del expediente ${ingreso.expediente}`} className="cursor-pointer transition-colors hover:bg-blue-50/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-slate-800/60">
+                {registrosPagina.map(ingreso => {
+                  const enEdicion = ingreso.id === editingId;
+                  return (
+                  <tr key={ingreso.id} onClick={() => setDetalleIngreso(ingreso)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetalleIngreso(ingreso); } }} tabIndex={0} role="button" aria-label={`Ver detalle del expediente ${ingreso.expediente}`} className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${enEdicion ? "bg-amber-50 shadow-[inset_4px_0_0_0_var(--color-amber-500)] hover:bg-amber-100/70 dark:bg-amber-950/30 dark:hover:bg-amber-950/50" : "hover:bg-blue-50/55 dark:hover:bg-slate-800/60"}`}>
                     <td className="px-3 py-3 sm:px-4">
                       <span className="inline-block max-w-full truncate rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">{ingreso.expediente}</span>
                       <p className="mt-1 truncate text-[11px] text-slate-500" title={formatFecha(ingreso.creadoEn)}>{formatFecha(ingreso.creadoEn)}</p>
@@ -848,18 +887,23 @@ export default function ControlIngresosPage() {
                     </td>
                     <td className="px-3 py-3 sm:px-4">
                       <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200" title={ingreso.servicio}>{ingreso.servicio}</p>
-                      <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${ingreso.ingresoDirectoServicio ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>{ingreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span>
+                      <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${origenCls(ingreso.ingresoDirectoServicio)}`}>{ingreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span>
                       {ingreso.reingresoMismoDia && (
                         <span className="ml-1 mt-1 inline-block rounded-md border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-300" title={ingreso.reingresoMotivo ? `Reingreso: ${ingreso.reingresoMotivo}` : "Reingreso confirmado"}>Reingreso</span>
                       )}
                     </td>
                     {puedeEditar && (
                       <td className="px-2 py-3 text-right">
-                        <button onClick={e => { e.stopPropagation(); handleEdit(ingreso); }} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30" title="Editar registro" aria-label="Editar registro"><Icon icon={pen} width={16} /></button>
+                        {enEdicion ? (
+                          <span className="inline-grid rounded-lg bg-amber-500 p-1.5 text-white" title="En edición" aria-label="En edición"><Icon icon={pen} width={16} /></span>
+                        ) : (
+                          <button onClick={e => { e.stopPropagation(); handleEdit(ingreso); }} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-300" title="Editar registro" aria-label="Editar registro"><Icon icon={pen} width={16} /></button>
+                        )}
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-3 dark:border-slate-800 sm:px-4">
