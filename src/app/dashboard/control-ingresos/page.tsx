@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addDoc, collection, Timestamp, query, orderBy, onSnapshot, limit, doc, updateDoc,
-  where, getDocs, QueryConstraint,
+  where, getDocs, QueryConstraint, deleteField,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
+import { claveExpediente, fechaDeRegistro, ingresosRepetidos } from "@/lib/esdomed/duplicadosIngreso";
 import { Ambulance, Download } from "lucide-react";
 import { Icon } from "@iconify/react";
 import documentAdd from "@iconify-icons/solar/document-add-linear";
@@ -18,6 +19,7 @@ import checkCircle from "@iconify-icons/solar/check-circle-linear";
 import magnifer from "@iconify-icons/solar/magnifer-linear";
 import closeCircle from "@iconify-icons/solar/close-circle-linear";
 import pen from "@iconify-icons/solar/pen-2-linear";
+import dangerTriangle from "@iconify-icons/solar/danger-triangle-linear";
 
 type GeneroIngreso = "masculino" | "femenino";
 
@@ -33,7 +35,16 @@ type ControlIngreso = {
   ingresoDirectoServicio: boolean;
   responsableIngresoNombre: string;
   creadoEn: Date;
+  // El personal confirmó que el paciente llegó de nuevo el mismo día / en
+  // menos de 12 h (ver lib/esdomed/duplicadosIngreso).
+  reingresoMismoDia?: boolean;
+  reingresoMotivo?: string;
+  reingresoDeId?: string;
 };
+
+type Reingreso = { motivo: string; deId: string };
+
+const MIN_MOTIVO_REINGRESO = 5;
 
 type FormState = {
   expediente: string;
@@ -79,6 +90,8 @@ export default function ControlIngresosPage() {
   const [pagina, setPagina] = useState(1);
   const [detalleIngreso, setDetalleIngreso] = useState<ControlIngreso | null>(null);
   const [exportando, setExportando] = useState(false);
+  const [posiblesDuplicados, setPosiblesDuplicados] = useState<ControlIngreso[] | null>(null);
+  const [motivoReingreso, setMotivoReingreso] = useState("");
 
   useEffect(() => {
     if (!profile) return;
@@ -139,13 +152,50 @@ export default function ControlIngresosPage() {
     return null;
   };
 
+  // Lo que la página ya tiene cargado: vista en vivo (ayer + hoy) y, si se
+  // consultaron, los históricos. Contra esto se buscan duplicados.
+  const registrosCargados = (): ControlIngreso[] => [...ingresos, ...(resultadosHistoricos ?? [])];
+
   const registrar = async (e: React.FormEvent) => {
     e.preventDefault();
     const err = validar();
-    if (err) { 
+    if (err) {
       setModalInfo({ tipo: "error", mensaje: err });
-      return; 
+      return;
     }
+
+    // Mismo expediente hoy o en las últimas 12 h → pedir confirmación antes de
+    // guardar. Al editar solo se revisa si cambió el expediente, y se mide
+    // contra la fecha del propio registro, no contra ahora.
+    const cargados = registrosCargados();
+    const original = editingId ? cargados.find(i => i.id === editingId) : undefined;
+    const cambioExpediente = !original || claveExpediente(original.expediente) !== claveExpediente(form.expediente);
+    if (!cambioExpediente) {
+      await guardar();
+      return;
+    }
+    const referencia = (original && fechaDeRegistro(original.creadoEn)) || new Date();
+    const previos = ingresosRepetidos(cargados, form.expediente, referencia, editingId ?? undefined);
+    if (previos.length > 0) {
+      setMotivoReingreso("");
+      setPosiblesDuplicados(previos);
+      return;
+    }
+    await guardar(null);
+  };
+
+  const confirmarReingreso = async () => {
+    const motivo = motivoReingreso.trim();
+    if (!posiblesDuplicados?.[0]?.id || motivo.length < MIN_MOTIVO_REINGRESO) return;
+    const deId = posiblesDuplicados[0].id;
+    setPosiblesDuplicados(null);
+    await guardar({ motivo, deId });
+  };
+
+  // `reingreso`: undefined = no tocar la marca (edición sin cambio de
+  // expediente); null = no es reingreso (al editar se limpia la marca previa);
+  // objeto = reingreso confirmado por el personal.
+  const guardar = async (reingreso?: Reingreso | null) => {
     setGuardando(true);
     try {
       const data: Record<string, unknown> = {
@@ -158,6 +208,15 @@ export default function ControlIngresosPage() {
         ingresoDirectoServicio: form.ingresoDirectoServicio,
       };
       if (form.dui.trim()) data.dui = form.dui.trim();
+      if (reingreso) {
+        data.reingresoMismoDia = true;
+        data.reingresoMotivo = reingreso.motivo;
+        data.reingresoDeId = reingreso.deId;
+      } else if (reingreso === null && editingId) {
+        data.reingresoMismoDia = deleteField();
+        data.reingresoMotivo = deleteField();
+        data.reingresoDeId = deleteField();
+      }
 
       if (editingId) {
         await updateDoc(doc(db, "control_ingresos", editingId), data);
@@ -208,6 +267,19 @@ export default function ControlIngresosPage() {
       day: "2-digit", month: "short", year: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: false,
     });
+  };
+
+  // "hoy a las 08:15" / "ayer a las 23:50" para el aviso de duplicado.
+  const cuandoFue = (ts: unknown) => {
+    const d = fechaDeRegistro(ts);
+    if (!d) return "—";
+    const hora = d.toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const hoy = new Date();
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    if (d.toDateString() === hoy.toDateString()) return `hoy a las ${hora}`;
+    if (d.toDateString() === ayer.toDateString()) return `ayer a las ${hora}`;
+    return formatFecha(ts);
   };
 
   // Fecha (YYYY-MM-DD local) de "ayer", límite inferior de la vista en vivo.
@@ -301,26 +373,31 @@ export default function ControlIngresosPage() {
         Servicio: i.servicio,
         "Tipo de ingreso": i.ingresoDirectoServicio ? "Directo a servicio" : "Triage",
         "Registrado por": i.responsableIngresoNombre ?? "",
+        Reingreso: i.reingresoMismoDia ? "Sí" : "",
+        "Motivo del reingreso": i.reingresoMotivo ?? "",
       }));
       const wsDetalle = XLSX.utils.json_to_sheet(detalle);
       wsDetalle["!cols"] = [
         { wch: 20 }, { wch: 11 }, { wch: 12 }, { wch: 24 }, { wch: 24 },
         { wch: 6 }, { wch: 10 }, { wch: 28 }, { wch: 17 }, { wch: 28 },
+        { wch: 10 }, { wch: 36 },
       ];
       XLSX.utils.book_append_sheet(wb, wsDetalle, "Ingresos");
 
       // Hoja Resumen — totales por servicio, tipo de ingreso y género
       const porServicio = new Map<string, number>();
-      let directos = 0, masculino = 0, femenino = 0;
+      let directos = 0, masculino = 0, femenino = 0, reingresos = 0;
       for (const i of filas) {
         porServicio.set(i.servicio, (porServicio.get(i.servicio) ?? 0) + 1);
         if (i.ingresoDirectoServicio) directos++;
+        if (i.reingresoMismoDia) reingresos++;
         if (i.genero === "masculino") masculino++;
         else if (i.genero === "femenino") femenino++;
       }
       const aoa: (string | number)[][] = [
         [`Control de ingresos del ${desdeRango} al ${hastaRango}`],
         [`Total de ingresos: ${filas.length}`],
+        [`Reingresos confirmados (mismo paciente el mismo día o en menos de 12 h): ${reingresos}`],
         [],
         ["Servicio", "Ingresos"],
         ...Array.from(porServicio.entries()).sort((a, b) => b[1] - a[1]),
@@ -383,6 +460,77 @@ export default function ControlIngresosPage() {
         </div>
       )}
 
+      {posiblesDuplicados && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-200 dark:border-slate-800 dark:bg-slate-900" role="alertdialog" aria-modal="true" aria-labelledby="titulo-posible-duplicado">
+            <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/60 dark:bg-amber-950/40">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-300"><Icon icon={dangerTriangle} width={22} /></div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Posible duplicado</p>
+                <h3 id="titulo-posible-duplicado" className="font-heading text-base font-bold text-slate-900 dark:text-slate-100">
+                  El expediente {form.expediente.trim()} ya tiene un ingreso reciente
+                </h3>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <ul className="space-y-2">
+                {posiblesDuplicados.map(previo => (
+                  <li key={previo.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/70">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">{previo.apellidos}, {previo.nombres}</p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      Registrado {cuandoFue(previo.creadoEn)} · {previo.servicio}
+                      {previo.responsableIngresoNombre && <> · por {previo.responsableIngresoNombre}</>}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Si es el mismo paciente y ya lo registraron, <span className="font-semibold text-slate-800 dark:text-slate-200">cancela</span>.
+                Si el nombre no coincide, revisa el número de expediente. Solo si el paciente de verdad llegó de nuevo, indica el motivo:
+              </p>
+
+              <div>
+                <label htmlFor="motivo-reingreso" className="mb-1.5 block text-xs font-medium text-slate-500">
+                  Motivo del reingreso <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="motivo-reingreso"
+                  type="text"
+                  value={motivoReingreso}
+                  onChange={e => setMotivoReingreso(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); void confirmarReingreso(); } }}
+                  placeholder="Ej: regresó referido de otro hospital"
+                  maxLength={200}
+                  className={inputCls}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setPosiblesDuplicados(null)}
+                  autoFocus
+                  className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmarReingreso()}
+                  disabled={motivoReingreso.trim().length < MIN_MOTIVO_REINGRESO}
+                  className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {editingId ? "Guardar como reingreso" : "Sí, es un nuevo ingreso"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {detalleIngreso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" onClick={() => setDetalleIngreso(null)}>
           <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" role="dialog" aria-modal="true" aria-label="Detalle del ingreso" onClick={e => e.stopPropagation()}>
@@ -415,6 +563,12 @@ export default function ControlIngresosPage() {
                   <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">Registro</dt><dd className="text-right font-medium text-slate-800 dark:text-slate-200">{formatFecha(detalleIngreso.creadoEn)}</dd></div>
                 </dl>
               </section>
+              {detalleIngreso.reingresoMismoDia && (
+                <section className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2.5 sm:col-span-2 dark:border-cyan-900 dark:bg-cyan-950/40">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">Reingreso confirmado</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{detalleIngreso.reingresoMotivo || "Sin motivo registrado"}</p>
+                </section>
+              )}
               <section className="border-t border-slate-100 pt-4 sm:col-span-2 dark:border-slate-800">
                 <p className="text-xs text-slate-500">Registrado por <span className="font-medium text-slate-700 dark:text-slate-300">{detalleIngreso.responsableIngresoNombre || "—"}</span></p>
               </section>
@@ -695,6 +849,9 @@ export default function ControlIngresosPage() {
                     <td className="px-3 py-3 sm:px-4">
                       <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200" title={ingreso.servicio}>{ingreso.servicio}</p>
                       <span className={`mt-1 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${ingreso.ingresoDirectoServicio ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300" : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"}`}>{ingreso.ingresoDirectoServicio ? "Directo" : "Triage"}</span>
+                      {ingreso.reingresoMismoDia && (
+                        <span className="ml-1 mt-1 inline-block rounded-md border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-300" title={ingreso.reingresoMotivo ? `Reingreso: ${ingreso.reingresoMotivo}` : "Reingreso confirmado"}>Reingreso</span>
+                      )}
                     </td>
                     {puedeEditar && (
                       <td className="px-2 py-3 text-right">
