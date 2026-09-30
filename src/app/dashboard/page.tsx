@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, NotificacionFallecido, SolicitudImpresion } from "@/types";
 import { ArrowRightLeft, HeartPulse, Printer, ChevronRight, ChevronLeft, Clock, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { InicioTrabajoSocial } from "@/components/InicioTrabajoSocial";
 
 type RecentItem = {
   id: string;
@@ -55,11 +56,18 @@ function greeting(): string {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  // Trabajo Social tiene su propio inicio (sus pendientes y accesos), no el
+  // panel de ESDOMED; así tampoco dispara los conteos de ESDOMED.
+  if (profile?.role === "trabajo_social") return <InicioTrabajoSocial />;
+  return <PanelEsdomed />;
+}
+
+function PanelEsdomed() {
+  const { profile } = useAuth();
   const router = useRouter();
 
-  // Trabajo Social y DIMES no tienen panel de inicio: ambos van a su única vista.
+  // DIMES no tiene panel de inicio: va a su única vista.
   useEffect(() => {
-    if (profile?.role === "trabajo_social") router.replace("/dashboard/defunciones");
     if (profile?.role === "medico_licenciado_dimes") router.replace("/dashboard/solicitudes-usuarios-sis");
   }, [profile, router]);
 

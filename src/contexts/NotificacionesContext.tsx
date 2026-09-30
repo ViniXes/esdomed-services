@@ -30,7 +30,7 @@ export interface NotifToast {
   mensaje: string;
 }
 
-interface Pendientes {
+export interface Pendientes {
   fallecidos: number;
   traslados: number;
   trasladosExternos: number;

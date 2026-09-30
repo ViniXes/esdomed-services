@@ -2,47 +2,13 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Ambulance,
-  ArrowRightLeft,
-  Activity,
-  BarChart3,
-  BedDouble,
-  Building2,
-  ClipboardCheck,
-  ClipboardList,
-  FileClock,
-  FileText,
-  HeartPulse,
-  History,
-  LayoutDashboard,
-  LayoutGrid,
-  ListChecks,
-  LogIn,
-  Phone,
-  PhoneCall,
-  Printer,
-  Radar,
-  Settings,
-  ShieldAlert,
-  Syringe,
-  Table2,
-  TrendingUp,
-  Users,
-  CalendarClock,
-  CalendarRange,
-  NotebookPen,
-  UserCheck,
-  UserSearch,
-  UsersRound,
-  FileCode2,
-} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionesProvider, useNotificaciones } from "@/contexts/NotificacionesContext";
-import { Sidebar, type NavItem } from "@/components/Sidebar";
+import { Sidebar } from "@/components/Sidebar";
 import { ToastContainer } from "@/components/ui/ToastContainer";
-import { esJefeCuidadosCriticos, puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
+import { esJefeCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
+import { navItemsEsdomed } from "@/lib/navEsdomed";
 import { navItemsTrabajoSocial } from "@/lib/navTrabajoSocial";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -86,215 +52,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           ? "Médico/Licenciado DIMES"
         : "ESDOMED";
 
-  const esTS = profile?.role === "trabajo_social";
-  // El auxiliar administrativo ESDOMED comparte los mismos permisos operativos que ESDOMED.
-  const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed";
-  const esAsistente = profile?.role === "asistente_esdomed";
   const esAdmin = profile?.role === "admin";
-  // DIMES entra únicamente a la bandeja SIS y siempre en modo consulta.
-  const esDimes = profile?.role === "medico_licenciado_dimes";
-  const verControlIngresos = esEsdomed || esAdmin;
-  const verPacientes       = esEsdomed || esAdmin;
-  const verIncapacidades   = esEsdomed || esAdmin;
-  const verAltasVivos = esEsdomed || esAdmin;
-  const verConfiguracion = esAdmin;
-  const verUsuarios = esAdmin;
-  const verBusquedaTelefono = esAdmin;
-  const verCuidadosCriticos = puedeVerModuloCuidadosCriticos(profile);
-  const verReportes = esEsdomed || esAdmin;
-  // SIMMOW, a diferencia del resto de módulos ESDOMED de arriba, es solo para
-  // el rol esdomed puntual + admin — NO para asistente_esdomed (pedido
-  // explícito del usuario, no sigue el agrupamiento esEsdomed habitual).
-  const verSimmow = profile?.role === "esdomed" || esAdmin;
-  const verHorario = esEsdomed || esAdmin;
-  // Aprobación de trámites (ver lo subido por todos): superusuario + auxiliar administrativo.
-  const verAprobacionTramites = esAdmin || esAsistente;
-  const verProductividad = esEsdomed || esAdmin;
-  // Avisos CONAPINA/FGR del Comité de Lesiones: ESDOMED solo los consulta.
-  const verAvisosLesiones = esEsdomed || esAdmin;
 
-  // Grupos del menú — operaciones relacionadas se muestran juntas bajo un encabezado.
-  const G_PACIENTES = "Gestión de pacientes";
-  const G_MEDICINA_CRITICA = "Medicina crítica";
-  const G_LESIONES = "Lesiones intencionales";
-  const G_TRABAJO_SOCIAL = "Trabajo Social";
-  const G_DOCUMENTOS = "Documentos";
-  const G_REPORTES = "Reportes";
-  const G_PERSONAL = "Mi área";
-  const G_ADMIN = "Administración";
-
-  // Trabajo Social tiene su menú completo en navTrabajoSocial: lo comparte con
-  // el layout de /comite-lesiones, donde apoya el trámite del Comité de
-  // Lesiones, para que el cruce entre áreas sea transparente. No usa el inicio
-  // (panel de ESDOMED); entra directo a sus vistas.
-  const navItems: NavItem[] = esDimes
-    ? [{ href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN, exact: true }]
-    : esTS
-    ? navItemsTrabajoSocial(pendientes)
-    : [
-    ...(!esJefeMedicinaCritica
-      ? [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }]
-      : []),
-
-    // ── Gestión de pacientes ──
-    ...(esEsdomed || esAdmin
-      ? [{ href: "/dashboard/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, group: G_PACIENTES }]
-      : []),
-    ...(verControlIngresos
-      ? [{ href: "/dashboard/control-ingresos", label: "Control ingresos", icon: FileText, group: G_PACIENTES }]
-      : []),
-    ...(verPacientes
-      ? [{ href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble, group: G_PACIENTES }]
-      : []),
-    ...(verPacientes
-      ? [{
-          href: "/dashboard/emergencia",
-          label: "Atendidos en emergencia",
-          icon: Ambulance,
-          group: G_PACIENTES,
-          children: [
-            { href: "/dashboard/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
-          ],
-        }]
-      : []),
-    ...(verPacientes
-      ? [{ href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe, group: G_PACIENTES }]
-      : []),
-    ...((esAdmin || esJefeMedicinaCritica)
-      ? [{ href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, group: G_MEDICINA_CRITICA }]
-      : []),
-    ...(verCuidadosCriticos
-      ? [{ href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: Activity, badge: pendientes.cuidadosCriticosEliminacion, group: G_MEDICINA_CRITICA, exact: true }]
-      : []),
-    ...(verCuidadosCriticos
-      ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, group: G_MEDICINA_CRITICA }]
-      : []),
-    ...(verBusquedaTelefono
-      ? [{ href: "/dashboard/busqueda-telefono", label: "Busqueda telefono", icon: Phone, group: G_PACIENTES }]
-      : []),
-    {
-      href: "/dashboard/traslados",
-      label: "Traslados",
-      icon: ArrowRightLeft,
-      badge: pendientes.traslados,
-      group: G_PACIENTES,
-    },
-    {
-      href: "/dashboard/traslados-externos",
-      label: "Traslado a otro hospital",
-      icon: Building2,
-      badge: pendientes.trasladosExternos,
-      group: G_PACIENTES,
-    },
-    ...(verAltasVivos
-      ? [{
-          href: "/dashboard/altas-vivos",
-          label: "Verificación de Altas",
-          icon: LogIn,
-          badge: pendientes.altas,
-          group: G_PACIENTES,
-        }]
-      : []),
-    {
-      href: "/dashboard/fallecidos",
-      label: "Fallecidos",
-      icon: HeartPulse,
-      tone: "rose" as const,
-      badge: pendientes.fallecidos,
-      group: G_PACIENTES,
-    },
-
-    // ── Lesiones intencionales ── consulta de solo lectura (sin globo: ESDOMED
-    // no recibe los casos, los recibe el comité).
-    ...(verAvisosLesiones
-      ? [{ href: "/dashboard/conapina-fgr", label: "Avisos CONAPINA / FGR", icon: ShieldAlert, group: G_LESIONES }]
-      : []),
-
-    // ── Trabajo Social ── el admin ve las vistas de gestiones (el menú de TS
-    // propiamente dicho vive en navTrabajoSocial).
-    ...(esAdmin
-      ? [
-          { href: "/dashboard/gestiones/asignaciones", label: "Asignaciones", icon: UserCheck, group: G_TRABAJO_SOCIAL },
-          { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar, group: G_TRABAJO_SOCIAL },
-          { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento", icon: ListChecks, group: G_TRABAJO_SOCIAL },
-          { href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen, group: G_TRABAJO_SOCIAL, exact: true },
-          { href: "/dashboard/gestiones/productividad", label: "Productividad", icon: BarChart3, group: G_TRABAJO_SOCIAL },
-          { href: "/dashboard/gestiones/bitacora", label: "Bitácora", icon: FileClock, group: G_TRABAJO_SOCIAL },
-        ]
-      : []),
-
-    // ── Documentos ──
-    { href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, badge: pendientes.impresiones, group: G_DOCUMENTOS },
-    ...(verIncapacidades
-      ? [
-          {
-            href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, badge: pendientes.incapacidades, group: G_DOCUMENTOS,
-            // Reposición: constancias de egresos anteriores a la app, cargadas del FIEH y asignadas a un médico.
-            children: [{ href: "/dashboard/incapacidades/reposicion", label: "Reposición de incapacidad", icon: FileClock }],
-          },
-          { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, badge: pendientes.anexo5, group: G_DOCUMENTOS },
-        ]
-      : []),
-    ...(verSimmow
-      ? [{ href: "/dashboard/simmow", label: "SIMMOW", icon: FileCode2, badge: pendientes.simmowReportes, group: G_DOCUMENTOS }]
-      : []),
-
-    // ── Reportes ──
-    ...(verReportes
-      ? [
-          { href: "/dashboard/reportes", label: "Reportería de egresos", icon: BarChart3, group: G_REPORTES, exact: true },
-          { href: "/dashboard/reportes/tabuladores", label: "Tabuladores", icon: Table2, group: G_REPORTES },
-          { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid, group: G_REPORTES },
-          { href: "/dashboard/reportes/traslados", label: "Traslados de cama", icon: ArrowRightLeft, group: G_REPORTES },
-        ]
-      : []),
-
-    // ── Mi área (horarios) ──
-    ...(verHorario
-      ? [
-          { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, group: G_PERSONAL },
-          { href: "/dashboard/personal", label: "Personal de trabajo", icon: UsersRound, group: G_PERSONAL },
-          { href: "/horarios", label: "Horarios por área", icon: CalendarRange, group: G_PERSONAL },
-          { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList, group: G_PERSONAL },
-          { href: "/dashboard/directorio-extensiones", label: "Directorio de extensiones", icon: PhoneCall, group: G_PERSONAL }
-        ]
-      : []),
-
-    // ── Administración ──
-    ...(verUsuarios
-      ? [
-          { href: "/dashboard/usuarios", label: "Usuarios", icon: Users, group: G_ADMIN },
-          { href: "/dashboard/registros-medicos", label: "Registros de médicos", icon: ClipboardList, group: G_ADMIN },
-          { href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN },
-        ]
-      : []),
-    ...(esAsistente
-      ? [{ href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: ClipboardCheck, badge: pendientes.solicitudesSis, group: G_ADMIN }]
-      : []),
-    ...(verAprobacionTramites
-      ? [{ href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck, group: G_ADMIN }]
-      : []),
-    ...(verConfiguracion
-      ? [
-          { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, group: G_ADMIN },
-          { href: "/dashboard/historial-busquedas", label: "Historial busquedas", icon: History, group: G_ADMIN },
-          { href: "/dashboard/historial-consultas", label: "Historial consultas", icon: UserSearch, group: G_ADMIN },
-        ]
-      : []),
-    ...(verProductividad
-      ? [{ href: "/dashboard/productividad/esdomed", label: "Productividad", icon: TrendingUp, group: G_ADMIN, exact: true }]
-      : []),
-    ...(esAdmin
-      ? [{ href: "/dashboard/productividad/administracion", label: "Productividad administrativa", icon: TrendingUp, group: G_ADMIN }]
-      : []),
-  ];
+  // Los menús viven en el registro de navegación (lib/navRegistro): el de
+  // ESDOMED/admin/DIMES/jefe UCI en navEsdomed, y el de Trabajo Social en
+  // navTrabajoSocial, que lo comparte con el layout de /comite-lesiones para
+  // que el cruce entre áreas sea transparente. El Inicio (/dashboard) le
+  // muestra a TS su propio panel, no el de ESDOMED.
+  const navItems = profile?.role === "trabajo_social"
+    ? navItemsTrabajoSocial(profile, pendientes)
+    : navItemsEsdomed(profile, pendientes);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
       <Sidebar
         navItems={navItems}
         roleLabel={roleLabel}
-        collapseGroupsInitially={esAdmin}
+        variant="portal"
         allowDesktopPanelCollapse={esAdmin}
       />
       <main className="flex-1 overflow-y-auto pt-mobile-bar md:pt-0 bg-slate-50 dark:bg-[var(--color-institutional-dark)]">

@@ -19,11 +19,11 @@ function PsicologiaContent({ children }: { children: React.ReactNode }) {
 
   // El menú (propio + vistas del Comité de Lesiones, salvo Reportes) vive en
   // navPsicologia para que el layout de /comite-lesiones muestre el mismo.
-  const navItems = navItemsPsicologia(pendientes);
+  const navItems = navItemsPsicologia(profile, pendientes);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
-      <Sidebar navItems={navItems} roleLabel="Psicología" />
+      <Sidebar navItems={navItems} roleLabel="Psicología" variant="portal" />
       <main className="flex-1 overflow-y-auto pt-mobile-bar md:pt-0 bg-slate-50 dark:bg-[var(--color-institutional-dark)]">
         {loading || !profile ? (
           <div className="flex items-center justify-center h-full">

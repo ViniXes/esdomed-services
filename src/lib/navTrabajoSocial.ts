@@ -1,52 +1,69 @@
 import {
-  Activity, BarChart3, CheckCheck, ClipboardCheck, DoorOpen, FileClock, HeartPulse,
-  Inbox, ListChecks, LogIn, Megaphone, NotebookPen, Radar, ShieldAlert, UserCheck, UserSearch,
+  BarChart3, CheckCheck, ClipboardCheck, Contact, DoorOpen, FileClock, HandHeart, HeartCrack, HeartPulse,
+  Inbox, LayoutDashboard, ListChecks, LogIn, NotebookPen, Radar, UserCheck, UserSearch, UsersRound,
 } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
+import type { Pendientes } from "@/contexts/NotificacionesContext";
+import type { UserProfile } from "@/types";
+import { construirMenu, type SeccionNav } from "@/lib/navRegistro";
+import { SECCION_LESIONES } from "@/lib/navComiteLesiones";
 
-interface BadgesTrabajoSocial {
-  fallecidos: number;
-  altas: number;
-  conapina: number;
-}
+// Menú de Trabajo Social por tarea, en acordeón como el portal médico. Las
+// gestiones del día van primero; las altas juntan la prealta y confirmación
+// propias de TS con la verificación de ESDOMED.
+const MENU_TRABAJO_SOCIAL: SeccionNav[] = [
+  {
+    // /dashboard muestra a TS su propio inicio (no el panel de ESDOMED).
+    entradas: [{ href: "/dashboard", label: "Inicio", icon: LayoutDashboard, exact: true }],
+  },
+  {
+    titulo: "Gestiones",
+    icon: HandHeart,
+    entradas: [
+      { href: "/dashboard/gestiones/asignaciones", label: "Asignaciones", icon: UserCheck },
+      { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar },
+      { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento", icon: ListChecks },
+      { href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen },
+      { href: "/dashboard/gestiones/productividad", label: "Productividad", icon: BarChart3 },
+    ],
+  },
+  {
+    titulo: "Altas",
+    icon: DoorOpen,
+    entradas: [
+      { href: "/dashboard/notificacion-altas", label: "Notificación de Prealta", icon: ClipboardCheck },
+      { href: "/dashboard/confirmacion-alta", label: "Confirmación de Alta", icon: CheckCheck },
+      { href: "/dashboard/altas-vivos", label: "Verificación de Altas", icon: LogIn, globo: "altas" },
+    ],
+  },
+  {
+    titulo: "Defunciones",
+    icon: HeartCrack,
+    tone: "rose",
+    entradas: [
+      // TS usa la vista de revisión (estilo Psicología), no la de ESDOMED.
+      { href: "/dashboard/defunciones", label: "Fallecidos", icon: HeartPulse, tone: "rose", globo: "fallecidos" },
+      { href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox },
+    ],
+  },
+  {
+    titulo: "Pacientes",
+    icon: Contact,
+    entradas: [
+      { href: "/dashboard/buscar-paciente", label: "Buscar paciente", icon: UserSearch },
+      { href: "/dashboard/gestiones/bitacora", label: "Bitácora del paciente", icon: FileClock },
+      { href: "/dashboard/visitas", label: "Visitas", icon: UsersRound },
+    ],
+  },
+  // Avisos, ingresos por lesión y solicitudes a médicos (el resto lo filtra la
+  // propia entrada).
+  SECCION_LESIONES,
+];
 
 // Menú de Trabajo Social, compartido entre el layout de /dashboard y el del
-// Comité de Lesiones: Trabajo Social apoya ese trámite y usa las mismas vistas
-// de /comite-lesiones (avisos, ingresos por lesión y solicitudes a médicos —
-// NO ingresos adolescentes ni reportes, que siguen siendo del comité). Al
-// mostrar ambas áreas el mismo menú, cruzar de una a otra es transparente.
-// Mismo patrón que navPsicologia.
-export function navItemsTrabajoSocial(pendientes: BadgesTrabajoSocial): NavItem[] {
-  const G_PROCESOS_ESDOMED = "Procesos con ESDOMED";
-  const G_GESTIONES_ALTAS = "Gestiones de Altas";
-  const G_TRABAJO_SOCIAL = "Trabajo Social";
-  const G_LESIONES = "Lesiones intencionales";
-
-  return [
-    // ── Procesos con ESDOMED ── flujos de TS que dependen de o responden a ESDOMED.
-    { href: "/dashboard/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, group: G_PROCESOS_ESDOMED },
-    // TS usa la vista de revisión (estilo Psicología), no la de ESDOMED.
-    { href: "/dashboard/defunciones", label: "Defunciones", icon: HeartPulse, tone: "rose", badge: pendientes.fallecidos, group: G_PROCESOS_ESDOMED },
-    { href: "/dashboard/recepciones", label: "Recepciones", icon: Inbox, group: G_PROCESOS_ESDOMED },
-    { href: "/dashboard/altas-vivos", label: "Verificación de Altas", icon: LogIn, badge: pendientes.altas, group: G_PROCESOS_ESDOMED },
-
-    // ── Gestiones de Altas ── Notificación + Confirmación.
-    { href: "/dashboard/notificacion-altas", label: "Notificación de Prealta", icon: ClipboardCheck, group: G_GESTIONES_ALTAS },
-    { href: "/dashboard/confirmacion-alta", label: "Confirmación de Alta", icon: CheckCheck, group: G_GESTIONES_ALTAS },
-
-    // ── Trabajo Social ── cada flujo con entrada propia.
-    { href: "/dashboard/gestiones/asignaciones", label: "Asignaciones", icon: UserCheck, group: G_TRABAJO_SOCIAL },
-    { href: "/dashboard/gestiones/rastreo", label: "Rastreo", icon: Radar, group: G_TRABAJO_SOCIAL },
-    { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento", icon: ListChecks, group: G_TRABAJO_SOCIAL },
-    // exact: /dashboard/gestiones es prefijo de las demás rutas del grupo.
-    { href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen, group: G_TRABAJO_SOCIAL, exact: true },
-    { href: "/dashboard/gestiones/productividad", label: "Productividad", icon: BarChart3, group: G_TRABAJO_SOCIAL },
-    { href: "/dashboard/gestiones/bitacora", label: "Bitácora", icon: FileClock, group: G_TRABAJO_SOCIAL },
-    { href: "/dashboard/visitas", label: "Visitas", icon: DoorOpen, group: G_TRABAJO_SOCIAL },
-
-    // ── Lesiones intencionales ── vistas del Comité de Lesiones que TS apoya.
-    { href: "/comite-lesiones/conapina-fgr", label: "Avisos CONAPINA / FGR", icon: ShieldAlert, badge: pendientes.conapina, group: G_LESIONES },
-    { href: "/comite-lesiones/lesiones-ingresos", label: "Ingresos por lesión", icon: Activity, group: G_LESIONES },
-    { href: "/comite-lesiones/solicitudes", label: "Avisos pendientes a notificar / Solicitudes al área médica", icon: Megaphone, group: G_LESIONES },
-  ];
+// Comité de Lesiones: TS apoya ese trámite y usa las mismas vistas de
+// /comite-lesiones. Al mostrar ambas áreas el mismo menú, cruzar de una a otra
+// es transparente. Mismo patrón que navPsicologia.
+export function navItemsTrabajoSocial(profile: UserProfile | null | undefined, pendientes: Pendientes): NavItem[] {
+  return construirMenu(MENU_TRABAJO_SOCIAL, profile, pendientes);
 }

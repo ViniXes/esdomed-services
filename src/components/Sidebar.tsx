@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useId, useRef, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon, KeyRound, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, Info } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, LockKeyhole, ChevronDown, Folder, PanelLeftClose, PanelLeftOpen, Info } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -19,23 +19,27 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Tono de icono usado en la variante médica. */
-  tone?: "blue" | "indigo" | "cyan" | "teal" | "emerald" | "rose" | "violet" | "amber";
+  /** Único tono con significado: rose en Fallecidos/Defunciones. Sin tono, azul institucional. */
+  tone?: "rose";
   exact?: boolean;
   badge?: number;
   /** Encabezado de sección. Los ítems consecutivos con el mismo grupo se muestran juntos. */
   group?: string;
-  /** Sub-ítems que se despliegan (submenú) al expandir este ítem. */
-  children?: NavItem[];
+  /** Ícono del botón padre del grupo en modo acordeón (se toma del primer ítem del grupo). */
+  groupIcon?: LucideIcon;
+  /** Tono del ícono del botón padre; solo rose (grupo de defunciones). */
+  groupTone?: "rose";
 }
 
 interface SidebarProps {
   navItems: NavItem[];
   roleLabel: string;
-  /** Estilo visual reservado para la navegación del portal médico. */
-  variant?: "default" | "medical";
-  /** Para perfiles con menús extensos, inicia todas las secciones cerradas. */
-  collapseGroupsInitially?: boolean;
+  /**
+   * Menú en acordeón: portales de área (médico, Psicología, Trabajo Social) y
+   * dashboard de ESDOMED/admin. `default` queda para los módulos que aún no se
+   * migran al registro (enfermería, RRHH, transporte, ISBM, horarios, comité).
+   */
+  variant?: "default" | "portal";
   /** Habilita el control de escritorio para ocultar el panel lateral. */
   allowDesktopPanelCollapse?: boolean;
 }
@@ -43,6 +47,7 @@ interface SidebarProps {
 interface SidebarBodyProps extends SidebarProps {
   dark: boolean;
   profile: UserProfile | null;
+  activeHref: string | null;
   isActive: (item: NavItem) => boolean;
   isGroupCollapsed: (group: string) => boolean;
   toggleGroup: (group: string) => void;
@@ -67,16 +72,30 @@ const ACTIVE_CLS =
   "bg-blue-50 text-blue-900 ring-1 ring-cyan-600/35 shadow-sm shadow-blue-100 dark:bg-blue-900 dark:text-white dark:ring-cyan-400/40 dark:shadow-cyan-950/30";
 const IDLE_CLS =
   "text-slate-600 dark:text-slate-300 hover:bg-blue-50/70 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white";
-const MEDICAL_ICON_TONE: Record<NonNullable<NavItem["tone"]>, string> = {
-  blue: "text-blue-500 group-hover:text-blue-600 dark:text-blue-300",
-  indigo: "text-indigo-500 group-hover:text-indigo-600 dark:text-indigo-300",
-  cyan: "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-300",
-  teal: "text-teal-600 group-hover:text-teal-700 dark:text-teal-300",
-  emerald: "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300",
-  rose: "text-rose-500 group-hover:text-rose-600 dark:text-rose-300",
-  violet: "text-violet-500 group-hover:text-violet-600 dark:text-violet-300",
-  amber: "text-amber-600 group-hover:text-amber-700 dark:text-amber-300",
-};
+
+// Rose conserva su significado aun activo; el resto es azul institucional.
+function iconCls(item: NavItem, active: boolean) {
+  if (item.tone === "rose") return "text-rose-500 group-hover:text-rose-600 dark:text-rose-300";
+  return active
+    ? "text-blue-600 dark:text-cyan-300"
+    : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300";
+}
+
+/**
+ * Un solo ítem activo por ruta: gana el href más específico que calce. Así
+ * /medico/censos/referidos marca Censos (no Inicio ni nada) y dos ítems que
+ * comparten prefijo nunca se resaltan a la vez.
+ */
+function itemActivo(items: NavItem[], pathname: string): NavItem | null {
+  let activo: NavItem | null = null;
+  for (const item of items) {
+    const calza = item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(item.href + "/");
+    if (calza && (!activo || item.href.length > activo.href.length)) activo = item;
+  }
+  return activo;
+}
 
 function NavLink({
   item, active, onNavigate, nested = false, variant = "default",
@@ -88,102 +107,133 @@ function NavLink({
   variant?: SidebarProps["variant"];
 }) {
   const { href, label, icon: Icon, badge } = item;
-  const medical = variant === "medical";
-  const activeClass = medical
+  const portal = variant === "portal";
+  // Hijo del acordeón: ícono y márgenes un poco más compactos para que
+  // los nombres largos quepan en una línea pese a la sangría.
+  const hijoAcordeon = portal && nested;
+  const activeClass = portal
     ? "bg-gradient-to-r from-cyan-50/80 to-blue-50/70 text-blue-700 ring-1 ring-blue-100/90 dark:from-cyan-950/55 dark:to-blue-950/40 dark:text-cyan-50 dark:ring-cyan-800/70"
     : ACTIVE_CLS;
-  const idleClass = medical
+  const idleClass = portal
     ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
     : IDLE_CLS;
   return (
     <Link prefetch={false}
       href={href}
       onClick={onNavigate}
-      className={`group relative flex items-center gap-3 rounded-xl font-medium transition-all duration-150 ${
-        nested ? "px-3 py-2 text-[13px]" : "px-3 py-2.5 text-sm"
+      aria-current={active ? "page" : undefined}
+      className={`group relative flex items-center rounded-xl transition-all duration-150 ${
+        hijoAcordeon
+          ? "min-h-11 gap-2.5 px-2.5 py-2 text-[13px] font-medium"
+          : nested
+          ? "gap-3 px-3 py-2 text-[13px] font-medium"
+          // En el acordeón, un ítem suelto (Inicio) está al nivel de los
+          // botones padre y lleva su mismo peso.
+          : portal ? "gap-3 px-3 py-2 text-sm font-semibold" : "gap-3 px-3 py-2.5 text-sm font-medium"
       } ${active ? activeClass : idleClass}`}
     >
-      {medical && active && <span className="absolute left-0 h-5 w-0.5 rounded-r-full bg-cyan-600 dark:bg-cyan-400" />}
-      <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
-        medical && active
-          ? "text-blue-600 dark:text-cyan-300"
-          : medical
-            ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
-            : item.tone
-              // La variante normal también respeta el tono explícito (p. ej.
-              // rose en Fallecidos/Defunciones); sin tono, azul institucional.
-              ? MEDICAL_ICON_TONE[item.tone]
-              : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
-      }`}>
+      {/* Dentro de un grupo, la marca del activo cae sobre la línea guía. */}
+      {portal && active && <span className={`absolute h-5 w-0.5 rounded-full bg-cyan-600 dark:bg-cyan-400 ${nested ? "left-[calc(-0.5rem-1.5px)]" : "left-0"}`} />}
+      <span className={`flex flex-shrink-0 items-center justify-center rounded-lg transition-colors ${hijoAcordeon ? "h-6 w-6" : "h-7 w-7"} ${iconCls(item, active)}`}>
         <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} />
       </span>
-      <span className="flex-1">{label}</span>
+      <span className={`flex-1 ${hijoAcordeon ? "leading-snug" : ""}`}>{label}</span>
       <Badge count={badge ?? 0} />
-      {medical && active && <ChevronRight size={15} strokeWidth={2.25} className="flex-shrink-0 text-blue-500" />}
     </Link>
   );
 }
 
-/** Ítem con submenú: navega a su propia ruta y despliega los hijos con la flecha. */
-function NavExpandable({
-  item, isActive, onNavigate, variant = "default",
+/**
+ * Lleva `el` al área visible del <nav> moviendo solo su scroll propio (nunca la
+ * página). Si no cabe entero, lo alinea arriba. En un panel oculto
+ * (display:none) las medidas son 0 y no hace nada.
+ */
+function asegurarVisible(nav: HTMLElement | null, el: Element | null | undefined) {
+  if (!nav || !el) return;
+  const n = nav.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  let delta = 0;
+  if (r.top < n.top || r.height > n.height) delta = r.top - n.top - 8;
+  else if (r.bottom > n.bottom) delta = r.bottom - n.bottom + 8;
+  if (!delta) return;
+  const suave = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  nav.scrollTo({ top: nav.scrollTop + delta, behavior: suave ? "smooth" : "auto" });
+}
+
+// Duración del despliegue del acordeón; el scroll espera a que termine.
+const ACORDEON_MS = 200;
+
+/**
+ * Grupo del acordeón de los portales: botón padre de ancho completo (mismo tamaño que
+ * un ítem) y sus hijos desplegables debajo, colgados de una línea guía.
+ */
+function GrupoAcordeon({
+  group, items, abierto, onToggle, isActive, onNavigate, variant,
 }: {
-  item: NavItem;
+  group: string;
+  items: NavItem[];
+  abierto: boolean;
+  onToggle: () => void;
   isActive: (item: NavItem) => boolean;
   onNavigate?: () => void;
   variant?: SidebarProps["variant"];
 }) {
-  const { href, label, icon: Icon, children = [] } = item;
-  const childActive = children.some(isActive);
-  const active = isActive(item) || childActive;
-  // null = sigue el estado de la ruta (abierto si un hijo está activo); luego respeta
-  // la preferencia manual del usuario. Sin efectos para no romper la regla de lint.
-  const [openManual, setOpenManual] = useState<boolean | null>(null);
-  const open = openManual ?? childActive;
-  const medical = variant === "medical";
-  const activeClass = medical
-    ? "bg-gradient-to-r from-cyan-50/80 to-blue-50/70 text-blue-700 ring-1 ring-blue-100/90 dark:from-cyan-950/55 dark:to-blue-950/40 dark:text-cyan-50 dark:ring-cyan-800/70"
-    : ACTIVE_CLS;
-  const idleClass = medical
-    ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
-    : IDLE_CLS;
+  const panelId = useId();
+  const Icon = items[0]?.groupIcon ?? Folder;
+  const contieneActivo = items.some(isActive);
+  const globo = items.reduce((s, i) => s + (i.badge ?? 0), 0);
 
   return (
-    <div>
-      <div className={`group relative flex items-center rounded-xl transition-all duration-150 ${active ? activeClass : idleClass}`}>
-        {medical && active && <span className="absolute left-0 h-5 w-0.5 rounded-r-full bg-cyan-600 dark:bg-cyan-400" />}
-        <Link prefetch={false} href={href} onClick={onNavigate} className="flex items-center gap-3 pl-3 pr-1 py-2.5 text-sm font-medium flex-1 min-w-0">
-          <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
-            medical && active
-              ? "text-blue-600 dark:text-cyan-300"
-              : medical
-                ? MEDICAL_ICON_TONE[item.tone ?? "cyan"]
-                : item.tone
-                  ? MEDICAL_ICON_TONE[item.tone]
-                  : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
-          }`}>
-            <Icon size={16} strokeWidth={active ? 2.5 : 2} />
-          </span>
-          <span className="flex-1 truncate">{label}</span>
-          <Badge count={item.badge ?? 0} />
-        </Link>
-        <button
-          type="button"
-          onClick={() => setOpenManual(!open)}
-          aria-expanded={open}
-          aria-label={open ? "Contraer submenú" : "Expandir submenú"}
-          className="px-2 self-stretch flex items-center text-current/70 hover:text-current"
-        >
-          <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "" : "-rotate-90"}`} />
-        </button>
-      </div>
-      {open && (
-        <div className="mt-0.5 ml-5 pl-2 border-l border-slate-200 dark:border-cyan-800/40 space-y-0.5">
-          {children.map((c) => (
-            <NavLink key={c.href} item={c} active={isActive(c)} onNavigate={onNavigate} nested variant={variant} />
-          ))}
+    <div data-grupo={group}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={abierto}
+        aria-controls={panelId}
+        className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors duration-150 ${
+          abierto
+            ? "bg-slate-100/80 text-slate-900 dark:bg-slate-800/70 dark:text-white"
+            // Cerrado pero con la página actual adentro: el padre la delata.
+            : contieneActivo
+              ? "text-blue-700 hover:bg-slate-50 dark:text-cyan-200 dark:hover:bg-slate-800/80"
+              : "text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/80 dark:hover:text-white"
+        }`}
+      >
+        <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
+          items[0]?.groupTone === "rose"
+            ? "text-rose-500 group-hover:text-rose-600 dark:text-rose-300"
+            : contieneActivo ? "text-blue-600 dark:text-cyan-300" : "text-blue-500 group-hover:text-blue-700 dark:text-cyan-300"
+        }`}>
+          <Icon size={16} strokeWidth={contieneActivo ? 2.5 : 2} />
+        </span>
+        <span className="flex-1">{group}</span>
+        {/* Globo y flecha en un bloque compacto: deja más ancho al nombre del
+            grupo ("Lesiones intencionales" con globo cabe en una línea). */}
+        <span className="flex flex-shrink-0 items-center gap-1.5">
+          {/* Cerrado, el padre resume los globos de sus hijos. */}
+          {!abierto && <Badge count={globo} />}
+          <ChevronDown
+            size={15}
+            aria-hidden
+            className={`text-slate-400 transition-transform duration-200 ease-out motion-reduce:transition-none dark:text-slate-500 ${abierto ? "" : "-rotate-90"}`}
+          />
+        </span>
+      </button>
+      {/* grid-rows 0fr↔1fr anima la altura sin medirla; inert saca a los hijos
+          ocultos del tabulador y del lector de pantalla. */}
+      <div
+        id={panelId}
+        inert={!abierto}
+        className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${abierto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="ml-[1.625rem] mt-0.5 mb-1 space-y-0.5 border-l border-slate-200 pl-2 dark:border-slate-800">
+            {items.map((item) => (
+              <NavLink key={item.href} item={item} active={isActive(item)} onNavigate={onNavigate} nested variant={variant} />
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -194,6 +244,7 @@ function SidebarBody({
   profile,
   dark,
   toggle,
+  activeHref,
   isActive,
   isGroupCollapsed,
   toggleGroup,
@@ -204,30 +255,53 @@ function SidebarBody({
   onCollapseDesktopPanel,
   variant,
 }: SidebarBodyProps) {
-  const medical = variant === "medical";
-  const medicalFooterAction = medical
+  const portal = variant === "portal";
+  const portalFooterAction = portal
     ? "text-slate-500 hover:bg-cyan-50 hover:text-cyan-700 dark:text-slate-400 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-200"
     : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-blue-50/70 dark:hover:bg-slate-800/80";
   const renderItem = (item: NavItem) =>
-    item.children?.length
-      ? <NavExpandable key={item.href} item={item} isActive={isActive} onNavigate={onNavigate} variant={variant} />
-      : <NavLink key={item.href} item={item} active={isActive(item)} onNavigate={onNavigate} variant={variant} />;
+    <NavLink key={item.href} item={item} active={isActive(item)} onNavigate={onNavigate} variant={variant} />;
 
   // Ítems sin grupo (p. ej. Inicio) arriba; el resto agrupado por sección colapsable.
   const sinGrupo = navItems.filter((i) => !i.group);
   const grupos: string[] = [];
   for (const i of navItems) if (i.group && !grupos.includes(i.group)) grupos.push(i.group);
 
+  // Variant portal: los grupos se pintan como acordeón (un solo grupo abierto).
+  const acordeon = portal;
+
+  // Al cambiar de ruta, el ítem activo entra al área visible del menú (tras
+  // el despliegue de su grupo, si se abrió).
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => asegurarVisible(navRef.current, navRef.current?.querySelector('[aria-current="page"]')),
+      ACORDEON_MS + 20,
+    );
+    return () => window.clearTimeout(t);
+  }, [activeHref]);
+
+  // Al abrir un grupo (sobre todo los de abajo), sus hijos quedan a la vista.
+  const alternarGrupo = (group: string) => {
+    const abriendo = isGroupCollapsed(group);
+    toggleGroup(group);
+    if (!abriendo) return;
+    window.setTimeout(
+      () => asegurarVisible(navRef.current, navRef.current?.querySelector(`[data-grupo="${CSS.escape(group)}"]`)),
+      ACORDEON_MS + 20,
+    );
+  };
+
   return (
-    <div className={`flex h-full flex-col border-r text-slate-700 dark:text-white ${medical ? "border-slate-200 bg-white dark:border-cyan-950 dark:bg-slate-950" : "border-slate-200 bg-white dark:border-cyan-900/40 dark:bg-[var(--color-institutional-dark)]"}`}>
-      <div className={`flex flex-col items-center gap-3 border-b px-4 pt-5 pb-4 ${medical ? "border-blue-100 bg-gradient-to-b from-white to-cyan-50/45 dark:border-cyan-950 dark:from-slate-950 dark:to-cyan-950/25" : "border-slate-200 dark:border-cyan-900/40"}`}>
-        <div className={`${medical ? "h-16" : "h-20"} flex items-center justify-center`}>
+    <div className={`flex h-full flex-col border-r text-slate-700 dark:text-white ${portal ? "border-slate-200 bg-white dark:border-cyan-950 dark:bg-slate-950" : "border-slate-200 bg-white dark:border-cyan-900/40 dark:bg-[var(--color-institutional-dark)]"}`}>
+      <div className={`flex flex-col items-center gap-3 border-b px-4 pt-5 pb-4 ${portal ? "border-blue-100 bg-gradient-to-b from-white to-cyan-50/45 dark:border-cyan-950 dark:from-slate-950 dark:to-cyan-950/25" : "border-slate-200 dark:border-cyan-900/40"}`}>
+        <div className={`${portal ? "h-16" : "h-20"} flex items-center justify-center`}>
           <Image
             src={SIDEBAR_LOGO_LIGHT_SRC}
             alt="Hospital Nacional El Salvador"
             width={150}
             height={150}
-            className={`${medical ? "h-16" : "h-20"} w-auto object-contain opacity-80 brightness-0 dark:hidden`}
+            className={`${portal ? "h-16" : "h-20"} w-auto object-contain opacity-80 brightness-0 dark:hidden`}
             priority
           />
           <Image
@@ -235,12 +309,12 @@ function SidebarBody({
             alt="Hospital Nacional El Salvador"
             width={150}
             height={150}
-            className={`hidden ${medical ? "h-16" : "h-20"} w-auto object-contain dark:block`}
+            className={`hidden ${portal ? "h-16" : "h-20"} w-auto object-contain dark:block`}
             priority
           />
         </div>
         <div className="flex items-center gap-2.5 w-full">
-          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${medical ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-600/25 dark:from-cyan-400 dark:to-blue-400" : "bg-gradient-to-br from-[#2b8ca8] to-[#1a4e70] shadow-cyan-900/25 dark:from-cyan-400 dark:to-blue-400"}`}>
+          <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${portal ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-600/25 dark:from-cyan-400 dark:to-blue-400" : "bg-gradient-to-br from-[#2b8ca8] to-[#1a4e70] shadow-cyan-900/25 dark:from-cyan-400 dark:to-blue-400"}`}>
             <span className="text-white dark:text-[var(--color-institutional-dark)] text-[10px] font-bold tracking-wide">ES</span>
           </div>
           <div className="min-w-0">
@@ -254,19 +328,34 @@ function SidebarBody({
         </div>
       </div>
 
-      <nav className={`flex-1 min-h-0 overflow-y-auto px-2 py-3 ${medical ? "space-y-1" : "space-y-0.5"}`}>
+      {/* pr más corto: la barra de desplazamiento (5 px) cae a la derecha. */}
+      <nav ref={navRef} className="flex-1 min-h-0 overflow-y-auto pl-2 pr-1.5 py-3 space-y-0.5">
         {sinGrupo.map(renderItem)}
 
         {grupos.map((group) => {
           const items = navItems.filter((i) => i.group === group);
           const isCollapsed = isGroupCollapsed(group);
           const groupBadge = items.reduce((s, i) => s + (i.badge ?? 0), 0);
+          if (acordeon) {
+            return (
+              <GrupoAcordeon
+                key={group}
+                group={group}
+                items={items}
+                abierto={!isCollapsed}
+                onToggle={() => alternarGrupo(group)}
+                isActive={isActive}
+                onNavigate={onNavigate}
+                variant={variant}
+              />
+            );
+          }
           return (
-            <div key={group} className={`space-y-0.5 ${medical ? "pt-3 first:pt-0" : "pt-1.5"}`}>
+            <div key={group} className={`space-y-0.5 ${portal ? "pt-3 first:pt-0" : "pt-1.5"}`}>
               <button
                 onClick={() => toggleGroup(group)}
                 aria-expanded={!isCollapsed}
-                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${medical ? "text-blue-800 hover:bg-cyan-50 hover:text-cyan-700 dark:text-cyan-300/80 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-200" : "text-blue-900 dark:text-cyan-300/80 hover:text-cyan-700 dark:hover:text-cyan-200 hover:bg-blue-50/70 dark:hover:bg-slate-800/70"}`}
+                className={`w-full flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-colors ${portal ? "text-blue-800 hover:bg-cyan-50 hover:text-cyan-700 dark:text-cyan-300/80 dark:hover:bg-cyan-950/50 dark:hover:text-cyan-200" : "text-blue-900 dark:text-cyan-300/80 hover:text-cyan-700 dark:hover:text-cyan-200 hover:bg-blue-50/70 dark:hover:bg-slate-800/70"}`}
               >
                 <ChevronDown
                   size={12}
@@ -281,7 +370,7 @@ function SidebarBody({
         })}
       </nav>
 
-      <div className={`px-2 pb-4 pt-2 border-t space-y-1 ${medical ? "border-blue-100 dark:border-cyan-950" : "border-slate-200 dark:border-cyan-900/40"}`}>
+      <div className={`px-2 pb-4 pt-2 border-t space-y-1 ${portal ? "border-blue-100 dark:border-cyan-950" : "border-slate-200 dark:border-cyan-900/40"}`}>
         {profile?.tipoMedico ? (
           <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400">
             {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · {profile.servicios?.length ?? 0} unidades
@@ -293,17 +382,17 @@ function SidebarBody({
         )}
         <button
           onClick={toggle}
-          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${medicalFooterAction}`}
+          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${portalFooterAction}`}
         >
           {dark ? <Sun size={16} /> : <Moon size={16} />}
           {dark ? "Modo claro" : "Modo oscuro"}
         </button>
         <button
           onClick={onChangePassword}
-          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${medicalFooterAction}`}
+          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${portalFooterAction}`}
         >
-          <KeyRound size={16} />
-          Cambiar contrasena
+          <LockKeyhole size={16} />
+          Cambiar contraseña
         </button>
         <button
           onClick={onLogout}
@@ -316,7 +405,7 @@ function SidebarBody({
           <button
             type="button"
             onClick={onCollapseDesktopPanel}
-            className={`hidden md:flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${medicalFooterAction}`}
+            className={`hidden md:flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${portalFooterAction}`}
           >
             <PanelLeftClose size={16} />
             Ocultar panel
@@ -341,7 +430,6 @@ export function Sidebar({
   navItems,
   roleLabel,
   variant = "default",
-  collapseGroupsInitially = false,
   allowDesktopPanelCollapse = false,
 }: SidebarProps) {
   const [open, setOpen] = useState(false);
@@ -353,16 +441,18 @@ export function Sidebar({
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
-  // Grupos independientes: cada uno se cierra o abre a gusto sin afectar a los demás.
+  // Variante default: grupos independientes, cada uno se cierra o abre a gusto.
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
-  const [openedGroups, setOpenedGroups] = useState<Set<string>>(new Set());
   const [desktopPanelCollapsed, setDesktopPanelCollapsed] = useState(false);
   const { profile, changePassword, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
-  // Compensa la escala del 90% en el portal médico sin modificar los demás roles.
-  const desktopSidebarWidth = variant === "medical" ? "w-[17rem]" : "w-60";
+  // Compensa la escala del 90% en el menú en acordeón sin modificar los demás
+  // roles; además da cabida a los hijos del acordeón (sangría + ícono) sin que
+  // "Reposición de incapacidad" parta en dos líneas.
+  const desktopSidebarWidth = variant === "portal" ? "w-[18.5rem]" : "w-60";
+  const mobileDrawerWidth = variant === "portal" ? "w-72" : "w-64";
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -371,17 +461,31 @@ export function Sidebar({
     };
   }, [open]);
 
-  const isActive = (item: NavItem) =>
-    item.exact
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(item.href + "/");
+  const activo = itemActivo(navItems, pathname);
+  const isActive = (item: NavItem) => item.href === activo?.href;
+
+  // Acordeón (variant portal): un solo grupo abierto a la vez, compartido por el
+  // panel de escritorio y el del celular. Cuando la ruta cae en otro grupo, se
+  // abre ese; entre cambios de ruta manda el usuario. (Se ajusta durante el
+  // render, sin efecto, como recomienda React para derivar de props.)
+  const acordeon = variant === "portal";
+  const grupoActivo = activo?.group ?? null;
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(grupoActivo);
+  const [grupoActivoPrevio, setGrupoActivoPrevio] = useState<string | null>(grupoActivo);
+  if (grupoActivo !== grupoActivoPrevio) {
+    setGrupoActivoPrevio(grupoActivo);
+    if (grupoActivo) setGrupoAbierto(grupoActivo);
+  }
 
   const isGroupCollapsed = (group: string) =>
-    collapseGroupsInitially ? !openedGroups.has(group) : closedGroups.has(group);
+    acordeon ? group !== grupoAbierto : closedGroups.has(group);
 
   const toggleGroup = (group: string) => {
-    const setGroups = collapseGroupsInitially ? setOpenedGroups : setClosedGroups;
-    setGroups((prev) => {
+    if (acordeon) {
+      setGrupoAbierto((prev) => (prev === group ? null : group));
+      return;
+    }
+    setClosedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) next.delete(group);
       else next.add(group);
@@ -414,30 +518,30 @@ export function Sidebar({
     setPasswordMessage("");
 
     if (newPassword.length < 6) {
-      setPasswordError("La nueva contrasena debe tener al menos 6 caracteres.");
+      setPasswordError("La nueva contraseña debe tener al menos 6 caracteres.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError("La confirmacion no coincide.");
+      setPasswordError("La confirmación no coincide.");
       return;
     }
 
     setSavingPassword(true);
     try {
       await changePassword(currentPassword, newPassword);
-      setPasswordMessage("Contrasena actualizada correctamente.");
+      setPasswordMessage("Contraseña actualizada correctamente.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
       const code = (err as { code?: string }).code;
       if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
-        setPasswordError("La contrasena actual no es correcta.");
+        setPasswordError("La contraseña actual no es correcta.");
       } else if (code === "auth/weak-password") {
-        setPasswordError("La nueva contrasena debe tener al menos 6 caracteres.");
+        setPasswordError("La nueva contraseña debe tener al menos 6 caracteres.");
       } else {
-        setPasswordError("No se pudo cambiar la contrasena. Intenta de nuevo.");
+        setPasswordError("No se pudo cambiar la contraseña. Intenta de nuevo.");
       }
     } finally {
       setSavingPassword(false);
@@ -452,6 +556,7 @@ export function Sidebar({
     profile,
     dark,
     toggle,
+    activeHref: activo?.href ?? null,
     isActive,
     isGroupCollapsed,
     toggleGroup,
@@ -485,21 +590,31 @@ export function Sidebar({
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           )}
         </button>
-        <div className="flex-1 flex justify-center">
-          <Image
-            src={SIDEBAR_LOGO_LIGHT_SRC}
-            alt="Hospital"
-            width={72}
-            height={36}
-            className="h-9 w-auto object-contain opacity-80 brightness-0 dark:hidden"
-          />
-          <Image
-            src={SIDEBAR_LOGO_DARK_SRC}
-            alt="Hospital"
-            width={110}
-            height={110}
-            className="hidden h-9 w-auto object-contain dark:block"
-          />
+        {/* En el celular la barra dice dónde estás; el logo queda para las
+            rutas que no están en el menú. */}
+        <div className="flex-1 min-w-0 flex justify-center">
+          {activo ? (
+            <p className="truncate font-heading text-sm font-semibold text-slate-800 dark:text-white">
+              {activo.label}
+            </p>
+          ) : (
+            <>
+              <Image
+                src={SIDEBAR_LOGO_LIGHT_SRC}
+                alt="Hospital"
+                width={72}
+                height={36}
+                className="h-9 w-auto object-contain opacity-80 brightness-0 dark:hidden"
+              />
+              <Image
+                src={SIDEBAR_LOGO_DARK_SRC}
+                alt="Hospital"
+                width={110}
+                height={110}
+                className="hidden h-9 w-auto object-contain dark:block"
+              />
+            </>
+          )}
         </div>
         <button
           onClick={toggle}
@@ -519,7 +634,7 @@ export function Sidebar({
       )}
 
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-64 transition-transform duration-300 ease-in-out ${
+        className={`md:hidden fixed inset-y-0 left-0 z-50 ${mobileDrawerWidth} transition-transform duration-300 ease-in-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -567,11 +682,11 @@ export function Sidebar({
           <form onSubmit={handleChangePassword} className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-6 space-y-4">
             <div>
               <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Cuenta</p>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Cambiar contrasena</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Cambiar contraseña</h2>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Contrasena actual</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Contraseña actual</label>
               <input
                 type="password"
                 value={currentPassword}
@@ -583,7 +698,7 @@ export function Sidebar({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Nueva contrasena</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Nueva contraseña</label>
               <input
                 type="password"
                 value={newPassword}
@@ -596,7 +711,7 @@ export function Sidebar({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Confirmar nueva contrasena</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Confirmar nueva contraseña</label>
               <input
                 type="password"
                 value={confirmPassword}

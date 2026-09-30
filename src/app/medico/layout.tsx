@@ -31,7 +31,7 @@ function MedicoContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
-      <Sidebar navItems={navItems} roleLabel={roleLabel} variant="medical" />
+      <Sidebar navItems={navItems} roleLabel={roleLabel} variant="portal" />
       <main className="flex-1 overflow-y-auto pt-mobile-bar md:pt-0 bg-slate-50 dark:bg-[var(--color-institutional-dark)]">
         {loading || !profile ? (
           <div className="flex items-center justify-center h-full">

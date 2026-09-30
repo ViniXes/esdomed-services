@@ -119,6 +119,19 @@ Consecuencias en el resto del sistema (regla para código nuevo: todo listado de
 
 **Eliminar** (`DELETE`) borra Auth + documento y hace desaparecer a la persona de cualquier plan que se vuelva a guardar. Reservarlo para cuentas creadas por error, nunca para personal que trabajó.
 
+### Navegación (menú lateral) — registro declarativo
+
+Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:
+
+- **Quién ve qué** va en `visibleSi(perfil)` de la entrada o sección (reusa los helpers `lib/acceso*.ts`); nunca `slice`/`if` por posición en el layout. Una marca nueva por persona es un predicado. Los globos se declaran con `globo: keyof Pendientes`.
+- **Guards desde el mismo registro**: el layout de `/comite-lesiones` veta con `rutaVetada(ENTRADAS_COMITE_LESIONES, …)`; agregar una vista restringida es declarar su `visibleSi`, no tocar el layout.
+- **Secciones por tarea**, máximo ~6 entradas cada una; si un grupo crece de más, se parte (p. ej. en ESDOMED los historiales salieron de Administración a "Auditoría"). No usar `children` (ítem que navega Y despliega con flecha: el usuario lo rechazó por confuso).
+- **Menú en acordeón** (`<Sidebar variant="portal">`: médico, Psicología, Trabajo Social —también cuando entran a `/comite-lesiones`— y todo el dashboard de ESDOMED/admin; pedido explícito del usuario): arriba **Inicio** suelto; cada sección es un **botón padre de ancho completo** con ícono (`SeccionNav.icon`, `tone: "rose"` solo para Defunciones) y flecha; sus entradas son **hijos con ícono** desplegables debajo, colgados de una línea guía; **un solo grupo abierto a la vez** y se abre solo el de la ruta activa. Siguen con `variant="default"` (encabezados pequeños) los módulos aún no migrados: rol comité, enfermería, RRHH, transporte, ISBM y horarios. No quitar los íconos de los hijos: si un nombre no cabe, ajustar ancho/sangría.
+- **Inicio de un portal de área**: `src/components/InicioArea.tsx` (hero institucional + "Pendientes" + "Accesos rápidos"). Los pendientes leen los contadores de `NotificacionesContext` (0 lecturas extra). Psicología en `/psicologia`; Trabajo Social en `/dashboard` (la página se lo muestra a TS en vez del panel de ESDOMED).
+- Una vista hermana **sin globo** va como pestaña dentro de su página; con globo (trabajo asignado a esta persona) merece fila propia.
+- El Sidebar resalta **un solo ítem**: el href más específico que calce la ruta (no hace falta `exact` para desambiguar prefijos; solo para rutas como Inicio). Lleva `aria-current="page"`, se desplaza solo hasta el activo y en celular la barra superior muestra su nombre.
+- Páginas que otro portal necesita (p. ej. matriz/indicadores UCI para el jefe en `/medico/cuidados-criticos/*`) se **reexportan** en la ruta del portal, para no sacar al usuario a otro menú.
+
 ## Design System (estándar vigente — TODA UI nueva lo sigue)
 
 Identidad institucional HNES: paleta en `public/paletanueva_tipografia.png`, logo de trazabilidad en `public/1c-trazabilidad-*.svg` (también es el favicon/ícono PWA).
@@ -128,4 +141,4 @@ Identidad institucional HNES: paleta en `public/paletanueva_tipografia.png`, log
 - **Heros**: degradado único `from-[#0d2739] via-[#1a4e70] to-[#2b8ca8]`. No inventar degradados por módulo.
 - **Tipografía**: Inter en todo — títulos (`font-heading`), cuerpo y cintillos `uppercase` (su tracking amplio hace de versalitas). No agregar otras fuentes. (Se carga como `--font-ui` en el layout raíz — cambiar de fuente es tocar solo esa línea. Barlow queda solo para los oficios impresos en Word, como dicta la paleta.)
 - **Modo claro y oscuro obligatorios**: las rampas del tema ya cubren ambos; escribir siempre las clases `dark:` siguiendo los patrones de páginas existentes.
-- **Sidebar**: ítems sin `tone` salen azul institucional por defecto; `tone` explícito solo para semántica (p. ej. `rose` en Fallecidos/Defunciones).
+- **Sidebar**: ítems sin `tone` salen azul institucional por defecto; el único `tone` que acepta `NavItem` es `rose` (Fallecidos/Defunciones). **Excepción deliberada**: los globos de pendientes del menú son rojos (`bg-red-500`) por convención de notificación, aunque la regla general diga amber = pendiente (decisión del usuario, 2026-09-30). No "corregirlos" a amber.

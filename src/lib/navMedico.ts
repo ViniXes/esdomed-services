@@ -1,103 +1,95 @@
 import {
-  Activity, LayoutDashboard, ArrowRightLeft, BarChart3, HeartPulse, Printer, FileText, FileClock,
-  FileStack, ClipboardList, Phone, Table2, UserSearch, Ambulance, Building2, BookOpenText,
-  ShieldAlert, Megaphone, Users,
-  KeyRound,
+  Activity, Ambulance, ArrowRightLeft, BarChart3, BookOpenText, Building2, ClipboardList, ClipboardPen,
+  Contact, DoorOpen, FileClock, FileStack, FileText, FolderOpen, HeartPulse, KeyRound, LayoutDashboard,
+  LayoutGrid, Phone, Printer, Send, ShieldAlert, Siren, Table2, UserSearch,
 } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
+import type { Pendientes } from "@/contexts/NotificacionesContext";
 import type { UserProfile } from "@/types";
+import { construirMenu, type SeccionNav } from "@/lib/navRegistro";
+import { SECCION_LESIONES } from "@/lib/navComiteLesiones";
 import { apoyaComiteLesiones } from "@/lib/accesoComiteLesiones";
+import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 
-interface BadgesMedico {
-  solicitudesLesion: number;
-  reposiciones: number;
-  conapina: number;
-}
+type Perfil = UserProfile | null | undefined;
 
-const baseNavItems: NavItem[] = [
-  { href: "/medico",                 label: "Inicio",          icon: LayoutDashboard, exact: true, tone: "blue" },
-  { href: "/medico/cola-expedientes", label: "Cola de expedientes", icon: FileStack, tone: "indigo" },
-  { href: "/medico/buscar-paciente", label: "Buscar Paciente", icon: UserSearch, tone: "cyan" },
+// El admin entra a /medico solo por el registro de cuidados críticos.
+const noEsAdmin = (p: Perfil) => p?.role !== "admin";
+
+// Menú del portal médico por tarea. El Sidebar lo pinta como acordeón: cada
+// sección es un botón padre y solo una queda abierta a la vez. Cuidados
+// críticos va arriba porque es el trabajo diario de quien lo tiene; luego
+// Emergencia; lo que es apoyo por persona (Lesiones intencionales) va al final.
+const MENU_MEDICO: SeccionNav[] = [
   {
-    href: "/medico/emergencia",
-    label: "Atendidos en emergencia",
-    icon: Ambulance,
-    tone: "blue",
-    children: [
-      { href: "/medico/emergencia/egresos", label: "Egresos de emergencia", icon: HeartPulse },
-      { href: "/medico/censos", label: "Censos de emergencia", icon: BookOpenText, exact: true },
+    entradas: [{ href: "/medico", label: "Inicio", icon: LayoutDashboard, exact: true }],
+  },
+  {
+    titulo: "Cuidados críticos",
+    icon: Activity,
+    visibleSi: p => !!p?.tipoMedico || p?.role === "admin",
+    entradas: [
+      { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: ClipboardPen },
+      { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2 },
+      // Matriz e indicadores se reexportan desde /dashboard para que el jefe
+      // no salga de su portal.
+      { href: "/medico/cuidados-criticos/matriz", label: "Matriz UCI / UCIN", icon: LayoutGrid, globo: "cuidadosCriticosEliminacion", visibleSi: puedeVerModuloCuidadosCriticos },
+      { href: "/medico/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, visibleSi: puedeVerModuloCuidadosCriticos },
     ],
   },
-  { href: "/medico/busqueda-telefono", label: "Busqueda de telefono", icon: Phone, tone: "teal" },
-  { href: "/medico/traslados",       label: "Traslados",       icon: ArrowRightLeft, tone: "cyan" },
-  { href: "/medico/traslado-externo", label: "Traslado a otro hospital", icon: Building2, tone: "blue" },
-  { href: "/medico/fallecidos",      label: "Fallecidos",      icon: HeartPulse, tone: "rose" },
-  { href: "/medico/conapina-fgr",    label: "CONAPINA / FGR",  icon: ShieldAlert, tone: "blue" },
-  { href: "/medico/impresiones",     label: "Impresiones",     icon: Printer, tone: "violet" },
-  { href: "/medico/reposicion-llave-sis", label: "Reposición de llave SIS", icon: KeyRound, tone: "violet" },
   {
-    href: "/medico/incapacidades",
-    label: "Incapacidades",
-    icon: FileText,
-    tone: "blue",
-    // Bandeja de reposiciones: incapacidades de egresos anteriores a la app que
-    // ESDOMED cargó del FIEH y asignó a este médico para que las complete.
-    children: [
-      { href: "/medico/incapacidades/reposicion", label: "Reposición de incapacidad", icon: FileClock },
+    titulo: "Emergencia",
+    icon: Siren,
+    visibleSi: noEsAdmin,
+    entradas: [
+      // Los censos se registran desde la cola, por eso van juntos.
+      { href: "/medico/cola-expedientes", label: "Cola de expedientes", icon: FileStack },
+      { href: "/medico/emergencia", label: "Atendidos en emergencia", icon: Ambulance },
+      { href: "/medico/emergencia/egresos", label: "Egresos de emergencia", icon: DoorOpen },
+      { href: "/medico/censos", label: "Censos de emergencia", icon: BookOpenText },
     ],
   },
-  { href: "/medico/anexo5/nueva",    label: "Anexo 5",         icon: ClipboardList, tone: "cyan" },
+  {
+    titulo: "Solicitudes y avisos",
+    icon: Send,
+    visibleSi: noEsAdmin,
+    entradas: [
+      { href: "/medico/traslados", label: "Traslados", icon: ArrowRightLeft },
+      { href: "/medico/traslado-externo", label: "Traslado a otro hospital", icon: Building2 },
+      { href: "/medico/fallecidos", label: "Fallecidos", icon: HeartPulse, tone: "rose" },
+      // Globo: solicitudes de notificación que el comité difunde a todos los médicos.
+      { href: "/medico/conapina-fgr", label: "CONAPINA / FGR", icon: ShieldAlert, globo: "solicitudesLesion" },
+      { href: "/medico/reposicion-llave-sis", label: "Reposición de llave SIS", icon: KeyRound },
+    ],
+  },
+  {
+    titulo: "Documentos",
+    icon: FolderOpen,
+    visibleSi: noEsAdmin,
+    entradas: [
+      { href: "/medico/incapacidades", label: "Incapacidades", icon: FileText },
+      // Egresos anteriores a la app que ESDOMED cargó del FIEH y asignó a este
+      // médico para que las complete; el globo es lo que tiene por completar.
+      { href: "/medico/incapacidades/reposicion", label: "Reposición de incapacidad", icon: FileClock, globo: "reposiciones" },
+      { href: "/medico/anexo5/nueva", label: "Anexo 5", icon: ClipboardList },
+      { href: "/medico/impresiones", label: "Impresiones", icon: Printer },
+    ],
+  },
+  {
+    titulo: "Pacientes",
+    icon: Contact,
+    visibleSi: noEsAdmin,
+    entradas: [
+      { href: "/medico/buscar-paciente", label: "Buscar paciente", icon: UserSearch },
+      { href: "/medico/busqueda-telefono", label: "Búsqueda de teléfono", icon: Phone },
+    ],
+  },
+  { ...SECCION_LESIONES, visibleSi: apoyaComiteLesiones },
 ];
 
-// Grupo "Lesiones intencionales" para los médicos que apoyan al comité: las
-// MISMAS vistas que ve el comité (incluidos Ingresos adolescentes y Reportes),
-// como grupo plano al final del menú — igual que en Psicología y Trabajo
-// Social. NO como ítem desplegable: se probó y al usuario le pareció confuso.
-// (El Sidebar pinta primero los ítems sin grupo y luego los grupos.)
-function itemsComiteLesiones(pendientes: BadgesMedico): NavItem[] {
-  const G_LESIONES = "Lesiones intencionales";
-  return [
-    { href: "/comite-lesiones/conapina-fgr",          label: "Avisos CONAPINA / FGR", icon: ShieldAlert, tone: "blue",   badge: pendientes.conapina, group: G_LESIONES },
-    { href: "/comite-lesiones/lesiones-ingresos",     label: "Ingresos por lesión",   icon: Activity,    tone: "cyan",   group: G_LESIONES },
-    { href: "/comite-lesiones/solicitudes",           label: "Avisos pendientes a notificar / Solicitudes al área médica", icon: Megaphone, tone: "blue", group: G_LESIONES },
-    { href: "/comite-lesiones/ingresos-adolescentes", label: "Ingresos adolescentes", icon: Users,       tone: "cyan",   group: G_LESIONES },
-    { href: "/comite-lesiones/reportes",              label: "Reportes",              icon: BarChart3,   tone: "blue",   group: G_LESIONES },
-  ];
-}
-
-// Menú del portal médico, compartido entre su layout y el de /comite-lesiones
-// (donde entran los médicos que apoyan al comité con su propio menú, para que
-// el cruce entre áreas sea transparente). Mismo patrón que navPsicologia y
-// navTrabajoSocial.
-export function navItemsMedico(profile: UserProfile | null | undefined, pendientes: BadgesMedico): NavItem[] {
-  const esAdmin = profile?.role === "admin";
-  const tipoMedicoNavegacion = esAdmin ? "uci_ucin" : profile?.tipoMedico;
-  const esJefeUciUcin = profile?.tipoMedico === "jefe_uci_ucin";
-
-  const items: NavItem[] = tipoMedicoNavegacion
-    ? [
-        baseNavItems[0],
-        { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: Activity, exact: true, tone: "blue" },
-        { href: "/medico/cuidados-criticos/registros", label: "Mis registros UCI / UCIN", icon: Table2, tone: "teal" },
-        ...((esAdmin || esJefeUciUcin) ? [{ href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3, tone: "blue" as const }] : []),
-        ...(esAdmin ? [] : baseNavItems.slice(1)),
-      ]
-    : baseNavItems;
-
-  // El globo del ítem CONAPINA/FGR son las solicitudes de notificación que el
-  // comité difunde a todos los médicos y siguen pendientes. El de Incapacidades
-  // (y su subítem) son las reposiciones asignadas a este médico por completar.
-  const conGlobos = items.map(i => {
-    if (i.href === "/medico/conapina-fgr") return { ...i, badge: pendientes.solicitudesLesion };
-    if (i.href === "/medico/incapacidades") {
-      return {
-        ...i,
-        badge: pendientes.reposiciones,
-        children: i.children?.map(c => (c.href === "/medico/incapacidades/reposicion" ? { ...c, badge: pendientes.reposiciones } : c)),
-      };
-    }
-    return i;
-  });
-
-  return apoyaComiteLesiones(profile) ? [...conGlobos, ...itemsComiteLesiones(pendientes)] : conGlobos;
+// Compartido entre el layout del portal y el de /comite-lesiones (donde entran
+// los médicos que apoyan al comité), para que el cruce entre áreas sea
+// transparente. Mismo patrón que navPsicologia y navTrabajoSocial.
+export function navItemsMedico(profile: Perfil, pendientes: Pendientes): NavItem[] {
+  return construirMenu(MENU_MEDICO, profile, pendientes);
 }
