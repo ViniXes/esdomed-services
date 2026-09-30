@@ -212,6 +212,7 @@ export default function ProductividadEsdomedPage() {
 
   const [mes, setMes] = useState(mesActualStr());
   const [personal, setPersonal] = useState<string[]>([]);
+  const [personalAdministrativo, setPersonalAdministrativo] = useState<string[]>([]);
   const [carpetasDrive, setCarpetasDrive] = useState<Map<string, number>>(new Map());
   const [actualizacionesDrive, setActualizacionesDrive] = useState<Map<string, number>>(new Map());
   const [consentimientosDrive, setConsentimientosDrive] = useState<Map<string, number>>(new Map());
@@ -236,8 +237,12 @@ export default function ProductividadEsdomedPage() {
 
   useEffect(() => {
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
-      .then(s => setPersonal(s.docs.map(d => (d.data().nombre as string)).filter(Boolean).sort((a, b) => a.localeCompare(b))))
-      .catch(() => setPersonal([]));
+      .then(s => {
+        const perfiles = s.docs.map(d => d.data() as { nombre?: string; role?: string });
+        setPersonal(perfiles.map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
+        setPersonalAdministrativo(perfiles.filter(perfil => perfil.role === "admin").map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => { setPersonal([]); setPersonalAdministrativo([]); });
   }, []);
 
   useEffect(() => {
@@ -388,6 +393,23 @@ export default function ProductividadEsdomedPage() {
     emergenciasSimmow,
   ]);
 
+  const resumenAdministrativoEsdomed = useMemo(() => personalAdministrativo.map(nombre => ({
+    nombre,
+    valores: {
+      expedientes: expedientesCreados.get(nombre) ?? 0,
+      defunciones: defuncionesProcesadas.get(nombre) ?? 0,
+      certificados: certificadosEntregados.get(nombre) ?? 0,
+      altas: altasEfectivas.get(nombre) ?? 0,
+      documentos: documentosEntregados.get(nombre) ?? 0,
+      simmow: altasSimmow.get(nombre) ?? 0,
+      traslados: trasladosProcesados.get(nombre) ?? 0,
+      carpetasDrive: carpetasDrive.get(nombre) ?? 0,
+      actualizacionesDrive: actualizacionesDrive.get(nombre) ?? 0,
+      consentimientosDrive: consentimientosDrive.get(nombre) ?? 0,
+      emergenciasSimmow: emergenciasSimmow.get(nombre) ?? 0,
+    },
+  })), [personalAdministrativo, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive, emergenciasSimmow]);
+
   if (!profile || !puedeVer) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -440,7 +462,7 @@ export default function ProductividadEsdomedPage() {
 
       <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin"} />
 
-      {grupo === "administrativos" ? <ProductividadAdministrativa /> : <>
+      {grupo === "administrativos" ? <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} /> : <>
       <div className="flex flex-wrap items-center gap-3">
         <input type="month" value={mes} onChange={e => { if (e.target.value) setMes(e.target.value); }} className={selectCls} />
         {!loading && (
