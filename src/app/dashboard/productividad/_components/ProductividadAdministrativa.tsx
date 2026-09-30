@@ -22,25 +22,31 @@ const mesActual = () => { const fecha = new Date(); return `${fecha.getFullYear(
 const fecha = (valor: string) => new Intl.DateTimeFormat("es-SV", { dateStyle: "medium", timeStyle: "short", timeZone: "America/El_Salvador" }).format(new Date(valor));
 
 /** Misma estructura de Productividad Operativos, ampliada con el trabajo SIS. */
-export function ProductividadAdministrativa({ resumenEsdomed }: { resumenEsdomed: FilaEsdomed[] }) {
+export function ProductividadAdministrativa({ resumenEsdomed, activa }: { resumenEsdomed: FilaEsdomed[]; activa: boolean }) {
   const { user } = useAuth();
   const [mes, setMes] = useState(mesActual);
   const [vista, setVista] = useState<Vista>("resumen");
   const [actividades, setActividades] = useState<Actividad[]>([]);
+  const [mesCargado, setMesCargado] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const cargar = async () => {
-    if (!user) return;
+  const cargar = async (forzar = false) => {
+    if (!user || (!forzar && mesCargado === mes)) return;
     setCargando(true); setError("");
     try {
       const respuesta = await fetch(`/api/productividad/usuarios-sis?mes=${encodeURIComponent(mes)}`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
       const data = await respuesta.json();
       if (!respuesta.ok) throw new Error(data.error || "No se pudo cargar la productividad administrativa.");
       setActividades(data.actividades ?? []);
+      setMesCargado(mes);
     } catch (causa) { setActividades([]); setError(causa instanceof Error ? causa.message : "No se pudo cargar la productividad administrativa."); }
     finally { setCargando(false); }
   };
-  useEffect(() => { const temporizador = window.setTimeout(() => { void cargar(); }, 0); return () => window.clearTimeout(temporizador); }, [user, mes]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!activa || mesCargado === mes) return;
+    const temporizador = window.setTimeout(() => { void cargar(); }, 0);
+    return () => window.clearTimeout(temporizador);
+  }, [activa, user, mes, mesCargado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sisPorPersona = useMemo(() => actividades.reduce((mapa, actividad) => {
     const fila = mapa.get(actividad.responsableNombre) ?? Object.fromEntries(SIS.map(([id]) => [id, 0]));
@@ -54,7 +60,7 @@ export function ProductividadAdministrativa({ resumenEsdomed }: { resumenEsdomed
   const exportar = async () => { const XLSX = await import("xlsx"); const hoja = XLSX.utils.aoa_to_sheet([["Productividad administrativa", mes], [], ["Nombre", ...COLUMNAS.map(([, label]) => label), ...SIS.map(([, label]) => label), "Total"], ...filas.map(fila => [fila.nombre, ...COLUMNAS.map(([id]) => fila.esdomed[id]), ...SIS.map(([id]) => fila.sis[id] ?? 0), total(fila)])]); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Administrativos"); XLSX.writeFile(libro, `productividad_administrativa_${mes}.xlsx`); };
 
   return <>
-    <div className="flex flex-wrap items-center gap-3"><input aria-label="Mes" type="month" value={mes} onChange={e => e.target.value && setMes(e.target.value)} className={selectCls} /><button type="button" onClick={() => void cargar()} disabled={cargando} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300"><RefreshCw size={15} className={cargando ? "animate-spin" : ""} />Actualizar</button>{!cargando && <button type="button" onClick={() => void exportar()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"><Download size={15} />Exportar Excel</button>}</div>
+    <div className="flex flex-wrap items-center gap-3"><input aria-label="Mes" type="month" value={mes} onChange={e => e.target.value && setMes(e.target.value)} className={selectCls} /><button type="button" onClick={() => void cargar(true)} disabled={cargando} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300"><RefreshCw size={15} className={cargando ? "animate-spin" : ""} />Actualizar</button>{!cargando && <button type="button" onClick={() => void exportar()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"><Download size={15} />Exportar Excel</button>}</div>
     {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
     {cargando ? <p className="py-16 text-center text-sm text-slate-400">Cargando...</p> : <><div className="grid grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white/80 p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:grid-cols-3"><>{VISTAS.map(item => <button key={item.id} type="button" onClick={() => setVista(item.id)} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold transition-all sm:text-sm ${vista === item.id ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}><item.icon size={15} />{item.label}</button>)}</></div>
       {vista === "resumen" && <><div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">{SIS.map(([id, label]) => <Tarjeta key={id} label={label} valor={actividades.filter(actividad => actividad.tipo === id).length} />)}<Tarjeta label="Total actividades" valor={porPersona.reduce((suma, item) => suma + item.valor, 0)} /></div><TablaResumen filas={filas} total={total} /></>}

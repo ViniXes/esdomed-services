@@ -462,7 +462,11 @@ export default function ProductividadEsdomedPage() {
 
       <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin"} />
 
-      {grupo === "administrativos" ? <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} /> : <>
+      <div className={grupo === "administrativos" ? "" : "hidden"}>
+        <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} activa={grupo === "administrativos"} />
+      </div>
+
+      <div className={grupo === "operativos" ? "" : "hidden"}>
       <div className="flex flex-wrap items-center gap-3">
         <input type="month" value={mes} onChange={e => { if (e.target.value) setMes(e.target.value); }} className={selectCls} />
         {!loading && (
@@ -643,7 +647,7 @@ export default function ProductividadEsdomedPage() {
           })()}
         </>
       )}
-      </>}
+      </div>
     </div>
   );
 }
