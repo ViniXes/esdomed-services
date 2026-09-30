@@ -19,6 +19,7 @@ import { ProductividadTabs, type GrupoProductividad } from "../_components/Produ
 import { ProductividadAdministrativa } from "../_components/ProductividadAdministrativa";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
 import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
+import { configPersonalPlan } from "@/lib/esdomed/catalogo-plan";
 import type { NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, SolicitudTraslado } from "@/types";
 
 const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos", "emergenciasSimmow"] as const;
@@ -238,9 +239,12 @@ export default function ProductividadEsdomedPage() {
   useEffect(() => {
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
       .then(s => {
-        const perfiles = s.docs.map(d => d.data() as { nombre?: string; role?: string });
+        const perfiles = s.docs.map(d => d.data() as { nombre?: string; role?: string; codigoMarcacion?: string });
         setPersonal(perfiles.map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
-        setPersonalAdministrativo(perfiles.filter(perfil => perfil.role === "admin").map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
+        // La jornada del plan, no el rol de acceso, define quién es administrativo.
+        // Así se incluye a Juan Carlos y se excluyen las cuentas técnicas, Super Su
+        // y los operativos aunque hayan realizado una acción SIS.
+        setPersonalAdministrativo(perfiles.filter(perfil => configPersonalPlan(perfil.codigoMarcacion)?.tipoJornada === "Administrativo").map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
       })
       .catch(() => { setPersonal([]); setPersonalAdministrativo([]); });
   }, []);
@@ -463,7 +467,7 @@ export default function ProductividadEsdomedPage() {
       <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin"} />
 
       <div className={grupo === "administrativos" ? "" : "hidden"}>
-        <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} activa={grupo === "administrativos"} />
+        <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} personalAdministrativo={personalAdministrativo} activa={grupo === "administrativos"} />
       </div>
 
       <div className={grupo === "operativos" ? "" : "hidden"}>
