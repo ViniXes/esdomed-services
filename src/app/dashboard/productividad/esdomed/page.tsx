@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ProductividadTabs } from "../_components/ProductividadTabs";
+import { ProductividadTabs, type GrupoProductividad } from "../_components/ProductividadTabs";
+import { ProductividadAdministrativa } from "../_components/ProductividadAdministrativa";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
 import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
 import type { NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, SolicitudTraslado } from "@/types";
@@ -229,6 +230,7 @@ export default function ProductividadEsdomedPage() {
   const [personaFranjas, setPersonaFranjas] = useState<string>("todas");
   const [mostrarHoras, setMostrarHoras] = useState(false);
   const [subVistaFranjas, setSubVistaFranjas] = useState<"dia" | "horario">("dia");
+  const [grupo, setGrupo] = useState<GrupoProductividad>("operativos");
 
   const { inicio, fin } = useMemo(() => rangoMes(mes), [mes]);
 
@@ -432,12 +434,13 @@ export default function ProductividadEsdomedPage() {
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
           <BarChart3 size={13} /> Productividad
         </div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">ESDOMED</h1>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Productividad</h1>
         <p className="text-xs text-slate-500 mt-0.5">Producción del personal de ESDOMED por periodo.</p>
       </div>
 
-      <ProductividadTabs />
+      <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin"} />
 
+      {grupo === "administrativos" ? <ProductividadAdministrativa /> : <>
       <div className="flex flex-wrap items-center gap-3">
         <input type="month" value={mes} onChange={e => { if (e.target.value) setMes(e.target.value); }} className={selectCls} />
         {!loading && (
@@ -618,6 +621,7 @@ export default function ProductividadEsdomedPage() {
           })()}
         </>
       )}
+      </>}
     </div>
   );
 }
