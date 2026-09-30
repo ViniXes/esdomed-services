@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { collection, query, orderBy, getDocs, getDoc, doc, updateDoc, runTransaction, Timestamp, limit, where } from "@/lib/firestoreMeter";
+import { useCallback, useEffect, useState } from "react";
+import { collection, query, orderBy, getDocs, getDoc, doc, updateDoc, runTransaction, Timestamp, limit, where, type QueryConstraint } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ClipboardCheck, File, Clock, CheckCircle, XCircle, Search, RefreshCw, AlertTriangle, CalendarCheck } from "lucide-react";
+import {
+  AlertTriangle, CalendarCheck, CheckCircle2, ChevronRight, Inbox, List, MessageSquareText,
+  Paperclip, RefreshCw, Search, X,
+} from "lucide-react";
 import type { FilaPlanTrabajo, PlanTrabajo, TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
@@ -16,45 +19,12 @@ import {
   periodosDelPermiso,
 } from "@/lib/esdomed/permisos-plan";
 import { labelPeriodo, parsePeriodo } from "@/lib/esdomed/plan";
-
-const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
-  "A1_permiso_con_goce": "A.1 - Permisos con goce de sueldo",
-  "A2_permiso_sin_goce": "A.2 - Permisos sin goce de sueldo",
-  "A3_enfermedad": "A.3 - Enfermedad (Incapacidad)",
-  "A4_compensatorio": "A.4 - Compensatorio",
-  "A5_consulta_isss": "A.5 - Consulta ISSS",
-  "A6_paternidad": "A.6 - Paternidad",
-  "A7_enfermedad_pariente": "A.7 - Enfermedad de pariente",
-  "A8_duelo": "A.8 - Duelo",
-  "A9_otros": "A.9 - Otros",
-  "B_cambio_turno_individual": "B. Cambio de turno individual",
-  "C_cambio_turno_2personas": "C. Cambio de turno (2 personas)",
-  "D_licencia_o_acciones": "D. Licencia o Acciones de Personal",
-  "E_inconsistencias_marcacion": "E. Inconsistencias de Marcación",
-  "F_tiempo_extra": "F. Informe mensual de tiempo extra",
-  "G_misiones_oficiales": "G. Misiones oficiales",
-};
-
-const ESTADO_BADGE: Record<EstadoTramitePersonal, string> = {
-  "subido": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  "pendiente": "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 animate-pulse",
-  "aprobado": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  "rechazado": "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-};
-
-// Lista de adjuntos, compatible con el campo legado de un solo archivo.
-const docsDe = (t: TramitePersonal): { url: string; nombre: string }[] =>
-  t.documentos?.length
-    ? t.documentos
-    : t.documentoUrl
-      ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
-      : [];
-
-type ConflictoPermisoGrupo = {
-  fecha: string;
-  grupo: string;
-  empleadoNombre: string;
-};
+import {
+  CATEGORIAS_TRAMITE, ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, docsDeTramite, fechaLegible, partesCategoria,
+  type ConflictoPermisoGrupo,
+} from "@/lib/tramitesPersonal";
+import { DateField } from "@/components/ui/DateField";
+import { TramiteDetalleModal } from "@/components/tramites/TramiteDetalleModal";
 
 const filaDelEmpleado = (plan: PlanTrabajo | undefined, empleadoId: string): FilaPlanTrabajo | undefined =>
   plan?.filas?.find((fila) => fila.uid === empleadoId);
@@ -66,22 +36,46 @@ const grupoOperativo = (plan: PlanTrabajo | undefined, empleadoId: string): stri
   return grupo && grupo.toLowerCase() !== "administrativo" ? grupo : null;
 };
 
-const fechaLegible = (fecha: string) =>
-  new Date(`${fecha}T12:00:00`).toLocaleDateString("es-SV", { day: "2-digit", month: "long", year: "numeric" });
+const msCreado = (t: TramitePersonal) => toDate(t.creadoEn)?.getTime() ?? 0;
+const porCreadoDesc = (a: TramitePersonal, b: TramitePersonal) => msCreado(b) - msCreado(a);
 
-// Caché a nivel módulo: persiste mientras no se recargue la página (no en F5).
-let cacheTramites: TramitePersonal[] | null = null;
+type Empleado = { uid: string; nombre: string; baja: boolean };
+type Filtros = {
+  empleadoId: string;
+  categoria: "" | CategoriaTramitePersonal;
+  estado: "" | EstadoTramitePersonal;
+  desde: string;
+  hasta: string;
+};
+const FILTROS_VACIOS: Filtros = { empleadoId: "", categoria: "", estado: "", desde: "", hasta: "" };
+const LIMITE_BUSQUEDA = 300;
+const LIMITE_TODOS = 400;
+
+// Cachés a nivel módulo: persisten mientras no se recargue la página (no en F5).
+let cachePendientes: TramitePersonal[] | null = null;
+let cacheEmpleados: Empleado[] | null = null;
+
+const SELECT_CLS =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 
 export default function AprobacionTramitesPage() {
   const { user, profile } = useAuth();
-  // Caché por sesión SPA: evita releer los 400 al volver a entrar a la vista.
-  const [tramites, setTramites] = useState<TramitePersonal[]>(() => cacheTramites ?? []);
-  const [loading, setLoading] = useState(false);
-  const [consultado, setConsultado] = useState(cacheTramites !== null);
-  const [filtroTab, setFiltroTab] = useState<"pendientes" | "todos">("pendientes");
-  const [searchTxt, setSearchTxt] = useState("");
+  const [vista, setVista] = useState<"pendientes" | "buscar">("pendientes");
 
-  const [tramiteAprobando, setTramiteAprobando] = useState<TramitePersonal | null>(null);
+  // ── Pendientes: consulta pequeña (solo estado == pendiente) al entrar ──
+  const [pendientes, setPendientes] = useState<TramitePersonal[]>(() => cachePendientes ?? []);
+  const [cargandoPendientes, setCargandoPendientes] = useState(cachePendientes === null);
+
+  // ── Buscar: filtros que van al servidor; "Consultar todos" trae los más recientes ──
+  const [empleados, setEmpleados] = useState<Empleado[]>(() => cacheEmpleados ?? []);
+  const [filtros, setFiltros] = useState<Filtros>(FILTROS_VACIOS);
+  const [resultados, setResultados] = useState<TramitePersonal[] | null>(null);
+  const [buscando, setBuscando] = useState<"filtros" | "todos" | null>(null);
+  const [tope, setTope] = useState<number | null>(null);
+  const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
+
+  // ── Ficha y resolución ──
+  const [detalle, setDetalle] = useState<TramitePersonal | null>(null);
   const [comentarioAdmin, setComentarioAdmin] = useState("");
   const [accionAdmin, setAccionAdmin] = useState<"aprobado" | "rechazado">("aprobado");
   const [saving, setSaving] = useState(false);
@@ -91,22 +85,112 @@ export default function AprobacionTramitesPage() {
   const [advertenciasPermiso, setAdvertenciasPermiso] = useState<ConflictoPermisoGrupo[]>([]);
   const [revisandoCoincidencias, setRevisandoCoincidencias] = useState(false);
 
-  // Lectura puntual bajo demanda (no listener vivo; la bandeja se refresca con el botón).
-  const consultar = async () => {
-    setLoading(true);
+  const leerPendientes = useCallback(async () => {
+    const snap = await getDocs(query(collection(db, "tramites_personal"), where("estado", "==", "pendiente"), limit(LIMITE_BUSQUEDA)));
+    const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() } as TramitePersonal)).sort(porCreadoDesc);
+    cachePendientes = lista;
+    return lista;
+  }, []);
+
+  useEffect(() => {
+    if (cachePendientes !== null) return;
+    let vivo = true;
+    leerPendientes()
+      .then((lista) => { if (vivo) setPendientes(lista); })
+      .catch((err) => console.error("No se pudieron cargar los trámites pendientes", err))
+      .finally(() => { if (vivo) setCargandoPendientes(false); });
+    return () => { vivo = false; };
+  }, [leerPendientes]);
+
+  const actualizarPendientes = async () => {
+    setCargandoPendientes(true);
     try {
-      const q = query(
-        collection(db, "tramites_personal"),
-        orderBy("creadoEn", "desc"),
-        limit(400)
-      );
-      const snap = await getDocs(q);
-      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() } as TramitePersonal));
-      cacheTramites = lista;
-      setTramites(lista);
-      setConsultado(true);
+      setPendientes(await leerPendientes());
+    } catch (err) {
+      console.error("No se pudieron cargar los trámites pendientes", err);
     } finally {
-      setLoading(false);
+      setCargandoPendientes(false);
+    }
+  };
+
+  // Personal de ESDOMED para el filtro por empleado: se lee una vez, al abrir Buscar.
+  // Incluye a los dados de baja: su historial de trámites sigue siendo consultable.
+  useEffect(() => {
+    if (vista !== "buscar" || cacheEmpleados) return;
+    let vivo = true;
+    getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
+      .then((snap) => {
+        const lista = snap.docs
+          .map((d) => ({ uid: d.id, nombre: String(d.data().nombre ?? ""), baja: d.data().activo === false }))
+          .filter((e) => e.nombre)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+        cacheEmpleados = lista;
+        if (vivo) setEmpleados(lista);
+      })
+      .catch((err) => console.error("No se pudo cargar el personal", err));
+    return () => { vivo = false; };
+  }, [vista]);
+
+  const hayFiltros = Object.values(filtros).some(Boolean);
+
+  // Un solo filtro va al servidor (el más selectivo: empleado > trámite >
+  // fechas > estado) para no depender de índices compuestos; el resto se
+  // aplica sobre lo que llegó. Así solo se leen los trámites que coinciden.
+  const buscar = async () => {
+    if (!hayFiltros) return;
+    const f = filtros;
+    const desde = f.desde ? new Date(`${f.desde}T00:00:00`) : null;
+    const hasta = f.hasta ? new Date(`${f.hasta}T23:59:59.999`) : null;
+    const restricciones: QueryConstraint[] = f.empleadoId
+      ? [where("empleadoId", "==", f.empleadoId)]
+      : f.categoria
+        ? [where("categoria", "==", f.categoria)]
+        : desde || hasta
+          ? [
+              ...(desde ? [where("creadoEn", ">=", Timestamp.fromDate(desde))] : []),
+              ...(hasta ? [where("creadoEn", "<=", Timestamp.fromDate(hasta))] : []),
+              orderBy("creadoEn", "desc"),
+            ]
+          : [where("estado", "==", f.estado)];
+
+    setBuscando("filtros");
+    setErrorBusqueda(null);
+    try {
+      const snap = await getDocs(query(collection(db, "tramites_personal"), ...restricciones, limit(LIMITE_BUSQUEDA)));
+      const lista = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as TramitePersonal))
+        .filter((t) => {
+          if (f.empleadoId && t.empleadoId !== f.empleadoId) return false;
+          if (f.categoria && t.categoria !== f.categoria) return false;
+          if (f.estado && t.estado !== f.estado) return false;
+          const creado = msCreado(t);
+          if (desde && creado < desde.getTime()) return false;
+          if (hasta && creado > hasta.getTime()) return false;
+          return true;
+        })
+        .sort(porCreadoDesc);
+      setResultados(lista);
+      setTope(snap.size >= LIMITE_BUSQUEDA ? LIMITE_BUSQUEDA : null);
+    } catch (err) {
+      console.error("No se pudo buscar", err);
+      setErrorBusqueda("No se pudo completar la búsqueda. Intenta de nuevo.");
+    } finally {
+      setBuscando(null);
+    }
+  };
+
+  const consultarTodos = async () => {
+    setBuscando("todos");
+    setErrorBusqueda(null);
+    try {
+      const snap = await getDocs(query(collection(db, "tramites_personal"), orderBy("creadoEn", "desc"), limit(LIMITE_TODOS)));
+      setResultados(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TramitePersonal)));
+      setTope(snap.size >= LIMITE_TODOS ? LIMITE_TODOS : null);
+    } catch (err) {
+      console.error("No se pudo consultar", err);
+      setErrorBusqueda("No se pudo completar la consulta. Intenta de nuevo.");
+    } finally {
+      setBuscando(null);
     }
   };
 
@@ -160,13 +244,13 @@ export default function AprobacionTramitesPage() {
     );
   };
 
-  const abrirResolucion = (tramite: TramitePersonal) => {
-    setTramiteAprobando(tramite);
+  const abrirDetalle = (tramite: TramitePersonal) => {
+    setDetalle(tramite);
     setAccionAdmin("aprobado");
     setComentarioAdmin("");
     setConflictosPermiso([]);
     setAdvertenciasPermiso([]);
-    if (!esPermisoPersonal(tramite)) return;
+    if (tramite.estado !== "pendiente" || !esPermisoPersonal(tramite)) return;
 
     setRevisandoCoincidencias(true);
     buscarCoincidenciasPermiso(tramite, "pendiente")
@@ -174,6 +258,12 @@ export default function AprobacionTramitesPage() {
       .catch((err) => console.error("No se pudieron revisar permisos pendientes del grupo", err))
       .finally(() => setRevisandoCoincidencias(false));
   };
+
+  const cerrarDetalle = useCallback(() => {
+    setDetalle(null);
+    setConflictosPermiso([]);
+    setAdvertenciasPermiso([]);
+  }, []);
 
   // Refleja el permiso aprobado en el plan de trabajo del/los mes(es) que cubre.
   // Corre en transacción para no pisar ediciones concurrentes del asistente.
@@ -242,13 +332,13 @@ export default function AprobacionTramitesPage() {
 
   const handleResolver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tramiteAprobando?.id || !user || !profile) return;
+    if (!detalle?.id || !user || !profile) return;
     setSaving(true);
     try {
-      if (accionAdmin === "aprobado" && esPermisoPersonal(tramiteAprobando)) {
+      if (accionAdmin === "aprobado" && esPermisoPersonal(detalle)) {
         // Se consulta al momento de resolver para no depender de la caché de la
         // bandeja: otro administrador pudo aprobar una solicitud recientemente.
-        const conflictos = await buscarCoincidenciasPermiso(tramiteAprobando, "aprobado");
+        const conflictos = await buscarCoincidenciasPermiso(detalle, "aprobado");
 
         if (conflictos.length > 0) {
           const primero = conflictos[0];
@@ -261,33 +351,39 @@ export default function AprobacionTramitesPage() {
         }
       }
 
-      const id = tramiteAprobando.id;
+      const id = detalle.id;
+      const ahora = Timestamp.now();
+      const comentario = comentarioAdmin.trim() || undefined;
       await updateDoc(doc(db, "tramites_personal", id), {
         estado: accionAdmin,
         revisadoPorId: user.uid,
         revisadoPorNombre: profile.nombre,
-        revisadoEn: Timestamp.now(),
-        comentariosRevision: comentarioAdmin.trim() || undefined,
-        actualizadoEn: Timestamp.now()
+        revisadoEn: ahora,
+        comentariosRevision: comentario,
+        actualizadoEn: ahora,
       });
-      // Actualización optimista: parchamos el doc en memoria + caché para no releer
-      // los 400 tras cada resolución.
-      const parche = (t: TramitePersonal): TramitePersonal =>
-        t.id === id
-          ? { ...t, estado: accionAdmin, revisadoPorId: user.uid, revisadoPorNombre: profile.nombre, comentariosRevision: comentarioAdmin.trim() || undefined }
-          : t;
-      setTramites(prev => prev.map(parche));
-      if (cacheTramites) cacheTramites = cacheTramites.map(parche);
+      // Actualización optimista: sale de pendientes y se parcha en los
+      // resultados de búsqueda, sin volver a leer.
+      const resuelto: TramitePersonal = {
+        ...detalle,
+        estado: accionAdmin,
+        revisadoPorId: user.uid,
+        revisadoPorNombre: profile.nombre,
+        revisadoEn: ahora.toDate(),
+        comentariosRevision: comentario,
+        actualizadoEn: ahora.toDate(),
+      };
+      setPendientes((prev) => prev.filter((t) => t.id !== id));
+      if (cachePendientes) cachePendientes = cachePendientes.filter((t) => t.id !== id);
+      setResultados((prev) => prev?.map((t) => (t.id === id ? resuelto : t)) ?? prev);
 
       // Permiso personal aprobado → se refleja en el plan de trabajo.
-      if (accionAdmin === "aprobado" && esPermisoPersonal(tramiteAprobando)) {
-        setResultadoPlan(await reflejarPermisoEnPlan({ ...tramiteAprobando, estado: "aprobado" }));
+      if (accionAdmin === "aprobado" && esPermisoPersonal(detalle)) {
+        setResultadoPlan(await reflejarPermisoEnPlan({ ...detalle, estado: "aprobado" }));
       }
 
-      setTramiteAprobando(null);
+      cerrarDetalle();
       setComentarioAdmin("");
-      setConflictosPermiso([]);
-      setAdvertenciasPermiso([]);
     } catch (err) {
       console.error(err);
       setErrorMsg("No se pudo guardar la resolución. Por favor intenta de nuevo.");
@@ -296,323 +392,172 @@ export default function AprobacionTramitesPage() {
     }
   };
 
-  const filtered = tramites.filter(t => {
-    if (filtroTab === "pendientes" && t.estado !== "pendiente") return false;
-    if (searchTxt) {
-      const q = searchTxt.toLowerCase();
-      return t.empleadoNombre.toLowerCase().includes(q) || CATEGORIAS[t.categoria].toLowerCase().includes(q);
-    }
-    return true;
-  });
-
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#1c1e4d] dark:text-[#c9a892] mb-1">
-            <ClipboardCheck size={13} /> Administración
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-heading">Gestión de Trámites</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Revisa y aprueba los permisos del personal y consulta sus documentos subidos.
-          </p>
-        </div>
-        <button
-          onClick={consultar}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 self-start"
-        >
-          {loading ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />}
-          {consultado ? "Actualizar" : "Consultar"}
-        </button>
-      </div>
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-heading">Gestión de Trámites</h1>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full md:w-auto">
+        {/* Pendientes | Buscar: la bandeja y la búsqueda histórica no se apilan. */}
+        <div className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/60">
+          {([
+            { id: "pendientes", label: "Pendientes", Icono: Inbox },
+            { id: "buscar", label: "Buscar", Icono: Search },
+          ] as const).map(({ id, label, Icono }) => (
             <button
-              onClick={() => setFiltroTab("pendientes")}
-              className={`flex-1 md:w-40 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${
-                filtroTab === "pendientes" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              key={id}
+              type="button"
+              onClick={() => setVista(id)}
+              aria-pressed={vista === id}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors sm:flex-none ${
+                vista === id
+                  ? "bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-cyan-300"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
-              Pendientes
+              <Icono size={15} />
+              {label}
+              {id === "pendientes" && pendientes.length > 0 && (
+                <span className="min-w-[1.25rem] rounded-full bg-amber-500 px-1.5 text-[11px] font-bold leading-5 text-white tabular-nums">
+                  {pendientes.length}
+                </span>
+              )}
             </button>
-            <button
-              onClick={() => setFiltroTab("todos")}
-              className={`flex-1 md:w-40 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${
-                filtroTab === "todos" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-              }`}
-            >
-              Historial Total
-            </button>
-          </div>
-          
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input
-              type="text"
-              placeholder="Buscar por empleado o trámite..."
-              value={searchTxt}
-              onChange={e => setSearchTxt(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          ))}
         </div>
-
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : !consultado ? (
-          <div className="px-6 py-20 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800/50 text-slate-300 mb-4">
-              <ClipboardCheck size={32} />
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Bandeja de trámites</h3>
-            <p className="text-sm text-slate-500 mb-4">Pulsa Consultar para cargar las solicitudes.</p>
-            <button
-              onClick={consultar}
-              className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              <Search size={15} /> Consultar
-            </button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="px-6 py-20 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800/50 text-slate-300 mb-4">
-              <CheckCircle size={32} />
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">Todo al día</h3>
-            <p className="text-sm text-slate-500">No hay trámites que coincidan con tu búsqueda.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Fecha</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Empleado</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Trámite</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</th>
-                  <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {filtered.map(t => {
-                  const fecha = toDate(t.creadoEn) ?? new Date();
-
-                  return (
-                    <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
-                      <td className="py-3.5 px-4 align-top whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                        {fecha.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" })}
-                        <span className="block text-[10px] mt-0.5 opacity-70">{fecha.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" })}</span>
-                      </td>
-                      <td className="py-3.5 px-4 align-top">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{t.empleadoNombre}</p>
-                      </td>
-                      <td className="py-3.5 px-4 align-top max-w-xs">
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[t.categoria]}</p>
-                        {(t.fechaInicio || t.horas) && (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            {t.tipoSolicitud && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${t.tipoSolicitud === "diferido" ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"}`}>{t.tipoSolicitud}</span>
-                            )}
-                            {t.horas && <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-600 dark:text-slate-300 font-bold">{t.horas} hrs</span>}
-                            {t.fechaInicio && <span className="text-[10px] text-slate-500">Inicia: {toDate(t.fechaInicio)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}</span>}
-                          </div>
-                        )}
-                        {t.notas && <p className="text-[11px] text-slate-500 italic mt-1 line-clamp-1 group-hover:line-clamp-none">&quot;{t.notas}&quot;</p>}
-                      </td>
-                      <td className="py-3.5 px-4 align-top whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${ESTADO_BADGE[t.estado]}`}>
-                          {t.estado === "subido" ? "Info Subida" : t.estado}
-                        </span>
-                        {t.revisadoPorNombre && (t.estado === "aprobado" || t.estado === "rechazado") && (
-                          <span className="block text-[9px] text-slate-400 mt-1 uppercase">Por: {t.revisadoPorNombre}</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 align-top whitespace-nowrap text-right space-x-2">
-                        {docsDe(t).map((docu, i) => (
-                          <a key={i} href={docu.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors" title={docu.nombre}>
-                            <File size={14} />
-                          </a>
-                        ))}
-                        {t.estado === "pendiente" && (
-                          <button
-                            onClick={() => abrirResolucion(t)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
-                          >
-                            Resolver
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
-      {/* Modal Resolver */}
-      {tramiteAprobando && (
-        <div className="fixed inset-0 z-50 flex justify-center items-start pt-10 px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden mb-10 transform transition-all">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-amber-50 dark:bg-amber-950/20">
-              <h2 className="text-lg font-bold text-amber-800 dark:text-amber-500 flex items-center gap-2">
-                <Clock size={20} /> Resolver Solicitud
-              </h2>
+      {vista === "pendientes" ? (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {cargandoPendientes ? "Cargando…" : `${pendientes.length} por resolver`}
+            </p>
+            <button
+              type="button"
+              onClick={actualizarPendientes}
+              disabled={cargandoPendientes}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <RefreshCw size={13} className={cargandoPendientes ? "animate-spin" : ""} /> Actualizar
+            </button>
+          </div>
+          {cargandoPendientes && pendientes.length === 0 ? (
+            <Cargando />
+          ) : pendientes.length === 0 ? (
+            <Vacio icono={CheckCircle2} titulo="Sin trámites pendientes" tono="verde" />
+          ) : (
+            <TablaTramites items={pendientes} onAbrir={abrirDetalle} />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <form
+            onSubmit={(e) => { e.preventDefault(); void buscar(); }}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <Campo label="Empleado">
+                <select value={filtros.empleadoId} onChange={(e) => setFiltros((f) => ({ ...f, empleadoId: e.target.value }))} className={SELECT_CLS}>
+                  <option value="">Todos</option>
+                  {empleados.map((e) => (
+                    <option key={e.uid} value={e.uid}>{e.nombre}{e.baja ? " (baja)" : ""}</option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Trámite">
+                <select value={filtros.categoria} onChange={(e) => setFiltros((f) => ({ ...f, categoria: e.target.value as Filtros["categoria"] }))} className={SELECT_CLS}>
+                  <option value="">Todos</option>
+                  {(Object.keys(CATEGORIAS_TRAMITE) as CategoriaTramitePersonal[]).map((c) => (
+                    <option key={c} value={c}>{CATEGORIAS_TRAMITE[c]}</option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Estado">
+                <select value={filtros.estado} onChange={(e) => setFiltros((f) => ({ ...f, estado: e.target.value as Filtros["estado"] }))} className={SELECT_CLS}>
+                  <option value="">Todos</option>
+                  {(Object.keys(ESTADO_TRAMITE_LABEL) as EstadoTramitePersonal[]).map((s) => (
+                    <option key={s} value={s}>{ESTADO_TRAMITE_LABEL[s]}</option>
+                  ))}
+                </select>
+              </Campo>
+              <Campo label="Solicitado desde">
+                <DateField value={filtros.desde} onChange={(v) => setFiltros((f) => ({ ...f, desde: v }))} ariaLabel="Solicitado desde" clearable />
+              </Campo>
+              <Campo label="Solicitado hasta">
+                <DateField value={filtros.hasta} onChange={(v) => setFiltros((f) => ({ ...f, hasta: v }))} ariaLabel="Solicitado hasta" clearable />
+              </Campo>
             </div>
-            
-            <form onSubmit={handleResolver} className="p-6 space-y-6">
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
-                <p className="text-xs text-slate-500 mb-1">Empleado</p>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3">{tramiteAprobando.empleadoNombre}</p>
-                
-                <p className="text-xs text-slate-500 mb-1">Trámite solicitado</p>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[tramiteAprobando.categoria]}</p>
-
-                {(tramiteAprobando.fechaInicio || tramiteAprobando.horas || tramiteAprobando.tipoSolicitud) && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {tramiteAprobando.tipoSolicitud && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${tramiteAprobando.tipoSolicitud === "diferido" ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"}`}>{tramiteAprobando.tipoSolicitud}</span>
-                    )}
-                    {tramiteAprobando.horas && (
-                      <span className="text-[11px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 font-bold">{tramiteAprobando.horas} hrs</span>
-                    )}
-                    {tramiteAprobando.fechaInicio && (
-                      <span className="text-[11px] text-slate-500">
-                        {toDate(tramiteAprobando.fechaInicio)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}
-                        {tramiteAprobando.fechaFin && ` → ${toDate(tramiteAprobando.fechaFin)?.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) ?? "-"}`}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {docsDe(tramiteAprobando).length > 0 && (
-                  <div className="mt-3 space-y-1.5">
-                    <p className="text-xs text-slate-500">Adjuntos</p>
-                    {docsDe(tramiteAprobando).map((docu, i) => (
-                      <a key={i} href={docu.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline">
-                        <File size={13} className="shrink-0" /> <span className="truncate">{docu.nombre}</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {revisandoCoincidencias && esPermisoPersonal(tramiteAprobando) && (
-                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
-                  <RefreshCw size={15} className="animate-spin" /> Revisando otras solicitudes pendientes del mismo grupo…
-                </div>
-              )}
-
-              {advertenciasPermiso.length > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                    <div>
-                      <p className="font-bold">Hay otra solicitud pendiente para el mismo grupo y fecha</p>
-                      <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-200">
-                        Es solo una advertencia: puedes decidir cuál solicitud priorizar según la necesidad. Al aprobar una, la otra ya no podrá aprobarse para esa misma fecha.
-                      </p>
-                      <ul className="mt-2 space-y-1 text-xs font-medium">
-                        {advertenciasPermiso.map((advertencia) => (
-                          <li key={`${advertencia.fecha}-${advertencia.grupo}-${advertencia.empleadoNombre}`}>
-                            {fechaLegible(advertencia.fecha)} · {advertencia.grupo} · {advertencia.empleadoNombre}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  Resolución
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className={`cursor-pointer border rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${accionAdmin === "aprobado" ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 text-emerald-700 dark:text-emerald-400" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-emerald-200"}`}>
-                    <input type="radio" name="resolucion" value="aprobado" checked={accionAdmin === "aprobado"} onChange={() => setAccionAdmin("aprobado")} className="sr-only" />
-                    <CheckCircle size={24} />
-                    <span className="text-sm font-bold">Aprobar</span>
-                  </label>
-                  <label className={`cursor-pointer border rounded-xl p-3 flex flex-col items-center gap-2 transition-all ${accionAdmin === "rechazado" ? "bg-rose-50 dark:bg-rose-950/30 border-rose-500 text-rose-700 dark:text-rose-400" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-rose-200"}`}>
-                    <input type="radio" name="resolucion" value="rechazado" checked={accionAdmin === "rechazado"} onChange={() => setAccionAdmin("rechazado")} className="sr-only" />
-                    <XCircle size={24} />
-                    <span className="text-sm font-bold">Rechazar</span>
-                  </label>
-                </div>
-              </div>
-
-              {conflictosPermiso.length > 0 && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-100">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
-                    <div>
-                      <p className="font-bold">No se puede aprobar este permiso personal</p>
-                      <p className="mt-1 text-xs leading-5 text-rose-800 dark:text-rose-200">
-                        Ya existe un permiso personal aprobado para el mismo grupo operativo en la fecha solicitada. Esta regla no aplica al personal administrativo.
-                      </p>
-                      <ul className="mt-2 space-y-1 text-xs font-medium">
-                        {conflictosPermiso.map((conflicto) => (
-                          <li key={`${conflicto.fecha}-${conflicto.grupo}-${conflicto.empleadoNombre}`}>
-                            {fechaLegible(conflicto.fecha)} · {conflicto.grupo} · {conflicto.empleadoNombre}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  Comentario / Respuesta <span className="text-slate-400 font-normal normal-case">(opcional)</span>
-                </label>
-                <textarea
-                  value={comentarioAdmin}
-                  onChange={e => setComentarioAdmin(e.target.value)}
-                  rows={3}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
-                  placeholder="Justificación de la resolución..."
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="submit"
+                disabled={!hayFiltros || buscando !== null}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {buscando === "filtros" ? <RefreshCw size={15} className="animate-spin" /> : <Search size={15} />} Buscar
+              </button>
+              <button
+                type="button"
+                onClick={consultarTodos}
+                disabled={buscando !== null}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                {buscando === "todos" ? <RefreshCw size={15} className="animate-spin" /> : <List size={15} />} Consultar todos
+              </button>
+              {hayFiltros && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setTramiteAprobando(null);
-                    setConflictosPermiso([]);
-                    setAdvertenciasPermiso([]);
-                  }}
-                  disabled={saving}
-                  className="px-5 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                  onClick={() => setFiltros(FILTROS_VACIOS)}
+                  className="inline-flex items-center gap-1 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                 >
-                  Cancelar
+                  <X size={14} /> Limpiar
                 </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${accionAdmin === "aprobado" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-rose-600 hover:bg-rose-500"}`}
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    "Guardar Resolución"
-                  )}
-                </button>
+              )}
+            </div>
+          </form>
+
+          {errorBusqueda && (
+            <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{errorBusqueda}</p>
+          )}
+
+          {resultados !== null && (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
+                  {resultados.length} {resultados.length === 1 ? "trámite" : "trámites"}
+                </p>
+                {tope && <p className="text-xs text-slate-500 dark:text-slate-400">Se muestran los {tope} más recientes</p>}
               </div>
-            </form>
-          </div>
+              {buscando ? (
+                <Cargando />
+              ) : resultados.length === 0 ? (
+                <Vacio icono={Search} titulo="Sin coincidencias" tono="neutro" />
+              ) : (
+                <TablaTramites items={resultados} onAbrir={abrirDetalle} />
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modal: resultado del reflejo en el plan de trabajo */}
+      {detalle && (
+        <TramiteDetalleModal
+          tramite={detalle}
+          onClose={cerrarDetalle}
+          resolucion={detalle.estado === "pendiente" ? {
+            accion: accionAdmin,
+            onAccion: setAccionAdmin,
+            comentario: comentarioAdmin,
+            onComentario: setComentarioAdmin,
+            advertencias: advertenciasPermiso,
+            conflictos: conflictosPermiso,
+            revisando: revisandoCoincidencias,
+            saving,
+            onSubmit: handleResolver,
+          } : undefined}
+        />
+      )}
+
+      {/* Resultado del reflejo en el plan de trabajo */}
       {resultadoPlan && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -642,7 +587,7 @@ export default function AprobacionTramitesPage() {
         </div>
       )}
 
-      {/* Modal de error */}
+      {/* Error al guardar */}
       {errorMsg && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
@@ -668,3 +613,123 @@ export default function AprobacionTramitesPage() {
     </div>
   );
 }
+
+function Campo({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Cargando() {
+  return (
+    <div className="flex justify-center py-16">
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+    </div>
+  );
+}
+
+function Vacio({ icono: Icono, titulo, tono }: { icono: typeof Search; titulo: string; tono: "verde" | "neutro" }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
+        tono === "verde"
+          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+          : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
+      }`}>
+        <Icono size={26} />
+      </span>
+      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{titulo}</p>
+    </div>
+  );
+}
+
+/** Tabla de trámites: toda la fila abre la ficha; el botón da el acceso por teclado. */
+function TablaTramites({ items, onAbrir }: { items: TramitePersonal[]; onAbrir: (t: TramitePersonal) => void }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900/60">
+            <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Solicitado</th>
+            <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Empleado</th>
+            <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Trámite</th>
+            <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Estado</th>
+            <th className="px-4 py-2.5"><span className="sr-only">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+          {items.map((t) => {
+            const creado = toDate(t.creadoEn);
+            const inicio = toDate(t.fechaInicio);
+            const { codigo, nombre } = partesCategoria(t.categoria);
+            const nDocs = docsDeTramite(t).length;
+            const conRespuesta = !!t.comentariosRevision && t.estado !== "subido";
+            return (
+              <tr key={t.id} onClick={() => onAbrir(t)} className="group cursor-pointer transition-colors hover:bg-blue-50/40 dark:hover:bg-slate-800/40">
+                <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-slate-500 tabular-nums dark:text-slate-400">
+                  {creado?.toLocaleDateString("es-SV", { day: "2-digit", month: "short", year: "numeric" }) ?? "—"}
+                  <span className="block text-[11px] opacity-75">{creado?.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t.empleadoNombre}</p>
+                </td>
+                <td className="max-w-sm px-4 py-3 align-top">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 inline-flex h-6 min-w-[2rem] shrink-0 items-center justify-center rounded-md bg-blue-50 px-1.5 font-heading text-[11px] font-bold text-blue-900 ring-1 ring-blue-100 dark:bg-blue-950 dark:text-cyan-200 dark:ring-blue-900">
+                      {codigo}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{nombre}</p>
+                      {(inicio || t.horas) && (
+                        <p className="text-xs text-slate-500 tabular-nums dark:text-slate-400">
+                          {inicio?.toLocaleDateString("es-SV", { day: "2-digit", month: "short" })}
+                          {inicio && t.horas ? " · " : ""}
+                          {t.horas ? `${t.horas} h` : ""}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 align-top">
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${ESTADO_TRAMITE_PILL[t.estado]}`}>
+                    {ESTADO_TRAMITE_LABEL[t.estado]}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 align-top">
+                  <div className="flex items-center justify-end gap-3">
+                    {nDocs > 0 && (
+                      <span className="inline-flex items-center gap-1 text-xs text-slate-400 tabular-nums" title={`${nDocs} adjunto(s)`}>
+                        <Paperclip size={13} /> {nDocs}
+                      </span>
+                    )}
+                    {conRespuesta && (
+                      <span className="text-slate-400" title="Con respuesta de administración">
+                        <MessageSquareText size={14} />
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onAbrir(t); }}
+                      className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        t.estado === "pendiente"
+                          ? "bg-amber-500 text-white hover:bg-amber-600"
+                          : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {t.estado === "pendiente" ? "Resolver" : "Ver"}
+                      <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
