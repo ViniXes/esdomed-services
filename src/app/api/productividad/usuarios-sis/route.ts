@@ -19,12 +19,6 @@ function fechaIso(value: unknown) {
   return (value as { toDate?: () => Date } | undefined)?.toDate?.().toISOString() ?? null;
 }
 
-function mismaFecha(a: unknown, b: unknown) {
-  const fechaA = fechaIso(a);
-  const fechaB = fechaIso(b);
-  return Boolean(fechaA && fechaB && fechaA === fechaB);
-}
-
 /**
  * Producción administrativa de usuarios SIS. Se sirve solo desde el servidor
  * para que el navegador nunca pueda consultar la bandeja completa por fuera
@@ -47,16 +41,11 @@ export async function GET(req: NextRequest) {
   // con el día laboral que ve el personal.
   const inicio = new Date(Date.UTC(anio, numeroMes - 1, 1, 6));
   const fin = new Date(Date.UTC(anio, numeroMes, 1, 5, 59, 59, 999));
-  const [creacionesSnap, gestionesUsuariosSnap, llavesSnap, reposicionesGeneradasSnap, reposicionesEntregadasSnap, gestionesLlavesSnap] = await Promise.all([
+  const [creacionesSnap, llavesSnap, reposicionesSnap] = await Promise.all([
     adminDb
       .collection(SOLICITUDES)
       .where("usuarioSisCreadoEn", ">=", inicio)
       .where("usuarioSisCreadoEn", "<=", fin)
-      .get(),
-    adminDb
-      .collection(SOLICITUDES)
-      .where("estadoActualizadoEn", ">=", inicio)
-      .where("estadoActualizadoEn", "<=", fin)
       .get(),
     adminDb
       .collection(SOLICITUDES)
@@ -67,16 +56,6 @@ export async function GET(req: NextRequest) {
       .collection("solicitudes_reposicion_llave_sis")
       .where("llaveGeneradaEn", ">=", inicio)
       .where("llaveGeneradaEn", "<=", fin)
-      .get(),
-    adminDb
-      .collection("solicitudes_reposicion_llave_sis")
-      .where("llaveSisEntregadaEn", ">=", inicio)
-      .where("llaveSisEntregadaEn", "<=", fin)
-      .get(),
-    adminDb
-      .collection("solicitudes_reposicion_llave_sis")
-      .where("estadoActualizadoEn", ">=", inicio)
-      .where("estadoActualizadoEn", "<=", fin)
       .get(),
   ]);
 
@@ -95,7 +74,10 @@ export async function GET(req: NextRequest) {
     .filter((registro) => registro.creadoPorId && registro.creadoPorNombre && registro.creadoEn)
     .sort((a, b) => String(b.creadoEn).localeCompare(String(a.creadoEn)));
 
-  const llavesEnviadasUsuarios = llavesSnap.docs
+  // La solicitud guarda la marca como "enviada" porque la llave se adjunta y
+  // envía al médico en un solo paso. En productividad se presenta como una
+  // sola actividad: creación de llave, sin duplicarla como entrega.
+  const llavesCreadas = llavesSnap.docs
     .map((doc) => {
       const data = doc.data();
       return {
@@ -110,7 +92,7 @@ export async function GET(req: NextRequest) {
     .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn)
     .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
 
-  const llavesGeneradasReposicion = reposicionesGeneradasSnap.docs
+  const reposicionesLlave = reposicionesSnap.docs
     .map((doc) => {
       const data = doc.data();
       return {
@@ -124,63 +106,11 @@ export async function GET(req: NextRequest) {
     })
     .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn);
 
-  const llavesEnviadasReposicion = reposicionesEntregadasSnap.docs
-    .map((doc) => {
-      const data = doc.data();
-      return {
-        id: `reposicion-${doc.id}`,
-        solicitante: String(data.medicoNombre ?? ""),
-        usuarioSis: "",
-        enviadoPorId: String(data.llaveSisEntregadaPorId ?? ""),
-        enviadoPorNombre: String(data.llaveSisEntregadaPorNombre ?? ""),
-        enviadoEn: fechaIso(data.llaveSisEntregadaEn),
-      };
-    })
-    .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn);
-
-  const llavesEnviadas = [...llavesEnviadasUsuarios, ...llavesEnviadasReposicion]
-    .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
-
-  const gestionesUsuarios = gestionesUsuariosSnap.docs
-    .map((doc) => {
-      const data = doc.data();
-      return {
-        id: `gestion-usuario-${doc.id}`,
-        solicitante: String(data.nombre ?? ""),
-        usuarioSis: String(data.usuarioSis ?? ""),
-        enviadoPorId: String(data.estadoActualizadoPorId ?? ""),
-        enviadoPorNombre: String(data.estadoActualizadoPorNombre ?? ""),
-        enviadoEn: fechaIso(data.estadoActualizadoEn),
-        esCreacion: mismaFecha(data.estadoActualizadoEn, data.usuarioSisCreadoEn),
-      };
-    })
-    // La transición a creado se contabiliza como creación, no dos veces como gestión.
-    .filter((registro) => !registro.esCreacion && registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn);
-
-  const gestionesLlaves = gestionesLlavesSnap.docs
-    .map((doc) => {
-      const data = doc.data();
-      return {
-        id: `gestion-llave-${doc.id}`,
-        solicitante: String(data.medicoNombre ?? ""),
-        usuarioSis: "",
-        enviadoPorId: String(data.estadoActualizadoPorId ?? ""),
-        enviadoPorNombre: String(data.estadoActualizadoPorNombre ?? ""),
-        enviadoEn: fechaIso(data.estadoActualizadoEn),
-        esGeneracion: mismaFecha(data.estadoActualizadoEn, data.llaveGeneradaEn),
-        esEntrega: mismaFecha(data.estadoActualizadoEn, data.llaveSisEntregadaEn),
-      };
-    })
-    // Generar o entregar ya son actividades propias y no se duplican como gestión.
-    .filter((registro) => !registro.esGeneracion && !registro.esEntrega && registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn);
-
   const actividades = [
     ...registros.map((registro) => ({ ...registro, tipo: "usuarios_creados", etiqueta: "Usuarios SIS creados", responsableId: registro.creadoPorId, responsableNombre: registro.creadoPorNombre, fecha: registro.creadoEn })),
-    ...gestionesUsuarios.map((registro) => ({ ...registro, tipo: "usuarios_gestionados", etiqueta: "Gestiones de usuarios SIS", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
-    ...llavesGeneradasReposicion.map((registro) => ({ ...registro, tipo: "llaves_generadas", etiqueta: "Llaves o firmas generadas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
-    ...llavesEnviadas.map((registro) => ({ ...registro, tipo: "llaves_entregadas", etiqueta: "Llaves o firmas entregadas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
-    ...gestionesLlaves.map((registro) => ({ ...registro, tipo: "llaves_gestionadas", etiqueta: "Gestiones de llaves o firmas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
+    ...llavesCreadas.map((registro) => ({ ...registro, tipo: "llaves_sis_creadas", etiqueta: "Llaves SIS creadas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
+    ...reposicionesLlave.map((registro) => ({ ...registro, tipo: "reposiciones_llave_medica", etiqueta: "Reposiciones de llaves médicas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
   ].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 
-  return NextResponse.json({ registros, llavesEnviadas, actividades });
+  return NextResponse.json({ actividades });
 }

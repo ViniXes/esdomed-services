@@ -14,7 +14,7 @@ const COLUMNAS = [
   ["expedientes", "Expedientes"], ["defunciones", "Defunciones"], ["certificados", "Certificados"], ["altas", "Altas"], ["documentos", "Docs. alta"], ["simmow", "SIMMOW"], ["traslados", "Traslados"], ["carpetasDrive", "Carpetas Drive"], ["actualizacionesDrive", "Actualiz. Drive"], ["consentimientosDrive", "Consent. Drive"], ["emergenciasSimmow", "Emerg. SIMMOW"],
 ] as const satisfies readonly (readonly [keyof ValoresEsdomed, string])[];
 const SIS = [
-  ["usuarios_creados", "Usuarios SIS"], ["usuarios_gestionados", "Gestiones usuarios"], ["llaves_generadas", "Llaves/firma generadas"], ["llaves_entregadas", "Llaves/firma entregadas"], ["llaves_gestionadas", "Gestiones llaves"],
+  ["usuarios_creados", "Usuarios SIS creados"], ["llaves_sis_creadas", "Llaves SIS creadas"], ["reposiciones_llave_medica", "Reposiciones de llaves médicas"],
 ] as const;
 const VISTAS: { id: Vista; label: string; icon: typeof BarChart3 }[] = [{ id: "resumen", label: "Resumen", icon: BarChart3 }, { id: "graficos", label: "Gráficos", icon: BarChart3 }, { id: "sis", label: "Usuarios y llaves SIS", icon: KeyRound }];
 const selectCls = "appearance-none rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
