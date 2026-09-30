@@ -40,6 +40,13 @@ const PERSONAS_NO_EVALUABLES = [
   ["supersu"],
 ] as const;
 
+// Boris pertenece a la jornada operativa aunque tenga un código que antes fue
+// incluido de forma histórica en el catálogo administrativo.
+function esBorisAndree(nombre?: string) {
+  const texto = (nombre ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  return texto.includes("BORIS") && texto.includes("ANDREE");
+}
+
 type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "drive" | "franjas";
 
 type ControlIngreso = {
@@ -244,7 +251,7 @@ export default function ProductividadEsdomedPage() {
         // La jornada del plan, no el rol de acceso, define quién es administrativo.
         // Así se incluye a Juan Carlos y se excluyen las cuentas técnicas, Super Su
         // y los operativos aunque hayan realizado una acción SIS.
-        setPersonalAdministrativo(perfiles.filter(perfil => configPersonalPlan(perfil.codigoMarcacion)?.tipoJornada === "Administrativo").map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
+        setPersonalAdministrativo(perfiles.filter(perfil => configPersonalPlan(perfil.codigoMarcacion)?.tipoJornada === "Administrativo" && !esBorisAndree(perfil.nombre)).map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
       })
       .catch(() => { setPersonal([]); setPersonalAdministrativo([]); });
   }, []);
