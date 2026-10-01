@@ -12,6 +12,8 @@ export const CARGOS_USUARIO_SIS = [
   { value: "medico_licenciado", label: "Médico o Licenciado" },
   { value: "trabajo_social", label: "Trabajo Social" },
   { value: "teleoperador", label: "Teleoperador" },
+  { value: "esdomed", label: "ESDOMED" },
+  { value: "gestor_hospitalario", label: "Gestor Hospitalario" },
 ] as const;
 
 export type CargoUsuarioSis = (typeof CARGOS_USUARIO_SIS)[number]["value"];
