@@ -59,6 +59,7 @@ export function normalizarNombrePersona(valor: unknown): string {
 // (ej. "Jefe de ESDOMED") es solo la etiqueta que ve quien llena el formulario
 // para reconocer a su jefe: lo que se guarda y valida es siempre `nombre`.
 export const JEFATURAS_SIS: { nombre: string; cargo?: string }[] = [
+  { nombre: "Laura Estela Miranda Iraheta", cargo: "Directora del Hospital Nacional El Salvador" },
   { nombre: "Rudy Armando Bonilla Carranza", cargo: "Subdirector del Hospital Nacional El Salvador" },
   { nombre: "Werner Stanley Posada Soriano", cargo: "Jefe de Dirección Médica" },
   { nombre: "Francisco Alexander Ruiz Zelaya", cargo: "Jefe de la Unidad de Cuidados Intensivos" },
@@ -70,7 +71,6 @@ export const JEFATURAS_SIS: { nombre: string; cargo?: string }[] = [
   { nombre: "Maria Jose Coto Silezar", cargo: "Jefe del Servicio de Cirugía" },
   { nombre: "William Francisco Huezo Vasquez", cargo: "Jefe de la Unidad de Epidemiología" },
   { nombre: "Maria Fernanda Cruz Zelaya", cargo: "Jefe de Emergencia" },
-  { nombre: "Laura Estela Miranda Iraheta", cargo: "Directora del Hospital Nacional El Salvador" },
   { nombre: "Rosa Carolina Beltran Henriquez" },
   { nombre: "Heber Benjamin Cardoza Guevara", cargo: "Jefe de ESDOMED" },
 ];
