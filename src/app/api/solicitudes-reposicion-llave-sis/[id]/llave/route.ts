@@ -13,7 +13,9 @@ async function administrador(req: NextRequest): Promise<Admin | null> {
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const perfil = (await adminDb.collection("usuarios").doc(decoded.uid).get()).data();
-    return perfil?.role === "admin" ? { uid: decoded.uid, nombre: String(perfil.nombre ?? "") } : null;
+    return perfil?.role === "admin" || perfil?.role === "asistente_esdomed"
+      ? { uid: decoded.uid, nombre: String(perfil.nombre ?? "") }
+      : null;
   } catch { return null; }
 }
 
@@ -30,7 +32,7 @@ function bucketPrivado() {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await administrador(req);
-  if (!admin) return NextResponse.json({ error: "Solo administración puede respaldar una llave." }, { status: 403 });
+  if (!admin) return NextResponse.json({ error: "Solo el equipo autorizado de Solicitudes SIS puede respaldar una llave." }, { status: 403 });
   const form = await req.formData();
   const archivo = form.get("archivo");
   if (!(archivo instanceof File)) return NextResponse.json({ error: "Selecciona el archivo de la llave SIS." }, { status: 400 });

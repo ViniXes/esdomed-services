@@ -52,14 +52,15 @@ export async function POST(req: NextRequest) {
 // ni datos del archivo. Administración ve toda la bandeja.
 export async function GET(req: NextRequest) {
   const actor = await sesion(req);
-  if (!actor || (actor.role !== "medico" && actor.role !== "admin")) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  if (!actor || (actor.role !== "medico" && actor.role !== "admin" && actor.role !== "asistente_esdomed")) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const resumen = new URL(req.url).searchParams.get("resumen") === "pendientes";
-  const snap = actor.role === "admin"
+  const esGestorSis = actor.role === "admin" || actor.role === "asistente_esdomed";
+  const snap = esGestorSis
     ? await adminDb.collection(SOLICITUDES).orderBy("creadoEn", "desc").limit(300).get()
     : await adminDb.collection(SOLICITUDES).where("medicoId", "==", actor.uid).limit(100).get();
 
-  if (resumen && actor.role === "admin") {
+  if (resumen && esGestorSis) {
     const pendientes = snap.docs.filter((doc) => String(doc.data().estado ?? "") === "pendiente");
     return NextResponse.json({
       pendientes: pendientes.length,
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
 
   const solicitudes = snap.docs.map((doc) => {
     const data = doc.data();
-    if (actor.role === "medico") {
+    if (!esGestorSis) {
       return { id: doc.id, tipo: "reposicion", estado: String(data.estado ?? "pendiente"), creadoEn: fechaIso(data.creadoEn), actualizadoEn: fechaIso(data.actualizadoEn) };
     }
     const {

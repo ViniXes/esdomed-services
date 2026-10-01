@@ -49,7 +49,7 @@ export function ReposicionesFirmaSis({ volverUsuarios }: { volverUsuarios: () =>
     } catch (err) { setError(err instanceof Error ? err.message : "No se pudieron cargar las reposiciones."); }
     finally { setCargando(false); }
   };
-  useEffect(() => { if (profile?.role === "admin") void cargar(); }, [profile?.role, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (profile?.role === "admin" || profile?.role === "asistente_esdomed") void cargar(); }, [profile?.role, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const abrir = (solicitud: Solicitud) => { setSeleccionada(solicitud); setEstado(solicitud.estado); setNotaAdmin(solicitud.notaAdmin ?? ""); setArchivo(null); };
   const guardar = async () => {
