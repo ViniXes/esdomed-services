@@ -54,8 +54,8 @@ export async function GET(req: NextRequest) {
       .get(),
     adminDb
       .collection("solicitudes_reposicion_llave_sis")
-      .where("llaveSisEntregadaEn", ">=", inicio)
-      .where("llaveSisEntregadaEn", "<=", fin)
+      .where("llaveGeneradaEn", ">=", inicio)
+      .where("llaveGeneradaEn", "<=", fin)
       .get(),
   ]);
 
@@ -74,7 +74,10 @@ export async function GET(req: NextRequest) {
     .filter((registro) => registro.creadoPorId && registro.creadoPorNombre && registro.creadoEn)
     .sort((a, b) => String(b.creadoEn).localeCompare(String(a.creadoEn)));
 
-  const llavesEnviadasUsuarios = llavesSnap.docs
+  // La solicitud guarda la marca como "enviada" porque la llave se adjunta y
+  // envía al médico en un solo paso. En productividad se presenta como una
+  // sola actividad: creación de llave, sin duplicarla como entrega.
+  const llavesCreadas = llavesSnap.docs
     .map((doc) => {
       const data = doc.data();
       return {
@@ -89,22 +92,25 @@ export async function GET(req: NextRequest) {
     .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn)
     .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
 
-  const llavesEnviadasReposicion = reposicionesSnap.docs
+  const reposicionesLlave = reposicionesSnap.docs
     .map((doc) => {
       const data = doc.data();
       return {
-        id: `reposicion-${doc.id}`,
+        id: `generacion-${doc.id}`,
         solicitante: String(data.medicoNombre ?? ""),
         usuarioSis: "",
-        enviadoPorId: String(data.llaveSisEntregadaPorId ?? ""),
-        enviadoPorNombre: String(data.llaveSisEntregadaPorNombre ?? ""),
-        enviadoEn: fechaIso(data.llaveSisEntregadaEn),
+        enviadoPorId: String(data.llaveGeneradaPorId ?? ""),
+        enviadoPorNombre: String(data.llaveGeneradaPorNombre ?? ""),
+        enviadoEn: fechaIso(data.llaveGeneradaEn),
       };
     })
     .filter((registro) => registro.enviadoPorId && registro.enviadoPorNombre && registro.enviadoEn);
 
-  const llavesEnviadas = [...llavesEnviadasUsuarios, ...llavesEnviadasReposicion]
-    .sort((a, b) => String(b.enviadoEn).localeCompare(String(a.enviadoEn)));
+  const actividades = [
+    ...registros.map((registro) => ({ ...registro, tipo: "usuarios_creados", etiqueta: "Usuarios SIS creados", responsableId: registro.creadoPorId, responsableNombre: registro.creadoPorNombre, fecha: registro.creadoEn })),
+    ...llavesCreadas.map((registro) => ({ ...registro, tipo: "llaves_sis_creadas", etiqueta: "Llaves SIS creadas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
+    ...reposicionesLlave.map((registro) => ({ ...registro, tipo: "reposiciones_llave_medica", etiqueta: "Reposiciones de llaves médicas", responsableId: registro.enviadoPorId, responsableNombre: registro.enviadoPorNombre, fecha: registro.enviadoEn })),
+  ].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
 
-  return NextResponse.json({ registros, llavesEnviadas });
+  return NextResponse.json({ actividades });
 }

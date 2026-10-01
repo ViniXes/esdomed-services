@@ -1,6 +1,6 @@
 import {
   Activity, Ambulance, ArrowRightLeft, BarChart3, BedDouble, Briefcase, Building2, CalendarClock,
-  CalendarRange, ChartColumn, ChartLine, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
+  CalendarRange, ChartColumn, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
   DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FolderOpen, HandHeart, HeartPulse,
   History, LayoutDashboard, LayoutGrid, ListChecks, LogIn, NotebookPen, Phone, PhoneCall, Printer, Radar,
   SearchCheck, Send, Settings, ShieldAlert, ShieldCheck, Siren, Stethoscope, Syringe, Table2, TrendingUp,
@@ -118,8 +118,6 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid },
       { href: "/dashboard/reportes/traslados", label: "Traslados de cama", icon: ArrowRightLeft },
       { href: "/dashboard/productividad/esdomed", label: "Productividad", icon: TrendingUp },
-      // Creaciones y entregas de llaves SIS por persona (título de la página: "Administración · Usuarios SIS").
-      { href: "/dashboard/productividad/administracion", label: "Productividad SIS", icon: ChartLine, visibleSi: esAdmin },
     ],
   },
   {

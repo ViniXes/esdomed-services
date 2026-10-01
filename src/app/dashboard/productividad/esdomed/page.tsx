@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { ProductividadTabs } from "../_components/ProductividadTabs";
+import { ProductividadTabs, type GrupoProductividad } from "../_components/ProductividadTabs";
+import { ProductividadAdministrativa } from "../_components/ProductividadAdministrativa";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
 import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
+import { configPersonalPlan } from "@/lib/esdomed/catalogo-plan";
 import type { NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, SolicitudTraslado } from "@/types";
 
 const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos", "emergenciasSimmow"] as const;
@@ -37,6 +39,13 @@ const PERSONAS_NO_EVALUABLES = [
   ["super", "su"],
   ["supersu"],
 ] as const;
+
+// Boris pertenece a la jornada operativa aunque tenga un código que antes fue
+// incluido de forma histórica en el catálogo administrativo.
+function esBorisAndree(nombre?: string) {
+  const texto = (nombre ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  return texto.includes("BORIS") && texto.includes("ANDREE");
+}
 
 type Vista = "resumen" | "expedientes" | "documentos" | "altas" | "drive" | "franjas";
 
@@ -211,6 +220,7 @@ export default function ProductividadEsdomedPage() {
 
   const [mes, setMes] = useState(mesActualStr());
   const [personal, setPersonal] = useState<string[]>([]);
+  const [personalAdministrativo, setPersonalAdministrativo] = useState<string[]>([]);
   const [carpetasDrive, setCarpetasDrive] = useState<Map<string, number>>(new Map());
   const [actualizacionesDrive, setActualizacionesDrive] = useState<Map<string, number>>(new Map());
   const [consentimientosDrive, setConsentimientosDrive] = useState<Map<string, number>>(new Map());
@@ -229,13 +239,21 @@ export default function ProductividadEsdomedPage() {
   const [personaFranjas, setPersonaFranjas] = useState<string>("todas");
   const [mostrarHoras, setMostrarHoras] = useState(false);
   const [subVistaFranjas, setSubVistaFranjas] = useState<"dia" | "horario">("dia");
+  const [grupo, setGrupo] = useState<GrupoProductividad>("operativos");
 
   const { inicio, fin } = useMemo(() => rangoMes(mes), [mes]);
 
   useEffect(() => {
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
-      .then(s => setPersonal(s.docs.map(d => (d.data().nombre as string)).filter(Boolean).sort((a, b) => a.localeCompare(b))))
-      .catch(() => setPersonal([]));
+      .then(s => {
+        const perfiles = s.docs.map(d => d.data() as { nombre?: string; role?: string; codigoMarcacion?: string });
+        setPersonal(perfiles.map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
+        // La jornada del plan, no el rol de acceso, define quién es administrativo.
+        // Así se incluye a Juan Carlos y se excluyen las cuentas técnicas, Super Su
+        // y los operativos aunque hayan realizado una acción SIS.
+        setPersonalAdministrativo(perfiles.filter(perfil => configPersonalPlan(perfil.codigoMarcacion)?.tipoJornada === "Administrativo" && !esBorisAndree(perfil.nombre)).map(perfil => perfil.nombre).filter((nombre): nombre is string => Boolean(nombre)).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => { setPersonal([]); setPersonalAdministrativo([]); });
   }, []);
 
   useEffect(() => {
@@ -386,6 +404,23 @@ export default function ProductividadEsdomedPage() {
     emergenciasSimmow,
   ]);
 
+  const resumenAdministrativoEsdomed = useMemo(() => personalAdministrativo.map(nombre => ({
+    nombre,
+    valores: {
+      expedientes: expedientesCreados.get(nombre) ?? 0,
+      defunciones: defuncionesProcesadas.get(nombre) ?? 0,
+      certificados: certificadosEntregados.get(nombre) ?? 0,
+      altas: altasEfectivas.get(nombre) ?? 0,
+      documentos: documentosEntregados.get(nombre) ?? 0,
+      simmow: altasSimmow.get(nombre) ?? 0,
+      traslados: trasladosProcesados.get(nombre) ?? 0,
+      carpetasDrive: carpetasDrive.get(nombre) ?? 0,
+      actualizacionesDrive: actualizacionesDrive.get(nombre) ?? 0,
+      consentimientosDrive: consentimientosDrive.get(nombre) ?? 0,
+      emergenciasSimmow: emergenciasSimmow.get(nombre) ?? 0,
+    },
+  })), [personalAdministrativo, expedientesCreados, defuncionesProcesadas, certificadosEntregados, altasEfectivas, documentosEntregados, altasSimmow, trasladosProcesados, carpetasDrive, actualizacionesDrive, consentimientosDrive, emergenciasSimmow]);
+
   if (!profile || !puedeVer) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -432,12 +467,17 @@ export default function ProductividadEsdomedPage() {
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
           <BarChart3 size={13} /> Productividad
         </div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">ESDOMED</h1>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Productividad</h1>
         <p className="text-xs text-slate-500 mt-0.5">Producción del personal de ESDOMED por periodo.</p>
       </div>
 
-      <ProductividadTabs />
+      <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin"} />
 
+      <div className={grupo === "administrativos" ? "" : "hidden"}>
+        <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} personalAdministrativo={personalAdministrativo} activa={grupo === "administrativos"} />
+      </div>
+
+      <div className={grupo === "operativos" ? "" : "hidden"}>
       <div className="flex flex-wrap items-center gap-3">
         <input type="month" value={mes} onChange={e => { if (e.target.value) setMes(e.target.value); }} className={selectCls} />
         {!loading && (
@@ -618,6 +658,7 @@ export default function ProductividadEsdomedPage() {
           })()}
         </>
       )}
+      </div>
     </div>
   );
 }
