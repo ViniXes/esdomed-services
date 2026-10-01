@@ -45,6 +45,7 @@ export default function SolicitudesUsuariosSisPage() {
   const [llavesEnviadas, setLlavesEnviadas] = useState(false);
   const [archivoLlave, setArchivoLlave] = useState<File | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [vista, setVista] = useState<"usuarios" | "reposiciones">("usuarios");
   const soloLectura = profile?.role === "medico_licenciado_dimes";
   const puedeAcceder = profile?.role === "admin" || profile?.role === "asistente_esdomed" || soloLectura;
@@ -101,6 +102,39 @@ export default function SolicitudesUsuariosSisPage() {
     finally { setGuardando(false); }
   };
   const visibles = useMemo(() => solicitudes.filter((s) => { const q = busqueda.trim().toLowerCase(); return (filtro === "todas" || s.estado === filtro) && (!q || [s.nombre, documento(s), s.servicio, s.especialidad, s.cargo].some((valor) => valor.toLowerCase().includes(q))); }), [solicitudes, busqueda, filtro]);
+  // Exporta lo que se está viendo en "Creado en SIS" (respeta la búsqueda).
+  const exportarExcel = async () => {
+    if (visibles.length === 0) return;
+    setExportando(true); setError("");
+    try {
+      const XLSX = await import("xlsx");
+      const filas = visibles.map((s) => ({
+        "Fecha de solicitud": fecha(s.creadoEn),
+        Nombre: s.nombre,
+        "Tipo de documento": TIPOS_DOCUMENTO_SIS.find((item) => item.value === s.tipoDocumento)?.label || "DUI",
+        "N° de documento": documento(s),
+        Correo: s.correo,
+        Teléfono: s.telefono,
+        "Tipo de empleado": cargo(s),
+        "Junta / registro": s.numeroJunta || "",
+        "Usuario SIS previo": s.yaTuvoUsuario === "si" ? "Sí" : "No",
+        Especialidad: s.otraEspecialidad || s.especialidad || "",
+        "Médico residente": s.esResidente === "si" ? "Sí" : "No",
+        Servicio: s.servicio,
+        "Jefatura que autoriza": s.autorizadoPor,
+        "Usuario asignado en SIS": s.usuarioSis || "",
+        "Llaves SIS enviadas": s.llavesSisEnviadasEn ? `${s.llavesSisEnviadasPorNombre || ""} · ${fecha(s.llavesSisEnviadasEn)}`.trim() : "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(filas);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Creados en SIS");
+      XLSX.writeFile(wb, `solicitudes_sis_creados_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      setError("No se pudo generar el archivo de Excel.");
+    } finally {
+      setExportando(false);
+    }
+  };
   const conteo = (item: EstadoSolicitudSis) => solicitudes.filter((s) => s.estado === item).length;
   if (loading || !puedeAcceder) return null;
   if (vista === "reposiciones" && esAdmin) return <ReposicionesFirmaSis volverUsuarios={() => setVista("usuarios")} />;
@@ -109,7 +143,7 @@ export default function SolicitudesUsuariosSisPage() {
     <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-300"><ClipboardList size={19} /></span><div><h1 className="font-heading text-xl font-bold text-slate-900 dark:text-slate-100">Solicitudes SIS</h1><p className="text-xs text-slate-500">{soloLectura ? "Consulta de solicitudes de usuarios SIS. Sin opciones de edición." : "Solicitudes de usuarios SIS y reposiciones de firma médica."}</p></div></div><button onClick={() => void cargar()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Actualizar</button></div>
     {esAdmin && <div className="mb-5 flex w-full gap-1 rounded-xl border border-slate-200 bg-white p-1 text-sm dark:border-slate-800 dark:bg-slate-900"><button className="flex-1 rounded-lg bg-cyan-100 px-3 py-2 font-semibold text-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200">Solicitudes de usuarios SIS</button><button onClick={() => setVista("reposiciones")} className="flex-1 rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">Reposiciones de firma médica</button></div>}
     <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">{estados.map((item) => <button key={item} onClick={() => setFiltro(item)} className={`rounded-xl border p-3 text-left transition ${estadoCls[item]} ${filtro === item ? "ring-2 ring-offset-1 ring-blue-500 dark:ring-offset-slate-950" : "opacity-80 hover:opacity-100"}`}><p className="text-xs">{ESTADO_SOLICITUD_SIS_LABEL[item]}</p><p className="mt-1 text-2xl font-bold">{conteo(item)}</p></button>)}</div>
-    <div className="mb-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row"><div className="relative flex-1"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className={`${inputCls} pl-9`} placeholder="Buscar por nombre, documento, cargo, servicio o especialidad..." /></div><select value={filtro} onChange={(e) => setFiltro(e.target.value as EstadoSolicitudSis | "todas")} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><option value="todas">Todos los estados</option>{estados.map((item) => <option key={item} value={item}>{ESTADO_SOLICITUD_SIS_LABEL[item]}</option>)}</select></div>
+    <div className="mb-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row"><div className="relative flex-1"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className={`${inputCls} pl-9`} placeholder="Buscar por nombre, documento, cargo, servicio o especialidad..." /></div><select value={filtro} onChange={(e) => setFiltro(e.target.value as EstadoSolicitudSis | "todas")} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><option value="todas">Todos los estados</option>{estados.map((item) => <option key={item} value={item}>{ESTADO_SOLICITUD_SIS_LABEL[item]}</option>)}</select>{filtro === "creado" && <button onClick={() => void exportarExcel()} disabled={exportando || visibles.length === 0} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"><Download size={15} />{exportando ? "Exportando..." : "Exportar a Excel"}</button>}</div>
     {error && <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</p>}
     {cargando ? <p className="py-16 text-center text-sm text-slate-400">Cargando solicitudes...</p> : visibles.length === 0 ? <Empty /> : <div className="space-y-3">{visibles.map((s) => <button key={s.id} onClick={() => abrir(s)} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900 dark:text-slate-100">{s.nombre}</p><span className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${estadoCls[s.estado]}`}>{ESTADO_SOLICITUD_SIS_LABEL[s.estado]}</span>{s.llavesSisEnviadasEn && <span className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">Llaves enviadas</span>}</div><p className="mt-1 text-xs text-slate-500">{etiquetaDocumento(s)} · {s.correo} · {s.telefono}</p><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{cargo(s)} · {s.otraEspecialidad || s.especialidad || "Sin especialidad"} · {s.servicio}</p></div><div className="shrink-0 text-xs text-slate-400 sm:text-right"><p>Solicitado</p><p>{fecha(s.creadoEn)}</p>{s.usuarioSis && <p className="mt-1 font-medium text-emerald-600 dark:text-emerald-400">Usuario SIS: {s.usuarioSis}</p>}</div></div></button>)}</div>}
     {seleccionada && <Modal solicitud={seleccionada} soloLectura={soloLectura} esAdmin={esAdmin} estado={estado} setEstado={setEstado} usuarioSis={usuarioSis} setUsuarioSis={setUsuarioSis} notaAdmin={notaAdmin} setNotaAdmin={setNotaAdmin} llavesEnviadas={llavesEnviadas} setLlavesEnviadas={setLlavesEnviadas} archivoLlave={archivoLlave} setArchivoLlave={setArchivoLlave} guardando={guardando} cerrar={() => setSeleccionada(null)} guardar={() => void guardar()} descargar={() => void descargar(seleccionada)} eliminar={() => void eliminar(seleccionada)} />}
