@@ -6,6 +6,7 @@ import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   CARGOS_USUARIO_SIS,
   ESPECIALIDADES_SIS,
+  SERVICIOS_EXTRA_SIS,
   type CargoUsuarioSis,
   TIPOS_DOCUMENTO_SIS,
   type TipoDocumentoSis,
@@ -17,6 +18,7 @@ const SOLICITUDES = "solicitudes_usuarios_sis";
 
 const cargosValidos = new Set<string>(CARGOS_USUARIO_SIS.map((cargo) => cargo.value));
 const especialidadesValidas = new Set<string>(ESPECIALIDADES_SIS);
+const serviciosExtraValidos = new Set<string>(SERVICIOS_EXTRA_SIS);
 const tiposDocumentoValidos = new Set<string>(TIPOS_DOCUMENTO_SIS.map((tipo) => tipo.value));
 const jefaturasAutorizadorasValidas = new Set<string>(JEFATURAS_AUTORIZADORAS_SIS);
 
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
   if (especialidad && !especialidadesValidas.has(especialidad)) return NextResponse.json({ error: "Selecciona una especialidad válida." }, { status: 400 });
   if (!esResidente || !yaTuvoUsuario) return NextResponse.json({ error: "Completa las preguntas de usuario previo y residencia." }, { status: 400 });
   if (!servicio) return NextResponse.json({ error: "Indica el servicio al que será asignado." }, { status: 400 });
-  if (!(await obtenerServiciosHabilitados()).has(servicio)) {
+  if (!serviciosExtraValidos.has(servicio) && !(await obtenerServiciosHabilitados()).has(servicio)) {
     return NextResponse.json({ error: "Selecciona uno de los servicios habilitados en ESDOMED." }, { status: 400 });
   }
   if (!jefaturasAutorizadorasValidas.has(autorizadoPor)) {

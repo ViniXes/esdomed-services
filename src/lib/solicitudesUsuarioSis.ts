@@ -80,7 +80,14 @@ export const JEFATURAS_AUTORIZADORAS_SIS: string[] = JEFATURAS_SIS.map((j) => j.
 export const etiquetaJefaturaSis = (j: { nombre: string; cargo?: string }) =>
   j.cargo ? `${j.nombre} — ${j.cargo}` : j.nombre;
 
+// Opciones de "Servicio al que será asignado" que no son del catálogo
+// hospitalario (no tienen camas ni entran a traslados) pero SIS sí las pide.
+// Se anteponen a la lista viva y el servidor las acepta además de ella.
+export const SERVICIOS_EXTRA_SIS = ["Consulta Externa"] as const;
+
 export const ESPECIALIDADES_SIS = [
+  // Va primero porque es la opción habitual de Consulta Externa y estaba muy abajo.
+  "Otras Atenciones Consulta Externa Médica-Consulta Externa-MINSAL",
   "Referido Externo-Referido-MINSAL",
   "Vacunación-Servicios de Apoyo-MINSAL",
   "Alimentación y Dieta-Servicios de Apoyo-MINSAL",
@@ -129,7 +136,6 @@ export const ESPECIALIDADES_SIS = [
   "Clinica de Atencion Integral-Consulta Externa-MINSAL",
   "Cirugía Cardiovascular-Hospitalización-MINSAL",
   "Anestesiología-Hospitalización-MINSAL",
-  "Otras Atenciones Consulta Externa Médica-Consulta Externa-MINSAL",
   "Nefrología-Hospitalización-MINSAL",
   "Gastroenterología-BM-Hospitalización-MINSAL",
   "Medicina Interna-BM-Hospitalización-MINSAL",

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FilePlus2 } from "lucide-react";
 import { normalizarDui } from "@/lib/dui";
-import { CARGOS_USUARIO_SIS, ESPECIALIDADES_SIS, JEFATURAS_SIS, etiquetaJefaturaSis, normalizarNombrePersona, RESPUESTAS_SI_NO, TIPOS_DOCUMENTO_SIS } from "@/lib/solicitudesUsuarioSis";
+import { CARGOS_USUARIO_SIS, ESPECIALIDADES_SIS, JEFATURAS_SIS, etiquetaJefaturaSis, normalizarNombrePersona, RESPUESTAS_SI_NO, SERVICIOS_EXTRA_SIS, TIPOS_DOCUMENTO_SIS } from "@/lib/solicitudesUsuarioSis";
 import { useServicios } from "@/contexts/ServiciosContext";
 
 const inputCls = "w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-transparent transition";
@@ -91,6 +91,7 @@ function SolicitudUsuarioSisFormulario() {
                 <Campo label="Servicio al que será asignado" className="lg:col-span-3">
                   <select value={form.servicio} onChange={(e) => set("servicio", e.target.value)} required disabled={cargandoServicios} className={`${inputCls} disabled:cursor-not-allowed disabled:opacity-60`}>
                     <option value="">{cargandoServicios ? "Cargando servicios habilitados..." : "Seleccionar servicio..."}</option>
+                    {SERVICIOS_EXTRA_SIS.map((servicio) => <option key={servicio} value={servicio}>{servicio}</option>)}
                     {servicios.map((servicio) => <option key={servicio} value={servicio}>{servicio}</option>)}
                   </select>
                 </Campo>
