@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
   if (new URL(req.url).searchParams.get("resumen") === "pendientes") {
     const [usuariosSnap, reposicionesSnap] = await Promise.all([
       adminDb.collection(SOLICITUDES).where("estado", "==", "pendiente").get(),
-      rol === "admin"
+      (rol === "admin" || rol === "asistente_esdomed")
         ? adminDb.collection("solicitudes_reposicion_llave_sis").where("estado", "==", "pendiente").get()
         : Promise.resolve(null),
     ]);
@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
       llaveSisArchivoSubidoEn: _subidoEnLlaveSis,
       ...datosSolicitud
     } = data;
-    const llaveSis = rol === "admin"
+    const llaveSis = rol === "admin" || rol === "asistente_esdomed"
       ? {
           llaveSisArchivoNombre: texto(_nombreLlaveSis, 180) || null,
           llaveSisArchivoTamano: Number(_tamanoLlaveSis ?? 0) || null,
