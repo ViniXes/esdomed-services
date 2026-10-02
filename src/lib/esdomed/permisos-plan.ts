@@ -47,9 +47,32 @@ export const fechasDelPermiso = (tramite: Pick<TramitePersonal, "fechaInicio" | 
 
 export const periodoDeFecha = (fecha: string): string => fecha.slice(0, 7);
 
-/** Periodos "YYYY-MM" que toca el permiso (normalmente uno). */
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * ¿El permiso cubre UN solo turno? Los turnos que amanecen (p. ej. 8 pm – 7 am)
+ * guardan `fechaFin` al día siguiente, así que contar fechas calendario los
+ * confunde con un permiso de dos días. Un solo turno = cabe en 24 h y a lo sumo
+ * toca dos fechas contiguas; su jornada pertenece al día en que inicia.
+ */
+export const esPermisoDeUnTurno = (tramite: Pick<TramitePersonal, "fechaInicio" | "fechaFin">): boolean => {
+  const fechas = fechasDelPermiso(tramite);
+  if (fechas.length === 1) return true;
+  if (fechas.length !== 2) return false;
+  const inicio = toDate(tramite.fechaInicio);
+  const fin = toDate(tramite.fechaFin);
+  return !!inicio && !!fin && fin.getTime() - inicio.getTime() <= MS_DIA;
+};
+
+/** Días del plan sobre los que actúa el permiso: el de inicio si es de un turno; si no, todo el rango. */
+export const fechasDePlanDelPermiso = (tramite: Pick<TramitePersonal, "fechaInicio" | "fechaFin">): string[] => {
+  const fechas = fechasDelPermiso(tramite);
+  return esPermisoDeUnTurno(tramite) ? fechas.slice(0, 1) : fechas;
+};
+
+/** Periodos "YYYY-MM" del plan que toca el permiso (normalmente uno). */
 export const periodosDelPermiso = (tramite: Pick<TramitePersonal, "fechaInicio" | "fechaFin">): string[] =>
-  [...new Set(fechasDelPermiso(tramite).map(periodoDeFecha))];
+  [...new Set(fechasDePlanDelPermiso(tramite).map(periodoDeFecha))];
 
 export interface ResultadoAplicarPermiso {
   filas: FilaPlanTrabajo[];
@@ -74,7 +97,7 @@ export function aplicarPermisoEnFilas(
   const sinCambios: ResultadoAplicarPermiso = { filas, cambio: false, completos: 0, parciales: 0, sinTurno: 0, sinFila: false };
   if (!tramite.id || !esPermisoPersonal(tramite)) return sinCambios;
 
-  const fechas = fechasDelPermiso(tramite);
+  const fechas = fechasDePlanDelPermiso(tramite);
   const prefijo = `${anio}-${String(mes).padStart(2, "0")}-`;
   const diasDelMesPermiso = fechas.filter((f) => f.startsWith(prefijo)).map((f) => Number(f.slice(8)));
   if (diasDelMesPermiso.length === 0) return sinCambios;

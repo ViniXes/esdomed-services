@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { EstadoTramitePersonal, TramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
+import { esPermisoDeUnTurno } from "@/lib/esdomed/permisos-plan";
 import {
   ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, docsDeTramite, fechaLegible, partesCategoria,
   type ConflictoPermisoGrupo,
@@ -310,8 +311,9 @@ export function TramiteDetalleModal({
   const docs = docsDeTramite(t);
   const resuelto = t.estado === "aprobado" || t.estado === "rechazado";
   const rechazoPrevio = t.estado === "pendiente" && !!t.revisadoEn;
+  // Un turno que amanece cruza la medianoche pero sigue siendo un solo día de permiso.
   const dias = inicio && fin
-    ? Math.round((new Date(fin.getFullYear(), fin.getMonth(), fin.getDate()).getTime() - new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate()).getTime()) / 86400000) + 1
+    ? esPermisoDeUnTurno(t) ? 1 : Math.round((new Date(fin.getFullYear(), fin.getMonth(), fin.getDate()).getTime() - new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate()).getTime()) / 86400000) + 1
     : 0;
 
   // Escape cierra (salvo mientras guarda); el foco entra al diálogo al abrir y

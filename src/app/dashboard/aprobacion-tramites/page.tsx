@@ -13,6 +13,7 @@ import { toDate } from "@/lib/pacientes/helpers";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
 import {
   aplicarPermisoEnFilas,
+  esPermisoDeUnTurno,
   esPermisoPersonal,
   fechasDelPermiso,
   periodoDeFecha,
@@ -357,8 +358,8 @@ export default function AprobacionTramitesPage() {
           throw new Error("Este trámite ya no admite ajustes de horas.");
         }
         const inicio = toDate(actual.fechaInicio);
-        if (!inicio || fechasDelPermiso(actual).length !== 1) {
-          throw new Error("Solo se pueden ajustar permisos de un solo día.");
+        if (!inicio || !esPermisoDeUnTurno(actual)) {
+          throw new Error("Solo se pueden ajustar permisos de un solo turno.");
         }
         const horasAnteriores = actual.horas ?? 0;
         if (nuevasHoras === horasAnteriores) throw new Error("Las horas indicadas son las mismas que ya tiene el permiso.");
@@ -669,7 +670,7 @@ export default function AprobacionTramitesPage() {
             profile?.role === "admin"
             && esPermisoPersonal(detalle)
             && (detalle.estado === "pendiente" || detalle.estado === "aprobado")
-            && fechasDelPermiso(detalle).length === 1
+            && esPermisoDeUnTurno(detalle)
               ? { guardando: ajustando, error: errorAjuste, onGuardar: ajustarHoras }
               : undefined
           }
