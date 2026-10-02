@@ -8,7 +8,7 @@ import {
   AlertTriangle, CalendarCheck, CheckCircle2, ChevronRight, Inbox, List, MessageSquareText,
   Paperclip, RefreshCw, Search, X,
 } from "lucide-react";
-import type { FilaPlanTrabajo, PlanTrabajo, TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
+import type { AjusteHorasTramite, FilaPlanTrabajo, PlanTrabajo, TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
 import {
@@ -17,7 +17,9 @@ import {
   fechasDelPermiso,
   periodoDeFecha,
   periodosDelPermiso,
+  reaplicarPermisoEnFilas,
 } from "@/lib/esdomed/permisos-plan";
+import { getHorario } from "@/lib/esdomed/horarios";
 import { labelPeriodo, parsePeriodo } from "@/lib/esdomed/plan";
 import {
   CATEGORIAS_TRAMITE, ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, docsDeTramite, fechaLegible, partesCategoria,
@@ -84,6 +86,8 @@ export default function AprobacionTramitesPage() {
   const [conflictosPermiso, setConflictosPermiso] = useState<ConflictoPermisoGrupo[]>([]);
   const [advertenciasPermiso, setAdvertenciasPermiso] = useState<ConflictoPermisoGrupo[]>([]);
   const [revisandoCoincidencias, setRevisandoCoincidencias] = useState(false);
+  const [ajustando, setAjustando] = useState(false);
+  const [errorAjuste, setErrorAjuste] = useState<string | null>(null);
 
   const leerPendientes = useCallback(async () => {
     const snap = await getDocs(query(collection(db, "tramites_personal"), where("estado", "==", "pendiente"), limit(LIMITE_BUSQUEDA)));
@@ -250,6 +254,7 @@ export default function AprobacionTramitesPage() {
     setComentarioAdmin("");
     setConflictosPermiso([]);
     setAdvertenciasPermiso([]);
+    setErrorAjuste(null);
     if (tramite.estado !== "pendiente" || !esPermisoPersonal(tramite)) return;
 
     setRevisandoCoincidencias(true);
@@ -328,6 +333,123 @@ export default function AprobacionTramitesPage() {
       lineas,
       tono: marcados > 0 ? "exito" : "alerta",
     };
+  };
+
+  // Ajuste de horas por solicitud verbal (solo admin; las reglas también lo exigen).
+  // Una transacción actualiza el trámite y, si ya estaba aprobado, el plan del
+  // mes: así nunca queda el trámite con unas horas y el plan con otras.
+  const ajustarHoras = async (nuevasHoras: number, justificacion: string): Promise<boolean> => {
+    if (!detalle?.id || !user || !profile || profile.role !== "admin") return false;
+    const id = detalle.id;
+    setAjustando(true);
+    setErrorAjuste(null);
+    try {
+      const ahora = Timestamp.now();
+      const lineas: string[] = [];
+      let nuevo!: TramitePersonal;
+      await runTransaction(db, async (tx) => {
+        lineas.length = 0;
+        const refTramite = doc(db, "tramites_personal", id);
+        const snapTramite = await tx.get(refTramite);
+        if (!snapTramite.exists()) throw new Error("El trámite ya no existe.");
+        const actual = { id, ...snapTramite.data() } as TramitePersonal;
+        if (!esPermisoPersonal(actual) || (actual.estado !== "pendiente" && actual.estado !== "aprobado")) {
+          throw new Error("Este trámite ya no admite ajustes de horas.");
+        }
+        const inicio = toDate(actual.fechaInicio);
+        if (!inicio || fechasDelPermiso(actual).length !== 1) {
+          throw new Error("Solo se pueden ajustar permisos de un solo día.");
+        }
+        const horasAnteriores = actual.horas ?? 0;
+        if (nuevasHoras === horasAnteriores) throw new Error("Las horas indicadas son las mismas que ya tiene el permiso.");
+
+        // El permiso conserva su inicio; el fin se recorre según las horas nuevas.
+        const ajuste: AjusteHorasTramite = {
+          horasAnteriores,
+          horasNuevas: nuevasHoras,
+          justificacion,
+          porId: user.uid,
+          porNombre: profile.nombre,
+          en: ahora.toDate(),
+        };
+        nuevo = {
+          ...actual,
+          horas: nuevasHoras,
+          fechaFin: new Date(inicio.getTime() + nuevasHoras * 60 * 60 * 1000),
+          ajustesHoras: [...(actual.ajustesHoras ?? []), ajuste],
+          actualizadoEn: ahora.toDate(),
+        };
+
+        // Lecturas del plan antes de cualquier escritura (requisito de las transacciones).
+        const planes: { periodo: string; snap: Awaited<ReturnType<typeof tx.get>> }[] = [];
+        if (actual.estado === "aprobado") {
+          for (const periodo of periodosDelPermiso(actual)) {
+            planes.push({ periodo, snap: await tx.get(doc(db, "planes_trabajo", periodo)) });
+          }
+        }
+
+        const escrituras: { periodo: string; filas: FilaPlanTrabajo[] }[] = [];
+        for (const { periodo, snap } of planes) {
+          if (!snap.exists()) {
+            lineas.push(`${labelPeriodo(periodo)}: el plan aún no existe; se aplicará con las horas nuevas al crearlo.`);
+            continue;
+          }
+          const plan = snap.data() as PlanTrabajo;
+          // La fracción no puede exceder el turno que tiene asignado ese día.
+          const registro = filaDelEmpleado(plan, actual.empleadoId)?.permisos?.find((p) => p.tramiteId === id);
+          const turno = registro ? getHorario(registro.codigoTurno) : undefined;
+          if (turno && nuevasHoras > turno.horas) {
+            throw new Error(`El turno de ese día (${registro?.codigoTurno}) es de ${turno.horas} horas; el permiso no puede excederlo.`);
+          }
+          const { anio, mes } = parsePeriodo(periodo);
+          const r = reaplicarPermisoEnFilas(plan.filas ?? [], nuevo, anio, mes);
+          if (r.sinFila) {
+            lineas.push(`${labelPeriodo(periodo)}: ${actual.empleadoNombre} no tiene fila en el plan; ajústalo manualmente.`);
+          } else if (r.cambio) {
+            escrituras.push({ periodo, filas: r.filas });
+            lineas.push(
+              r.parciales > 0
+                ? `${labelPeriodo(periodo)}: el turno se conserva y se anotan ${nuevasHoras} h de permiso.`
+                : `${labelPeriodo(periodo)}: el día queda marcado PER (permiso del turno completo).`,
+            );
+          } else {
+            lineas.push(`${labelPeriodo(periodo)}: no hubo cambios en el plan (la celda ya fue editada a mano).`);
+          }
+        }
+
+        tx.update(refTramite, {
+          horas: nuevo.horas,
+          fechaFin: Timestamp.fromDate(nuevo.fechaFin as Date),
+          ajustesHoras: nuevo.ajustesHoras,
+          actualizadoEn: ahora,
+        });
+        for (const { periodo, filas } of escrituras) {
+          tx.update(doc(db, "planes_trabajo", periodo), {
+            filas,
+            actualizadoEn: ahora,
+            actualizadoPorId: user.uid,
+            actualizadoPorNombre: profile.nombre,
+          });
+        }
+      });
+
+      setDetalle(nuevo);
+      setPendientes((prev) => prev.map((t) => (t.id === id ? nuevo : t)));
+      if (cachePendientes) cachePendientes = cachePendientes.map((t) => (t.id === id ? nuevo : t));
+      setResultados((prev) => prev?.map((t) => (t.id === id ? nuevo : t)) ?? prev);
+      if (lineas.length > 0) {
+        setResultadoPlan({ titulo: "Horas del permiso actualizadas", lineas, tono: "exito" });
+      }
+      return true;
+    } catch (err) {
+      console.error("No se pudo ajustar las horas del permiso", err);
+      setErrorAjuste(err instanceof Error && !("code" in err)
+        ? err.message
+        : "No se pudo guardar el ajuste. Intenta de nuevo.");
+      return false;
+    } finally {
+      setAjustando(false);
+    }
   };
 
   const handleResolver = async (e: React.FormEvent) => {
@@ -543,6 +665,14 @@ export default function AprobacionTramitesPage() {
         <TramiteDetalleModal
           tramite={detalle}
           onClose={cerrarDetalle}
+          ajusteHoras={
+            profile?.role === "admin"
+            && esPermisoPersonal(detalle)
+            && (detalle.estado === "pendiente" || detalle.estado === "aprobado")
+            && fechasDelPermiso(detalle).length === 1
+              ? { guardando: ajustando, error: errorAjuste, onGuardar: ajustarHoras }
+              : undefined
+          }
           resolucion={detalle.estado === "pendiente" ? {
             accion: accionAdmin,
             onAccion: setAccionAdmin,

@@ -808,7 +808,12 @@ service cloud.firestore {
       //  - a un trámite APROBADO solo puede agregarle documentos (el respaldo
       //    físico llega antes o después del permiso) reclasificando
       //    ordinario/diferido, sin que vuelva a revisión: el estado no cambia.
-      allow update: if isEsdomed() || isAsistenteEsdomed() || isAdmin()
+      //  - Ajustar las horas de un permiso ya presentado (solicitud verbal del
+      //    colaborador) es EXCLUSIVO del admin: ni ESDOMED ni el asistente
+      //    pueden tocar 'horas', 'fechaFin' ni el historial 'ajustesHoras'.
+      allow update: if isAdmin()
+        || ((isEsdomed() || isAsistenteEsdomed())
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['horas', 'fechaFin', 'ajustesHoras']))
         || (
           isAuth()
           && resource.data.empleadoId == uid()

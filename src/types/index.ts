@@ -1684,6 +1684,18 @@ export type CategoriaTramitePersonal =
 
 export type EstadoTramitePersonal = "subido" | "pendiente" | "aprobado" | "rechazado";
 
+// Ajuste de las horas de un permiso ya presentado (solicitud verbal del
+// colaborador el mismo día). Solo el admin lo registra; la justificación es
+// obligatoria y la lista queda como historial del trámite.
+export interface AjusteHorasTramite {
+  horasAnteriores: number;
+  horasNuevas: number;
+  justificacion: string;
+  porId: string;
+  porNombre: string;
+  en: Date;
+}
+
 export interface TramitePersonal {
   id?: string;
   categoria: CategoriaTramitePersonal;
@@ -1714,6 +1726,9 @@ export interface TramitePersonal {
   revisadoPorNombre?: string;
   revisadoEn?: Date;
   comentariosRevision?: string;
+
+  // Ajustes de horas hechos por el admin (más antiguo primero)
+  ajustesHoras?: AjusteHorasTramite[];
 }
 
 // Archivero permanente del expediente de cada empleado ESDOMED: evaluaciones

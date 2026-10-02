@@ -123,6 +123,40 @@ export function aplicarPermisoEnFilas(
   return { filas: filasNuevas, cambio: true, completos, parciales, sinTurno, sinFila: false };
 }
 
+/**
+ * Vuelve a aplicar un permiso cuyas horas cambiaron (ajuste del admin). Deshace
+ * lo que la automatización había hecho —devuelve el turno a las celdas que ella
+ * marcó "PER" y quita su registro en `fila.permisos`— y aplica el permiso con
+ * los datos nuevos. Una celda que el asistente ya editó a mano se respeta: su
+ * registro se conserva y no se vuelve a tocar.
+ */
+export function reaplicarPermisoEnFilas(
+  filas: FilaPlanTrabajo[],
+  tramite: TramitePersonal,
+  anio: number,
+  mes: number,
+): ResultadoAplicarPermiso {
+  const filaIdx = filas.findIndex((f) => f.uid && f.uid === tramite.empleadoId);
+  if (!tramite.id || filaIdx === -1) return aplicarPermisoEnFilas(filas, tramite, anio, mes);
+
+  const fila = filas[filaIdx];
+  const asignaciones = [...fila.asignaciones];
+  const deshacer = (fila.permisos ?? []).filter((p) => {
+    if (p.tramiteId !== tramite.id) return false;
+    if (p.parcial) return true; // la celda conservó el turno: solo se quita el registro
+    if ((asignaciones[p.dia - 1] ?? "").trim().toUpperCase() !== "PER") return false;
+    asignaciones[p.dia - 1] = p.codigoTurno;
+    return true;
+  });
+  if (deshacer.length === 0) return aplicarPermisoEnFilas(filas, tramite, anio, mes);
+
+  const limpias = filas.map((f, i) =>
+    i === filaIdx ? { ...f, asignaciones, permisos: (f.permisos ?? []).filter((p) => !deshacer.includes(p)) } : f,
+  );
+  const r = aplicarPermisoEnFilas(limpias, tramite, anio, mes);
+  return r.cambio ? r : { ...r, filas: limpias, cambio: true };
+}
+
 /** Aplica una lista de permisos aprobados sobre las filas de un mes (para el editor). */
 export function aplicarPermisosAprobados(
   filas: FilaPlanTrabajo[],
