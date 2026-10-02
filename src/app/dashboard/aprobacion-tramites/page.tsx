@@ -15,6 +15,7 @@ import {
   aplicarPermisoEnFilas,
   esPermisoDeUnTurno,
   esPermisoPersonal,
+  fechaLocalISO,
   fechasDelPermiso,
   periodoDeFecha,
   periodosDelPermiso,
@@ -339,7 +340,11 @@ export default function AprobacionTramitesPage() {
   // Ajuste de horas por solicitud verbal (solo admin; las reglas también lo exigen).
   // Una transacción actualiza el trámite y, si ya estaba aprobado, el plan del
   // mes: así nunca queda el trámite con unas horas y el plan con otras.
-  const ajustarHoras = async (nuevasHoras: number, justificacion: string): Promise<boolean> => {
+  const ajustarHoras = async (
+    nuevasHoras: number,
+    justificacion: string,
+    extremo: "inicio" | "fin",
+  ): Promise<boolean> => {
     if (!detalle?.id || !user || !profile || profile.role !== "admin") return false;
     const id = detalle.id;
     setAjustando(true);
@@ -364,10 +369,25 @@ export default function AprobacionTramitesPage() {
         const horasAnteriores = actual.horas ?? 0;
         if (nuevasHoras === horasAnteriores) throw new Error("Las horas indicadas son las mismas que ya tiene el permiso.");
 
-        // El permiso conserva su inicio; el fin se recorre según las horas nuevas.
+        // "fin": se conserva el inicio y el fin se recorre. "inicio": se conserva
+        // el fin y el inicio se recorre (el colaborador sale antes o entra después).
+        const horasMs = nuevasHoras * 60 * 60 * 1000;
+        const finActual = toDate(actual.fechaFin) ?? new Date(inicio.getTime() + horasAnteriores * 60 * 60 * 1000);
+        const nuevoInicio = extremo === "inicio" ? new Date(finActual.getTime() - horasMs) : inicio;
+        const nuevoFin = extremo === "inicio" ? finActual : new Date(inicio.getTime() + horasMs);
+        // El turno pertenece al día en que empieza: si el inicio cambiara de día, el
+        // plan y la clasificación ordinario/diferido quedarían descuadrados.
+        if (fechaLocalISO(nuevoInicio) !== fechaLocalISO(inicio)) {
+          throw new Error(
+            extremo === "inicio"
+              ? "Con esas horas el inicio pasaría a otro día. Ajusta el final o usa menos horas."
+              : "Con esas horas el inicio pasaría a otro día. Ajusta el inicio en lugar del final.",
+          );
+        }
         const ajuste: AjusteHorasTramite = {
           horasAnteriores,
           horasNuevas: nuevasHoras,
+          extremo,
           justificacion,
           porId: user.uid,
           porNombre: profile.nombre,
@@ -376,7 +396,8 @@ export default function AprobacionTramitesPage() {
         nuevo = {
           ...actual,
           horas: nuevasHoras,
-          fechaFin: new Date(inicio.getTime() + nuevasHoras * 60 * 60 * 1000),
+          fechaInicio: nuevoInicio,
+          fechaFin: nuevoFin,
           ajustesHoras: [...(actual.ajustesHoras ?? []), ajuste],
           actualizadoEn: ahora.toDate(),
         };
@@ -420,6 +441,7 @@ export default function AprobacionTramitesPage() {
 
         tx.update(refTramite, {
           horas: nuevo.horas,
+          fechaInicio: Timestamp.fromDate(nuevo.fechaInicio as Date),
           fechaFin: Timestamp.fromDate(nuevo.fechaFin as Date),
           ajustesHoras: nuevo.ajustesHoras,
           actualizadoEn: ahora,

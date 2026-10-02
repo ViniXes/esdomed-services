@@ -34,25 +34,41 @@ export interface AjusteHorasProps {
   guardando: boolean;
   error: string | null;
   /** Devuelve true si se guardó (el formulario se cierra). */
-  onGuardar: (horas: number, justificacion: string) => Promise<boolean>;
+  onGuardar: (horas: number, justificacion: string, extremo: "inicio" | "fin") => Promise<boolean>;
 }
 
 const MIN_JUSTIFICACION = 10;
 
+const EXTREMOS_AJUSTE: { valor: "fin" | "inicio"; titulo: string; detalle: string }[] = [
+  { valor: "fin", titulo: "Mover el final", detalle: "Se conserva la hora de inicio" },
+  { valor: "inicio", titulo: "Mover el inicio", detalle: "Se conserva la hora de fin" },
+];
+
 function AjusteHoras({ t, ajuste }: { t: TramitePersonal; ajuste: AjusteHorasProps }) {
   const [abierto, setAbierto] = useState(false);
   const [horas, setHoras] = useState(String(t.horas ?? ""));
+  const [extremo, setExtremo] = useState<"inicio" | "fin">("fin");
   const [justificacion, setJustificacion] = useState("");
   const horasNum = Number(horas);
   const justificacionLimpia = justificacion.trim();
   const valido = horasNum > 0 && horasNum <= 24 && horasNum !== t.horas && justificacionLimpia.length >= MIN_JUSTIFICACION;
 
+  // Cómo quedaría el horario con las horas y el extremo elegidos.
+  const inicioActual = toDate(t.fechaInicio);
+  const finActual = toDate(t.fechaFin) ?? (inicioActual ? new Date(inicioActual.getTime() + (t.horas ?? 0) * 3600000) : null);
+  const vista = inicioActual && finActual && horasNum > 0 && horasNum <= 24
+    ? extremo === "fin"
+      ? { desde: inicioActual, hasta: new Date(inicioActual.getTime() + horasNum * 3600000) }
+      : { desde: new Date(finActual.getTime() - horasNum * 3600000), hasta: finActual }
+    : null;
+
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
     if (!valido || ajuste.guardando) return;
-    if (await ajuste.onGuardar(horasNum, justificacionLimpia)) {
+    if (await ajuste.onGuardar(horasNum, justificacionLimpia, extremo)) {
       setAbierto(false);
       setJustificacion("");
+      setExtremo("fin");
     }
   };
 
@@ -74,6 +90,32 @@ function AjusteHoras({ t, ajuste }: { t: TramitePersonal; ajuste: AjusteHorasPro
         Úsalo cuando el colaborador pide por vía verbal añadir o quitar tiempo a un permiso ya presentado.
         {t.estado === "aprobado" && " El plan de trabajo se actualiza con las nuevas horas."}
       </p>
+      <fieldset>
+        <legend className="mb-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">¿Qué extremo del permiso cambia?</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {EXTREMOS_AJUSTE.map((op) => (
+            <label
+              key={op.valor}
+              className={`cursor-pointer rounded-xl border px-3 py-2 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${
+                extremo === op.valor
+                  ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/40"
+                  : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              }`}
+            >
+              <input
+                type="radio"
+                name="ajuste-extremo"
+                value={op.valor}
+                checked={extremo === op.valor}
+                onChange={() => setExtremo(op.valor)}
+                className="sr-only"
+              />
+              <span className="block text-xs font-semibold text-slate-800 dark:text-slate-100">{op.titulo}</span>
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400">{op.detalle}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <div className="grid gap-3 sm:grid-cols-[9rem_1fr]">
         <div>
           <label htmlFor="ajuste-horas" className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">Horas del permiso</label>
@@ -104,6 +146,11 @@ function AjusteHoras({ t, ajuste }: { t: TramitePersonal; ajuste: AjusteHorasPro
           />
         </div>
       </div>
+      {vista && horasNum !== t.horas && (
+        <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600 tabular-nums dark:bg-slate-950/50 dark:text-slate-300">
+          Quedaría: <span className="font-semibold">{fechaHora(vista.desde)}</span> → <span className="font-semibold">{fechaHora(vista.hasta)}</span>
+        </p>
+      )}
       {ajuste.error && (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{ajuste.error}</p>
       )}
@@ -429,6 +476,7 @@ export function TramiteDetalleModal({
                             <p className="flex items-center gap-1.5 font-semibold">
                               <Clock size={12} className="shrink-0" />
                               <span className="tabular-nums">{a.horasAnteriores} h → {a.horasNuevas} h</span>
+                              {a.extremo && <span className="font-normal opacity-80">· {a.extremo === "inicio" ? "inicio" : "final"}</span>}
                               <span className="font-normal opacity-80">· {a.porNombre}{en ? ` · ${fechaHora(en)}` : ""}</span>
                             </p>
                             <p className="mt-0.5 whitespace-pre-line pl-[18px]">{a.justificacion}</p>

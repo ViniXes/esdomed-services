@@ -810,10 +810,10 @@ service cloud.firestore {
       //    ordinario/diferido, sin que vuelva a revisión: el estado no cambia.
       //  - Ajustar las horas de un permiso ya presentado (solicitud verbal del
       //    colaborador) es EXCLUSIVO del admin: ni ESDOMED ni el asistente
-      //    pueden tocar 'horas', 'fechaFin' ni el historial 'ajustesHoras'.
+      //    pueden tocar 'horas', 'fechaInicio', 'fechaFin' ni el historial 'ajustesHoras'.
       allow update: if isAdmin()
         || ((isEsdomed() || isAsistenteEsdomed())
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['horas', 'fechaFin', 'ajustesHoras']))
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['horas', 'fechaInicio', 'fechaFin', 'ajustesHoras']))
         || (
           isAuth()
           && resource.data.empleadoId == uid()

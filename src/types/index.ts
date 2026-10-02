@@ -1690,6 +1690,8 @@ export type EstadoTramitePersonal = "subido" | "pendiente" | "aprobado" | "recha
 export interface AjusteHorasTramite {
   horasAnteriores: number;
   horasNuevas: number;
+  /** Qué extremo se movió: "fin" conserva el inicio (lo habitual); "inicio" conserva el fin. */
+  extremo?: "inicio" | "fin";
   justificacion: string;
   porId: string;
   porNombre: string;
