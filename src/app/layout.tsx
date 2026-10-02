@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
-import { Sora } from "next/font/google";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -10,7 +9,6 @@ import { TerminosGate } from "@/components/TerminosGate";
 import { PwaRegister } from "@/components/PwaRegister";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
-const sora = Sora({ variable: "--font-sora", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 // Tipografía de la identidad institucional HNES: Inter para toda la interfaz
 // (títulos, cuerpo y cintillos — el tracking amplio de las clases uppercase da
@@ -50,7 +48,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${geistSans.variable} ${sora.variable} h-full antialiased`}>
+    <html lang="es" className={`${geistSans.variable} h-full antialiased`}>
       <head>
         {/* Aplica el tema oscuro antes del primer render solo si el usuario lo
             eligió antes (evita parpadeo). El tema por defecto es el claro. */}

@@ -4,7 +4,7 @@
 @variant dark (&:where(.dark, .dark *));
 
 :root {
-  --font-heading: var(--font-sora);
+  --font-heading: var(--font-sans);
   --font-body: var(--font-sans);
   --color-institutional: #1c2834;
   --color-institutional-dark: #1c2834;
