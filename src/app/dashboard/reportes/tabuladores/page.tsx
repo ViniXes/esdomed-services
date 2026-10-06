@@ -5,53 +5,38 @@ import { useRouter } from "next/navigation";
 import { collection, query, where, orderBy, getDocs, Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Table2, Download, AlertTriangle, HeartPulse, LogIn, LogOut, BedDouble, RefreshCw } from "lucide-react";
-import type { EstadoPaciente, Genero, Paciente } from "@/types";
+import { Table2, Download, AlertTriangle, HeartPulse, LogIn, LogOut, BedDouble, RefreshCw, FileText } from "lucide-react";
+import type { Paciente } from "@/types";
 import { DateField } from "@/components/ui/DateField";
+import TabuladoresPdf from "@/components/reportes/TabuladoresPdf";
 import { calcularEdad, diasEstancia, formatFecha, nombreCompleto, toDate, ESTADO_LABEL } from "@/lib/pacientes/helpers";
+import { mismoServicio } from "@/lib/servicios";
+import {
+  ESTADOS_VIVO, MODALIDADES_VIVO, generoDe, pivotar, servicioDe, sexoCols, type ColDef,
+} from "@/lib/reportes/tabuladores";
 
 type Tab = "vivos" | "fallecidos" | "activos" | "ingresos";
 
-interface ColDef { key: string; label: string }
-interface FilaPivote { servicio: string; cols: Record<string, number>; total: number }
-
-// Modalidades de egreso vivo (cualquiera cuenta como "egreso vivo").
-const MODALIDADES_VIVO: { key: EstadoPaciente; label: string }[] = [
-  { key: "alta_vivo",       label: "Domicilio" },
-  { key: "alta_voluntaria", label: "Voluntaria / Exigida" },
-  { key: "referido",        label: "Traslado a otro hospital" },
-  { key: "fuga",            label: "Fuga" },
-  { key: "in_extremis",     label: "In extremis" },
-];
-const ESTADOS_VIVO = MODALIDADES_VIVO.map((m) => m.key);
-
-const generoDe = (g?: Genero): "masculino" | "femenino" | "otro" =>
-  g === "masculino" ? "masculino" : g === "femenino" ? "femenino" : "otro";
-
-const sexoCols = (items: Paciente[]): ColDef[] => {
-  const base: ColDef[] = [{ key: "masculino", label: "Masculino" }, { key: "femenino", label: "Femenino" }];
-  return items.some((p) => generoDe(p.genero) === "otro") ? [...base, { key: "otro", label: "Otro" }] : base;
-};
-
-function pivotar(items: Paciente[], columnas: ColDef[], clasificar: (p: Paciente) => string) {
-  const filas = new Map<string, FilaPivote>();
-  const totCols: Record<string, number> = {};
-  columnas.forEach((c) => { totCols[c.key] = 0; });
-  let totalGeneral = 0;
-  for (const p of items) {
-    const s = (p.servicioActual || "Sin servicio").trim();
-    if (!filas.has(s)) {
-      const cols: Record<string, number> = {};
-      columnas.forEach((c) => { cols[c.key] = 0; });
-      filas.set(s, { servicio: s, cols, total: 0 });
-    }
-    const f = filas.get(s)!;
-    const k = clasificar(p);
-    if (k in f.cols) { f.cols[k]++; totCols[k] = (totCols[k] ?? 0) + 1; }
-    f.total++; totalGeneral++;
-  }
-  const lista = Array.from(filas.values()).sort((a, b) => b.total - a.total || a.servicio.localeCompare(b.servicio));
-  return { filas: lista, totCols, totalGeneral };
+/** Pacientes cuyo `campo` (fecha de ingreso o de egreso) cae en el rango, de un solo
+ *  getDocs: rango + orderBy en el mismo campo, sin índice compuesto. */
+async function leerPorRango(campo: "fechaIngreso" | "fechaEgreso", fechaDesde: string, fechaHasta: string): Promise<Paciente[]> {
+  const desde = new Date(fechaDesde + "T00:00:00");
+  const hasta = new Date(fechaHasta + "T23:59:59");
+  const snap = await getDocs(query(
+    collection(db, "pacientes"),
+    where(campo, ">=", Timestamp.fromDate(desde)),
+    where(campo, "<=", Timestamp.fromDate(hasta)),
+    orderBy(campo, "desc"),
+  ));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id, ...data,
+      fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
+      fechaEgreso: toDate(data.fechaEgreso),
+      fechaNacimiento: toDate(data.fechaNacimiento),
+    } as Paciente;
+  });
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -79,9 +64,15 @@ export default function TabuladoresPage() {
   const [egresos, setEgresos] = useState<Paciente[]>([]);
   const [activos, setActivos] = useState<Paciente[]>([]);
   const [ingresos, setIngresos] = useState<Paciente[]>([]);
+  // Rango ("desde|hasta") al que corresponden `egresos` e `ingresos`, para que
+  // el PDF no vuelva a leerlos si ya están cargados.
+  const [egresosRango, setEgresosRango] = useState("");
+  const [ingresosRango, setIngresosRango] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
+  const [preparandoPdf, setPreparandoPdf] = useState(false);
+  const [pdf, setPdf] = useState<{ desde: string; hasta: string; vivos: Paciente[]; fallecidos: Paciente[]; ingresados: Paciente[] } | null>(null);
 
   const esActivos = tab === "activos";
   const esIngresos = tab === "ingresos";
@@ -96,23 +87,8 @@ export default function TabuladoresPage() {
     setCargando(true);
     setError(null);
     try {
-      const desde = new Date(fechaDesde + "T00:00:00");
-      const hasta = new Date(fechaHasta + "T23:59:59");
-      const snap = await getDocs(query(
-        collection(db, "pacientes"),
-        where("fechaEgreso", ">=", Timestamp.fromDate(desde)),
-        where("fechaEgreso", "<=", Timestamp.fromDate(hasta)),
-        orderBy("fechaEgreso", "desc"),
-      ));
-      setEgresos(snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id, ...data,
-          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-          fechaEgreso: toDate(data.fechaEgreso),
-          fechaNacimiento: toDate(data.fechaNacimiento),
-        } as Paciente;
-      }));
+      setEgresos(await leerPorRango("fechaEgreso", fechaDesde, fechaHasta));
+      setEgresosRango(`${fechaDesde}|${fechaHasta}`);
     } catch (e) {
       setError(`No se pudo cargar el reporte: ${e instanceof Error ? e.message : "error"}`);
     } finally {
@@ -129,23 +105,8 @@ export default function TabuladoresPage() {
     setCargando(true);
     setError(null);
     try {
-      const desde = new Date(fechaDesde + "T00:00:00");
-      const hasta = new Date(fechaHasta + "T23:59:59");
-      const snap = await getDocs(query(
-        collection(db, "pacientes"),
-        where("fechaIngreso", ">=", Timestamp.fromDate(desde)),
-        where("fechaIngreso", "<=", Timestamp.fromDate(hasta)),
-        orderBy("fechaIngreso", "desc"),
-      ));
-      setIngresos(snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id, ...data,
-          fechaIngreso: toDate(data.fechaIngreso) ?? new Date(),
-          fechaEgreso: toDate(data.fechaEgreso),
-          fechaNacimiento: toDate(data.fechaNacimiento),
-        } as Paciente;
-      }));
+      setIngresos(await leerPorRango("fechaIngreso", fechaDesde, fechaHasta));
+      setIngresosRango(`${fechaDesde}|${fechaHasta}`);
     } catch (e) {
       setError(`No se pudo cargar el reporte: ${e instanceof Error ? e.message : "error"}`);
     } finally {
@@ -212,11 +173,39 @@ export default function TabuladoresPage() {
 
   const detalle = useMemo(() => {
     const lista = servicioFiltro
-      ? items.filter((p) => (p.servicioActual || "Sin servicio").trim() === servicioFiltro)
+      ? items.filter((p) => mismoServicio(servicioDe(p), servicioFiltro))
       : items;
     const fechaOrden = (p: Paciente) => (esActivos || esIngresos ? p.fechaIngreso : p.fechaEgreso ?? p.fechaIngreso);
     return [...lista].sort((a, b) => (fechaOrden(b)?.getTime() ?? 0) - (fechaOrden(a)?.getTime() ?? 0));
   }, [items, servicioFiltro, esActivos, esIngresos]);
+
+  // PDF de las 3 categorías con fecha (vivos, fallecidos, ingresados) para el
+  // rango elegido. Reusa lo ya cargado; solo lee lo que falte para ese rango.
+  const generarPdf = async () => {
+    if (!fechaDesde || !fechaHasta) return;
+    const rango = `${fechaDesde}|${fechaHasta}`;
+    setPreparandoPdf(true);
+    setError(null);
+    try {
+      const [egr, ing] = await Promise.all([
+        egresosRango === rango ? egresos : leerPorRango("fechaEgreso", fechaDesde, fechaHasta),
+        ingresosRango === rango ? ingresos : leerPorRango("fechaIngreso", fechaDesde, fechaHasta),
+      ]);
+      if (egresosRango !== rango) { setEgresos(egr); setEgresosRango(rango); }
+      if (ingresosRango !== rango) { setIngresos(ing); setIngresosRango(rango); }
+      setPdf({
+        desde: fechaDesde,
+        hasta: fechaHasta,
+        vivos: egr.filter((p) => ESTADOS_VIVO.includes(p.estado)),
+        fallecidos: egr.filter((p) => p.estado === "alta_fallecido"),
+        ingresados: ing,
+      });
+    } catch (e) {
+      setError(`No se pudo generar el PDF: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setPreparandoPdf(false);
+    }
+  };
 
   const exportarExcel = async () => {
     setExportando(true);
@@ -308,6 +297,17 @@ export default function TabuladoresPage() {
             <RefreshCw size={15} className={cargandoVista ? "animate-spin" : ""} />
             Actualizar
           </button>
+          {!esActivos && (
+            <button
+              onClick={generarPdf}
+              disabled={preparandoPdf || cargandoVista || fechaDesde > fechaHasta}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+              title="PDF tamaño carta: egresos vivos, egresos fallecidos e ingresados por servicio (Bienestar Magisterial y MINSAL)"
+            >
+              <FileText size={15} />
+              {preparandoPdf ? "Preparando..." : "Generar PDF"}
+            </button>
+          )}
           <button
             onClick={exportarExcel}
             disabled={exportando || cargandoVista || pivote.filas.length === 0}
@@ -445,6 +445,18 @@ export default function TabuladoresPage() {
             </>
           )}
         </>
+      )}
+
+      {pdf && (
+        <TabuladoresPdf
+          desde={pdf.desde}
+          hasta={pdf.hasta}
+          vivos={pdf.vivos}
+          fallecidos={pdf.fallecidos}
+          ingresados={pdf.ingresados}
+          generadoPor={profile.nombre}
+          onClose={() => setPdf(null)}
+        />
       )}
     </div>
   );

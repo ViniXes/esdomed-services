@@ -1,7 +1,11 @@
 "use client";
 
+import { IsbmStats, IsbmTableHeading, IsbmEmptyState, IsbmFilter, isbmStyles as ui } from "../_components/IsbmUi";
+
+import { IsbmPageHeading } from "../_components/IsbmPageHeading";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Ban, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
+import { BookOpenText, Ban, Pencil, Plus, RotateCcw, Search, X, ShieldCheck, Layers } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import {
@@ -76,12 +80,9 @@ export default function ArancelesPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className={`${ui.page} p-4 md:p-6 max-w-6xl mx-auto space-y-6`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Aranceles</h1>
-        </div>
+        <IsbmPageHeading title="Aranceles" description="Catálogo de servicios, precios y reglas de autorización." icon={BookOpenText} />
         {puedeEditar && (
           <button
             onClick={() => setEditando("nuevo")}
@@ -92,26 +93,32 @@ export default function ArancelesPage() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <select value={rubro} onChange={(e) => setRubro(e.target.value)} className={filtroCls}>
+      <IsbmStats items={[
+        { label: "Aranceles visibles", value: aranceles ? filtrados.length : "—", detail: "Resultados de la búsqueda y el rubro", icon: BookOpenText },
+        { label: "Rubros", value: aranceles ? new Set(filtrados.map(a => a.rubro)).size : "—", detail: "Categorías en los resultados", icon: Layers },
+        { label: "Requieren autorización", value: aranceles ? filtrados.filter(a => a.requiere_autorizacion).length : "—", detail: "Servicios con autorización obligatoria", icon: ShieldCheck, tone: "warning" },
+      ]} />
+      <div className={ui.toolbar}>
+        <IsbmFilter label="Rubro"><select aria-label="Rubro" value={rubro} onChange={(e) => setRubro(e.target.value)} className={filtroCls}>
           <option value="">Todos los rubros</option>
           {(Object.keys(RUBRO_LABEL) as RubroArancelIsbm[]).map((r) => (
             <option key={r} value={r}>{RUBRO_LABEL[r]}</option>
           ))}
-        </select>
+        </select></IsbmFilter>
         <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 px-1 cursor-pointer">
           <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="accent-blue-600" />
           Incluir inactivos
         </label>
-        <div className="relative flex-1 min-w-[220px]">
+        <div className={ui.search}><IsbmFilter label="Buscar en el catálogo"><div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            aria-label="Buscar arancel por descripción o código"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar por descripción o código…"
             className={`${filtroCls} w-full pl-9`}
           />
-        </div>
+        </div></IsbmFilter></div>
       </div>
 
       {error && (
@@ -119,12 +126,13 @@ export default function ArancelesPage() {
       )}
 
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+        <IsbmTableHeading title="Catálogo de aranceles" count={aranceles ? filtrados.length : undefined}>Precios HNES y condiciones de cobro</IsbmTableHeading>
         {!aranceles ? (
           <div className="p-10 flex justify-center">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtrados.length === 0 ? (
-          <p className="p-8 text-sm text-slate-500 text-center">Sin aranceles que coincidan.</p>
+          <IsbmEmptyState icon={BookOpenText} title="No encontramos aranceles">Prueba con otro código, descripción o rubro.</IsbmEmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -167,13 +175,14 @@ export default function ArancelesPage() {
                         <div className="flex justify-end gap-1">
                           <button
                             onClick={() => setEditando(a)}
-                            title="Editar arancel"
+                            title="Editar arancel" aria-label={`Editar arancel ${a.codigo}`}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
                           >
                             <Pencil size={14} />
                           </button>
                           <button
                             onClick={() => toggleActivo(a)}
+                            aria-label={`${a.activo ? "Desactivar" : "Reactivar"} arancel ${a.codigo}`}
                             title={a.activo ? "Desactivar (no se borra: los cargos históricos lo referencian)" : "Reactivar"}
                             className={`p-1.5 rounded-lg transition-colors ${
                               a.activo
@@ -289,7 +298,7 @@ function ModalArancel({
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+      <div data-isbm-dialog className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">
             {arancel ? `Editar arancel — ${arancel.codigo}` : "Nuevo arancel"}

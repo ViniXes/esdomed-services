@@ -1,18 +1,20 @@
 "use client";
 
+import { IsbmStats, IsbmTableHeading, IsbmEmptyState, IsbmFilter, isbmStyles as ui } from "../_components/IsbmUi";
+
+import { AfiliarPacienteWizard } from "../_components/AfiliarPacienteWizard";
+import { IsbmPageHeading } from "../_components/IsbmPageHeading";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, UserPlus, Pencil, LogOut, X } from "lucide-react";
+import { Search, UserPlus, Pencil, LogOut, X, Users, BedDouble, ClipboardList } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import {
-  afiliarPaciente,
   actualizarAfiliacion,
   listarAfiliaciones,
   listarIngresosActivos,
-  listarPacientesActivosEsdomed,
   registrarEgresoIngreso,
   hoyISO,
-  type PacienteActivoEsdomed,
 } from "@/lib/isbm/api";
 import {
   TIPO_BENEFICIARIO_LABEL,
@@ -78,12 +80,9 @@ export default function AfiliacionesPage() {
   }, [afiliaciones, busqueda]);
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+    <div className={`${ui.page} p-4 md:p-6 max-w-6xl mx-auto space-y-6`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Afiliaciones</h1>
-        </div>
+        <IsbmPageHeading title="Afiliaciones" description="Pacientes del convenio, cobertura e ingresos activos." icon={UserPlus} />
         <button
           onClick={() => setModalAfiliar(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
@@ -96,27 +95,35 @@ export default function AfiliacionesPage() {
         <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      <div className="relative">
+      <IsbmStats items={[
+        { label: "Afiliados", value: cargando ? "—" : afiliaciones.length, detail: "Pacientes registrados en el convenio", icon: Users },
+        { label: "Ingresos activos", value: cargando ? "—" : ingresosActivos.length, detail: "Con atención hospitalaria en curso", icon: BedDouble, tone: "success" },
+        { label: "N° de afiliación pendiente", value: cargando ? "—" : afiliaciones.filter(a => !a.numero_afiliacion_isbm).length, detail: "Registros por completar", icon: ClipboardList, tone: "warning" },
+      ]} />
+
+      <div className={ui.toolbar}><div className={ui.search}><IsbmFilter label="Buscar afiliación"><div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
+          aria-label="Buscar por expediente, nombre o número de afiliación"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por expediente, nombre o N° de afiliación…"
           className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
+      </div></IsbmFilter></div></div>
 
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+        <IsbmTableHeading title="Pacientes afiliados" count={cargando ? undefined : filtradas.length}>Cobertura e ingresos del convenio</IsbmTableHeading>
         {cargando ? (
           <div className="p-10 flex justify-center">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtradas.length === 0 ? (
-          <p className="p-8 text-sm text-slate-500 text-center">
+          <IsbmEmptyState icon={Users} title={afiliaciones.length === 0 ? "Aún no hay afiliaciones" : "Sin coincidencias"}>
             {afiliaciones.length === 0
               ? "Aún no hay pacientes afiliados. Usa “Afiliar paciente” para empezar."
-              : "Sin resultados para la búsqueda."}
-          </p>
+              : "Prueba con otro nombre, expediente o número de afiliación."}
+          </IsbmEmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -138,7 +145,7 @@ export default function AfiliacionesPage() {
                       <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{a.expediente}</td>
                       <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{a.paciente_nombre}</td>
                       <td className="px-4 py-3">
-                        {a.numero_afiliacion_isbm ?? <span className="text-slate-400 italic text-xs">pendiente</span>}
+                        {a.numero_afiliacion_isbm ?? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">Pendiente</span>}
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                         {a.tipo_beneficiario ? TIPO_BENEFICIARIO_LABEL[a.tipo_beneficiario] : "—"}
@@ -156,7 +163,7 @@ export default function AfiliacionesPage() {
                         <div className="flex justify-end gap-1">
                           <button
                             onClick={() => setEditando(a)}
-                            title="Editar afiliación"
+                            title="Editar afiliación" aria-label={`Editar afiliación de ${a.paciente_nombre}`}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
                           >
                             <Pencil size={14} />
@@ -164,7 +171,7 @@ export default function AfiliacionesPage() {
                           {ingreso && (
                             <button
                               onClick={() => setEgresando(ingreso)}
-                              title="Registrar egreso de la cobertura"
+                              title="Registrar egreso de la cobertura" aria-label={`Registrar egreso de ${a.paciente_nombre}`}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 transition-colors"
                             >
                               <LogOut size={14} />
@@ -182,7 +189,7 @@ export default function AfiliacionesPage() {
       </section>
 
       {modalAfiliar && profile && (
-        <ModalAfiliar
+        <AfiliarPacienteWizard
           actor={{ uid: profile.uid, nombre: profile.nombre }}
           yaAfiliados={new Set(ingresosActivos.map((i) => i.id))}
           onCerrar={() => setModalAfiliar(false)}
@@ -207,169 +214,6 @@ export default function AfiliacionesPage() {
         />
       )}
     </div>
-  );
-}
-
-// ── Modal: afiliar paciente activo de ESDOMED ────────────────────────────────
-
-function ModalAfiliar({
-  actor, yaAfiliados, onCerrar, onListo,
-}: {
-  actor: { uid: string; nombre: string };
-  yaAfiliados: Set<string>;
-  onCerrar: () => void;
-  onListo: () => void;
-}) {
-  const [activos, setActivos] = useState<PacienteActivoEsdomed[] | null>(null);
-  const [busqueda, setBusqueda] = useState("");
-  const [seleccionado, setSeleccionado] = useState<PacienteActivoEsdomed | null>(null);
-  const [numeroAfiliacion, setNumeroAfiliacion] = useState("");
-  const [tipoBeneficiario, setTipoBeneficiario] = useState("");
-  const [observaciones, setObservaciones] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    listarPacientesActivosEsdomed()
-      .then(setActivos)
-      .catch((e) => setError((e as Error).message));
-  }, []);
-
-  const candidatos = useMemo(() => {
-    if (!activos) return [];
-    const t = busqueda.trim().toLowerCase();
-    const lista = activos.filter((p) => !yaAfiliados.has(p.id));
-    if (!t) return lista.slice(0, 15);
-    return lista
-      .filter((p) => p.expediente.toLowerCase().includes(t) || p.nombre.toLowerCase().includes(t))
-      .slice(0, 15);
-  }, [activos, busqueda, yaAfiliados]);
-
-  const guardar = async () => {
-    if (!seleccionado) return;
-    setGuardando(true);
-    setError("");
-    try {
-      await afiliarPaciente(
-        seleccionado,
-        { numeroAfiliacion, tipoBeneficiario, observaciones },
-        actor
-      );
-      onListo();
-    } catch (e) {
-      setError((e as Error).message);
-      setGuardando(false);
-    }
-  };
-
-  return (
-    <Modal titulo="Afiliar paciente al convenio" onCerrar={onCerrar} maxW="max-w-5xl">
-      {!seleccionado ? (
-        <div className="space-y-3">
-          <p className="text-xs text-slate-500">
-            Busca entre los pacientes <strong>activos</strong> de la plataforma (hospitalizados hoy).
-          </p>
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              autoFocus
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Expediente o nombre…"
-              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="max-h-[58vh] overflow-y-auto grid sm:grid-cols-2 xl:grid-cols-3 gap-1.5 content-start">
-            {!activos && !error && (
-              <div className="p-6 flex justify-center sm:col-span-2">
-                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-            {activos && candidatos.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-4 sm:col-span-2">Sin pacientes activos que coincidan.</p>
-            )}
-            {candidatos.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSeleccionado(p)}
-                className="w-full text-left border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/40 transition-colors"
-              >
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{p.nombre}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Exp. <span className="font-mono">{p.expediente}</span> · {p.servicioActual}
-                  {p.camaActual ? ` · cama ${p.camaActual}` : ""}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{seleccionado.nombre}</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Exp. <span className="font-mono">{seleccionado.expediente}</span> · {seleccionado.servicioActual}
-            </p>
-            <button onClick={() => setSeleccionado(null)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1">
-              Cambiar paciente
-            </button>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Campo label="N° de afiliación ISBM (opcional)">
-              <input
-                value={numeroAfiliacion}
-                onChange={(e) => setNumeroAfiliacion(e.target.value)}
-                placeholder="Se puede agregar después"
-                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </Campo>
-
-            <Campo label="Tipo de beneficiario (opcional)">
-              <select
-                value={tipoBeneficiario}
-                onChange={(e) => setTipoBeneficiario(e.target.value)}
-                className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">— Sin especificar —</option>
-                {(Object.keys(TIPO_BENEFICIARIO_LABEL) as TipoBeneficiarioIsbm[]).map((t) => (
-                  <option key={t} value={t}>{TIPO_BENEFICIARIO_LABEL[t]}</option>
-                ))}
-              </select>
-            </Campo>
-          </div>
-
-          <Campo label="Observaciones (opcional)">
-            <textarea
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              rows={2}
-              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </Campo>
-        </div>
-      )}
-
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 mt-3">{error}</p>
-      )}
-
-      <div className="flex gap-2 pt-4">
-        <button
-          onClick={onCerrar}
-          className="flex-1 py-2.5 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={guardar}
-          disabled={!seleccionado || guardando}
-          className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
-        >
-          {guardando ? "Afiliando…" : "Afiliar"}
-        </button>
-      </div>
-    </Modal>
   );
 }
 
@@ -545,7 +389,7 @@ function Modal({
   // Default max-w-2xl; cada modal pide más ancho cuando su contenido lo aprovecha.
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className={`w-full ${maxW} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto`}>
+      <div data-isbm-dialog className={`w-full ${maxW} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto`}>
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">{titulo}</h2>
           <button

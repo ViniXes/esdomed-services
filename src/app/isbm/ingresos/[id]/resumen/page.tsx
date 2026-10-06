@@ -1,5 +1,7 @@
 "use client";
 
+import { IsbmStats, isbmStyles as ui } from "../../../_components/IsbmUi";
+
 // Ficha "Resumen de Cargos" por paciente — réplica de la vista estilo Excel
 // del convenio (la misma agrupación en secciones numeradas del libro que
 // manejaba la Unidad): 7 secciones color-coded por tipo de cargo, filtro por
@@ -7,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Receipt, CircleDollarSign } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import {
   cargosDeIngreso,
@@ -148,7 +150,7 @@ export default function ResumenIngresoPage() {
         : `${fechaDesde || "…"} → ${fechaHasta || "…"}`;
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
+    <div className={`${ui.page} p-4 md:p-6 max-w-6xl mx-auto space-y-6`}>
       <button
         onClick={() => router.back()}
         className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
@@ -167,7 +169,7 @@ export default function ResumenIngresoPage() {
       ) : (
         <>
           {/* ── Encabezado del paciente ── */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className={ui.patientCard}>
             <div className="flex-1 min-w-[220px]">
               <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Resumen de cargos</p>
               <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 font-heading">
@@ -182,22 +184,20 @@ export default function ResumenIngresoPage() {
                   : " · Activo"}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wide text-slate-400">Total servicio</p>
-              <p className="text-base font-bold tabular-nums text-slate-700 dark:text-slate-300">{formatoDolares(totales.servicio)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Total cobrable</p>
-              <p className="text-xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{formatoDolares(totales.cobrable)}</p>
-            </div>
           </div>
+          <IsbmStats items={[
+            { label: "Cargos del período", value: visibles.length, detail: etiquetaPeriodo, icon: Receipt },
+            { label: "Total servicio", value: formatoDolares(totales.servicio), detail: "Sin incluir cargos anulados", icon: CircleDollarSign },
+            { label: "Total cobrable", value: formatoDolares(totales.cobrable), detail: "Monto cobrable del período", icon: CircleDollarSign, tone: "success" },
+          ]} />
 
           {/* ── Filtros ── */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={ui.toolbar}>
             <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1">
               {([["estancia", "Estancia completa"], ["dia", "Día"], ["rango", "Rango"]] as [ModoFecha, string][]).map(([m, l]) => (
                 <button
                   key={m}
+                  aria-pressed={modoFecha === m}
                   onClick={() => setModoFecha(m)}
                   className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                     modoFecha === m
@@ -219,6 +219,7 @@ export default function ResumenIngresoPage() {
               </>
             )}
             <button
+              aria-pressed={mostrarAnulados}
               onClick={() => setMostrarAnulados((v) => !v)}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
             >
@@ -254,11 +255,11 @@ function SeccionTabla({ seccion, cargos }: { seccion: SeccionDef; cargos: CargoC
 
   return (
     <div className={`overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 border-l-4 bg-white dark:bg-slate-900 ${seccion.color.border}`}>
-      <div className={`flex items-baseline justify-between border-b border-slate-100 dark:border-slate-800 px-4 py-2 ${seccion.color.headerBg}`}>
+      <div className={`${ui.sectionHeader} ${seccion.color.headerBg}`}>
         <div>
-          <span className={`text-[11px] font-extrabold tracking-widest uppercase ${seccion.color.headerText}`}>
+          <h2 className={`inline text-xs font-bold tracking-wide uppercase ${seccion.color.headerText}`}>
             {seccion.titulo}
-          </span>
+          </h2>
           {seccion.subtitulo && (
             <span className="ml-2 text-[10px] italic text-slate-400">({seccion.subtitulo})</span>
           )}

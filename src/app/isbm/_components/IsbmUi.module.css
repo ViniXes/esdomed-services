@@ -1,0 +1,75 @@
+.page { min-width: 0; padding-bottom: 3rem; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.stat { border: 1px solid var(--color-slate-200); background: white; border-radius: 16px; padding: 18px 20px; }
+.statTop { display: flex; justify-content: space-between; gap: 12px; color: var(--color-slate-500); font-size: 11px; font-weight: 600; letter-spacing: .055em; text-transform: uppercase; }
+.statTop svg { color: var(--color-blue-600); flex-shrink: 0; }
+.statValue { margin-top: 10px; color: var(--color-slate-900); font-size: 27px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
+.statDetail { margin-top: 7px; font-size: 12px; color: var(--color-slate-500); }
+.stat[data-tone="success"] { background: var(--color-emerald-50); border-color: var(--color-emerald-200); }
+.stat[data-tone="success"] :is(.statValue, svg) { color: var(--color-emerald-700); }
+.stat[data-tone="warning"] :is(.statValue, svg) { color: var(--color-amber-700); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 18px; background: white; border: 1px solid var(--color-slate-200); border-radius: 16px; }
+.filter { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.filterLabel { font-size: 11px; font-weight: 600; color: var(--color-slate-600); }
+.toolbar > .search { flex: 1 1 260px; min-width: 0; }
+.toolbar :is(select, input:not([type="checkbox"]):not([type="radio"])) { min-height: 40px; }
+.toolbar > label { min-height: 40px; }
+.tableHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 17px 20px; border-bottom: 1px solid var(--color-slate-200); }
+.tableHeading > div { display: flex; align-items: center; gap: 9px; }
+.tableHeading h2 { font-size: 14px; font-weight: 650; color: var(--color-slate-900); }
+.tableHeading > p { font-size: 12px; color: var(--color-slate-500); }
+.count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; padding: 2px 7px; border-radius: 7px; background: var(--color-blue-50); color: var(--color-blue-700); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.empty { display: flex; flex-direction: column; align-items: center; padding: 48px 20px; text-align: center; }
+.emptyIcon { padding: 13px; margin-bottom: 16px; border: 1px solid var(--color-slate-200); border-radius: 16px; color: var(--color-blue-600); background: var(--color-slate-50); }
+.empty h3 { font-size: 15px; font-weight: 600; color: var(--color-slate-800); }
+.empty p { margin-top: 6px; max-width: 380px; font-size: 13px; line-height: 1.6; color: var(--color-slate-500); }
+.page table { min-width: 700px; }
+.page table th { padding-top: 13px; padding-bottom: 13px; font-size: 10px; font-weight: 650; color: var(--color-slate-600); }
+.page table td { padding-top: 15px; padding-bottom: 15px; }
+.page table tbody tr { border-bottom-color: var(--color-slate-100); }
+.page table tbody tr:hover { background: var(--color-slate-50); }
+.page table td :is(button, a) { min-width: 32px; min-height: 32px; }
+.notice { display: flex; align-items: start; gap: 9px; padding: 13px 16px; border: 1px solid var(--color-amber-200); border-radius: 12px; background: var(--color-amber-50); color: var(--color-amber-800); font-size: 13px; line-height: 1.5; }
+.notice svg { flex-shrink: 0; margin-top: 2px; }
+.patientCard { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 24px; background: white; border: 1px solid var(--color-slate-200); border-radius: 18px; }
+.patientCard > div { min-width: 0; flex: 1; }
+.patientCard h1 { margin-top: 4px; font-size: 24px; }
+.censoCard { display: block; width: 100%; text-align: left; background: white; border: 1px solid var(--color-slate-200); border-radius: 16px; padding: 20px; transition: border-color 150ms ease, box-shadow 150ms ease; }
+@media (hover: hover) and (pointer: fine) { .censoCard:hover { border-color: var(--color-blue-300); box-shadow: 0 3px 12px rgb(15 23 42 / .04); } }
+.censoCard > div { gap: 16px; }
+.censoCard p:first-child { font-size: 15px; }
+.authorization { padding: 20px; border-left-width: 4px; }
+.authorization > div { gap: 16px; }
+.authorization p:first-child { font-size: 15px; }
+.page [data-isbm-dialog] { border-radius: 20px; padding: 24px; overscroll-behavior: contain; }
+.page [data-isbm-dialog] h2 { font-size: 20px; letter-spacing: -.02em; }
+.page [data-isbm-dialog] > div:first-child { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--color-slate-200); }
+.sectionHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 20px; border-bottom: 1px solid var(--color-slate-200); }
+.page :is(button, a):focus-visible { outline: 2px solid var(--color-blue-600); outline-offset: 3px; }
+:global(.dark) :is(.stat, .toolbar, .patientCard, .censoCard) { background: var(--color-slate-900); border-color: var(--color-slate-800); }
+:global(.dark) .statValue, :global(.dark) .tableHeading h2, :global(.dark) .empty h3 { color: var(--color-slate-100); }
+:global(.dark) .stat[data-tone="success"] { background: color-mix(in srgb, var(--color-emerald-950) 50%, var(--color-slate-900)); border-color: var(--color-emerald-900); }
+:global(.dark) .stat[data-tone="success"] :is(.statValue, svg) { color: var(--color-emerald-300); }
+:global(.dark) .stat[data-tone="warning"] :is(.statValue, svg) { color: var(--color-amber-300); }
+:global(.dark) :is(.tableHeading, .sectionHeader) { border-color: var(--color-slate-800); }
+:global(.dark) .page table th { color: var(--color-slate-300); }
+:global(.dark) .page table tbody tr { border-bottom-color: var(--color-slate-800); }
+:global(.dark) .page table tbody tr:hover { background: var(--color-slate-800); }
+:global(.dark) .count { background: var(--color-blue-950); color: var(--color-blue-300); }
+:global(.dark) .emptyIcon { background: var(--color-slate-800); border-color: var(--color-slate-700); color: var(--color-blue-300); }
+:global(.dark) .notice { background: var(--color-amber-950); border-color: var(--color-amber-900); color: var(--color-amber-200); }
+:global(.dark) .page [data-isbm-dialog] > div:first-child { border-color: var(--color-slate-700); }
+@media (max-width: 640px) {
+  .stats { grid-template-columns: 1fr; gap: 8px; }
+  .stat { padding: 15px 18px; }
+  .statValue { font-size: 25px; }
+  .toolbar { gap: 12px; padding: 16px; }
+  .filter { flex: 1 1 120px; }
+  .toolbar > .search { flex-basis: 100%; }
+  .toolbar input, .toolbar select { max-width: 100%; }
+  .patientCard { padding: 18px; }
+  .censoCard { padding: 16px; }
+  .authorization { padding: 16px; }
+}
+@media (pointer: coarse) { .page :is(button, a) { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .censoCard { transition: none; } }

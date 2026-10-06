@@ -1,0 +1,46 @@
+.content :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-cyan-600);
+  outline-offset: 3px;
+}
+
+.content table {
+  min-width: 640px;
+}
+
+.content thead {
+  background: var(--color-slate-50);
+  color: var(--color-slate-600);
+}
+
+.content thead tr {
+  color: inherit;
+}
+
+:global(.dark) .content thead {
+  background: var(--color-slate-800);
+  color: var(--color-slate-300);
+}
+
+.content th {
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .content button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .content :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content :global(.animate-pulse),
+  .content :global(.animate-spin) {
+    animation: none;
+  }
+  .content :is(button, a) {
+    transition: none;
+  }
+}

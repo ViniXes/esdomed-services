@@ -1,9 +1,13 @@
 "use client";
 
+import { IsbmStats, IsbmTableHeading, IsbmEmptyState, IsbmFilter, isbmStyles as ui } from "../_components/IsbmUi";
+
+import { IsbmPageHeading } from "../_components/IsbmPageHeading";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import * as XLSX from "xlsx";
-import { Download, TriangleAlert } from "lucide-react";
+import { Table2, Download, TriangleAlert, Users, CircleDollarSign, ArrowUpRight } from "lucide-react";
 import { consultarTabulador } from "@/lib/isbm/api";
 import {
   CONDICION_EGRESO_LABEL,
@@ -26,7 +30,6 @@ const inputCls =
   "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function TabuladoresPage() {
-  const router = useRouter();
   const hoy = new Date();
   const [tab, setTab] = useState<Tab>("activos");
   const [anio, setAnio] = useState(hoy.getFullYear());
@@ -98,27 +101,30 @@ export default function TabuladoresPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+    <div className={`${ui.page} p-4 md:p-6 max-w-6xl mx-auto space-y-6`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Tabuladores</h1>
-        </div>
+        <IsbmPageHeading title="Tabuladores" description="Consolida los cargos por paciente y exporta el período." icon={Table2} />
         <button
           onClick={exportarExcel}
           disabled={visibles.length === 0}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
         >
-          <Download size={15} /> Excel
+          <Download size={15} /> Exportar Excel
         </button>
       </div>
 
+      <IsbmStats items={[
+        { label: "Pacientes", value: filas ? visibles.length : "—", detail: TABS.find(t => t.id === tab)?.label ?? "Vista actual", icon: Users },
+        { label: "Total servicio", value: filas ? formatoDolares(totales.servicio) : "—", detail: "Servicios acumulados de esta vista", icon: CircleDollarSign },
+        { label: "Total cobrable", value: filas ? formatoDolares(totales.cobrable) : "—", detail: "Monto cobrable de esta vista", icon: CircleDollarSign, tone: "success" },
+      ]} />
       {/* Segmented control + período */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={ui.toolbar}>
         <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-1">
           {TABS.map((t) => (
             <button
               key={t.id}
+              aria-pressed={tab === t.id}
               onClick={() => setTab(t.id)}
               className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-colors ${
                 tab === t.id
@@ -132,14 +138,14 @@ export default function TabuladoresPage() {
         </div>
         {tab !== "activos" && (
           <>
-            <select value={anio} onChange={(e) => setAnio(Number(e.target.value))} className={inputCls}>
+            <IsbmFilter label="Año"><select aria-label="Año" value={anio} onChange={(e) => setAnio(Number(e.target.value))} className={inputCls}>
               {[hoy.getFullYear(), hoy.getFullYear() - 1, hoy.getFullYear() - 2].map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
-            </select>
-            <select value={mes} onChange={(e) => setMes(Number(e.target.value))} className={inputCls}>
+            </select></IsbmFilter>
+            <IsbmFilter label="Mes"><select aria-label="Mes" value={mes} onChange={(e) => setMes(Number(e.target.value))} className={inputCls}>
               {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
-            </select>
+            </select></IsbmFilter>
           </>
         )}
       </div>
@@ -148,33 +154,16 @@ export default function TabuladoresPage() {
         <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      {filas && visibles.length > 0 && (
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            {visibles.length} paciente{visibles.length !== 1 ? "s" : ""}
-          </span>
-          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            Servicio: {formatoDolares(totales.servicio)}
-          </span>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium">
-            Cobrable: {formatoDolares(totales.cobrable)}
-          </span>
-          {totales.diasAbiertos > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300">
-              <TriangleAlert size={12} />
-              {totales.diasAbiertos} día{totales.diasAbiertos !== 1 ? "s" : ""} de censo sin cerrar: los montos aún no son definitivos
-            </span>
-          )}
-        </div>
-      )}
+      {totales.diasAbiertos > 0 && <div className={ui.notice}><TriangleAlert size={16} /><p><strong>{totales.diasAbiertos} días de censo por cerrar.</strong> Los montos aún no son definitivos.</p></div>}
 
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+        <IsbmTableHeading title="Consolidado por paciente" count={filas ? visibles.length : undefined}>Abre un paciente para ver su resumen</IsbmTableHeading>
         {!filas ? (
           <div className="p-10 flex justify-center">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : visibles.length === 0 ? (
-          <p className="p-8 text-sm text-slate-500 text-center">Sin pacientes para esta vista.</p>
+          <IsbmEmptyState icon={Users} title="No hay pacientes en esta vista">Selecciona otra condición de egreso o período.</IsbmEmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -194,12 +183,10 @@ export default function TabuladoresPage() {
                 {visibles.map((f) => (
                   <tr
                     key={f.id}
-                    onClick={() => router.push(`/isbm/ingresos/${f.id}/resumen`)}
-                    title="Ver resumen de cargos del paciente"
-                    className="border-b border-slate-50 dark:border-slate-800/60 last:border-0 cursor-pointer hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition-colors"
+                    className="border-b border-slate-50 dark:border-slate-800/60 last:border-0 hover:bg-blue-50/40 dark:hover:bg-blue-950/30 transition-colors"
                   >
                     <td className="px-4 py-2.5">
-                      <p className="text-slate-900 dark:text-slate-100">{f.paciente_nombre}</p>
+                      <Link href={`/isbm/ingresos/${f.id}/resumen`} className="inline-flex items-center gap-1.5 font-semibold text-blue-800 hover:underline dark:text-blue-300">{f.paciente_nombre}<ArrowUpRight size={13} aria-hidden="true" /></Link>
                       <p className="text-[10px] font-mono text-slate-400">{f.expediente}</p>
                     </td>
                     <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">

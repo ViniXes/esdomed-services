@@ -1,7 +1,11 @@
 "use client";
 
+import { IsbmStats, IsbmFilter, isbmStyles as ui } from "../_components/IsbmUi";
+
+import { IsbmPageHeading } from "../_components/IsbmPageHeading";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck, Lock, LockOpen, Pencil, Stethoscope, X } from "lucide-react";
+import { CalendarCheck, Lock, LockOpen, Pencil, Stethoscope, X, Users, CircleDollarSign, Search, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { CargosDelDia } from "@/components/isbm/CargosDelDia";
@@ -42,6 +46,8 @@ const formatoHora = (h: string | null) => (h ? h.slice(0, 5) : null);
 export default function CensoDiarioPage() {
   const { profile } = useAuth();
   const [fecha, setFecha] = useState(hoyISO());
+  const [busqueda, setBusqueda] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState("");
   const [censos, setCensos] = useState<CensoDiarioConRelaciones[]>([]);
   const [servicios, setServicios] = useState<ServicioHospitalarioIsbm[]>([]);
   const [medicos, setMedicos] = useState<MedicoSistema[]>([]);
@@ -92,53 +98,49 @@ export default function CensoDiarioPage() {
     };
   }, [censos]);
 
+  const visibles = censos.filter(c => {
+    const texto = busqueda.trim().toLowerCase();
+    return (!estadoFiltro || (estadoFiltro === "cerrado" ? c.dia_cerrado : !c.dia_cerrado)) &&
+      (!texto || c.ingreso.paciente_nombre.toLowerCase().includes(texto) || c.expediente.toLowerCase().includes(texto) || c.servicio_facturacion.nombre.toLowerCase().includes(texto));
+  });
+
   const detalle = useMemo(
     () => (detalleId == null ? null : censos.find((c) => c.id === detalleId) ?? null),
     [censos, detalleId]
   );
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+    <div className={`${ui.page} p-4 md:p-6 max-w-6xl mx-auto space-y-6`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Censo diario</h1>
-        </div>
-        <div className="w-44">
-          <DateField value={fecha} onChange={(v) => v && setFecha(v)} ariaLabel="Fecha del censo" />
-        </div>
+        <IsbmPageHeading title="Censo diario" description="Visitas AM/PM, servicios y cierre de cada día." icon={CalendarCheck} />
+        <div className="w-full sm:w-44"><IsbmFilter label="Fecha del censo"><DateField value={fecha} onChange={(v) => v && setFecha(v)} ariaLabel="Fecha del censo" /></IsbmFilter></div>
       </div>
 
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      {!cargando && censos.length > 0 && (
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            {resumen.total} paciente{resumen.total !== 1 ? "s" : ""} en censo
-          </span>
-          <span className="px-2.5 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-            {resumen.cerrados} día{resumen.cerrados !== 1 ? "s" : ""} cerrado{resumen.cerrados !== 1 ? "s" : ""}
-          </span>
-          {resumen.cerrados > 0 && (
-            <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium">
-              Cobrable del día: {formatoDolares(resumen.cobrable)}
-            </span>
-          )}
-        </div>
-      )}
+      <IsbmStats items={[
+        { label: "Pacientes en censo", value: cargando ? "—" : resumen.total, detail: "Ingresos de la fecha seleccionada", icon: Users },
+        { label: "Días por cerrar", value: cargando ? "—" : resumen.total - resumen.cerrados, detail: resumen.cerrados + " días cerrados", icon: LockOpen, tone: "warning" },
+        { label: "Cobrable del día", value: cargando ? "—" : formatoDolares(resumen.cobrable), detail: "Solo incluye días cerrados", icon: CircleDollarSign, tone: "success" },
+      ]} />
+      <div className={ui.toolbar}>
+        <div className={ui.search}><IsbmFilter label="Buscar paciente"><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input aria-label="Buscar paciente en censo" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Nombre, expediente o servicio…" className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" /></div></IsbmFilter></div>
+        <IsbmFilter label="Estado del día"><select aria-label="Estado del censo" value={estadoFiltro} onChange={e => setEstadoFiltro(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><option value="">Todos los estados</option><option value="abierto">Por cerrar</option><option value="cerrado">Cerrados</option></select></IsbmFilter>
+      </div>
 
-      <section className="space-y-2.5">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between"><h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pacientes del día</h2><span className="text-xs text-slate-500">{visibles.length} de {censos.length} pacientes</span></div>
         {cargando ? (
           <div className="p-10 flex justify-center">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : censos.length === 0 ? (
+        ) : visibles.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center">
             <CalendarCheck size={26} className="text-slate-300 mx-auto mb-2" />
             <p className="text-sm text-slate-500">
-              No hay pacientes ISBM en el censo de esta fecha.
+              {censos.length ? "No hay pacientes que coincidan con los filtros." : "No hay pacientes ISBM en el censo de esta fecha."}
               {fecha > hoyISO() && " (Las fechas futuras no se abren.)"}
             </p>
             <p className="text-xs text-slate-400 mt-1">
@@ -146,13 +148,13 @@ export default function CensoDiarioPage() {
             </p>
           </div>
         ) : (
-          censos.map((c) => {
+          visibles.map((c) => {
             const est = ESTADO_UI[estadoCenso(c)];
             return (
               <button
                 key={c.id}
                 onClick={() => setDetalleId(c.id)}
-                className="w-full text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3.5 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                className={ui.censoCard}
               >
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                   <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${est.punto}`} />
@@ -172,7 +174,7 @@ export default function CensoDiarioPage() {
                   </div>
                   <span className={`text-[11px] font-medium border rounded-full px-2.5 py-1 ${est.clases}`}>
                     {c.dia_cerrado ? formatoDolares(c.total_cobrable_dia) + " · " : ""}{est.label}
-                  </span>
+                  </span><ChevronRight size={17} className="text-slate-400" aria-hidden="true" />
                 </div>
               </button>
             );
@@ -295,7 +297,7 @@ function ModalCenso({
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+      <div data-isbm-dialog className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">

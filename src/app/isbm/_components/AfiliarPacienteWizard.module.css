@@ -1,0 +1,102 @@
+.backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgb(15 23 42 / .48); backdrop-filter: blur(5px); }
+.dialog { display: flex; flex-direction: column; width: 100%; max-width: 760px; max-height: 92dvh; overflow: hidden; border: 1px solid var(--color-slate-200); border-radius: 22px; background: white; color: var(--color-slate-900); box-shadow: 0 24px 80px rgb(15 23 42 / .18); }
+.header { display: flex; align-items: start; gap: 14px; padding: 24px 28px 20px; flex-shrink: 0; }
+.headerIcon { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 14px; background: var(--color-blue-50); color: var(--color-blue-700); }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .13em; color: var(--color-blue-700); }
+.header h2 { font-size: 23px; font-weight: 700; letter-spacing: -.03em; line-height: 1.3; margin-top: 3px; }
+.header > div > p:last-child { font-size: 12px; color: var(--color-slate-500); margin-top: 5px; }
+.close { margin-left: auto; display: grid; place-items: center; border-radius: 9px; width: 32px; height: 32px; flex-shrink: 0; color: var(--color-slate-500); }
+.close:hover { background: var(--color-slate-100); }
+.steps { display: flex; gap: 16px; padding: 16px 28px; background: var(--color-slate-50); border-block: 1px solid var(--color-slate-200); flex-shrink: 0; }
+.steps li { flex: 1; display: flex; align-items: center; gap: 8px; color: var(--color-slate-500); font-size: 12px; font-weight: 500; }
+.steps li:not(:last-child)::after { content: ""; height: 1px; background: var(--color-slate-200); flex: 1; margin-left: 8px; }
+.steps li > span { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; border: 1px solid var(--color-slate-300); font-size: 11px; flex-shrink: 0; }
+.steps li[data-active="true"] { color: var(--color-blue-700); font-weight: 700; }
+.steps li[data-active="true"] > span { background: var(--color-blue-600); border-color: var(--color-blue-600); color: white; }
+.steps li[data-done="true"] { color: var(--color-blue-700); }
+.steps li[data-done="true"] > span { background: var(--color-blue-50); border-color: var(--color-blue-200); }
+.body { padding: 24px 28px; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+.stepHeading p { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-slate-500); margin-bottom: 5px; }
+.stepHeading h3 { font-size: 18px; font-weight: 650; letter-spacing: -.02em; outline: none; }
+.hint { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--color-slate-500); }
+.filters { display: grid; grid-template-columns: 1fr 215px; align-items: end; gap: 12px; margin-top: 20px; }
+.dialog label > span:first-child, .search > span, .fields label > span { display: block; font-size: 11px; font-weight: 600; color: var(--color-slate-600); margin-bottom: 7px; }
+.search > div { position: relative; }
+.search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-slate-400); }
+.dialog :is(input:not([type="radio"]), select, textarea) { width: 100%; border: 1px solid var(--color-slate-200); border-radius: 10px; padding: 10px 12px; background: white; color: var(--color-slate-900); font-size: 13px; }
+.search input { padding-left: 38px !important; }
+.dialog :is(input, select, textarea, button):focus-visible { outline: 2px solid var(--color-blue-600); outline-offset: 2px; }
+.dialog input[type="radio"] { accent-color: var(--color-blue-600); width: 16px; height: 16px; flex-shrink: 0; }
+.listCaption { display: flex; justify-content: space-between; gap: 8px; margin: 18px 0 10px; color: var(--color-slate-500); font-size: 11px; }
+.selectedCaption { color: var(--color-blue-700); font-weight: 600; }
+.patientList { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; padding: 3px; margin: -3px; overscroll-behavior: contain; }
+.patientOption { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--color-slate-200); border-radius: 12px; cursor: pointer; }
+.patientOption[data-selected="true"] { border-color: var(--color-blue-500); background: var(--color-blue-50); }
+.avatar { display: grid; place-items: center; flex-shrink: 0; width: 35px; height: 35px; background: var(--color-slate-100); color: var(--color-slate-500); border-radius: 11px; }
+.patientInfo { min-width: 0; }
+.patientInfo strong { display: block; font-size: 13px; font-weight: 600; }
+.patientInfo > span { display: block; margin-top: 4px; color: var(--color-slate-500); font-size: 11px; line-height: 1.5; }
+.selectionSummary { margin-top: 12px; color: var(--color-slate-500); font-size: 11px; }
+.selectionSummary strong { color: var(--color-blue-700); }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 20px; text-align: center; color: var(--color-slate-500); font-size: 12px; }
+.empty p { max-width: 380px; line-height: 1.6; }
+.empty strong { color: var(--color-slate-700); }
+.selectedPatient { display: flex; align-items: start; gap: 12px; padding: 16px; border-radius: 13px; background: var(--color-blue-50); border: 1px solid var(--color-blue-100); margin-top: 18px; }
+.selectedPatient strong { font-size: 14px; font-weight: 600; }
+.selectedPatient p { font-size: 11px; color: var(--color-slate-500); margin-top: 4px; }
+.selectedPatient .avatar { background: white; color: var(--color-blue-700); }
+.selectedPatient .service { display: flex; align-items: start; gap: 6px; margin-top: 8px; color: var(--color-blue-700); }
+.service svg { flex-shrink: 0; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+.fields small { font-weight: 400; font-size: 10px; margin-left: 4px; color: var(--color-slate-400); }
+.fullField { grid-column: 1 / -1; }
+.dialog textarea { resize: vertical; min-height: 80px; }
+.review { margin-top: 20px; border: 1px solid var(--color-slate-200); border-radius: 12px; padding: 0 16px; }
+.review > div { display: grid; grid-template-columns: 180px 1fr; gap: 12px; padding: 13px 0; }
+.review > div + div { border-top: 1px solid var(--color-slate-100); }
+.review dt { font-size: 12px; color: var(--color-slate-500); }
+.review dd { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; }
+.confirmationNote { display: flex; align-items: start; gap: 10px; padding: 14px 16px; margin-top: 18px; background: var(--color-slate-50); border-radius: 12px; color: var(--color-slate-500); font-size: 12px; line-height: 1.6; }
+.confirmationNote svg { flex-shrink: 0; color: var(--color-blue-600); }
+.error { padding: 12px; margin-top: 16px; border: 1px solid var(--color-red-200); border-radius: 10px; background: var(--color-red-50); color: var(--color-red-700); font-size: 12px; }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 28px; border-top: 1px solid var(--color-slate-200); flex-shrink: 0; background: white; }
+.footer > div { display: flex; gap: 8px; }
+.primary, .secondary, .cancel { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.primary { background: var(--color-blue-600); color: white; border: 1px solid var(--color-blue-600); }
+.secondary { border: 1px solid var(--color-slate-200); background: white; color: var(--color-slate-600); }
+.cancel { color: var(--color-slate-500); }
+.dialog button:disabled { opacity: .5; cursor: not-allowed; }
+.spinner { display: inline-block; width: 17px; height: 17px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (hover: hover) and (pointer: fine) { .primary:not(:disabled):hover { background: var(--color-blue-700); } .secondary:not(:disabled):hover, .cancel:not(:disabled):hover { background: var(--color-slate-50); } .patientOption:hover { border-color: var(--color-blue-300); } }
+:global(.dark) .dialog, :global(.dark) .footer, :global(.dark) .secondary { background: var(--color-slate-900); color: var(--color-slate-100); border-color: var(--color-slate-700); }
+:global(.dark) .steps, :global(.dark) .confirmationNote { background: var(--color-slate-800); border-color: var(--color-slate-700); }
+:global(.dark) .steps li:not(:last-child)::after { background: var(--color-slate-700); }
+:global(.dark) .dialog :is(input:not([type="radio"]), select, textarea) { background: var(--color-slate-900); color: var(--color-slate-100); border-color: var(--color-slate-700); }
+:global(.dark) :is(.patientOption, .review) { border-color: var(--color-slate-700); }
+:global(.dark) .review > div + div { border-color: var(--color-slate-700); }
+:global(.dark) .patientOption[data-selected="true"], :global(.dark) .selectedPatient { background: var(--color-blue-950); border-color: var(--color-blue-700); }
+:global(.dark) .avatar, :global(.dark) .selectedPatient .avatar { background: var(--color-slate-800); color: var(--color-blue-300); }
+:global(.dark) .headerIcon, :global(.dark) .steps li[data-done="true"] > span { background: var(--color-blue-950); border-color: var(--color-blue-800); color: var(--color-blue-300); }
+:global(.dark) :is(.eyebrow, .selectedCaption, .selectionSummary strong, .selectedPatient .service), :global(.dark) .steps li[data-active="true"], :global(.dark) .steps li[data-done="true"] { color: var(--color-blue-300); }
+:global(.dark) .error { background: var(--color-red-950); border-color: var(--color-red-900); color: var(--color-red-300); }
+@media (max-width: 640px) {
+  .backdrop { padding: 10px; }
+  .dialog { max-height: calc(100dvh - 20px); border-radius: 17px; }
+  .header { padding: 20px 18px 16px; gap: 10px; }
+  .header h2 { font-size: 21px; }
+  .headerIcon { display: none; }
+  .steps { padding: 14px 18px; gap: 9px; }
+  .steps li { gap: 5px; font-size: 11px; }
+  .steps li:not(:last-child)::after { display: none; }
+  .body { padding: 20px 18px; }
+  .filters, .fields { grid-template-columns: 1fr; gap: 12px; }
+  .patientList { max-height: 220px; }
+  .patientOption { padding: 12px; gap: 9px; }
+  .patientOption .avatar { display: none; }
+  .dialog :is(input:not([type="radio"]), select, textarea) { font-size: 16px; }
+  .review > div { grid-template-columns: 1fr; gap: 5px; }
+  .footer { padding: 14px 18px; gap: 8px; }
+  .primary, .secondary, .cancel { padding: 10px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

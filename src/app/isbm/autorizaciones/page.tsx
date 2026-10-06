@@ -1,7 +1,11 @@
 "use client";
 
+import { IsbmStats, IsbmEmptyState, isbmStyles as ui } from "../_components/IsbmUi";
+
+import { IsbmPageHeading } from "../_components/IsbmPageHeading";
+
 import { useCallback, useEffect, useState } from "react";
-import { Check, ShieldCheck, X as XIcon } from "lucide-react";
+import { Check, ShieldCheck, X as XIcon, Clock3, CircleDollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { aprobarAutorizacion, listarAutorizaciones, rechazarAutorizacion } from "@/lib/isbm/api";
 import { RUBRO_LABEL, formatoDolares, type AutorizacionConCargo } from "@/lib/isbm/types";
@@ -79,12 +83,14 @@ export default function AutorizacionesPage() {
   const resueltas = (autorizaciones ?? []).filter((a) => a.estado !== "PENDIENTE");
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-      <div>
-        <p className="text-xs text-slate-400 uppercase tracking-widest mb-0.5">Convenios ISBM</p>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Autorizaciones</h1>
-      </div>
+    <div className={`${ui.page} p-4 md:p-6 max-w-6xl mx-auto space-y-6`}>
+      <IsbmPageHeading title="Autorizaciones" description="Revisa solicitudes pendientes y consulta sus resoluciones." icon={ShieldCheck} />
 
+      <IsbmStats items={[
+        { label: "Pendientes", value: autorizaciones ? pendientes.length : "—", detail: "Solicitudes que requieren resolución", icon: Clock3, tone: "warning" },
+        { label: "Monto solicitado", value: autorizaciones ? formatoDolares(pendientes.reduce((s, a) => s + a.monto_solicitado, 0)) : "—", detail: "Total de solicitudes pendientes", icon: CircleDollarSign },
+        { label: "Resueltas", value: autorizaciones ? resueltas.length : "—", detail: "Autorizaciones aprobadas o rechazadas", icon: ShieldCheck, tone: "success" },
+      ]} />
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">{error}</p>
       )}
@@ -101,13 +107,12 @@ export default function AutorizacionesPage() {
               Pendientes {pendientes.length > 0 && `(${pendientes.length})`}
             </h2>
             {pendientes.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center">
-                <ShieldCheck size={24} className="text-emerald-400 mx-auto mb-1.5" />
-                <p className="text-sm text-slate-500">No hay autorizaciones pendientes.</p>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                <IsbmEmptyState icon={ShieldCheck} title="Todo al día">No hay solicitudes pendientes de resolución.</IsbmEmptyState>
               </div>
             ) : (
               pendientes.map((a) => (
-                <div key={a.id} className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900 rounded-2xl px-4 py-3.5">
+                <div key={a.id} className={`${ui.authorization} bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900 rounded-2xl`}>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                     <div className="flex-1 min-w-[200px]">
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -148,6 +153,7 @@ export default function AutorizacionesPage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <input
                         autoFocus
+                        aria-label="Motivo del rechazo"
                         value={comentario}
                         onChange={(e) => setComentario(e.target.value)}
                         placeholder="Motivo del rechazo (mínimo 10 caracteres)"
