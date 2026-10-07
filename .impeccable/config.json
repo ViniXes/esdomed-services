@@ -18,6 +18,15 @@
         ],
         "createdAt": "2026-09-30T14:47:24.458Z",
         "reason": "Assessment B (critique 2026-09-30): the colored bg is hover-only and the text switches color on hover; detector pairs idle text with hover bg"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/app/medico/cola-expedientes/page.tsx"
+        ],
+        "createdAt": "2026-10-07T21:05:46.830Z",
+        "reason": "Claude: L175 is the pre-existing edit-censo pencil link; gray text sits on a transparent background and only gets bg-blue-50 together with text-blue-600 on hover"
       }
     ]
   }

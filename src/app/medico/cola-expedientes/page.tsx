@@ -7,8 +7,9 @@ import {
   collection, query, orderBy, onSnapshot, limit, where, getDocs, Timestamp, QueryConstraint,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
-import { Ambulance } from "lucide-react";
+import { Ambulance, Download } from "lucide-react";
 import { Icon } from "@iconify/react";
 import medicalKit from "@iconify-icons/solar/medical-kit-linear";
 import calendar from "@iconify-icons/solar/calendar-minimalistic-linear";
@@ -246,7 +247,18 @@ function esFechaAyer(ts: unknown): boolean {
     d.getDate() === ayer.getDate();
 }
 
+function fechaIsoLocal(d: Date) {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 export default function ColaExpedientesPage() {
+  const { profile } = useAuth();
+  // Trabajo Social entra por /dashboard/cola-expedientes (re-export) a
+  // consultar: no registra censos (las reglas tampoco le dejan leerlos), pero
+  // sí descarga en Excel lo que está viendo.
+  const soloConsulta = profile?.role !== "medico";
+  const [exportando, setExportando] = useState(false);
+  const [errorExport, setErrorExport] = useState("");
   const [ingresos, setIngresos] = useState<ControlIngreso[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [soloAyer, setSoloAyer] = useState(false);
@@ -287,6 +299,7 @@ export default function ColaExpedientesPage() {
   // (volumen chico: ~50 registros/día entre ambos censos). Alimenta los
   // badges y el bloqueo del botón "+" cuando ya hay censo.
   useEffect(() => {
+    if (soloConsulta) return;
     const inicioAyer = new Date();
     inicioAyer.setDate(inicioAyer.getDate() - 1);
     inicioAyer.setHours(0, 0, 0, 0);
@@ -320,7 +333,7 @@ export default function ColaExpedientesPage() {
     const u1 = sub("censo_demanda_espontanea", setCensosDemanda);
     const u2 = sub("censo_referidos", setCensosReferido);
     return () => { u1(); u2(); };
-  }, []);
+  }, [soloConsulta]);
 
   // El match es por ATENCIÓN: primero por el vínculo exacto al registro de la
   // cola; si el censo se digitó sin pasar por la cola (sin vínculo), se cae a
@@ -409,6 +422,46 @@ export default function ColaExpedientesPage() {
     (esFechaHoy(ingreso.creadoEn) || esFechaAyer(ingreso.creadoEn)) &&
     censosDemanda.verificado && censosReferido.verificado;
 
+  // Exporta lo que está en pantalla: ayer/hoy con la búsqueda y el filtro
+  // aplicados, o el resultado del histórico. El archivo lleva el rango real
+  // de fechas de los registros.
+  const exportarExcel = async () => {
+    if (exportando || lista.length === 0) return;
+    setExportando(true);
+    setErrorExport("");
+    try {
+      const XLSX = await import("xlsx");
+      const filas = lista.map(i => ({
+        Fecha: formatFecha(i.creadoEn),
+        Hora: formatHora(i.creadoEn),
+        Expediente: i.expediente,
+        DUI: i.dui ?? "",
+        Apellidos: i.apellidos,
+        Nombres: i.nombres,
+        Edad: i.edad ?? "",
+        Género: i.genero === "masculino" ? "Masculino" : i.genero === "femenino" ? "Femenino" : "",
+        Servicio: i.servicio,
+        "Tipo de ingreso": i.ingresoDirectoServicio ? "Directo a servicio" : "Triage",
+        "Registrado por": i.responsableIngresoNombre ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(filas);
+      ws["!cols"] = [
+        { wch: 11 }, { wch: 9 }, { wch: 11 }, { wch: 12 }, { wch: 24 }, { wch: 24 },
+        { wch: 6 }, { wch: 10 }, { wch: 28 }, { wch: 17 }, { wch: 28 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Expedientes");
+      const fechas = lista.map(i => fechaIsoLocal(tsToDate(i.creadoEn))).sort();
+      const desde = fechas[0];
+      const hasta = fechas[fechas.length - 1];
+      XLSX.writeFile(wb, `cola_expedientes_${desde === hasta ? desde : `${desde}_a_${hasta}`}.xlsx`);
+    } catch {
+      setErrorExport("No se pudo generar el Excel. Intenta de nuevo.");
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4">
 
@@ -420,7 +473,7 @@ export default function ColaExpedientesPage() {
             <Ambulance size={25} strokeWidth={2.1} />
           </div>
           <div>
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">Tablero médico</p>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600 dark:text-blue-300">{soloConsulta ? "Emergencia · consulta" : "Tablero médico"}</p>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading leading-tight md:text-2xl">
               Cola de expedientes
             </h1>
@@ -463,7 +516,8 @@ export default function ColaExpedientesPage() {
         </div>
       </div>
 
-      {/* Tabs Recientes / Histórico */}
+      {/* Tabs Recientes / Histórico (+ Excel en modo consulta) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="inline-flex items-center gap-1 rounded-2xl border border-blue-100 bg-white p-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {([
           { key: "recientes", label: "Ayer y hoy", icon: pulse },
@@ -484,6 +538,22 @@ export default function ColaExpedientesPage() {
           </button>
         ))}
       </div>
+      {soloConsulta && (
+        <button
+          type="button"
+          onClick={exportarExcel}
+          disabled={exportando || lista.length === 0}
+          title="Descargar en Excel los registros que se muestran"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Download size={15} />
+          {exportando ? "Generando…" : "Exportar a Excel"}
+        </button>
+      )}
+      </div>
+      {errorExport && (
+        <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">{errorExport}</p>
+      )}
 
       {/* Tabla */}
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -591,7 +661,7 @@ export default function ColaExpedientesPage() {
         {vista === "historico" && errorHistorico && (
           <p role="alert" className="border-t border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">{errorHistorico}</p>
         )}
-        {vista === "historico" && lista.some(i => !censoVerificado(i)) && (
+        {!soloConsulta && vista === "historico" && lista.some(i => !censoVerificado(i)) && (
           <p className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-700">El estado de censo solo se verifica para ayer y hoy. Para fechas anteriores, consulta el libro de censos.</p>
         )}
         {((vista === "recientes" && conexion === "cargando") || (vista === "historico" && buscandoHistoricos)) ? (
@@ -617,7 +687,7 @@ export default function ColaExpedientesPage() {
                 <caption className="sr-only">{vista === "recientes" ? "Cola de expedientes recientes" : "Resultados del histórico de expedientes"}</caption>
                 <thead>
                   <tr className="border-y border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
-                    {["Paciente", "Expediente", "Fecha y hora", "Servicio", "Censo"].map(titulo => (
+                    {["Paciente", "Expediente", "Fecha y hora", "Servicio", ...(soloConsulta ? [] : ["Censo"])].map(titulo => (
                       <th key={titulo} scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500">{titulo}</th>
                     ))}
                   </tr>
@@ -650,9 +720,11 @@ export default function ColaExpedientesPage() {
                           {ingreso.servicio}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} />
-                      </td>
+                      {!soloConsulta && (
+                        <td className="px-4 py-3 text-left whitespace-nowrap">
+                          <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -694,9 +766,11 @@ export default function ColaExpedientesPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                    <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} />
-                  </div>
+                  {!soloConsulta && (
+                    <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
