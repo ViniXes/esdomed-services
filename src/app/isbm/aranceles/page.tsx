@@ -5,7 +5,7 @@ import { IsbmStats, IsbmTableHeading, IsbmEmptyState, IsbmFilter, isbmStyles as 
 import { IsbmPageHeading } from "../_components/IsbmPageHeading";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpenText, Ban, Pencil, Plus, RotateCcw, Search, X, ShieldCheck, Layers } from "lucide-react";
+import { BookOpenText, Ban, Pencil, Plus, RotateCcw, Search, X, ShieldCheck, Layers, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import {
@@ -39,6 +39,8 @@ export default function ArancelesPage() {
   const [rubro, setRubro] = useState("");
   const [verInactivos, setVerInactivos] = useState(false);
   const [editando, setEditando] = useState<ArancelIsbm | "nuevo" | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(10);
 
   // Solo el jefe ISBM (y admin) administran el catálogo; el resto consulta.
   const puedeEditar = profile?.role === "isbm_jefe" || profile?.role === "admin";
@@ -67,6 +69,11 @@ export default function ArancelesPage() {
       return a.descripcion.toLowerCase().includes(t) || a.codigo.toLowerCase().includes(t);
     });
   }, [aranceles, busqueda, rubro]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const inicio = (paginaActual - 1) * porPagina;
+  const paginados = filtrados.slice(inicio, inicio + porPagina);
 
   const toggleActivo = async (a: ArancelIsbm) => {
     const accion = a.activo ? "desactivar" : "reactivar";
@@ -99,14 +106,14 @@ export default function ArancelesPage() {
         { label: "Requieren autorización", value: aranceles ? filtrados.filter(a => a.requiere_autorizacion).length : "—", detail: "Servicios con autorización obligatoria", icon: ShieldCheck, tone: "warning" },
       ]} />
       <div className={ui.toolbar}>
-        <IsbmFilter label="Rubro"><select aria-label="Rubro" value={rubro} onChange={(e) => setRubro(e.target.value)} className={filtroCls}>
+        <IsbmFilter label="Rubro"><select aria-label="Rubro" value={rubro} onChange={(e) => { setRubro(e.target.value); setPagina(1); }} className={filtroCls}>
           <option value="">Todos los rubros</option>
           {(Object.keys(RUBRO_LABEL) as RubroArancelIsbm[]).map((r) => (
             <option key={r} value={r}>{RUBRO_LABEL[r]}</option>
           ))}
         </select></IsbmFilter>
         <label className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 px-1 cursor-pointer">
-          <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="accent-blue-600" />
+          <input type="checkbox" checked={verInactivos} onChange={(e) => { setVerInactivos(e.target.checked); setPagina(1); }} className="accent-blue-600" />
           Incluir inactivos
         </label>
         <div className={ui.search}><IsbmFilter label="Buscar en el catálogo"><div className="relative">
@@ -114,7 +121,7 @@ export default function ArancelesPage() {
           <input
             aria-label="Buscar arancel por descripción o código"
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
             placeholder="Buscar por descripción o código…"
             className={`${filtroCls} w-full pl-9`}
           />
@@ -127,6 +134,32 @@ export default function ArancelesPage() {
 
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
         <IsbmTableHeading title="Catálogo de aranceles" count={aranceles ? filtrados.length : undefined}>Precios HNES y condiciones de cobro</IsbmTableHeading>
+        {aranceles && filtrados.length > 0 && (
+          <nav aria-label="Paginación de aranceles" className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <p role="status" className="text-xs text-slate-500">
+              Mostrando <span className="font-semibold text-slate-700 dark:text-slate-200">{inicio + 1}–{Math.min(inicio + porPagina, filtrados.length)}</span> de {filtrados.length} aranceles
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-slate-500">
+                Por página
+                <select aria-label="Aranceles por página" value={porPagina} onChange={e => { setPorPagina(Number(e.target.value)); setPagina(1); }} className={`${filtroCls} py-1.5`}>
+                  {[10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <div className="flex items-center gap-2">
+                <button aria-label="Página anterior" disabled={paginaActual === 1} onClick={() => setPagina(paginaActual - 1)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-35 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"><ChevronLeft size={16} /></button>
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="sr-only">Ir a página</span>
+                  <select aria-label="Ir a página" value={paginaActual} onChange={e => setPagina(Number(e.target.value))} className={`${filtroCls} py-1.5`}>
+                    {Array.from({ length: totalPaginas }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                  </select>
+                  de {totalPaginas}
+                </label>
+                <button aria-label="Página siguiente" disabled={paginaActual === totalPaginas} onClick={() => setPagina(paginaActual + 1)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-35 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"><ChevronRight size={16} /></button>
+              </div>
+            </div>
+          </nav>
+        )}
         {!aranceles ? (
           <div className="p-10 flex justify-center">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -148,7 +181,7 @@ export default function ArancelesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map((a) => (
+                {paginados.map((a) => (
                   <tr key={a.id} className={`border-b border-slate-50 dark:border-slate-800/60 last:border-0 ${!a.activo ? "opacity-45" : ""}`}>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-400">{a.codigo}</td>
                     <td className="px-4 py-2.5 text-slate-900 dark:text-slate-100">

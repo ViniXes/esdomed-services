@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, UserPlus, Users, BedDouble, ArrowRight, CircleDollarSign, ShieldCheck, Receipt, Table2, BookOpenText } from "lucide-react";
+import { CalendarCheck, UserPlus, Users, BedDouble, ArrowRight, CircleDollarSign, ShieldCheck, Receipt, Table2, BookOpenText, BadgeDollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSupabase } from "@/lib/isbm/supabase";
 import { hoyISO } from "@/lib/isbm/api";
@@ -131,6 +131,7 @@ export default function IsbmInicioPage() {
         <AccionCard href="/isbm/cargos" icon={Receipt} title="Cargos" desc="Consulta servicios, observaciones y montos facturables." />
         <AccionCard href="/isbm/tabuladores" icon={Table2} title="Tabuladores" desc="Consolida cargos por paciente y exporta a Excel." />
         <AccionCard href="/isbm/aranceles" icon={BookOpenText} title="Aranceles" desc="Consulta precios y reglas de autorización." />
+        <AccionCard href="/isbm/honorarios" icon={BadgeDollarSign} title="Honorarios" desc="Revisa la participación médica y prepara la liquidación mensual." />
       </section>
     </div>
   );

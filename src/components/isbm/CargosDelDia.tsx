@@ -1,10 +1,10 @@
 "use client";
 
-// Sección "Cargos del día" del modal del censo ISBM: lista los cargos del
+// Sección de cargos integrada en el detalle del censo ISBM: lista los cargos del
 // censo, permite capturar nuevos (wizard: buscar arancel → detalles) y
 // anularlos lógicamente mientras el día esté abierto.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Ban, CheckCircle2, ChevronRight, Hourglass, Pencil, Plus, Search, X } from "lucide-react";
 import {
   anularCargo,
@@ -33,11 +33,16 @@ import {
 const inputCls =
   "w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
+export type ResumenCargos = { cantidad: number; observados: number; servicio: number; cobrable: number };
+
 export function CargosDelDia({
-  censo, actor,
+  censo, actor, revision, onActividad, onResumen,
 }: {
   censo: CensoDiarioConRelaciones;
   actor: { uid: string; nombre: string };
+  revision: number;
+  onActividad: (activo: boolean) => void;
+  onResumen: (resumen: ResumenCargos | null) => void;
 }) {
   const [cargos, setCargos] = useState<CargoConArancel[] | null>(null);
   const [error, setError] = useState("");
@@ -48,22 +53,49 @@ export function CargosDelDia({
 
   const cargar = useCallback(async () => {
     try {
-      setCargos(await cargosDeCenso(censo.id));
+      setError("");
+      onResumen(null);
+      const lista = await cargosDeCenso(censo.id);
+      setCargos(lista);
+      const vivos = lista.filter(c => !c.anulado);
+      onResumen({ cantidad: vivos.length, observados: vivos.filter(c => c.pendiente_revision).length, servicio: vivos.reduce((s,c) => s+c.costo_total,0), cobrable: vivos.reduce((s,c) => s+c.monto_facturable,0) });
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [censo.id]);
+  }, [censo.id, onResumen]);
 
   useEffect(() => {
     const t = setTimeout(cargar, 0);
     return () => clearTimeout(t);
-  }, [cargar]);
+  }, [cargar, revision]);
+
+  useEffect(() => { onActividad(capturando || detalleId !== null); return () => onActividad(false); }, [capturando, detalleId, onActividad]);
 
   const detalle = detalleId == null ? null : (cargos ?? []).find((c) => c.id === detalleId) ?? null;
 
   const vivos = (cargos ?? []).filter((c) => !c.anulado);
   const totalServicio = vivos.reduce((s, c) => s + c.costo_total, 0);
   const totalFacturable = vivos.reduce((s, c) => s + c.monto_facturable, 0);
+
+  if (capturando || detalle) return <div>      {capturando && (
+        <NuevoCargoFormulario
+          censo={censo}
+          actor={actor}
+          onCerrar={() => setCapturando(false)}
+          onListo={async (avs) => { setCapturando(false); setAvisos(avs); await cargar(); }}
+        />
+      )}
+
+      {detalle && (
+        <DetalleCargoFormulario
+          key={`${detalle.id}-${detalle.modificado_en ?? ""}`}
+          cargo={detalle}
+          diaCerrado={censo.dia_cerrado}
+          actor={actor}
+          onCerrar={() => setDetalleId(null)}
+          onCambio={cargar}
+        />
+      )}</div>;
 
   return (
     <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-3">
@@ -148,39 +180,22 @@ export function CargosDelDia({
         </>
       )}
 
-      {capturando && (
-        <NuevoCargoModal
-          censo={censo}
-          actor={actor}
-          onCerrar={() => setCapturando(false)}
-          onListo={(avs) => { setCapturando(false); setAvisos(avs); cargar(); }}
-        />
-      )}
 
-      {detalle && (
-        <DetalleCargoModal
-          key={`${detalle.id}-${detalle.modificado_en ?? ""}`}
-          cargo={detalle}
-          diaCerrado={censo.dia_cerrado}
-          actor={actor}
-          onCerrar={() => setDetalleId(null)}
-          onCambio={cargar}
-        />
-      )}
     </div>
   );
 }
 
 // ── Wizard: buscar arancel → detalles ────────────────────────────────────────
 
-function NuevoCargoModal({
+function NuevoCargoFormulario({
   censo, actor, onCerrar, onListo,
 }: {
   censo: CensoDiarioConRelaciones;
   actor: { uid: string; nombre: string };
   onCerrar: () => void;
-  onListo: (avisos: string[]) => void;
+  onListo: (avisos: string[]) => Promise<void>;
 }) {
+  const enviando = useRef(false);
   const [rubro, setRubro] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<ArancelIsbm[] | null>(null);
@@ -199,14 +214,16 @@ function NuevoCargoModal({
 
   // Búsqueda con debounce sobre el catálogo vigente
   useEffect(() => {
+    let vigente = true;
     const t = setTimeout(async () => {
       try {
-        setResultados(await buscarAranceles(busqueda, rubro || undefined));
+        const lista = await buscarAranceles(busqueda, rubro || undefined);
+        if (vigente) { setResultados(lista); setError(""); }
       } catch (e) {
-        setError((e as Error).message);
+        if (vigente) setError((e as Error).message);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => { vigente = false; clearTimeout(t); };
   }, [busqueda, rubro]);
 
   const esInterconsulta = arancel?.es_interconsulta ?? false;
@@ -214,13 +231,14 @@ function NuevoCargoModal({
   const esFisioterapia = arancel?.seccion_consolidado === "FISIOTERAPIA";
 
   const guardar = async () => {
-    if (!arancel) return;
+    if (!arancel || enviando.current) return;
     const cant = Number(cantidad);
     if (!cant || cant <= 0) { setError("La cantidad debe ser mayor que cero."); return; }
     if (esInterconsulta && !especialidad) {
       setError("Indica la especialidad de la interconsulta (aplica la regla de 48 h).");
       return;
     }
+    enviando.current = true;
     setGuardando(true);
     setError("");
     try {
@@ -235,16 +253,17 @@ function NuevoCargoModal({
         pendienteRevision: enObservacion,
       };
       const avisos = await crearCargo(censo, arancel, input, actor);
-      onListo(avisos);
+      await onListo(avisos);
     } catch (e) {
       setError((e as Error).message);
+      enviando.current = false;
       setGuardando(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className="w-full max-w-5xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+    <fieldset disabled={guardando} className="space-y-4 min-w-0">
+      <div className="min-w-0">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">Nuevo cargo</h2>
@@ -255,16 +274,18 @@ function NuevoCargoModal({
           <button
             onClick={onCerrar}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            aria-label="Cerrar"
+            aria-label="Volver a cargos"
           >
-            <X size={16} />
+            <span className="inline-flex items-center gap-1 text-xs"><X size={14} /> Cancelar</span>
           </button>
         </div>
 
+        {error && !arancel && <p role="alert" className="text-sm text-red-600 mb-3">{error}</p>}
+        <p className="text-xs text-blue-600 dark:text-blue-400 mb-4">{arancel ? "Paso 2 de 2 · Completar detalles" : "Paso 1 de 2 · Elegir arancel"}</p>
         {!arancel ? (
           <div className="space-y-3">
             <div className="grid sm:grid-cols-[180px_1fr] gap-2">
-              <select value={rubro} onChange={(e) => setRubro(e.target.value)} className={inputCls}>
+              <select aria-label="Rubro del arancel" value={rubro} onChange={(e) => { setRubro(e.target.value); setResultados(null); }} className={inputCls}>
                 <option value="">Todos los rubros</option>
                 {(Object.keys(RUBRO_LABEL) as RubroArancelIsbm[]).map((r) => (
                   <option key={r} value={r}>{RUBRO_LABEL[r]}</option>
@@ -275,13 +296,13 @@ function NuevoCargoModal({
                 <input
                   autoFocus
                   value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  placeholder="Buscar en el catálogo de aranceles…"
+                  onChange={(e) => { setBusqueda(e.target.value); setResultados(null); }}
+                  aria-label="Buscar arancel" placeholder="Buscar en el catálogo de aranceles…"
                   className={`${inputCls} pl-9`}
                 />
               </div>
             </div>
-            <div className="max-h-[58vh] overflow-y-auto grid lg:grid-cols-2 gap-1 content-start">
+            <div className="max-h-[58vh] overflow-y-auto grid xl:grid-cols-2 gap-1 content-start">
               {!resultados && (
                 <div className="p-6 flex justify-center">
                   <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -422,16 +443,16 @@ function NuevoCargoModal({
           </div>
         )}
       </div>
-    </div>
+    </fieldset>
   );
 }
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
+    <label className="block">
+      <span className="block text-xs font-medium text-slate-500 mb-1.5">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
@@ -448,15 +469,16 @@ const DOC_LABEL: Record<string, string> = {
 const fechaHora = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) : "—";
 
-function DetalleCargoModal({
+function DetalleCargoFormulario({
   cargo, diaCerrado, actor, onCerrar, onCambio,
 }: {
   cargo: CargoConArancel;
   diaCerrado: boolean;
   actor: { uid: string; nombre: string };
   onCerrar: () => void;
-  onCambio: () => void;
+  onCambio: () => Promise<void>;
 }) {
+  const enviando = useRef(false);
   const [modo, setModo] = useState<"ver" | "editar" | "nocobrable">("ver");
   const [aut, setAut] = useState<AutorizacionIsbm | null | undefined>(undefined);
   const [error, setError] = useState("");
@@ -486,15 +508,18 @@ function DetalleCargoModal({
   const esOverride = cargo.motivo_no_facturable === "DECISION_ISBM";
 
   const ejecutar = async (fn: () => Promise<void>) => {
+    if (enviando.current) return;
+    enviando.current = true;
     setOcupado(true);
     setError("");
     try {
       await fn();
-      onCambio();
+      await onCambio();
       setModo("ver");
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      enviando.current = false;
       setOcupado(false);
     }
   };
@@ -510,8 +535,8 @@ function DetalleCargoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-3 md:p-6 backdrop-blur-sm">
-      <div className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-5 md:p-6 max-h-[92vh] overflow-y-auto">
+    <fieldset disabled={ocupado} className="space-y-4 min-w-0">
+      <div className="min-w-0">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-heading">
@@ -525,9 +550,9 @@ function DetalleCargoModal({
           <button
             onClick={onCerrar}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            aria-label="Cerrar"
+            aria-label="Volver a cargos"
           >
-            <X size={16} />
+            <span className="inline-flex items-center gap-1 text-xs"><X size={14} /> Cancelar</span>
           </button>
         </div>
 
@@ -687,7 +712,7 @@ function DetalleCargoModal({
               autoFocus
               value={justificacion}
               onChange={(e) => setJustificacion(e.target.value)}
-              placeholder="Justificación (mínimo 10 caracteres)"
+              aria-label="Justificación para no cobrar" placeholder="Justificación (mínimo 10 caracteres)"
               className={inputCls}
             />
           </div>
@@ -777,6 +802,6 @@ function DetalleCargoModal({
           )}
         </div>
       </div>
-    </div>
+    </fieldset>
   );
 }

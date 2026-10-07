@@ -67,6 +67,8 @@ const MENU_ESDOMED: SeccionNav[] = [
     entradas: [
       { href: "/dashboard/impresiones", label: "Impresiones", icon: Printer, globo: "impresiones" },
       { href: "/dashboard/incapacidades", label: "Incapacidades", icon: FileText, globo: "incapacidades", visibleSi: esdomedOAdmin },
+      // Reporte: cuántas se emitieron por área en un rango de fechas de emisión.
+      { href: "/dashboard/incapacidades/por-area", label: "Incapacidades por área", icon: BarChart3, visibleSi: esdomedOAdmin },
       // Constancias de egresos anteriores a la app, cargadas del FIEH y asignadas a un médico.
       { href: "/dashboard/incapacidades/reposicion", label: "Reposición de incapacidad", icon: FileClock, visibleSi: esdomedOAdmin },
       { href: "/dashboard/anexo5", label: "Anexo 5", icon: ClipboardList, globo: "anexo5", visibleSi: esdomedOAdmin },

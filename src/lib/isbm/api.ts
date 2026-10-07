@@ -298,6 +298,16 @@ export async function censosDeIngreso(ingresoId: string): Promise<CensoDiarioCon
   return (data ?? []) as unknown as CensoDiarioConRelaciones[];
 }
 
+export async function censoPorId(id: number): Promise<CensoDiarioConRelaciones> {
+  const { data, error } = await getSupabase()
+    .from("censo_diario")
+    .select(CENSO_SELECT)
+    .eq("id", id)
+    .single();
+  lanzar("Error actualizando el censo", error);
+  return data as unknown as CensoDiarioConRelaciones;
+}
+
 // Mapeo del servicio de ESDOMED (texto libre) → servicio de facturación del
 // convenio. Regla confirmada por ESDOMED (2026-07-15): solo existen 3 tipos BM:
 //   · "Bienestar Magisterial"            → Hospitalización General (HOSPI)
