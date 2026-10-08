@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Hospital, LayoutPanelLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
+import { RecordatorioSincronizacionSis } from "@/components/esdomed/RecordatorioSincronizacionSis";
 
 // Planes de trabajo por área del hospital (Terapia Respiratoria, etc.).
 //
@@ -37,7 +38,12 @@ export default function HorariosAreasLayout({ children }: { children: React.Reac
             <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          children
+          <>
+            {(profile.role === "esdomed" || profile.role === "asistente_esdomed") && (
+              <RecordatorioSincronizacionSis key={profile.uid} uid={profile.uid} />
+            )}
+            {children}
+          </>
         )}
       </main>
     </div>

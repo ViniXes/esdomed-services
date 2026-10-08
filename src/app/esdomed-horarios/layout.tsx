@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, CalendarDays, LayoutDashboard, LayoutPanelLeft, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
+import { RecordatorioSincronizacionSis } from "@/components/esdomed/RecordatorioSincronizacionSis";
 
 const ROLES_PERMITIDOS = ["esdomed", "asistente_esdomed", "admin"];
 
@@ -45,7 +46,12 @@ export default function EsdomedHorariosLayout({ children }: { children: React.Re
             <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          children
+          <>
+            {(profile.role === "esdomed" || profile.role === "asistente_esdomed") && (
+              <RecordatorioSincronizacionSis key={profile.uid} uid={profile.uid} />
+            )}
+            {children}
+          </>
         )}
       </main>
     </div>

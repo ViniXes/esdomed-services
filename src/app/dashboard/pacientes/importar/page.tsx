@@ -54,7 +54,7 @@ const nombreDe = (f: PacienteFormValue) => `${f.nombres ?? ""} ${f.apellidos ?? 
 const dxKey = (d?: DiagnosticoCIE) => `${(d?.codigo ?? "").trim()}|${(d?.descripcion ?? "").trim()}`.toLowerCase();
 
 export default function ImportarReportePage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { servicios, getCamas } = useServicios();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,6 +66,8 @@ export default function ImportarReportePage() {
   const [diff, setDiff] = useState<Diff | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState<{ creados: number; actualizados: number } | null>(null);
+  const [errorSincronizacion, setErrorSincronizacion] = useState(false);
+  const [registrandoHora, setRegistrandoHora] = useState(false);
 
   const reset = () => {
     setPaso("subir");
@@ -73,6 +75,27 @@ export default function ImportarReportePage() {
     setDiff(null);
     setError(null);
     setResultado(null);
+    setErrorSincronizacion(false);
+  };
+
+  const registrarHoraSincronizacion = async () => {
+    setRegistrandoHora(true);
+    try {
+      if (!user) throw new Error("Sesión no disponible");
+      const token = await user.getIdToken();
+      const response = await fetch("/api/esdomed/sincronizacion-sis", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("No se pudo registrar la hora");
+      setErrorSincronizacion(false);
+    } catch {
+      // Los pacientes ya se guardaron. Reintentar solo el registro de la hora
+      // evita crear ingresos o movimientos duplicados por repetir la importación.
+      setErrorSincronizacion(true);
+    } finally {
+      setRegistrandoHora(false);
+    }
   };
 
   // ── Parseo + diff ───────────────────────────────────────────────────────
@@ -238,7 +261,7 @@ export default function ImportarReportePage() {
 
   // ── Confirmar (escritura) ─────────────────────────────────────────────────
   const confirmar = async () => {
-    if (!profile || !diff) return;
+    if (!profile || !user || !diff || guardando) return;
     setGuardando(true);
     setError(null);
     try {
@@ -304,6 +327,7 @@ export default function ImportarReportePage() {
       }
 
       await flush();
+      await registrarHoraSincronizacion();
       setResultado({ creados: diff.nuevos.length, actualizados: diff.actualizar.length });
       setPaso("hecho");
     } catch (e) {
@@ -488,7 +512,7 @@ export default function ImportarReportePage() {
             </button>
             <button
               onClick={confirmar}
-              disabled={guardando || (diff.nuevos.length === 0 && diff.actualizar.length === 0)}
+              disabled={guardando || (diff.nuevos.length === 0 && diff.actualizar.length === 0 && diff.sinCambios.length === 0)}
               className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
             >
               {guardando ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
@@ -512,6 +536,15 @@ export default function ImportarReportePage() {
               {resultado.creados} ingresos creados · {resultado.actualizados} activos actualizados
             </p>
           </div>
+          {errorSincronizacion && (
+            <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" role="status">
+              <p>Los pacientes se importaron, pero no se pudo registrar la hora de sincronización en Inicio.</p>
+              <button type="button" disabled={registrandoHora} onClick={() => { void registrarHoraSincronizacion(); }}
+                className="mt-2 rounded-lg border border-current px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                {registrandoHora ? "Registrando…" : "Reintentar guardar hora"}
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-center gap-3 pt-2">
             <button
               onClick={reset}

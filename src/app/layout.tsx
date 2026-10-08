@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ServiciosProvider } from "@/contexts/ServiciosContext";
 import { TerminosGate } from "@/components/TerminosGate";
 import { PwaRegister } from "@/components/PwaRegister";
+import { SincronizacionSisProvider } from "@/contexts/SincronizacionSisContext";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 
@@ -61,7 +62,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`tema-hnes ${fontUi.variable} min-h-full flex flex-col bg-slate-50 dark:bg-[var(--color-institutional-dark)] text-slate-900 dark:text-slate-100`}>
         <ThemeProvider>
           <AuthProvider>
-            <ServiciosProvider>{children}</ServiciosProvider>
+            <SincronizacionSisProvider>
+              <ServiciosProvider>{children}</ServiciosProvider>
+            </SincronizacionSisProvider>
             <TerminosGate />
           </AuthProvider>
         </ThemeProvider>

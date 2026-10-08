@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, NotificacionFallecido, SolicitudImpresion } from "@/types";
 import { ArrowRightLeft, HeartPulse, Printer, ChevronRight, ChevronLeft, Clock, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { InicioTrabajoSocial } from "@/components/InicioTrabajoSocial";
+import { UltimaSincronizacionSis } from "@/components/esdomed/UltimaSincronizacionSis";
 
 type RecentItem = {
   id: string;
@@ -169,6 +170,10 @@ function PanelEsdomed() {
           </div>
         )}
       </div>
+
+      {(profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin") && (
+        <UltimaSincronizacionSis />
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
