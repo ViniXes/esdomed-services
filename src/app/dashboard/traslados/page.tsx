@@ -10,7 +10,8 @@ import { DateField } from "@/components/ui/DateField";
 import { useAuth } from "@/contexts/AuthContext";
 import { SolicitudTraslado, EstadoTraslado, Paciente, MovimientoPaciente } from "@/types";
 import { Badge } from "@/components/ui/Badge";
-import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History, Inbox, Undo2, CheckCircle2 } from "lucide-react";
+import { DetalleSolicitudTraslado } from "@/components/traslados/DetalleSolicitudTraslado";
+import { ArrowRightLeft, Clock, X, Building2, RefreshCw, Search, History, Inbox, Undo2, CheckCircle2, FileText, ClipboardCheck, XCircle, LoaderCircle } from "lucide-react";
 
 const FILTROS: { label: string; value: EstadoTraslado | "todos" }[] = [
   { label: "Todos", value: "todos" },
@@ -55,6 +56,7 @@ export default function DashboardTrasladosPage() {
   const [selected, setSelected] = useState<SolicitudTraslado | null>(null);
   const [notas, setNotas] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   // Reversión de una aprobación errónea — solo admin (ver revertirAprobacion).
   const isAdmin = profile?.role === "admin";
@@ -135,44 +137,51 @@ export default function DashboardTrasladosPage() {
   const actualizarEstado = async (estado: EstadoTraslado) => {
     if (!selected?.id || !profile) return;
     setSaving(true);
-    const id = selected.id;
-    await updateDoc(doc(db, "traslados", id), {
-      estado, notasEsdomed: notas,
-      revisadoPor: profile.uid, revisadoPorNombre: profile.nombre,
-      actualizadoEn: Timestamp.now(),
-    });
-    // Si se aprueba, propagar el movimiento al/los paciente(s) si existen en la BD
-    if (estado === "aprobado") {
-      try {
-        await aplicarTrasladoAPaciente(selected, profile.nombre);
-      } catch (err) {
-        // No bloqueamos la aprobación del traslado si la sincronización falla
-        console.error("Error sincronizando traslado con paciente:", err);
-      }
-      // Si el traslado saca al paciente de una unidad UCI/UCIN, cierra automáticamente
-      // la ficha de esa unidad (mismo efecto que un egreso vivo/fallecido manual).
-      try {
-        if (user) {
-          const token = await user.getIdToken();
-          const cierreRes = await fetch(`/api/esdomed/traslados/${id}/cerrar-ficha-critica`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!cierreRes.ok) {
-            const detalle = await cierreRes.text();
-            throw new Error(detalle || "No se pudo cerrar la ficha UCI/UCIN.");
-          }
+    setSaveError("");
+    try {
+      const id = selected.id;
+      await updateDoc(doc(db, "traslados", id), {
+        estado, notasEsdomed: notas,
+        revisadoPor: profile.uid, revisadoPorNombre: profile.nombre,
+        actualizadoEn: Timestamp.now(),
+      });
+      // Si se aprueba, propagar el movimiento al/los paciente(s) si existen en la BD
+      if (estado === "aprobado") {
+        try {
+          await aplicarTrasladoAPaciente(selected, profile.nombre);
+        } catch (err) {
+          // No bloqueamos la aprobación del traslado si la sincronización falla
+          console.error("Error sincronizando traslado con paciente:", err);
         }
-      } catch (err) {
-        console.error("Error cerrando ficha UCI/UCIN tras traslado:", err);
-        alert("El traslado fue aprobado, pero no se pudo cerrar automáticamente la ficha UCI/UCIN. Revisá el expediente en Matriz UCI/UCIN.");
+        // Si el traslado saca al paciente de una unidad UCI/UCIN, cierra automáticamente
+        // la ficha de esa unidad (mismo efecto que un egreso vivo/fallecido manual).
+        try {
+          if (user) {
+            const token = await user.getIdToken();
+            const cierreRes = await fetch(`/api/esdomed/traslados/${id}/cerrar-ficha-critica`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!cierreRes.ok) {
+              const detalle = await cierreRes.text();
+              throw new Error(detalle || "No se pudo cerrar la ficha UCI/UCIN.");
+            }
+          }
+        } catch (err) {
+          console.error("Error cerrando ficha UCI/UCIN tras traslado:", err);
+          alert("El traslado fue aprobado, pero no se pudo cerrar automáticamente la ficha UCI/UCIN. Revisá el expediente en Matriz UCI/UCIN.");
+        }
       }
+      // La lista en vivo se actualiza sola (listeners). Los resultados de búsqueda son
+      // una foto puntual → actualización optimista local.
+      const local = { estado, notasEsdomed: notas, revisadoPor: profile.uid, revisadoPorNombre: profile.nombre };
+      setResultados(prev => prev?.map(t => (t.id === id ? { ...t, ...local } : t)) ?? prev);
+      setSelected(null); setNotas("");
+    } catch (error) {
+      setSaveError((error as Error).message || "No se pudo guardar la solicitud. Intenta de nuevo.");
+    } finally {
+      setSaving(false);
     }
-    // La lista en vivo se actualiza sola (listeners). Los resultados de búsqueda son
-    // una foto puntual → actualización optimista local.
-    const local = { estado, notasEsdomed: notas, revisadoPor: profile.uid, revisadoPorNombre: profile.nombre };
-    setResultados(prev => prev?.map(t => (t.id === id ? { ...t, ...local } : t)) ?? prev);
-    setSaving(false); setSelected(null); setNotas("");
   };
 
   // Deshace una aprobación dada por error: el servidor (firebase-admin) valida el
@@ -224,7 +233,7 @@ export default function DashboardTrasladosPage() {
   };
 
   const abrir = (t: SolicitudTraslado) => {
-    setSelected(t); setNotas(t.notasEsdomed ?? "");
+    setSelected(t); setNotas(t.notasEsdomed ?? ""); setSaveError("");
     setRevMotivo(""); setRevEstado("rechazado"); setRevError("");
   };
 
@@ -232,8 +241,10 @@ export default function DashboardTrasladosPage() {
     const typeInfo = getTipoLabel(t.tipoTraslado);
     const Icon = typeInfo.icon;
     return (
-      <div key={t.id} onClick={() => abrir(t)}
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all">
+      <div key={t.id} role="button" tabIndex={0} onClick={() => abrir(t)}
+        onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); abrir(t); } }}
+        aria-label={`Ver solicitud de traslado de expediente ${t.pacienteExpediente}`}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
 
@@ -432,163 +443,104 @@ export default function DashboardTrasladosPage() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-xl">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <h2 className="font-bold text-slate-900 dark:text-slate-100 font-heading">
-                {selected.tipoTraslado === "intercambio" ? "Solicitud de Intercambio" : "Solicitud de Traslado"}
-              </h2>
-              <button onClick={() => setSelected(null)} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"><X size={16} /></button>
+        <DetalleSolicitudTraslado
+          solicitud={selected}
+          busy={saving || revirtiendo}
+          onClose={() => setSelected(null)}
+          footer={
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {selected.estado === "aprobado" || selected.estado === "rechazado"
+                  ? "Solicitud procesada"
+                  : "Revisa el recorrido antes de aprobar."}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+                {selected.estado === "aprobado" || selected.estado === "rechazado" ? (
+                  <button type="button" onClick={() => setSelected(null)} disabled={revirtiendo}
+                    className="col-span-2 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                    Cerrar
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => actualizarEstado("rechazado")} disabled={saving}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 disabled:opacity-50 dark:border-red-900 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950">
+                      <XCircle size={16} aria-hidden="true" /> Rechazar
+                    </button>
+                    <button type="button" onClick={() => actualizarEstado("en_revision")} disabled={saving}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 dark:border-blue-900 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950">
+                      <ClipboardCheck size={16} aria-hidden="true" /> En revisión
+                    </button>
+                    <button type="button" onClick={() => actualizarEstado("aprobado")} disabled={saving}
+                      className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-green-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-500 disabled:opacity-50">
+                      {saving ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
+                      {saving ? "Guardando..." : "Aprobar"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="p-5 space-y-4 text-sm">
+          }
+        >
+          {saveError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{saveError}</p>}
+          {/* Una vez aprobado/rechazado el traslado es terminal: notas en solo lectura. */}
+          {selected.estado === "aprobado" || selected.estado === "rechazado" ? (
+            selected.notasEsdomed && (
+              <section className="space-y-2">
+                <h3 className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300"><FileText size={16} aria-hidden="true" /> Notas ESDOMED</h3>
+                <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700 break-words whitespace-pre-wrap leading-relaxed">{selected.notasEsdomed}</p>
+              </section>
+            )
+          ) : (
+            <section className="space-y-2">
+              <label htmlFor="notas-esdomed" className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300"><FileText size={16} aria-hidden="true" /> Notas ESDOMED <span className="font-normal text-slate-400">· Opcional</span></label>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Agrega observaciones para el médico o explica el motivo de rechazo.</p>
+              <textarea id="notas-esdomed" disabled={saving} value={notas} onChange={e => setNotas(e.target.value)} rows={3}
+                placeholder="Observaciones o motivo de rechazo..."
+                className={inputCls} />
+            </section>
+          )}
 
-              {selected.tipoTraslado === "intercambio" ? (
-                <>
-                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-                    <p className="text-xs font-semibold uppercase text-slate-500 mb-2">Paciente A (Se mueve a cama {selected.camaDestino})</p>
-                    <Row label="Expediente"  value={selected.pacienteExpediente} />
-                    <Row label="Nombre"      value={selected.pacienteNombre || "No especificado"} />
-                    <Row label="Ubicación"   value={`${selected.servicioOrigen} / Cama ${selected.camaOrigen}`} />
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-                    <p className="text-xs font-semibold uppercase text-slate-500 mb-2">Paciente B (Se mueve a cama {selected.camaOrigen})</p>
-                    <Row label="Expediente"  value={selected.pacienteBExpediente} />
-                    <Row label="Nombre"      value={selected.pacienteBNombre || "No especificado"} />
-                    <Row label="Ubicación"   value={`${selected.servicioDestino} / Cama ${selected.camaDestino}`} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Row label="Expediente"  value={selected.pacienteExpediente} />
-                  <Row label="Paciente"    value={selected.pacienteNombre || "No especificado"} />
-                  <Row label="Origen"      value={`${selected.servicioOrigen} / Cama ${selected.camaOrigen}`} />
-                  <Row label="Destino"     value={`${selected.tipoTraslado === "interno" ? selected.servicioOrigen : selected.servicioDestino} / Cama ${selected.camaDestino}`} />
-                </>
-              )}
-
-              <div className="h-px bg-slate-200 dark:bg-slate-800 my-2" />
-
-              <Row label="Motivo"      value={selected.motivoTraslado} />
-              <Row label="Solicitado"  value={formatFechaHora(selected.creadoEn)} />
-              <Row label="Médico"      value={`Dr. ${selected.medicoNombre}`} />
-              {selected.medicoJvpm && (
-                <Row label="JVPM"        value={selected.medicoJvpm} />
-              )}
-              <Row label="Estado"      value={<Badge estado={selected.estado} />} />
-              {selected.revisadoPorNombre && (
-                <Row label="Procesado por" value={selected.revisadoPorNombre} />
-              )}
-
-              {selected.respuestaMedico && (
-                <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-3 border border-blue-200 dark:border-blue-900/50">
-                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-1">Respuesta del médico</p>
-                  <p className="text-sm text-slate-700 dark:text-slate-300">{selected.respuestaMedico}</p>
-                </div>
-              )}
-
-              {selected.reversion && (
-                <div className="bg-amber-50 dark:bg-amber-950/40 rounded-lg p-3 border border-amber-200 dark:border-amber-900/50 space-y-1">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                    <Undo2 size={12} /> Aprobación revertida
-                  </p>
-                  <p className="text-sm text-slate-700 dark:text-slate-300">
-                    {selected.reversion.porNombre} · {formatFechaHora(selected.reversion.en)}
-                    {selected.reversion.aprobadoPorNombre && <> · había aprobado: {selected.reversion.aprobadoPorNombre}</>}
-                  </p>
-                  <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selected.reversion.motivo}</p>
-                  <p className="text-xs text-slate-500">
-                    {selected.reversion.pacientesRestaurados.length === 0
-                      ? "Sin cambios en el censo."
-                      : selected.reversion.pacientesRestaurados.every(p => p.ubicacionRestaurada)
-                        ? "Paciente devuelto a la cama de origen."
-                        : "Movimiento eliminado; el paciente ya se había movido después, se conservó su ubicación."}
-                    {selected.reversion.fichasReabiertas.length > 0 && " Ficha UCI/UCIN reabierta."}
-                  </p>
-                </div>
-              )}
-
-              {/* Una vez aprobado/rechazado el traslado es terminal: notas en solo lectura. */}
-              {selected.estado === "aprobado" || selected.estado === "rechazado" ? (
-                selected.notasEsdomed && (
-                  <div className="pt-2">
-                    <p className="text-xs font-medium text-slate-500 mb-1.5">Notas ESDOMED</p>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-200 dark:border-slate-700 whitespace-pre-wrap">{selected.notasEsdomed}</p>
-                  </div>
-                )
-              ) : (
-                <div className="pt-2">
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5">Notas ESDOMED</label>
-                  <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}
-                    placeholder="Observaciones o motivo de rechazo..."
-                    className={inputCls} />
-                </div>
-              )}
-
-              {/* Solo admin: deshacer una aprobación dada por error. */}
-              {selected.estado === "aprobado" && isAdmin && (
-                <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
-                    <Undo2 size={13} /> Revertir aprobación
-                  </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Devuelve al paciente a su cama de origen (si sigue en el destino), borra este movimiento de su historial y
-                    reabre la ficha UCI/UCIN si este traslado la cerró. Queda registrado quién lo revirtió y por qué.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { value: "rechazado", label: "Dejar como rechazado" },
-                      { value: "pendiente", label: "Volver a pendiente" },
-                    ] as const).map(op => (
-                      <label key={op.value}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
-                          revEstado === op.value
-                            ? "bg-white dark:bg-slate-900 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-300"
-                            : "border-amber-200 dark:border-amber-800 text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-900/60"
-                        }`}>
-                        <input type="radio" name="revEstado" value={op.value} checked={revEstado === op.value}
-                          onChange={() => setRevEstado(op.value)} className="accent-amber-600" />
-                        {op.label}
-                      </label>
-                    ))}
-                  </div>
-                  <textarea value={revMotivo} onChange={e => setRevMotivo(e.target.value)} rows={2}
-                    placeholder="Justificación (el médico la verá como nota de ESDOMED)..."
-                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-400" />
-                  {revError && <p className="text-xs text-red-600 dark:text-red-400">{revError}</p>}
-                  <button onClick={revertirAprobacion} disabled={revMotivo.trim().length < 5 || revirtiendo}
-                    className="w-full py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-                    <Undo2 size={14} />
-                    {revirtiendo ? "Revirtiendo..." : "Revertir aprobación"}
-                  </button>
-                </div>
-              )}
+          {/* Solo admin: deshacer una aprobación dada por error. */}
+          {selected.estado === "aprobado" && isAdmin && (
+            <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                <Undo2 size={13} /> Revertir aprobación
+              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Devuelve al paciente a su cama de origen (si sigue en el destino), borra este movimiento de su historial y
+                reabre la ficha UCI/UCIN si este traslado la cerró. Queda registrado quién lo revirtió y por qué.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "rechazado", label: "Dejar como rechazado" },
+                  { value: "pendiente", label: "Volver a pendiente" },
+                ] as const).map(op => (
+                  <label key={op.value}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                      revEstado === op.value
+                        ? "bg-white dark:bg-slate-900 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-300"
+                        : "border-amber-200 dark:border-amber-800 text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-900/60"
+                    }`}>
+                    <input type="radio" name="revEstado" value={op.value} checked={revEstado === op.value}
+                      disabled={revirtiendo} onChange={() => setRevEstado(op.value)} className="accent-amber-600" />
+                    {op.label}
+                  </label>
+                ))}
+              </div>
+              <label htmlFor="motivo-reversion" className="block text-xs font-medium text-amber-800 dark:text-amber-300">Justificación de la reversión</label>
+              <textarea id="motivo-reversion" disabled={revirtiendo} value={revMotivo} onChange={e => setRevMotivo(e.target.value)} rows={2}
+                placeholder="Justificación (el médico la verá como nota de ESDOMED)..."
+                className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-400" />
+              {revError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{revError}</p>}
+              <button onClick={revertirAprobacion} disabled={revMotivo.trim().length < 5 || revirtiendo}
+                className="w-full py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                <Undo2 size={14} />
+                {revirtiendo ? "Revirtiendo..." : "Revertir aprobación"}
+              </button>
             </div>
+          )}
 
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap gap-2 justify-end bg-slate-50 dark:bg-slate-900/50 rounded-b-2xl">
-              {selected.estado === "aprobado" || selected.estado === "rechazado" ? (
-                <button onClick={() => setSelected(null)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                  Cerrar
-                </button>
-              ) : (
-                <>
-                  <button onClick={() => actualizarEstado("rechazado")} disabled={saving}
-                    className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 disabled:opacity-50 transition-colors">
-                    Rechazar
-                  </button>
-                  <button onClick={() => actualizarEstado("en_revision")} disabled={saving}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 disabled:opacity-50 transition-colors">
-                    En revisión
-                  </button>
-                  <button onClick={() => actualizarEstado("aprobado")} disabled={saving}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-700 rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors">
-                    {saving ? "Guardando..." : "Aprobar"}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        </DetalleSolicitudTraslado>
       )}
     </div>
   );
@@ -601,15 +553,6 @@ function formatFechaHora(ts: unknown) {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit", hour12: true,
   });
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex gap-3">
-      <span className="text-slate-500 w-24 shrink-0 text-xs pt-0.5 font-medium">{label}</span>
-      <span className="text-slate-800 dark:text-slate-200 font-medium text-sm flex-1">{value}</span>
-    </div>
-  );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
