@@ -114,10 +114,7 @@ async function normalizarDiagnosticosCIE10(datos: DatosMatrizCuidadosCriticos, c
 
 export function FichaMatrizCuidadosCriticos({ paciente, tipo, servicioEstancia, numeroEstancia, datosGuardados, saving, puedeEditarAutomaticos = false, onSave }: Props) {
   const grupos = useMemo(() => gruposMatrizPorTipo(tipo), [tipo]);
-  const esFichaNueva = !datosGuardados;
-  const datosAutomaticos = useMemo(() => datosAutomaticosPaciente(paciente, {
-    prellenarEstanciaActual: esFichaNueva,
-  }), [esFichaNueva, paciente]);
+  const datosAutomaticos = useMemo(() => datosAutomaticosPaciente(paciente), [paciente]);
   const datosIniciales = useMemo(() => fusionarDatosAutomaticos(datosAutomaticos, datosGuardados), [datosAutomaticos, datosGuardados]);
   const [paso, setPaso] = useState(0);
   const [datos, setDatos] = useState<DatosMatrizCuidadosCriticos>(() => datosIniciales);
