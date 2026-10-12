@@ -11,7 +11,6 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import {
-  serviciosCanonicosCuidadosCriticos,
   serviciosConsultaCuidadosCriticos,
 } from "@/lib/cuidadosCriticos";
 import type { FichaCuidadosCriticos, Paciente } from "@/types";
@@ -33,7 +32,7 @@ function fechaInput(fecha: Date) {
 }
 
 function serviciosParaConsultaFichas(servicios: string[]) {
-  const unicos = [...new Set(serviciosCanonicosCuidadosCriticos(servicios).map(servicio => servicio.trim()).filter(Boolean))];
+  const unicos = [...new Set(serviciosConsultaCuidadosCriticos(servicios).map(servicio => servicio.trim()).filter(Boolean))];
   if (unicos.length === 0) {
     throw new Error("No hay servicios asignados para consultar fichas de cuidados criticos.");
   }
