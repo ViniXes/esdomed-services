@@ -1,5 +1,5 @@
 import {
-  BarChart3, CheckCheck, ClipboardCheck, Contact, DoorOpen, FileClock, FileStack, HandHeart, HeartCrack,
+  BarChart3, CheckCheck, ClipboardCheck, Clock, Contact, DoorOpen, FileClock, FileStack, HandHeart, HeartCrack,
   HeartPulse, Inbox, LayoutDashboard, ListChecks, LogIn, NotebookPen, Radar, UserCheck, UserSearch, UsersRound,
 } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
@@ -51,6 +51,7 @@ const MENU_TRABAJO_SOCIAL: SeccionNav[] = [
     icon: Contact,
     entradas: [
       { href: "/dashboard/buscar-paciente", label: "Buscar paciente", icon: UserSearch },
+      { href: "/dashboard/pacientes-activos", label: "Pacientes activos", icon: Clock },
       // La de los médicos, en consulta: sin registrar censos, con Excel.
       { href: "/dashboard/cola-expedientes", label: "Cola de expedientes", icon: FileStack },
       { href: "/dashboard/gestiones/bitacora", label: "Bitácora del paciente", icon: FileClock },

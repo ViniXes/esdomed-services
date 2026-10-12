@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardCheck, HandHeart, HeartPulse, ListChecks, LogIn, NotebookPen, ShieldAlert, UserCheck } from "lucide-react";
+import { ClipboardCheck, Clock, HandHeart, HeartPulse, ListChecks, LogIn, NotebookPen, ShieldAlert, UserCheck } from "lucide-react";
 import { InicioArea } from "@/components/InicioArea";
 
 // Inicio de Trabajo Social. Vive en /dashboard (donde están sus vistas): la
@@ -16,6 +16,7 @@ export function InicioTrabajoSocial() {
         { href: "/comite-lesiones/conapina-fgr", label: "Avisos CONAPINA / FGR por recibir", icon: ShieldAlert, globo: "conapina" },
       ]}
       accesos={[
+        { href: "/dashboard/pacientes-activos", label: "Pacientes activos", icon: Clock },
         { href: "/dashboard/gestiones/asignaciones", label: "Asignaciones", icon: UserCheck },
         { href: "/dashboard/gestiones/seguimiento", label: "Seguimiento", icon: ListChecks },
         { href: "/dashboard/gestiones", label: "Registro de gestiones", icon: NotebookPen },
