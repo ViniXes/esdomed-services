@@ -1,4 +1,4 @@
-import { tipoMedicoCubreUciYUcin } from "@/lib/cuidadosCriticos";
+import { servicioCanonicoCuidadosCriticos, servicioCoincideCuidadosCriticos, tipoMedicoCubreUciYUcin } from "@/lib/cuidadosCriticos";
 import type { FichaCuidadosCriticos, Paciente, TipoMedicoCuidadosCriticos } from "@/types";
 
 export type TipoCampoMatriz = "text" | "textarea" | "number" | "date" | "time" | "yesno" | "select" | "cie10" | "servicioCritico" | "servicioHospitalario" | "catalogoCritico";
@@ -503,6 +503,30 @@ function fechaComoInput(value: unknown) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function horaComoInput(value: unknown) {
+  if (!value) return "";
+  const date = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function mesDesdeFechaInput(fecha: string) {
+  const match = fecha.match(/^\d{4}-(\d{2})-\d{2}$/);
+  if (!match) return mesActual();
+  return MESES[Number(match[1]) - 1] ?? mesActual();
+}
+
+function ultimoMovimientoHaciaServicioActual(paciente: Paciente) {
+  const actual = servicioCanonicoCuidadosCriticos(paciente.servicioActual);
+  return [...(paciente.movimientos ?? [])]
+    .filter(mov => servicioCoincideCuidadosCriticos(mov.servicioDestino, actual))
+    .sort((a, b) => {
+      const fechaA = (a.fecha as { toDate?: () => Date }).toDate?.() ?? new Date(a.fecha as Date);
+      const fechaB = (b.fecha as { toDate?: () => Date }).toDate?.() ?? new Date(b.fecha as Date);
+      return fechaB.getTime() - fechaA.getTime();
+    })[0];
+}
+
 function calcularEdad(value: unknown) {
   if (!value) return "";
   const nacimiento = (value as { toDate?: () => Date }).toDate?.() ?? new Date(value as string);
@@ -518,19 +542,28 @@ function mesActual() {
   return MESES[new Date().getMonth()];
 }
 
-export function datosAutomaticosPaciente(paciente: Paciente): DatosMatrizCuidadosCriticos {
+export function datosAutomaticosPaciente(paciente: Paciente, options?: { prellenarEstanciaActual?: boolean }): DatosMatrizCuidadosCriticos {
   const sexo = paciente.genero === "femenino" ? "Femenino" : paciente.genero === "masculino" ? "Masculino" : "Otro";
   const fallecido = paciente.estado === "alta_fallecido";
+  const servicioActual = servicioCanonicoCuidadosCriticos(paciente.servicioActual);
+  const movimientoActual = options?.prellenarEstanciaActual ? ultimoMovimientoHaciaServicioActual(paciente) : undefined;
+  const fechaIngresoServicio = fechaComoInput(movimientoActual?.fecha) || fechaComoInput(paciente.fechaIngreso) || fechaActualInput();
+  const horaIngresoServicio = horaComoInput(movimientoActual?.fecha) || horaComoInput(paciente.fechaIngreso);
 
   return {
-    mes: mesActual(),
+    mes: options?.prellenarEstanciaActual ? mesDesdeFechaInput(fechaIngresoServicio) : mesActual(),
     registro: paciente.expediente,
     nombres: paciente.nombres,
     apellidos: paciente.apellidos,
     sexo,
     edad: calcularEdad(paciente.fechaNacimiento),
     centro_de_procedencia: paciente.establecimientoProcedencia ?? "",
-    fecha_ingreso_al_servicio: fechaActualInput(),
+    fecha_ingreso_al_servicio: fechaIngresoServicio,
+    ...(options?.prellenarEstanciaActual ? {
+      especialidad: servicioActual,
+      servicio_proveniente: movimientoActual?.servicioOrigen || paciente.servicioIngreso || "",
+      ...(horaIngresoServicio ? { hora_ingreso_al_servicio: horaIngresoServicio } : {}),
+    } : {}),
     ...(fallecido ? {
       fecha_de_muerte: fechaComoInput(paciente.fechaEgreso),
       alta: "FALLECIDO",
