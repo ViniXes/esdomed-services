@@ -26,7 +26,7 @@ import {
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type PeriodoFiltro = "todos" | "mes" | "rango";
-type CierreFiltro = "todos" | "pendientes" | "cerrados" | "sin_diagnostico_egreso";
+type CierreFiltro = "todos" | "activos" | "pendientes" | "cerrados" | "sin_diagnostico_egreso";
 type FiltrosPersistidos = {
   servicio?: string;
   periodo?: PeriodoFiltro;
@@ -67,7 +67,7 @@ function esPeriodoFiltro(value: unknown): value is PeriodoFiltro {
 }
 
 function esCierreFiltro(value: unknown): value is CierreFiltro {
-  return value === "todos" || value === "pendientes" || value === "cerrados" || value === "sin_diagnostico_egreso";
+  return value === "todos" || value === "activos" || value === "pendientes" || value === "cerrados" || value === "sin_diagnostico_egreso";
 }
 
 function leerFiltrosPersistidos(): FiltrosPersistidos {
@@ -260,6 +260,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
   const fichasFiltradas = useMemo(() => {
     return fichasBaseFiltradas.filter(ficha => {
       const pendienteCierre = fichaPendienteCierreCuidadosCriticos(ficha);
+      if (cierre === "activos") return !fichaEgresada(ficha);
       if (cierre === "pendientes") return pendienteCierre;
       if (cierre === "cerrados") return !pendienteCierre;
       if (cierre === "sin_diagnostico_egreso") return fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha);
@@ -271,10 +272,15 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
     : fichasFiltradas;
 
   const pacientesUnicos = new Set(fichasMostradas.map(ficha => ficha.pacienteExpediente)).size;
-  const activas = fichasMostradas.filter(ficha => !fichaEgresada(ficha)).length;
+  const activas = fichasBaseFiltradas.filter(ficha => !fichaEgresada(ficha)).length;
   const pendientesCierre = fichasBaseFiltradas.filter(fichaPendienteCierreCuidadosCriticos).length;
   const cerradasSinDiagnosticoEgreso = fichasBaseFiltradas.filter(fichaCerradaSinDiagnosticoEgresoCuidadosCriticos).length;
   const solicitudesPendientes = fichasBaseFiltradas.filter(ficha => ficha.solicitudEliminacion?.estado === "pendiente").length;
+
+  const filtrarActivas = () => {
+    setSoloSolicitudesEliminacion(false);
+    setCierre(actual => actual === "activos" ? "todos" : "activos");
+  };
 
   const filtrarCerradasSinDiagnosticoEgreso = () => {
     setSoloSolicitudesEliminacion(false);
@@ -321,7 +327,13 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Stat icon={<FileSpreadsheet size={18} />} label="Entradas filtradas" value={fichasMostradas.length} />
         <Stat icon={<Users size={18} />} label="Pacientes" value={pacientesUnicos} />
-        <Stat icon={<Activity size={18} />} label="Activas" value={activas} />
+        <Stat
+          icon={<Activity size={18} />}
+          label="Activas"
+          value={activas}
+          onClick={activas > 0 || cierre === "activos" ? filtrarActivas : undefined}
+          active={cierre === "activos"}
+        />
         <Stat icon={<AlertCircle size={18} />} label="Pendientes de cierre" value={pendientesCierre} variant={pendientesCierre > 0 ? "warning" : "default"} />
         <Stat
           icon={<AlertCircle size={18} />}
@@ -366,6 +378,7 @@ export default function RegistrosCuidadosCriticosMedicoPage() {
             <span className="mb-1 block text-xs font-semibold text-slate-500">Cierre</span>
             <select value={cierre} onChange={event => setCierre(event.target.value as CierreFiltro)} className={inputCls}>
               <option value="todos">Todos</option>
+              <option value="activos">Activos</option>
               <option value="pendientes">Pendientes</option>
               <option value="cerrados">Cerrados</option>
               <option value="sin_diagnostico_egreso">Sin diagnóstico egreso</option>

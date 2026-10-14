@@ -18,13 +18,14 @@ import {
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
 import { serviciosPorTipoMedico, tipoUnidadPorServicio } from "@/lib/cuidadosCriticos";
 import {
+  esValorRegistrado,
   fichaCerradaSinDiagnosticoEgresoCuidadosCriticos,
   fichaPendienteCierreCuidadosCriticos,
 } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, HistorialEliminacionCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
 type Filtro = "todos" | TipoMedicoCuidadosCriticos;
-type FiltroCierre = "todos" | "pendientes" | "cerrados" | "sin_diagnostico_egreso";
+type FiltroCierre = "todos" | "activos" | "pendientes" | "cerrados" | "sin_diagnostico_egreso";
 type FiltroMes = "todos" | number;
 
 const MESES = [
@@ -76,6 +77,12 @@ function tipoFicha(ficha: FichaCuidadosCriticos) {
   return tipoUnidadPorServicio(ficha.servicio) ?? ficha.tipoUnidad;
 }
 
+function fichaEgresada(ficha: FichaCuidadosCriticos) {
+  return ficha.estadoEstancia === "egresada"
+    || esValorRegistrado(ficha.datos?.fecha_egreso_del_servicio)
+    || ficha.datos?.alta === "FALLECIDO";
+}
+
 export default function CuidadosCriticosDashboardPage() {
   const { profile, loading } = useAuth();
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -122,6 +129,7 @@ export default function CuidadosCriticosDashboardPage() {
   const fichasPeriodoCierre = fichas.filter(ficha => {
     const pendiente = fichaPendienteCierreCuidadosCriticos(ficha);
     if (filtroMes !== "todos" && mesFicha(ficha) !== filtroMes) return false;
+    if (filtroCierre === "activos") return !fichaEgresada(ficha);
     if (filtroCierre === "pendientes") return pendiente;
     if (filtroCierre === "cerrados") return !pendiente;
     if (filtroCierre === "sin_diagnostico_egreso") return fichaCerradaSinDiagnosticoEgresoCuidadosCriticos(ficha);
@@ -364,6 +372,7 @@ export default function CuidadosCriticosDashboardPage() {
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
               >
                 <option value="todos">Todos</option>
+                <option value="activos">Activos</option>
                 <option value="pendientes">Pendientes</option>
                 <option value="cerrados">Cerrados</option>
                 <option value="sin_diagnostico_egreso">Sin diagnóstico egreso</option>

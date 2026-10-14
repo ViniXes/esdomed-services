@@ -89,7 +89,7 @@ const MENU_ESDOMED: SeccionNav[] = [
     icon: Activity,
     visibleSi: puedeVerModuloCuidadosCriticos,
     entradas: [
-      { href: "/medico/cuidados-criticos", label: "Registro UCI / UCIN", icon: ClipboardPen },
+      { href: "/dashboard/cuidados-criticos/registro", label: "Registro UCI / UCIN", icon: ClipboardPen },
       // Globo: solicitudes de eliminación de fichas (lo resuelve el admin).
       { href: "/dashboard/cuidados-criticos", label: "Matriz UCI / UCIN", icon: LayoutGrid, globo: "cuidadosCriticosEliminacion" },
       { href: "/dashboard/cuidados-criticos/indicadores", label: "Indicadores UCI / UCIN", icon: BarChart3 },
