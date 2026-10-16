@@ -78,8 +78,6 @@ function PanelEsdomed() {
     return () => { activo = false; };
   }, [profile]);
 
-  const totalPendientes = counts.traslado.pend + counts.fallecido.pend + counts.impresion.pend;
-
   const stats = [
     { tipo: "traslado" as const,  pendientes: counts.traslado.pend,  total: counts.traslado.total },
     { tipo: "fallecido" as const, pendientes: counts.fallecido.pend, total: counts.fallecido.total },
@@ -100,12 +98,6 @@ function PanelEsdomed() {
             <p className="mt-2 text-sm text-cyan-50/80">
               Estadística y Documentos Médicos{grupo ? ` · ${grupo}` : ""}
             </p>
-            {totalPendientes > 0 && (
-              <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-300" aria-hidden="true" />
-                {totalPendientes} pendiente{totalPendientes !== 1 ? "s" : ""} en total
-              </p>
-            )}
           </div>
           {vePlan && (
             <TurnoDeHoy
