@@ -10,7 +10,6 @@ import { esJefeCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { navItemsEsdomed } from "@/lib/navEsdomed";
 import { navItemsTrabajoSocial } from "@/lib/navTrabajoSocial";
-import { RecordatorioSincronizacionSis } from "@/components/esdomed/RecordatorioSincronizacionSis";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
@@ -77,14 +76,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-center h-full">
             <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : (
-          <>
-            {(profile.role === "esdomed" || profile.role === "asistente_esdomed") && (
-              <RecordatorioSincronizacionSis key={profile.uid} uid={profile.uid} />
-            )}
-            {children}
-          </>
-        )}
+        ) : children}
       </main>
       <ToastContainer />
     </div>
