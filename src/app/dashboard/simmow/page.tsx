@@ -485,6 +485,7 @@ export default function SimmowPage() {
     const filas = pacientesAmb.map((p) => {
       const d = p.datos;
       return {
+        Fecha: d.fecha,
         Expediente: d.expediente,
         "Nombre del Paciente": d.paciente,
         DUI: d.dui,
@@ -507,7 +508,6 @@ export default function SimmowPage() {
         "N° de Afiliación": d.numeroAfiliacion,
         "Establecimiento Referido (texto original)": d.establecimientoReferidoTexto,
         "Código SIMMOW Establecimiento": d.establecimientoReferidoCodigo,
-        Fecha: d.fecha,
         "Semana Epidemiológica": d.semanaEpidemiologica,
         "En Pacientes Atendidos En Emergencia": p.enPacientesAtendidos ? "Sí" : "No",
         Advertencias: p.advertencias.join(" / "),
