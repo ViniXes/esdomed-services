@@ -1164,6 +1164,8 @@ export interface Paciente {
 
 // ¿Ingresó a hospitalización? — columna del reporte. "sin_dato" = celda vacía.
 export type IngresoHospitalizacion = "si" | "no" | "sin_dato";
+/** "ingreso" = pasó a hospitalización (no egresó de emergencia). */
+export type CondicionAtencionEmergencia = "vivo" | "fallecido" | "otro" | "sin_dato" | "ingreso";
 
 export interface AtencionEmergencia {
   id?: string;                  // == dedup determinista: `${expediente}__${YYYYMMDDHHmmss}`
@@ -1180,6 +1182,10 @@ export interface AtencionEmergencia {
   fechaHoraIngreso: Date;                  // llave temporal de la visita
   ingresoHospitalizacion: IngresoHospitalizacion; // ← filtro principal de la ruta
   tipoEgreso?: string;          // "Vivo" | "" | ...
+  // Condición normalizada (ingreso + tipoEgreso) para contar/filtrar en el servidor;
+  // la escribe la importación (condicionAtencion en lib/emergencia/helpers).
+  // Docs anteriores: scripts/backfill-condicion-emergencia.mjs.
+  condicionEgreso?: CondicionAtencionEmergencia;
   diagnostico?: string;         // texto libre (el reporte no trae CIE)
   categorizacion?: string;      // triage: "3 - Verde", "2 - Amarillo", ...
   llegaReferido: boolean;

@@ -17,7 +17,7 @@ export function UltimaSincronizacionSis() {
       <p>
         <span className="font-medium">Hora de última sincronización con SIS: </span>
         {cargando ? "Consultando…" : error ? "No se pudo consultar" : sincronizadoEn !== null ? (
-          <time dateTime={new Date(sincronizadoEn).toISOString()}>{formato.format(sincronizadoEn)}</time>
+          <time className="whitespace-nowrap tabular-nums" dateTime={new Date(sincronizadoEn).toISOString()}>{formato.format(sincronizadoEn)}</time>
         ) : "Aún no hay importaciones registradas"}
       </p>
     </div>

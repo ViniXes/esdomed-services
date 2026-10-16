@@ -1,4 +1,4 @@
-import type { IngresoHospitalizacion } from "@/types";
+import type { CondicionAtencionEmergencia, IngresoHospitalizacion } from "@/types";
 
 // Etiquetas y estilos del módulo Atendidos en Emergencia.
 
@@ -21,7 +21,7 @@ export const INGRESO_BADGE: Record<IngresoHospitalizacion, string> = {
 // hospitalización (no egresó de emergencia). El término de defunción se normaliza
 // de forma defensiva (no hubo muestra en el reporte de ejemplo).
 
-export type CondicionEgresoEmergencia = "vivo" | "fallecido" | "otro" | "sin_dato";
+export type CondicionEgresoEmergencia = Exclude<CondicionAtencionEmergencia, "ingreso">;
 
 export function condicionEgreso(tipoEgreso?: string): CondicionEgresoEmergencia {
   const s = (tipoEgreso ?? "").toLowerCase().trim();
@@ -30,6 +30,22 @@ export function condicionEgreso(tipoEgreso?: string): CondicionEgresoEmergencia 
   if (/falleci|muert|defun|[óo]bito/.test(s)) return "fallecido";
   return "otro";
 }
+
+/**
+ * Condición normalizada de la atención, guardada como `condicionEgreso` para que
+ * Firestore pueda contar y filtrar por tipo (no puede hacerlo sobre el texto crudo
+ * de "Tipo de egreso"). Si ingresó a hospitalización no egresó de emergencia.
+ * scripts/backfill-condicion-emergencia.mjs replica esta lógica: mantenerlos iguales.
+ */
+export function condicionAtencion(
+  ingreso: IngresoHospitalizacion,
+  tipoEgreso?: string,
+): CondicionAtencionEmergencia {
+  return ingreso === "si" ? "ingreso" : condicionEgreso(tipoEgreso);
+}
+
+/** Valores de `condicionEgreso` que cuentan como egreso desde emergencia. */
+export const CONDICIONES_EGRESO: CondicionEgresoEmergencia[] = ["vivo", "fallecido", "otro", "sin_dato"];
 
 export const CONDICION_LABEL: Record<CondicionEgresoEmergencia, string> = {
   vivo:      "Vivo",

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, getDoc, deleteField, Timestamp } from "@/lib/firestoreMeter";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
@@ -119,13 +120,25 @@ const PERIODOS_WIZARD = (() => {
   return [-1, 0, 1].map((off) => formatPeriodo(d(off).getFullYear(), d(off).getMonth() + 1));
 })();
 
+// `useSearchParams` obliga a un límite de Suspense en el App Router.
 export default function MisTramitesPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-slate-400">Cargando…</p>}>
+      <MisTramitesVista />
+    </Suspense>
+  );
+}
+
+function MisTramitesVista() {
   const { user, profile } = useAuth();
+  // "Nuevo trámite" del inicio de ESDOMED llega con ?nuevo=1: abre el asistente
+  // directo (el formulario ya arranca en blanco).
+  const nuevoDesdeUrl = useSearchParams().get("nuevo") === "1";
   const [tramites, setTramites] = useState<TramitePersonal[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ── Wizard ──
-  const [showWizard, setShowWizard] = useState(false);
+  const [showWizard, setShowWizard] = useState(nuevoDesdeUrl);
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [categoria, setCategoria] = useState<CategoriaTramitePersonal>("A1_permiso_con_goce");
   const [notas, setNotas] = useState("");
@@ -171,6 +184,11 @@ export default function MisTramitesPage() {
       setLoading(false);
     });
   }, [user]);
+
+  // Quita ?nuevo=1 de la URL para que recargar no vuelva a abrir el asistente.
+  useEffect(() => {
+    if (nuevoDesdeUrl) window.history.replaceState(null, "", window.location.pathname);
+  }, [nuevoDesdeUrl]);
 
   const esPermiso = REQUIERE_APROBACION(categoria);
   const totalPasos = esPermiso ? 3 : 2;

@@ -1,5 +1,6 @@
 import type { AtencionEmergencia, Genero, IngresoHospitalizacion } from "@/types";
 import { normalizarGenero } from "@/lib/pacientes/helpers";
+import { condicionAtencion } from "@/lib/emergencia/helpers";
 
 // Mapeo del reporte del SIS "Pacientes Atendidos En Emergencia" (HTML exportado
 // como .xls) → AtencionEmergencia. Lógica pura, sin Firebase.
@@ -176,6 +177,7 @@ export function mapearFilaEmergencia(row: FilaReporteEmergencia): FilaEmergencia
   const anios = aniosDeEdad(row[COL.edad]);
   if (anios !== undefined) datos.edadAnios = anios;
   asignar("tipoEgreso", row[COL.tipoEgreso]);
+  datos.condicionEgreso = condicionAtencion(ingresoHospitalizacion, datos.tipoEgreso);
   asignar("diagnostico", row[COL.diagnostico]);
   asignar("categorizacion", row[COL.categorizacion]);
   asignar("medicoTriage", row[COL.medicoTriage]);
