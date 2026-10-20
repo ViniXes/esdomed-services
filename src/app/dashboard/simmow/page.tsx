@@ -36,7 +36,7 @@ import { ReportarErrorSimmow } from "@/components/simmow/ReportarErrorSimmow";
 import { VerTerminosSimmow } from "@/components/simmow/VerTerminosSimmow";
 import { RecordatorioTerminosSimmow } from "@/components/simmow/RecordatorioTerminosSimmow";
 
-type Flujo = "elegir" | "hospitalaria" | "ambulatoria";
+type Flujo = "elegir" | "hospitalaria" | "ambulatoria" | "consulta_externa";
 type Paso = "carga" | "revision";
 type PasoAmbulatorio = "carga" | "lista" | "revision";
 
@@ -179,6 +179,7 @@ async function sugerirMedicoDelCatalogo(datos: DatosSimmow): Promise<DatosSimmow
 export default function SimmowPage() {
   const router = useRouter();
   const { profile, loading } = useAuth();
+  const esAdmin = profile?.role === "admin";
 
   const [flujo, setFlujo] = useState<Flujo>("elegir");
 
@@ -485,6 +486,7 @@ export default function SimmowPage() {
     const filas = pacientesAmb.map((p) => {
       const d = p.datos;
       return {
+        Fecha: d.fecha,
         Expediente: d.expediente,
         "Nombre del Paciente": d.paciente,
         DUI: d.dui,
@@ -507,7 +509,6 @@ export default function SimmowPage() {
         "N° de Afiliación": d.numeroAfiliacion,
         "Establecimiento Referido (texto original)": d.establecimientoReferidoTexto,
         "Código SIMMOW Establecimiento": d.establecimientoReferidoCodigo,
-        Fecha: d.fecha,
         "Semana Epidemiológica": d.semanaEpidemiologica,
         "En Pacientes Atendidos En Emergencia": p.enPacientesAtendidos ? "Sí" : "No",
         Advertencias: p.advertencias.join(" / "),
@@ -617,6 +618,20 @@ export default function SimmowPage() {
               &ldquo;Registro Diario&rdquo;.
             </span>
           </button>
+          {esAdmin && (
+            <button
+              onClick={() => setFlujo("consulta_externa")}
+              className="flex flex-col items-start gap-2 text-left bg-white dark:bg-slate-900 border border-dashed border-violet-300 dark:border-violet-700 rounded-xl p-5 shadow-sm hover:border-violet-500 dark:hover:border-violet-500 transition-colors"
+            >
+              <Stethoscope className="h-6 w-6 text-violet-600 dark:text-violet-400" />
+              <span className="font-semibold text-slate-800 dark:text-slate-100">
+                Consulta Externa <span className="ml-1 text-[10px] font-medium uppercase tracking-wide text-violet-700 dark:text-violet-300">Pruebas</span>
+              </span>
+              <span className="text-xs text-slate-500">
+                Nueva instancia para Consulta Curativa / Atención Preventiva. Solo administración mientras se define el cruce de reportes.
+              </span>
+            </button>
+          )}
         </div>
       )}
 
@@ -840,6 +855,43 @@ export default function SimmowPage() {
             </div>
           )}
         </>
+      )}
+
+      {flujo === "consulta_externa" && esAdmin && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-900 rounded-xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg bg-violet-50 dark:bg-violet-950/40 p-2">
+                <Stethoscope className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">Consulta Externa</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Instancia de prueba preparada para el formulario de SIMMOW “Ingreso/Edición Consulta Curativa / Atención Preventiva”.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-300">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">Aún no genera ni pega código.</p>
+                <p className="mt-1 text-xs">
+                  Se confirmó que este formulario no es el mismo de Emergencia: incluye modalidad, tipo de atención, especialidad, referencias/interconsultas y controles preventivos. Cuando estén claros los reportes de origen, se conectará aquí su carga y mapeo sin reutilizar datos de Emergencia por error.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-5">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Próximo paso</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Definir los reportes de Consulta Externa y qué columna alimenta cada campo del formulario. La instancia queda aislada de Atención Ambulatoria para que sus futuras reglas, pacientes y código no se mezclen.
+            </p>
+          </div>
+        </div>
       )}
       </div>
     </>
