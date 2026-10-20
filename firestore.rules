@@ -847,6 +847,13 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ─── Inconsistencias de marcación (estadísticas) ──────────────────────────
+    // Espejo mensual del "Reporte Descuentos" de RRHH (doc id = "YYYY-MM").
+    // Trae descuentos por persona: por ahora SOLO el admin lo ve y lo carga.
+    match /inconsistencias_marcacion/{periodo} {
+      allow read, write: if isAdmin();
+    }
+
     // ─── Configuración global ────────────────────────────────────────────────
     // Servicios y camas: lectura pública (no es dato sensible), escritura solo admin.
     match /configuracion/{docId} {

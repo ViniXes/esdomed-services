@@ -1,7 +1,7 @@
 import {
   Activity, Ambulance, ArrowRightLeft, BarChart3, BedDouble, Briefcase, Building2, CalendarClock,
   CalendarRange, ChartColumn, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
-  DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FolderOpen, HandHeart, HeartPulse,
+  DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FingerprintPattern, FolderOpen, HandHeart, HeartPulse,
   History, LayoutDashboard, LayoutGrid, ListChecks, LogIn, NotebookPen, Phone, PhoneCall, Printer, Radar,
   SearchCheck, Send, Settings, ShieldAlert, ShieldCheck, Siren, Stethoscope, Syringe, Table2, TrendingUp,
   UserCheck, UserPlus, Users, UserSearch, UsersRound,
@@ -143,6 +143,7 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/registros-medicos", label: "Registros de médicos", icon: Stethoscope, visibleSi: esAdmin },
       { href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: UserPlus, globo: "solicitudesSis" },
       { href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck },
+      { href: "/dashboard/inconsistencias-marcacion", label: "Inconsistencias de marcación", icon: FingerprintPattern, visibleSi: esAdmin },
       { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, visibleSi: esAdmin },
     ],
   },

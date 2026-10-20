@@ -1757,6 +1757,67 @@ export interface EvaluacionPersonal {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Inconsistencias de marcación (estadísticas, solo admin)
+//
+// Espejo del "Reporte Descuentos {Mes} de {Año}" que RRHH genera del reloj
+// marcador (JasperReports). Cada mes el admin sube el PDF; se lee en el
+// navegador (src/lib/inconsistenciasMarcacion) y se guarda UN documento por mes
+// en `inconsistencias_marcacion/{YYYY-MM}`. Solo trae a quien tuvo descuentos y
+// solo los días con incidencia. El salario del encabezado NO se guarda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DiaInconsistenciaMarcacion {
+  fecha: string;          // "2026-09-02" — día en que INICIA el turno
+  horario: string;        // "07:00 - 15:00" (turno de 24 h: "07:00 - 07:00")
+  entrada: string;        // "HH:MM"; "00:00" = no hay marca
+  salida: string;
+  salidaComida: string;
+  entradaComida: string;
+  entradaPausa: string;
+  salidaPausa: string;
+  trabajadas: string;     // "HH:MM"
+  septimo: number;        // $
+  ausencia: number;       // $ descontado como ausencia (turno completo)
+  minutos: number;        // TIEMPO descontado
+  monto: number;          // $ descontado ese día
+}
+
+export interface ConceptoDescuentoMarcacion {
+  minutos: number;
+  monto: number;
+}
+
+export interface EmpleadoInconsistenciasMarcacion {
+  codigoMarcacion: string; // "C-043" — mismo código que UserProfile.codigoMarcacion
+  nombre: string;
+  plaza: string;           // "Técnico en Estadística y Documentos Médicos"
+  dias: DiaInconsistenciaMarcacion[];
+  // Resumen del reporte, tal cual (montos oficiales)
+  total: number;
+  tardanza: ConceptoDescuentoMarcacion;          // TARDANZA - SALIDA TEMP.
+  ausencias: ConceptoDescuentoMarcacion;
+  permisoSinGoce: ConceptoDescuentoMarcacion;
+  incapacidadSinGoce: ConceptoDescuentoMarcacion;
+  septimo: { cantidad: number; monto: number };
+  minutosPeriodoAnterior: number;
+}
+
+export interface ReporteInconsistenciasMarcacion {
+  id?: string;             // == periodo
+  periodo: string;         // "2026-09"
+  anio: number;
+  mes: number;             // 1-12
+  unidad: string;          // "ESDOMED"
+  fechaImpresion: string | null; // "01-oct-2026 5.42 PM" (texto del reporte)
+  totalGeneral: number;
+  empleados: EmpleadoInconsistenciasMarcacion[];
+  archivoNombre: string;
+  cargadoEn: Date;
+  cargadoPorId: string;
+  cargadoPorNombre: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Transporte institucional
 // ─────────────────────────────────────────────────────────────────────────────
 
