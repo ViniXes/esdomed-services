@@ -147,7 +147,7 @@ function PanelEsdomed() {
         })}
       </div>
 
-      {/* Tu equipo: quién viene, a qué hora, permisos, emergencia y apoyo diurno */}
+      {/* Tu equipo: quién viene, a qué hora, permisos, emergencia, apoyo diurno y consulta externa */}
       {vePlan && (
         <EquipoDelDia jornada={jornada} persona={persona}>
           <TramitesInicio />

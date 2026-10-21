@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Ambulance, ChevronRight, Sun, Users, UsersRound } from "lucide-react";
+import { Ambulance, ChevronRight, Stethoscope, Sun, Users, UsersRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { doc, getDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
@@ -27,13 +27,14 @@ import {
 } from "@/lib/esdomed/turnos-dia";
 
 // "Tu equipo" del inicio de ESDOMED: el turno propio, quién de tu grupo viene
-// (y a qué hora, o si tiene permiso) y quién cubre emergencia y apoyo diurno,
-// para hoy y los próximos 6 días. Todo sale del plan de trabajo del mes
+// (y a qué hora, o si tiene permiso) y quién cubre emergencia, apoyo diurno y
+// consulta externa, para hoy y los próximos 6 días. Todo sale del plan de trabajo del mes
 // (planes_trabajo/{YYYY-MM}): 1 lectura, 2 si la semana cruza de mes, con
 // caché de 5 min para no releer al volver al inicio.
 
 const GRUPO_EMERGENCIA = "Equipo de emergencia";
 const GRUPO_APOYO = "Equipo de apoyo diurno / emergencia";
+const GRUPO_CONSULTA_EXTERNA = "Consulta Externa";
 const GRUPOS_ROTATIVOS = ["Grupo 1", "Grupo 2", "Grupo 3", "Grupo 4"];
 
 const DIA_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -348,10 +349,11 @@ export function EquipoDelDia({ jornada, persona, children }: {
     return hayTurno(planes[fp.periodo], grupoVista, fp.dia);
   });
 
-  // Cobertura: emergencia, apoyo diurno y el grupo rotativo de turno (sin repetir el que se ve a la izquierda).
+  // Cobertura: emergencia, apoyo diurno, consulta externa y el grupo rotativo de turno (sin repetir el que se ve a la izquierda).
   const bloques: { grupo: string; titulo: string; icono: LucideIcon }[] = [
     { grupo: GRUPO_EMERGENCIA, titulo: "Emergencia", icono: Ambulance },
     { grupo: GRUPO_APOYO, titulo: "Apoyo diurno", icono: Sun },
+    { grupo: GRUPO_CONSULTA_EXTERNA, titulo: "Consulta externa", icono: Stethoscope },
     ...GRUPOS_ROTATIVOS.filter((g) => hayTurno(plan, g, dia)).map((g) => ({ grupo: g, titulo: `${g} de turno`, icono: Users })),
   ].filter((b) => b.grupo !== grupoVista && gruposPresentes.includes(b.grupo));
 

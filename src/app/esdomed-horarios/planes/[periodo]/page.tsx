@@ -556,7 +556,7 @@ export default function EditorPlanPage() {
       .map((count, idx) => count < 2 ? idx + 1 : null)
       .filter((val): val is number => val !== null);
     if (diasIncompletos.length > 0) {
-      advertencias.push(`Días con menos de 2 operativos de grupo asignados (sin contar emergencia ni apoyo diurno): ${diasIncompletos.join(", ")}.`);
+      advertencias.push(`Días con menos de 2 operativos de grupo asignados (sin contar emergencia, apoyo diurno ni consulta externa): ${diasIncompletos.join(", ")}.`);
     }
 
     // Las vacaciones siempre son un periodo de 15 días: avisar si alguien tiene
@@ -750,18 +750,23 @@ export default function EditorPlanPage() {
     }
   };
 
-  // Tres contadores EXCLUYENTES: cada turno operativo/hospitalario suma solo a
-  // uno según el grupo de la fila. El de operativos cubre a los grupos
-  // regulares (y filas sin grupo); los equipos de emergencia y de apoyo diurno
-  // llevan cada uno su propia fila de totales.
+  // Cuatro contadores EXCLUYENTES: cada turno suma solo a uno según el grupo
+  // de la fila. El de operativos cubre a los grupos regulares (y filas sin
+  // grupo); emergencia, apoyo diurno y consulta externa llevan cada uno su
+  // propia fila de totales y no cuentan para el mínimo de 2 operativos.
+  // Consulta externa cuenta cualquier jornada (es de día y puede llevar un
+  // código administrativo); los demás, solo turnos operativos/hospitalarios.
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
   const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
   const conteoApoyoDiurnoPorDia = new Array(dias.length).fill(0);
+  const conteoConsultaExternaPorDia = new Array(dias.length).fill(0);
   filas.forEach((fila) => {
     const grupo = fila.grupo?.trim();
     fila.asignaciones.forEach((celda, diaIdx) => {
       const horario = getHorario(celda);
-      if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
+      if (horario && grupo === "Consulta Externa") {
+        conteoConsultaExternaPorDia[diaIdx]++;
+      } else if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
         if (grupo === "Equipo de emergencia") {
           conteoEmergenciaPorDia[diaIdx]++;
         } else if (grupo === "Equipo de apoyo diurno / emergencia") {
@@ -775,7 +780,7 @@ export default function EditorPlanPage() {
 
   const colSpanTotal = dias.length + 2; // Personal + días + Hrs
 
-  const renderFilaTotal = (tipo: "emergencia" | "apoyo" | "operativos") => {
+  const renderFilaTotal = (tipo: "emergencia" | "apoyo" | "consulta" | "operativos") => {
     const configuracion = {
       emergencia: {
         etiqueta: "Total Emergencia / Día:",
@@ -794,6 +799,15 @@ export default function EditorPlanPage() {
         celda: "border-r border-orange-100 dark:border-orange-900/40",
         caja: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
         final: "border-l border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950",
+      },
+      consulta: {
+        etiqueta: "Total Consulta Externa / Día:",
+        conteos: conteoConsultaExternaPorDia,
+        fila: "bg-slate-100 dark:bg-slate-800/60 border-t-2 border-slate-300 dark:border-slate-600",
+        fija: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-r border-slate-300 dark:border-slate-600",
+        celda: "border-r border-slate-200 dark:border-slate-700/60",
+        caja: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+        final: "border-l border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800",
       },
       operativos: {
         etiqueta: "Total Operativos de Grupo / Día:",
@@ -991,7 +1005,8 @@ export default function EditorPlanPage() {
                       "Grupo 4": "operativos",
                       "Equipo de emergencia": "emergencia",
                       "Equipo de apoyo diurno / emergencia": "apoyo",
-                    }[grupoActual] as "emergencia" | "apoyo" | "operativos" | undefined;
+                      "Consulta Externa": "consulta",
+                    }[grupoActual] as "emergencia" | "apoyo" | "consulta" | "operativos" | undefined;
 
                     return (
                       <Fragment key={fila.uid || fila.codigoMarcacion || filaIdx}>

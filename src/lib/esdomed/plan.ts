@@ -23,6 +23,7 @@ export const GRUPOS_ESDOMED = [
   "Grupo 4",
   "Equipo de emergencia",
   "Equipo de apoyo diurno / emergencia",
+  "Consulta Externa",
 ] as const;
 
 export type GrupoEsdomed = (typeof GRUPOS_ESDOMED)[number];
@@ -70,6 +71,14 @@ export const COLOR_GRUPO: Record<string, { badge: string; dot: string; barra: st
     dot: "bg-orange-500",
     barra: "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300",
     corto: "Apoyo",
+  },
+  // Neutro a propósito: en el tema HNES orange/sky/violet/indigo se vuelven el
+  // azul o el acento y se confundirían con Grupo 1, Grupo 4 o Apoyo.
+  "Consulta Externa": {
+    badge: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+    dot: "bg-slate-500 dark:bg-slate-400",
+    barra: "bg-slate-200/70 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200",
+    corto: "C. Ext.",
   },
 };
 
