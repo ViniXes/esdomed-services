@@ -2,16 +2,18 @@
 
 import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, getDoc, deleteField, Timestamp } from "@/lib/firestoreMeter";
+import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, getDoc, getDocs, deleteField, Timestamp } from "@/lib/firestoreMeter";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileText, Plus, Upload, X, CheckCircle2, Clock, File, Pencil, AlertTriangle, Paperclip, CalendarDays, ChevronLeft, Wallet, WalletCards, Check, Trash2 } from "lucide-react";
-import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal, PlanTrabajo, FilaPlanTrabajo } from "@/types";
+import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal, PlanTrabajo, FilaPlanTrabajo, InconsistenciasMarcacionPersonal, ReclamoMarcacion } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { getHorario, esMarcaEspecial, labelMarca } from "@/lib/esdomed/horarios";
 import { filaDeUsuario, formatPeriodo, labelPeriodo, parsePeriodo, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
-import { minutosDeEtiqueta } from "@/lib/esdomed/permisos-plan";
+import { minutosDeEtiqueta, periodoDeFecha } from "@/lib/esdomed/permisos-plan";
+import { fechaCorta, formatoDinero } from "@/lib/inconsistenciasMarcacion/analisis";
+import { COLECCION_INCONSISTENCIAS_PERSONAL, contextoPlanDia, diaReclamado } from "@/lib/inconsistenciasMarcacion/personal";
 
 const toLocalInput = (val: unknown): string => {
   const d = toDate(val);
@@ -53,6 +55,8 @@ const CATEGORIAS: Record<CategoriaTramitePersonal, string> = {
   "F_tiempo_extra": "F. Informe mensual de tiempo extra laborado",
   "G_misiones_oficiales": "G. Control de misiones oficiales",
 };
+
+const CATEGORIA_MARCACION: CategoriaTramitePersonal = "E_inconsistencias_marcacion";
 
 const REQUIERE_APROBACION = (cat: CategoriaTramitePersonal) =>
   cat === "A1_permiso_con_goce" || cat === "A2_permiso_sin_goce";
@@ -132,15 +136,28 @@ export default function MisTramitesPage() {
 function MisTramitesVista() {
   const { user, profile } = useAuth();
   // "Nuevo trámite" del inicio de ESDOMED llega con ?nuevo=1: abre el asistente
-  // directo (el formulario ya arranca en blanco).
-  const nuevoDesdeUrl = useSearchParams().get("nuevo") === "1";
+  // directo (el formulario ya arranca en blanco). "Mis marcaciones" llega con
+  // ?reclamo=YYYY-MM&dias=YYYY-MM-DD,…: abre el trámite E con esos días.
+  const searchParams = useSearchParams();
+  const nuevoDesdeUrl = searchParams.get("nuevo") === "1";
+  const [pedidoReclamo] = useState(() => {
+    const periodo = searchParams.get("reclamo");
+    const fechas = (searchParams.get("dias") ?? "").split(",").filter(Boolean);
+    return periodo && fechas.length ? { periodo, fechas } : null;
+  });
   const [tramites, setTramites] = useState<TramitePersonal[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ── Wizard ──
-  const [showWizard, setShowWizard] = useState(nuevoDesdeUrl);
-  const [paso, setPaso] = useState<1 | 2 | 3>(1);
-  const [categoria, setCategoria] = useState<CategoriaTramitePersonal>("A1_permiso_con_goce");
+  const [showWizard, setShowWizard] = useState(nuevoDesdeUrl || !!pedidoReclamo);
+  const [paso, setPaso] = useState<1 | 2 | 3>(pedidoReclamo ? 2 : 1);
+  const [categoria, setCategoria] = useState<CategoriaTramitePersonal>(pedidoReclamo ? CATEGORIA_MARCACION : "A1_permiso_con_goce");
+  // Días del reporte de marcación que se reclaman (trámite E desde "Mis marcaciones").
+  const [reclamo, setReclamo] = useState<ReclamoMarcacion | null>(null);
+  const [cargandoReclamo, setCargandoReclamo] = useState(!!pedidoReclamo);
+  // El pedido de la URL se arma una sola vez (que un refresco del perfil no lo
+  // vuelva a meter en otro trámite abierto después).
+  const reclamoAtendido = useRef(false);
   const [notas, setNotas] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -185,10 +202,49 @@ function MisTramitesVista() {
     });
   }, [user]);
 
-  // Quita ?nuevo=1 de la URL para que recargar no vuelva a abrir el asistente.
+  // Quita ?nuevo=1 / ?reclamo=… de la URL para que recargar no vuelva a abrir el asistente.
   useEffect(() => {
-    if (nuevoDesdeUrl) window.history.replaceState(null, "", window.location.pathname);
-  }, [nuevoDesdeUrl]);
+    if (nuevoDesdeUrl || pedidoReclamo) window.history.replaceState(null, "", window.location.pathname);
+  }, [nuevoDesdeUrl, pedidoReclamo]);
+
+  // Arma el reclamo con los días tal como vienen en la copia publicada y lo que
+  // decía el plan (quien revisa el trámite no lee las copias personales).
+  useEffect(() => {
+    if (!pedidoReclamo || reclamoAtendido.current || !user || !profile) return;
+    let cancelado = false;
+    (async () => {
+      const copias = await getDocs(query(collection(db, COLECCION_INCONSISTENCIAS_PERSONAL), where("empleadoId", "==", user.uid)));
+      const copia = copias.docs.map(d => d.data() as InconsistenciasMarcacionPersonal).find(c => c.periodo === pedidoReclamo.periodo);
+      const elegidos = (copia?.dias ?? []).filter(d => pedidoReclamo.fechas.includes(d.fecha));
+      if (!elegidos.length) throw new Error("sin días");
+      const periodos = [...new Set(elegidos.map(d => periodoDeFecha(d.fecha)))];
+      const planesDia = Object.fromEntries(await Promise.all(periodos.map(p =>
+        getDoc(doc(db, "planes_trabajo", p))
+          .then(s => [p, s.exists() ? ({ id: s.id, ...s.data() } as PlanTrabajo) : null] as const)
+          .catch(() => [p, null] as const),
+      )));
+      if (cancelado) return;
+      reclamoAtendido.current = true;
+      setReclamo({
+        periodo: pedidoReclamo.periodo,
+        dias: elegidos.map(d => {
+          const plan = planesDia[periodoDeFecha(d.fecha)];
+          return diaReclamado(d, plan ? contextoPlanDia(filaDeUsuario(plan, profile), d) : null);
+        }),
+      });
+    })()
+      .catch(() => {
+        if (cancelado) return;
+        reclamoAtendido.current = true;
+        setFeedback({ tipo: "error", mensaje: "No se pudieron cargar los días a reclamar. Puedes indicarlos en las notas." });
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoReclamo(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [pedidoReclamo, user, profile]);
 
   const esPermiso = REQUIERE_APROBACION(categoria);
   const totalPasos = esPermiso ? 3 : 2;
@@ -367,6 +423,7 @@ function MisTramitesVista() {
         };
         if (notas.trim()) payload.notas = notas.trim();
         if (documentos.length) payload.documentos = documentos;
+        if (categoria === CATEGORIA_MARCACION && reclamo) payload.reclamoMarcacion = reclamo;
         if (datos) {
           payload.fechaInicio = Timestamp.fromDate(datos.inicio);
           payload.fechaFin = Timestamp.fromDate(datos.fin);
@@ -460,6 +517,8 @@ function MisTramitesVista() {
     setHoraInicioFraccion("");
     setPeriodoSel(PERIODO_ACTUAL);
     setModoManual(false);
+    setReclamo(null);
+    setCargandoReclamo(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -479,6 +538,7 @@ function MisTramitesVista() {
     setFechaFin(toLocalInput(t.fechaFin));
     setHoras(t.horas != null ? String(t.horas) : "");
     setDocsActuales(docsDe(t));
+    setReclamo(t.reclamoMarcacion ?? null);
     // Al editar se entra directo al detalle en modo manual (fechas prellenadas).
     setModoManual(true);
     setPaso(2);
@@ -574,6 +634,12 @@ function MisTramitesVista() {
                         </span>
                       )}
                     </div>
+                  )}
+                  {t.reclamoMarcacion && (
+                    <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                      {labelPeriodo(t.reclamoMarcacion.periodo)} · {t.reclamoMarcacion.dias.length} día{t.reclamoMarcacion.dias.length === 1 ? "" : "s"} reclamado{t.reclamoMarcacion.dias.length === 1 ? "" : "s"}:{" "}
+                      {t.reclamoMarcacion.dias.map(d => fechaCorta(d.fecha)).join(", ")}
+                    </p>
                   )}
                   {t.notas && <p className="text-xs text-slate-500 italic mt-2.5 line-clamp-2">&ldquo;{t.notas}&rdquo;</p>}
 
@@ -824,6 +890,31 @@ function MisTramitesVista() {
               {/* ── Paso 2 (otros trámites) y Paso 3 (permisos): documentos + notas ── */}
               {((paso === 2 && !esPermiso) || (paso === 3 && esPermiso)) && (
                 <>
+                  {paso === 2 && categoria === CATEGORIA_MARCACION && (reclamo || cargandoReclamo) && (
+                    <div className="rounded-2xl border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                        Días que reclamas{reclamo ? ` · ${labelPeriodo(reclamo.periodo)}` : ""}
+                      </p>
+                      {!reclamo ? (
+                        <p className="text-sm text-blue-900 dark:text-blue-200">Cargando los días…</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {reclamo.dias.map(d => (
+                            <li key={`${d.fecha}-${d.horario}`} className="flex items-baseline justify-between gap-3 text-sm text-blue-950 dark:text-blue-100">
+                              <span className="min-w-0">
+                                <span className="font-semibold">{fechaCorta(d.fecha)}</span> · {d.incidencia}
+                                {d.motivo && <span className="block text-xs text-blue-800/80 dark:text-blue-300/80">{d.motivo}</span>}
+                              </span>
+                              <span className="shrink-0 font-semibold tabular-nums">{formatoDinero(d.monto)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80">
+                        Adjunta el formulario de inconsistencia firmado; administración verá estos días en la ficha del trámite.
+                      </p>
+                    </div>
+                  )}
                   {paso === 3 && resumenValido && (
                     <div className="rounded-2xl border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-1.5">
                       <p className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">Resumen de tu solicitud</p>

@@ -3,22 +3,20 @@
 // Bloques de resumen del dashboard de inconsistencias de marcación:
 // indicadores del alcance, composición del descuento y trazabilidad de la carga.
 
-import { ArrowDownRight, ArrowUpRight, Clock, FingerprintPattern, Timer, Users, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, FingerprintPattern, Timer, Users, Wallet } from "lucide-react";
 import type { ReporteInconsistenciasMarcacion } from "@/types";
 import { nombreMes } from "@/lib/inconsistenciasMarcacion/parser";
 import {
   desgloseMinutos,
+  etiquetaPeriodo,
   formatoDinero,
   formatoDuracion,
   turnoCompleto,
   TIPO_INCIDENCIA_LABEL,
   type ResumenAlcance,
 } from "@/lib/inconsistenciasMarcacion/analisis";
+import { Tarjeta } from "@/components/marcacion/Piezas";
 import { Leyenda, useColoresGrafica } from "./Graficos";
-
-const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-/** { mes: 9, anio: 2026 } → "Septiembre 2026". */
-export const etiquetaPeriodo = (r: { mes: number; anio: number }) => `${capitalizar(nombreMes(r.mes))} ${r.anio}`;
 
 // ─── Indicadores ──────────────────────────────────────────────────────────────
 
@@ -80,19 +78,6 @@ export function Indicadores({
         valor={formatoDuracion(porTipo.minutos.minutos)}
         pie={<span>{porTipo.minutos.eventos} días con tardanza o salida temprana · {formatoDinero(porTipo.minutos.monto)}</span>}
       />
-    </div>
-  );
-}
-
-function Tarjeta({ icon: Icon, label, valor, pie }: { icon: typeof Clock; label: string; valor: string; pie: React.ReactNode }) {
-  return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-      <div className="flex items-center gap-1.5 text-slate-500 mb-1.5">
-        <Icon size={13} className="text-blue-600 dark:text-blue-400" />
-        <p className="text-[11px] font-medium uppercase tracking-wider">{label}</p>
-      </div>
-      <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-heading">{valor}</p>
-      <p className="mt-1 text-xs text-slate-500">{pie}</p>
     </div>
   );
 }
@@ -200,11 +185,17 @@ export function MesesCargados({ reportes }: { reportes: ReporteInconsistenciasMa
             {" · "}{r.archivoNombre}
             {" · "}cargado por {r.cargadoPorNombre} el {r.cargadoEn.toLocaleDateString("es-SV")}
             {r.fechaImpresion && <> · impreso por RRHH el {r.fechaImpresion}</>}
+            {" · "}
+            {r.publicacion ? (
+              <span className="text-emerald-700 dark:text-emerald-400">publicado al personal el {r.publicacion.publicadoEn.toLocaleDateString("es-SV")}</span>
+            ) : (
+              <span className="text-amber-700 dark:text-amber-400">sin publicar</span>
+            )}
           </li>
         ))}
       </ul>
       <p className="mt-2">
-        Montos tal como vienen en el reporte de RRHH (Art. 99 de las Disposiciones Generales de Presupuestos). Volver a subir el PDF de un mes lo reemplaza.
+        Montos tal como vienen en el reporte de RRHH (Art. 99 de las Disposiciones Generales de Presupuestos). Volver a subir el PDF de un mes lo reemplaza y retira su publicación.
       </p>
     </section>
   );

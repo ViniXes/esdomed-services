@@ -1723,7 +1723,10 @@ export interface TramitePersonal {
   // "ordinario" si se solicita en o antes de la fecha del permiso;
   // "diferido" si se solicita después (permiso retroactivo).
   tipoSolicitud?: "ordinario" | "diferido";
-  
+
+  // E. Inconsistencias de marcación presentada desde "Mis marcaciones"
+  reclamoMarcacion?: ReclamoMarcacion;
+
   estado: EstadoTramitePersonal;
 
   creadoEn: Date;
@@ -1815,6 +1818,48 @@ export interface ReporteInconsistenciasMarcacion {
   cargadoEn: Date;
   cargadoPorId: string;
   cargadoPorNombre: string;
+  // Lo pone el admin al revisar el mes y publicarlo al personal; sin él, nadie
+  // más que el admin ve el mes. Volver a subir el PDF lo retira.
+  publicacion?: PublicacionInconsistenciasMarcacion;
+}
+
+export interface PublicacionInconsistenciasMarcacion {
+  publicadoEn: Date;
+  publicadoPorId: string;
+  publicadoPorNombre: string;
+  personas: number;        // copias creadas (personas vinculadas a un usuario)
+  sinVincular: string[];   // códigos del reporte sin usuario: esas personas no lo ven
+}
+
+// Copia por persona de un mes PUBLICADO: `inconsistencias_marcacion_personal/
+// {YYYY-MM}_{CODIGO}`. Existe porque las reglas de Firestore no pueden filtrar
+// dentro del arreglo `empleados` del documento mensual; cada empleado lee solo
+// las suyas por `empleadoId` (uid resuelto por código de marcación al publicar).
+export interface InconsistenciasMarcacionPersonal extends EmpleadoInconsistenciasMarcacion {
+  id?: string;
+  periodo: string;
+  anio: number;
+  mes: number;
+  unidad: string;
+  fechaImpresion: string | null;
+  empleadoId: string;
+  publicadoEn: Date;
+}
+
+// Días que el empleado reclama en un trámite "E. Inconsistencias de marcación",
+// copiados del reporte al presentarlo (quien revisa no lee las copias personales).
+export interface DiaReclamadoMarcacion {
+  fecha: string;           // "2026-09-02"
+  horario: string;         // "07:00 - 15:00"
+  incidencia: string;      // "Olvidó marcar salida"
+  monto: number;
+  plan: string | null;     // lo que decía el plan ese día ("Vacaciones", "MA2 · 7:00 am – 3:00 pm")
+  motivo: string | null;   // por qué podría proceder ("El plan marca vacaciones ese día")
+}
+
+export interface ReclamoMarcacion {
+  periodo: string;         // "2026-09"
+  dias: DiaReclamadoMarcacion[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

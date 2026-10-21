@@ -853,6 +853,13 @@ service cloud.firestore {
     match /inconsistencias_marcacion/{periodo} {
       allow read, write: if isAdmin();
     }
+    // Copia por persona de un mes que el admin revisó y PUBLICÓ (id =
+    // "{YYYY-MM}_{CODIGO}"): cada empleado lee solo las suyas ("Mis marcaciones").
+    // Existe porque una regla no puede filtrar dentro del arreglo del doc mensual.
+    match /inconsistencias_marcacion_personal/{id} {
+      allow read:  if isAdmin() || (isAuth() && resource.data.empleadoId == uid());
+      allow write: if isAdmin();
+    }
 
     // ─── Configuración global ────────────────────────────────────────────────
     // Servicios y camas: lectura pública (no es dato sensible), escritura solo admin.

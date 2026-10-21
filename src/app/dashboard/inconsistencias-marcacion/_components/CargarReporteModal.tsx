@@ -2,15 +2,14 @@
 
 import { useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, X } from "lucide-react";
-import { doc, serverTimestamp, setDoc } from "@/lib/firestoreMeter";
+import { doc, serverTimestamp, writeBatch } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { extraerItemsPdf } from "@/lib/inconsistenciasMarcacion/pdf";
 import { leerReporteDescuentos, nombreMes, type ResultadoLectura } from "@/lib/inconsistenciasMarcacion/parser";
 import { formatoDinero } from "@/lib/inconsistenciasMarcacion/analisis";
+import { borrarCopiasDelMes, COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
 import type { ReporteInconsistenciasMarcacion } from "@/types";
-
-export const COLECCION_INCONSISTENCIAS = "inconsistencias_marcacion";
 
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -65,13 +64,18 @@ export function CargarReporteModal({
     setGuardando(true);
     setError(null);
     try {
-      await setDoc(doc(db, COLECCION_INCONSISTENCIAS, reporte.periodo), {
+      // Reemplazar un mes retira lo publicado al personal (el documento nuevo
+      // no trae `publicacion`): el admin revisa la versión nueva y la vuelve a publicar.
+      const batch = writeBatch(db);
+      if (previo) await borrarCopiasDelMes(batch, reporte.periodo);
+      batch.set(doc(db, COLECCION_INCONSISTENCIAS, reporte.periodo), {
         ...reporte,
         archivoNombre: archivo.name,
         cargadoEn: serverTimestamp(),
         cargadoPorId: profile.uid,
         cargadoPorNombre: profile.nombre,
       });
+      await batch.commit();
       onGuardado(reporte.periodo);
     } catch (e) {
       setError(`No se pudo guardar: ${e instanceof Error ? e.message : "error"}`);
@@ -169,6 +173,9 @@ export function CargarReporteModal({
                     `Ya hay un reporte de ${etiquetaMes} cargado por ${previo.cargadoPorNombre}${
                       previo.cargadoEn ? ` el ${previo.cargadoEn.toLocaleDateString("es-SV")}` : ""
                     } (${formatoDinero(previo.totalGeneral)}). Si guardas, se reemplaza.`,
+                    ...(previo.publicacion
+                      ? ["Ese mes está publicado al personal: al reemplazarlo se retira la publicación hasta que revises la versión nueva y la vuelvas a publicar."]
+                      : []),
                   ]}
                 />
               )}
@@ -195,7 +202,7 @@ export function CargarReporteModal({
   );
 }
 
-function Dato({ label, valor }: { label: string; valor: string }) {
+export function Dato({ label, valor }: { label: string; valor: string }) {
   return (
     <div className="rounded-xl bg-slate-50 px-2 py-2 dark:bg-slate-800/60">
       <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{label}</dt>
@@ -204,7 +211,7 @@ function Dato({ label, valor }: { label: string; valor: string }) {
   );
 }
 
-function Alerta({ tono, titulo, mensajes }: { tono: "error" | "aviso"; titulo?: string; mensajes: string[] }) {
+export function Alerta({ tono, titulo, mensajes }: { tono: "error" | "aviso"; titulo?: string; mensajes: string[] }) {
   const cls =
     tono === "error"
       ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400"

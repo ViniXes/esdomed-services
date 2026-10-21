@@ -3,11 +3,13 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, ExternalLink, FileImage, FileText, MessageSquareText,
-  CalendarRange, Clock, Paperclip, Pencil, RefreshCw, Route, X, XCircle,
+  CalendarRange, Clock, FingerprintPattern, Paperclip, Pencil, RefreshCw, Route, X, XCircle,
 } from "lucide-react";
 import type { EstadoTramitePersonal, TramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { esPermisoDeUnTurno } from "@/lib/esdomed/permisos-plan";
+import { labelPeriodo } from "@/lib/esdomed/plan";
+import { fechaCorta, formatoDinero } from "@/lib/inconsistenciasMarcacion/analisis";
 import {
   ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, docsDeTramite, fechaLegible, partesCategoria,
   type ConflictoPermisoGrupo,
@@ -485,6 +487,27 @@ export function TramiteDetalleModal({
                       })}
                     </ul>
                   )}
+                </Seccion>
+              )}
+
+              {!!t.reclamoMarcacion?.dias.length && (
+                <Seccion titulo={`Días reclamados · ${labelPeriodo(t.reclamoMarcacion.periodo)}`} icon={FingerprintPattern}>
+                  <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+                    {t.reclamoMarcacion.dias.map((d) => (
+                      <li key={`${d.fecha}-${d.horario}`} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm">
+                        <span className="min-w-0">
+                          <span className="font-semibold text-slate-800 dark:text-slate-100">{fechaCorta(d.fecha)}</span>
+                          <span className="text-slate-600 dark:text-slate-300"> · {d.incidencia} · turno {d.horario}</span>
+                          {d.plan && <span className="block text-xs text-slate-500">Plan: {d.plan}</span>}
+                          {d.motivo && <span className="block text-xs text-cyan-800 dark:text-cyan-300">{d.motivo}</span>}
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums text-slate-800 dark:text-slate-100">{formatoDinero(d.monto)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-slate-500">
+                    Total reclamado: <span className="font-semibold tabular-nums">{formatoDinero(t.reclamoMarcacion.dias.reduce((a, d) => a + d.monto, 0))}</span> · según el reporte de descuentos de RRHH.
+                  </p>
                 </Seccion>
               )}
 

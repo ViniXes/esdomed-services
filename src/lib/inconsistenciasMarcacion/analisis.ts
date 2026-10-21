@@ -15,6 +15,7 @@ import type {
   EmpleadoInconsistenciasMarcacion,
   ReporteInconsistenciasMarcacion,
 } from "@/types";
+import { nombreMes } from "./parser";
 
 export type TipoIncidencia = "omision_entrada" | "omision_salida" | "sin_marcacion" | "minutos";
 
@@ -61,6 +62,17 @@ export function desgloseMinutos(d: DiaInconsistenciaMarcacion): { tarde: number;
   let salidaRel = (aMin(d.salida) - ini + 1440) % 1440;
   if (duracion === 1440 && salidaRel < 720) salidaRel += 1440;
   return { tarde: Math.max(0, entradaRel), temprano: Math.max(0, duracion - salidaRel) };
+}
+
+/** En los días de minutos dice qué pasó según el horario (estimación); si no, el tipo. */
+export function etiquetaIncidencia(d: DiaInconsistenciaMarcacion): string {
+  const tipo = tipoIncidencia(d);
+  if (tipo !== "minutos") return TIPO_INCIDENCIA_LABEL[tipo];
+  const { tarde, temprano } = desgloseMinutos(d);
+  if (tarde && temprano) return "Llegó tarde y salió antes";
+  if (tarde) return "Llegó tarde";
+  if (temprano) return "Salió antes de hora";
+  return TIPO_INCIDENCIA_LABEL.minutos;
 }
 
 // ─── Agregados ────────────────────────────────────────────────────────────────
@@ -200,6 +212,17 @@ export function totalesPorMes(reportes: ReporteInconsistenciasMarcacion[]) {
 }
 
 // ─── Formato ──────────────────────────────────────────────────────────────────
+
+const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** { mes: 9, anio: 2026 } → "Septiembre 2026". */
+export const etiquetaPeriodo = (r: { mes: number; anio: number }) => `${capitalizar(nombreMes(r.mes))} ${r.anio}`;
+
+/** "2026-09-02" → "Mié 02/09". */
+export const fechaCorta = (iso: string) => {
+  const [, m, d] = iso.split("-");
+  return `${DIAS_SEMANA_CORTOS[indiceDiaSemana(iso)]} ${d}/${m}`;
+};
 
 export const formatoDinero = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

@@ -4,20 +4,15 @@ import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   desgloseMinutos,
+  etiquetaIncidencia,
+  fechaCorta,
   formatoDinero,
   formatoDuracion,
-  indiceDiaSemana,
-  DIAS_SEMANA_CORTOS,
-  TIPO_INCIDENCIA_LABEL,
   type DiaConContexto,
   type ResumenPersona,
 } from "@/lib/inconsistenciasMarcacion/analisis";
+import { Marca } from "@/components/marcacion/Piezas";
 import { useColoresGrafica } from "./Graficos";
-
-const fechaCorta = (iso: string) => {
-  const [, m, d] = iso.split("-");
-  return `${DIAS_SEMANA_CORTOS[indiceDiaSemana(iso)]} ${d}/${m}`;
-};
 
 /**
  * Ranking por persona (de mayor a menor descuento). Es también la vista en
@@ -157,7 +152,7 @@ function DetalleDias({ dias, conMes }: { dias: DiaConContexto[]; conMes: boolean
                 <td className="px-3 py-2 whitespace-nowrap">
                   <Marca hora={d.salida} desvio={temprano ? `−${temprano} min` : null} />
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">{etiquetaIncidencia(d.tipo, tarde, temprano)}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">{etiquetaIncidencia(d)}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-300">{formatoDuracion(d.minutos)}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap font-semibold tabular-nums text-slate-800 dark:text-slate-100">{formatoDinero(d.monto)}</td>
               </tr>
@@ -166,32 +161,6 @@ function DetalleDias({ dias, conMes }: { dias: DiaConContexto[]; conMes: boolean
         </tbody>
       </table>
     </div>
-  );
-}
-
-/** En los días de minutos dice qué pasó según el horario (estimación); si no, el tipo. */
-function etiquetaIncidencia(tipo: DiaConContexto["tipo"], tarde: number, temprano: number): string {
-  if (tipo !== "minutos") return TIPO_INCIDENCIA_LABEL[tipo];
-  if (tarde && temprano) return "Llegó tarde y salió antes";
-  if (tarde) return "Llegó tarde";
-  if (temprano) return "Salió antes de hora";
-  return TIPO_INCIDENCIA_LABEL.minutos;
-}
-
-/** Hora marcada; "00:00" es que no hay marca (rose = error), y el desvío del horario va en amber. */
-function Marca({ hora, desvio }: { hora: string; desvio: string | null }) {
-  if (hora === "00:00") {
-    return (
-      <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300">
-        Sin marca
-      </span>
-    );
-  }
-  return (
-    <span className="tabular-nums text-slate-700 dark:text-slate-300">
-      {hora}
-      {desvio && <span className="ml-1.5 font-semibold text-amber-700 dark:text-amber-400">{desvio}</span>}
-    </span>
   );
 }
 

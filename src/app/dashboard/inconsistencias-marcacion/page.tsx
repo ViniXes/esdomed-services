@@ -4,31 +4,37 @@
 // sube el PDF "Reporte Descuentos" de RRHH; se lee en el navegador y queda un
 // documento por mes en `inconsistencias_marcacion/{YYYY-MM}`. Al montar se lee
 // la colección completa (un documento pequeño por mes cargado) y todo lo demás
-// —filtros, gráficas, tabla— se calcula en memoria.
+// —filtros, gráficas, tabla— se calcula en memoria. Ya revisado, el admin
+// PUBLICA el mes al personal (copias por persona, ver lib/.../personal.ts).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Download, FileUp, FingerprintPattern } from "lucide-react";
+import { AlertTriangle, Download, FileUp, FingerprintPattern, Send } from "lucide-react";
 import { collection, getDocs, type Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ReporteInconsistenciasMarcacion } from "@/types";
 import { nombreMes } from "@/lib/inconsistenciasMarcacion/parser";
-import { resumirAlcance, totalesPorMes } from "@/lib/inconsistenciasMarcacion/analisis";
-import { CargarReporteModal, COLECCION_INCONSISTENCIAS } from "./_components/CargarReporteModal";
+import { etiquetaPeriodo, resumirAlcance, totalesPorMes } from "@/lib/inconsistenciasMarcacion/analisis";
+import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
+import { CargarReporteModal } from "./_components/CargarReporteModal";
 import { GraficoDiaSemana, GraficoMeses } from "./_components/Graficos";
-import { Composicion, etiquetaPeriodo, Indicadores, MesesCargados } from "./_components/Resumen";
+import { PublicarModal } from "./_components/PublicarModal";
+import { Composicion, Indicadores, MesesCargados } from "./_components/Resumen";
 import { TablaPersonas } from "./_components/TablaPersonas";
 import { exportarInconsistenciasExcel } from "./_components/exportarExcel";
 
 const capitalizar = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+const aFecha = (v: unknown) => ((v as Timestamp | null | undefined)?.toDate ? (v as Timestamp).toDate() : new Date());
+
 function mapReporte(id: string, data: Record<string, unknown>): ReporteInconsistenciasMarcacion {
-  const cargadoEn = data.cargadoEn as Timestamp | null | undefined;
+  const r = data as unknown as ReporteInconsistenciasMarcacion;
   return {
-    ...(data as unknown as ReporteInconsistenciasMarcacion),
+    ...r,
     id,
-    cargadoEn: cargadoEn?.toDate ? cargadoEn.toDate() : new Date(),
+    cargadoEn: aFecha(data.cargadoEn),
+    publicacion: r.publicacion ? { ...r.publicacion, publicadoEn: aFecha(r.publicacion.publicadoEn) } : undefined,
   };
 }
 
@@ -54,6 +60,7 @@ export default function InconsistenciasMarcacionPage() {
   // periodo "YYYY-MM" del mes elegido, o null = todo el año
   const [periodo, setPeriodo] = useState<string | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [publicarAbierto, setPublicarAbierto] = useState(false);
   const [guardadoMsg, setGuardadoMsg] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
 
@@ -217,6 +224,16 @@ export default function InconsistenciasMarcacionPage() {
             </div>
           </div>
 
+          {reporteActual && (
+            <EstadoPublicacion
+              reporte={reporteActual}
+              onGestionar={() => {
+                setGuardadoMsg(null);
+                setPublicarAbierto(true);
+              }}
+            />
+          )}
+
           <Indicadores
             resumen={resumen}
             actual={reporteActual}
@@ -253,6 +270,60 @@ export default function InconsistenciasMarcacionPage() {
           }}
         />
       )}
+
+      {publicarAbierto && reporteActual && (
+        <PublicarModal
+          reporte={reporteActual}
+          onCerrar={() => setPublicarAbierto(false)}
+          onHecho={(mensaje) => {
+            setPublicarAbierto(false);
+            setGuardadoMsg(mensaje);
+            leerReportes().then((lista) => aplicar(lista, reporteActual.periodo)).catch(fallo);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Si el personal ya ve el mes elegido; sin publicar, solo lo ve el admin. */
+function EstadoPublicacion({ reporte, onGestionar }: { reporte: ReporteInconsistenciasMarcacion; onGestionar: () => void }) {
+  const p = reporte.publicacion;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span
+          className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+            p
+              ? "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-900"
+              : "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-900"
+          }`}
+        >
+          {p ? "Publicado" : "Sin publicar"}
+        </span>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {p ? (
+            <>
+              Desde el {p.publicadoEn.toLocaleDateString("es-SV")}, {p.personas} persona{p.personas === 1 ? "" : "s"} lo ven en Mis marcaciones
+              {p.sinVincular.length > 0 && <span className="text-amber-700 dark:text-amber-400"> · {p.sinVincular.length} sin usuario vinculado</span>}.
+            </>
+          ) : (
+            <>El personal todavía no ve {etiquetaPeriodo(reporte)}. Revísalo y publícalo cuando esté listo.</>
+          )}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onGestionar}
+        className={`flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+          p
+            ? "text-blue-700 ring-1 ring-blue-200 hover:bg-blue-50 dark:text-blue-300 dark:ring-blue-900 dark:hover:bg-blue-950/40"
+            : "bg-blue-600 text-white hover:bg-blue-500"
+        }`}
+      >
+        <Send size={14} />
+        {p ? "Gestionar publicación" : "Publicar al personal"}
+      </button>
     </div>
   );
 }

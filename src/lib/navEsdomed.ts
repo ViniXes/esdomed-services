@@ -11,6 +11,7 @@ import type { Pendientes } from "@/contexts/NotificacionesContext";
 import type { UserProfile } from "@/types";
 import { construirMenu, type SeccionNav } from "@/lib/navRegistro";
 import { esJefeCuidadosCriticos, puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
+import { esPersonalPlan } from "@/lib/esdomed/plan";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -24,6 +25,8 @@ const esdomedOAdmin = (p: Perfil) => esEsdomed(p) || esAdmin(p);
 const veSimmow = (p: Perfil) => p?.role === "esdomed" || esAdmin(p);
 // Solicitudes SIS y aprobación de trámites: superusuario + auxiliar administrativo.
 const adminOAsistente = (p: Perfil) => esAdmin(p) || p?.role === "asistente_esdomed";
+// Personal con fila en el plan (ESDOMED, auxiliar, o admin con código de marcación).
+const esPersonalDelPlan = (p: Perfil) => esPersonalPlan(p?.role ?? "", p?.codigoMarcacion);
 
 // Menú de ESDOMED y admin por tarea, en acordeón como los portales de área.
 // Pacientes va primero (pedido del usuario); luego las bandejas (lo que llega
@@ -131,6 +134,8 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/personal", label: "Personal de trabajo", icon: UsersRound },
       { href: "/horarios", label: "Horarios por área", icon: CalendarRange },
       { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList },
+      // Sus descuentos del reloj marcador, de los meses que el admin publicó.
+      { href: "/dashboard/mis-marcaciones", label: "Mis marcaciones", icon: FingerprintPattern, visibleSi: esPersonalDelPlan },
       { href: "/dashboard/directorio-extensiones", label: "Directorio de extensiones", icon: PhoneCall },
     ],
   },
