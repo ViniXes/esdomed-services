@@ -15,7 +15,7 @@ import {
 import {
   ShieldAlert, Plus, X, CheckCircle2, AlertCircle, Search, ChevronLeft, ChevronRight,
   Car, HeartCrack, Clock3, FileText, StickyNote, Ban, Landmark, Baby, Scale,
-  Megaphone, ArrowRight,
+  Megaphone, ArrowRight, AlertTriangle, BookOpen,
 } from "lucide-react";
 import type { NotificacionConapinaFgr, InstanciaAviso, SolicitudNotificacionLesion } from "@/types";
 
@@ -214,6 +214,25 @@ export default function MedicoConapinaFgrPage() {
             <Plus size={16} /> Nueva notificación
           </button>
         </div>
+      </section>
+
+      {/* Nota fija del comité: cuándo se notifica. El tutorial es el mismo PDF
+          que se ofrece en el Inicio del médico. */}
+      <section role="note" className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30 sm:flex-row sm:items-start">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+        <div className="min-w-0 flex-1 text-sm leading-6 text-amber-900 dark:text-amber-100">
+          <p>
+            <span className="font-bold uppercase tracking-wide">Nota importante:</span>{" "}
+            Se deben notificar los avisos al ingreso, en los casos de los pacientes contemplados por la ley, así como los casos de fallecimiento.
+          </p>
+          <p className="mt-1 font-bold uppercase tracking-wide">
+            Casos de defunción: se debe dar aviso y subir el formulario también por este medio.
+          </p>
+        </div>
+        <a href="/documentos/tutorial-notificacion-avisos.pdf" target="_blank" rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-950/60">
+          <BookOpen size={14} aria-hidden="true" /> Ver tutorial paso a paso
+        </a>
       </section>
 
       {/* Bandeja de difusión del comité: casos que pide notificar. Solo se
