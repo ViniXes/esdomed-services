@@ -755,8 +755,9 @@ export default function EditorPlanPage() {
   // de la fila. El de operativos cubre a los grupos regulares (y filas sin
   // grupo); emergencia, apoyo diurno y consulta externa llevan cada uno su
   // propia fila de totales y no cuentan para el mínimo de 2 operativos.
-  // Consulta externa cuenta cualquier jornada (es de día y puede llevar un
-  // código administrativo); los demás, solo turnos operativos/hospitalarios.
+  // Consulta externa y apoyo diurno cuentan cualquier jornada (son de día y
+  // pueden llevar un código administrativo, p. ej. un administrativo que pasa
+  // a apoyo); los demás, solo turnos operativos/hospitalarios.
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
   const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
   const conteoApoyoDiurnoPorDia = new Array(dias.length).fill(0);
@@ -767,11 +768,11 @@ export default function EditorPlanPage() {
       const horario = getHorario(celda);
       if (horario && grupo === "Consulta Externa") {
         conteoConsultaExternaPorDia[diaIdx]++;
+      } else if (horario && grupo === "Equipo de apoyo diurno / emergencia") {
+        conteoApoyoDiurnoPorDia[diaIdx]++;
       } else if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
         if (grupo === "Equipo de emergencia") {
           conteoEmergenciaPorDia[diaIdx]++;
-        } else if (grupo === "Equipo de apoyo diurno / emergencia") {
-          conteoApoyoDiurnoPorDia[diaIdx]++;
         } else {
           conteoOperativosPorDia[diaIdx]++;
         }
