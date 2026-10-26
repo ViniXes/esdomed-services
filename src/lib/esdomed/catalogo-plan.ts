@@ -45,10 +45,15 @@ export function configPersonalPlan(codigo?: string | null): ConfigPersonalPlan |
   return CATALOGO_POR_CODIGO.get(normalizarCodigoMarcacion(codigo));
 }
 
+/**
+ * La jornada guardada en la fila manda: el catálogo solo es el valor por
+ * defecto de quien aún no la tiene. Así un administrativo del catálogo puede
+ * pasar a un grupo operativo (p. ej. apoyo diurno) eligiéndolo en el editor.
+ */
 export function esAdministrativoPlan(
   persona: Pick<FilaPlanTrabajo, "codigoMarcacion" | "grupo" | "tipoJornada">,
 ): boolean {
-  if (persona.tipoJornada === "Administrativo") return true;
+  if (persona.tipoJornada) return persona.tipoJornada === "Administrativo";
   if (configPersonalPlan(persona.codigoMarcacion)?.tipoJornada === "Administrativo") return true;
   return (persona.grupo ?? "").trim().toLowerCase() === "administrativo";
 }
@@ -56,7 +61,7 @@ export function esAdministrativoPlan(
 /** Aplica al snapshot del plan la clasificación propia de este módulo. */
 export function normalizarMetadatosFilaPlan(fila: FilaPlanTrabajo): FilaPlanTrabajo {
   const config = configPersonalPlan(fila.codigoMarcacion);
-  const administrativa = config?.tipoJornada === "Administrativo" || esAdministrativoPlan(fila);
+  const administrativa = esAdministrativoPlan(fila);
   return {
     ...fila,
     codigoMarcacion: normalizarCodigoMarcacion(fila.codigoMarcacion),

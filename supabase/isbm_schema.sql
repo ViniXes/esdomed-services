@@ -260,7 +260,11 @@ CREATE TABLE cargos_paciente_dia (
     -- Marcado para revisión antes de facturar (no afecta montos)
     pendiente_revision          BOOLEAN NOT NULL DEFAULT FALSE,
     anulado                     BOOLEAN NOT NULL DEFAULT FALSE,
-    capturado_por_uid           TEXT NOT NULL,
+    -- (fase 5) Anotación de un servicio que NO se hizo: va anulado (fuera
+    -- de los totales) pero la app lo muestra como "No realizado".
+    no_realizado                BOOLEAN NOT NULL DEFAULT FALSE,
+    justificacion_no_realizado  TEXT,
+    capturado_por_uid          TEXT NOT NULL,
     capturado_por_nombre        TEXT NOT NULL,
     capturado_en                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     modificado_por_nombre       TEXT,
@@ -268,6 +272,7 @@ CREATE TABLE cargos_paciente_dia (
     CONSTRAINT chk_facturable_menor_igual_servicio
         CHECK (monto_facturable <= costo_total),
     CONSTRAINT chk_cantidad_positiva CHECK (cantidad > 0),
+    CONSTRAINT chk_no_realizado_anulado CHECK (NOT no_realizado OR anulado),
     CONSTRAINT chk_precios_positivos
         CHECK (precio_unitario >= 0 AND costo_total >= 0 AND monto_facturable >= 0)
 );

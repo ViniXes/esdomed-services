@@ -777,6 +777,32 @@ export async function anularCargo(cargoId: number, actorNombre: string): Promise
   lanzar("Error anulando el cargo", error);
 }
 
+// Servicio que se anotó pero NO se hizo: sale de Total servicio y Facturable
+// igual que un anulado (anulado = true), pero queda como anotación con su
+// justificación. También convierte un cargo ya anulado.
+export async function marcarNoRealizado(
+  cargoId: number,
+  justificacion: string,
+  actorNombre: string
+): Promise<void> {
+  if (justificacion.trim().length < 10) {
+    throw new Error("La justificación debe tener al menos 10 caracteres");
+  }
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      anulado: true,
+      no_realizado: true,
+      justificacion_no_realizado: justificacion.trim(),
+      monto_facturable: 0,
+      motivo_no_facturable: "ANULADO",
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargoId);
+  lanzar("Error registrando el cargo como no realizado", error);
+}
+
 // ── Autorizaciones ───────────────────────────────────────────────────────────
 
 const AUTORIZACION_SELECT =

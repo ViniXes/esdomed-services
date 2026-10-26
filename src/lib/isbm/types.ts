@@ -197,6 +197,10 @@ export interface CargoIsbm {
   especialidad_interconsulta: string | null;
   pendiente_revision: boolean;
   anulado: boolean;
+  // Servicio anotado que no se hizo: va anulado (fuera de totales) pero se
+  // muestra como anotación con su justificación (fase 5).
+  no_realizado: boolean;
+  justificacion_no_realizado: string | null;
   capturado_por_uid: string;
   capturado_por_nombre: string;
   capturado_en: string;

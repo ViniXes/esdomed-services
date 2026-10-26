@@ -434,8 +434,9 @@ export default function EditorPlanPage() {
       i === filaIdx ? normalizarMetadatosFilaPlan({
         ...f,
         grupo,
+        // El grupo elegido decide la jornada; "Sin grupo" vuelve al valor del catálogo.
         tipoJornada:
-          configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo" || grupo === "Administrativo"
+          grupo === "Administrativo" || (!grupo && configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo")
             ? "Administrativo"
             : "Operativo",
       }) : f

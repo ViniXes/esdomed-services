@@ -15,6 +15,7 @@ import {
   editarCargo,
   marcarCobrable,
   marcarNoCobrable,
+  marcarNoRealizado,
   obtenerAutorizacionDeCargo,
   type NuevoCargoInput,
 } from "@/lib/isbm/api";
@@ -76,6 +77,8 @@ export function CargosDelDia({
   const vivos = (cargos ?? []).filter((c) => !c.anulado);
   const totalServicio = vivos.reduce((s, c) => s + c.costo_total, 0);
   const totalFacturable = vivos.reduce((s, c) => s + c.monto_facturable, 0);
+  // Lo que el hospital absorbe: no cobrable por convenio, tope, 48 h, decisión ISBM…
+  const totalNoCobrable = Math.round((totalServicio - totalFacturable) * 100) / 100;
 
   if (capturando || detalle) return <div>      {capturando && (
         <NuevoCargoFormulario
@@ -135,44 +138,71 @@ export function CargosDelDia({
         </p>
       ) : (
         <>
+          {/* Dos columnas fijas por cargo: lo que valdría el servicio y lo que
+              se factura (≠ cuando es no cobrable, excede tope, 48 h…). */}
+          <div className="flex items-center gap-3 px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            <span className="flex-1">Cargo</span>
+            <span className="w-20 text-right">Servicio</span>
+            <span className="w-20 text-right">Facturable</span>
+            <span className="w-[13px]" aria-hidden />
+          </div>
           <div className="space-y-1">
             {cargos.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setDetalleId(c.id)}
-                className={`w-full text-left flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg px-2.5 py-2 border transition-colors hover:border-blue-300 dark:hover:border-blue-700 ${
-                  c.anulado
-                    ? "border-slate-200 dark:border-slate-700 opacity-50"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                className={`w-full text-left flex items-center gap-3 rounded-lg px-2.5 py-2 border transition-colors hover:border-blue-300 dark:hover:border-blue-700 ${
+                  c.no_realizado
+                    ? "border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                    : c.anulado
+                      ? "border-slate-200 dark:border-slate-700 opacity-50"
+                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 }`}
               >
-                <div className="flex-1 min-w-[160px]">
-                  <p className={`text-xs font-medium text-slate-800 dark:text-slate-200 ${c.anulado ? "line-through" : ""}`}>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-medium text-slate-800 dark:text-slate-200 ${c.anulado && !c.no_realizado ? "line-through" : ""}`}>
                     {c.arancel.descripcion}
                   </p>
                   <p className="text-[10px] text-slate-400">
                     {RUBRO_LABEL[c.arancel.rubro]} · {Number(c.cantidad)} × {formatoDolares(c.precio_unitario)}
                   </p>
+                  {c.no_realizado && (
+                    <p className="mt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      <span className="font-semibold uppercase tracking-wide text-[10px] text-slate-500 dark:text-slate-400">No realizado</span>
+                      {c.justificacion_no_realizado && ` — ${c.justificacion_no_realizado}`}
+                    </p>
+                  )}
+                  {!c.anulado && (c.pendiente_revision || c.motivo_no_facturable) && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {c.pendiente_revision && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-full px-2 py-0.5">
+                          <Hourglass size={10} /> En observación
+                        </span>
+                      )}
+                      {c.motivo_no_facturable && (
+                        <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-full px-2 py-0.5">
+                          {MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable]}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {c.pendiente_revision && !c.anulado && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-full px-2 py-0.5">
-                    <Hourglass size={10} /> En observación
-                  </span>
-                )}
-                {c.motivo_no_facturable && !c.anulado && (
-                  <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-full px-2 py-0.5">
-                    {MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable]}
-                  </span>
-                )}
-                <span className="text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                  {formatoDolares(c.monto_facturable)}
+                {/* El no realizado no suma en ninguna columna */}
+                <span className="w-20 text-right text-xs tabular-nums text-slate-600 dark:text-slate-400">
+                  {c.no_realizado ? "—" : formatoDolares(c.costo_total)}
+                </span>
+                <span className="w-20 text-right text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                  {c.no_realizado ? "—" : formatoDolares(c.monto_facturable)}
                 </span>
                 <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
               </button>
             ))}
           </div>
-          <div className="flex justify-end gap-4 text-xs pt-2 text-slate-500">
-            <span>Servicio: <strong className="tabular-nums">{formatoDolares(totalServicio)}</strong></span>
+          <div className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-xs pt-2 text-slate-500">
+            <span>Total servicio: <strong className="tabular-nums">{formatoDolares(totalServicio)}</strong></span>
+            <span className="text-amber-700 dark:text-amber-300">
+              No cobrable: <strong className="tabular-nums">{formatoDolares(totalNoCobrable)}</strong>
+            </span>
             <span className="text-emerald-700 dark:text-emerald-300">
               Facturable: <strong className="tabular-nums">{formatoDolares(totalFacturable)}</strong>
             </span>
@@ -479,7 +509,7 @@ function DetalleCargoFormulario({
   onCambio: () => Promise<void>;
 }) {
   const enviando = useRef(false);
-  const [modo, setModo] = useState<"ver" | "editar" | "nocobrable">("ver");
+  const [modo, setModo] = useState<"ver" | "editar" | "nocobrable" | "norealizado">("ver");
   const [aut, setAut] = useState<AutorizacionIsbm | null | undefined>(undefined);
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -544,7 +574,9 @@ function DetalleCargoFormulario({
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {cargo.arancel.codigo} · {RUBRO_LABEL[cargo.arancel.rubro]} · {cargo.fecha}
-              {cargo.anulado && <span className="text-red-500 font-semibold"> · ANULADO</span>}
+              {cargo.no_realizado
+                ? <span className="text-slate-600 dark:text-slate-300 font-semibold"> · NO REALIZADO</span>
+                : cargo.anulado && <span className="text-red-500 font-semibold"> · ANULADO</span>}
             </p>
           </div>
           <button
@@ -629,7 +661,12 @@ function DetalleCargoFormulario({
                   <p className="font-semibold">
                     <span className="text-slate-400 font-normal">Facturable:</span> {formatoDolares(cargo.monto_facturable)}
                   </p>
-                  {cargo.motivo_no_facturable && (
+                  {cargo.no_realizado ? (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      No realizado: no suma en Total servicio ni en Facturable
+                      {cargo.justificacion_no_realizado && ` — ${cargo.justificacion_no_realizado}`}
+                    </p>
+                  ) : cargo.motivo_no_facturable && (
                     <p className="text-xs text-amber-700 dark:text-amber-300">
                       {MOTIVO_NO_FACTURABLE_LABEL[cargo.motivo_no_facturable]}
                       {cargo.justificacion_no_facturable && ` — ${cargo.justificacion_no_facturable}`}
@@ -718,6 +755,21 @@ function DetalleCargoFormulario({
           </div>
         )}
 
+        {modo === "norealizado" && (
+          <div className="mt-3 border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              Registrar como NO realizado — queda como anotación y no suma en Total servicio ni en Facturable
+            </p>
+            <input
+              autoFocus
+              value={justificacion}
+              onChange={(e) => setJustificacion(e.target.value)}
+              aria-label="Justificación de por qué no se realizó" placeholder="Por qué no se realizó (mínimo 10 caracteres)"
+              className={inputCls}
+            />
+          </div>
+        )}
+
         {error && (
           <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 mt-3">{error}</p>
         )}
@@ -751,6 +803,14 @@ function DetalleCargoFormulario({
                 >
                   {ocupado ? "Guardando…" : "Guardar cambios"}
                 </button>
+              ) : modo === "norealizado" ? (
+                <button
+                  onClick={() => ejecutar(() => marcarNoRealizado(cargo.id, justificacion, actor.nombre))}
+                  disabled={ocupado || justificacion.trim().length < 10}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-slate-700 hover:bg-slate-600 dark:bg-slate-600 dark:hover:bg-slate-500 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {ocupado ? "Guardando…" : "Confirmar no realizado"}
+                </button>
               ) : (
                 <button
                   onClick={() => ejecutar(() => marcarNoCobrable(cargo.id, justificacion, actor.nombre))}
@@ -763,6 +823,13 @@ function DetalleCargoFormulario({
             </>
           ) : editable ? (
             <>
+              <button
+                onClick={() => { setModo("norealizado"); setJustificacion(""); setError(""); }}
+                disabled={ocupado}
+                className="px-3.5 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              >
+                No se realizó
+              </button>
               <button
                 onClick={anular}
                 disabled={ocupado}
@@ -795,9 +862,22 @@ function DetalleCargoFormulario({
                 <Pencil size={14} /> Editar
               </button>
             </>
+          ) : cargo.anulado && !cargo.no_realizado && !diaCerrado ? (
+            <>
+              <p className="text-xs text-slate-400 self-center">Cargo anulado. Si en realidad no se realizó, déjalo como anotación:</p>
+              <button
+                onClick={() => { setModo("norealizado"); setJustificacion(""); setError(""); }}
+                disabled={ocupado}
+                className="px-3.5 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              >
+                Cambiar a no realizado
+              </button>
+            </>
           ) : (
             <p className="text-xs text-slate-400 self-center">
-              {cargo.anulado ? "Cargo anulado: solo lectura." : "Día cerrado: reábrelo para modificar cargos."}
+              {cargo.no_realizado
+                ? "No realizado: queda como anotación, solo lectura."
+                : cargo.anulado ? "Cargo anulado: solo lectura." : "Día cerrado: reábrelo para modificar cargos."}
             </p>
           )}
         </div>

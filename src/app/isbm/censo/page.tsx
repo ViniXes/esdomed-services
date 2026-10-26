@@ -367,7 +367,19 @@ function DetalleCenso({
                 </p>
                 {registrada ? (
                   <div className="text-sm text-slate-700 dark:text-slate-300">
-                    <p className="font-medium text-emerald-700 dark:text-emerald-300">Registrada · {hora}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium text-emerald-700 dark:text-emerald-300">Registrada · {hora}</p>
+                      {!censo.dia_cerrado && (
+                        <button
+                          disabled={visitaTurno !== null || ocupado}
+                          aria-label={`Corregir visita ${turno.toUpperCase()}`}
+                          onClick={() => { setVisitaMedico(medico ?? ""); setVisitaTurno(turno); setVisitaHora(hora ?? horaAhora()); setError(""); }}
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40"
+                        >
+                          <Pencil size={12} /> Editar
+                        </button>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-500 mt-0.5">{medico}</p>
                   </div>
                 ) : censo.dia_cerrado ? (
@@ -390,7 +402,7 @@ function DetalleCenso({
         {visitaTurno && (
           <div className="border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/40 rounded-xl p-3 mb-3 space-y-2">
             <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
-              Registrar visita {visitaTurno.toUpperCase()}
+              {(visitaTurno === "am" ? censo.visita_am_registrada : censo.visita_pm_registrada) ? "Corregir" : "Registrar"} visita {visitaTurno.toUpperCase()}
             </p>
             <SelectMedico
               valor={visitaMedico}
@@ -439,6 +451,7 @@ function DetalleCenso({
           <div className="p-4 flex justify-between gap-3"><dt className="text-slate-500">Tarifa día-cama</dt><dd className="font-semibold text-slate-800 dark:text-slate-200">{formatoDolares(censo.servicio_facturacion.precio_dia_cama)}</dd></div>
           <div className="p-4 flex justify-between gap-3"><dt className="text-slate-500">Cargos registrados</dt><dd className="font-medium text-slate-800 dark:text-slate-200">{resumenCargos ? resumenCargos.cantidad : "Consultando…"}</dd></div>
           <div className="p-4 flex justify-between gap-3"><dt className="text-slate-500">{censo.dia_cerrado ? "Total servicio cerrado" : "Total servicio registrado"}</dt><dd className="font-semibold text-slate-800 dark:text-slate-200">{censo.dia_cerrado ? formatoDolares(censo.total_servicio_dia) : resumenCargos ? formatoDolares(resumenCargos.servicio) : "—"}</dd></div>
+          <div className="p-4 flex justify-between gap-3"><dt className="text-slate-500">No cobrable (lo absorbe el hospital)</dt><dd className="font-semibold text-amber-700 dark:text-amber-300">{censo.dia_cerrado ? formatoDolares(Math.round((Number(censo.total_servicio_dia ?? 0) - Number(censo.total_cobrable_dia ?? 0)) * 100) / 100) : resumenCargos ? formatoDolares(Math.round((resumenCargos.servicio - resumenCargos.cobrable) * 100) / 100) : "—"}</dd></div>
           <div className="p-4 flex justify-between gap-3"><dt className="text-slate-500">{censo.dia_cerrado ? "Cobrable del día" : "Cobrable registrado antes del cierre"}</dt><dd className="font-bold text-emerald-700 dark:text-emerald-300">{censo.dia_cerrado ? formatoDolares(censo.total_cobrable_dia) : resumenCargos ? formatoDolares(resumenCargos.cobrable) : "—"}</dd></div>
         </dl>
         {resumenCargos && resumenCargos.observados > 0 && <p className="rounded-xl bg-orange-50 p-3 text-xs text-orange-800 dark:bg-orange-950 dark:text-orange-300">Hay {resumenCargos.observados} cargo(s) en observación. Revisa si los servicios se realizaron.</p>}

@@ -334,7 +334,9 @@ function SeccionTabla({ seccion, cargos }: { seccion: SeccionDef; cargos: CargoC
                     {c.pendiente_revision && !c.anulado && (
                       <Estado texto="⏳ Obs." tono="ambar" titulo="En observación: pendiente de confirmar que se realizó" />
                     )}{" "}
-                    {c.anulado ? (
+                    {c.no_realizado ? (
+                      <Estado texto="No realizado" tono="ambar" titulo={c.justificacion_no_realizado ?? undefined} />
+                    ) : c.anulado ? (
                       <Estado texto="Anulado" tono="rojo" />
                     ) : c.monto_facturable === 0 ? (
                       <Estado texto="No fact." tono="ambar" titulo={c.motivo_no_facturable ? MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable] : undefined} />
