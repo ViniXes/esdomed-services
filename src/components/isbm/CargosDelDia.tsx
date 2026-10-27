@@ -21,6 +21,9 @@ import {
 } from "@/lib/isbm/api";
 import {
   MOTIVO_NO_FACTURABLE_LABEL,
+  MOTIVOS_NO_COBRABLE_MANUAL,
+  esNoCobrableManual,
+  type MotivoNoCobrableManual,
   RUBRO_LABEL,
   ESPECIALIDADES_INTERCONSULTA,
   formatoDolares,
@@ -70,9 +73,37 @@ export function CargosDelDia({
     return () => clearTimeout(t);
   }, [cargar, revision]);
 
-  useEffect(() => { onActividad(capturando || detalleId !== null); return () => onActividad(false); }, [capturando, detalleId, onActividad]);
+  // Selección para marcar varios cargos no cobrables desde la lista.
+  const [seleccion, setSeleccion] = useState<number[]>([]);
+  const [motivoLote, setMotivoLote] = useState<MotivoNoCobrableManual>("INCLUIDO_EN_DIA_CAMA");
+  const [justificacionLote, setJustificacionLote] = useState("");
+  const [marcandoLote, setMarcandoLote] = useState(false);
+
+  useEffect(() => { onActividad(capturando || detalleId !== null || seleccion.length > 0); return () => onActividad(false); }, [capturando, detalleId, seleccion.length, onActividad]);
 
   const detalle = detalleId == null ? null : (cargos ?? []).find((c) => c.id === detalleId) ?? null;
+
+  // Se marca a mano lo que hoy se cobra: no el día-cama, ni lo anulado, ni lo
+  // que ya es no cobrable por convenio o por otra marca manual.
+  const esMarcable = (c: CargoConArancel) =>
+    !censo.dia_cerrado && !c.anulado && c.arancel.rubro !== "DIA_CAMA" &&
+    !c.arancel.es_no_cobrable && !esNoCobrableManual(c.motivo_no_facturable);
+  const marcables = (cargos ?? []).filter(esMarcable);
+
+  const aplicarNoCobrableLote = async () => {
+    setMarcandoLote(true);
+    setError("");
+    try {
+      await marcarNoCobrable(seleccion, motivoLote, justificacionLote, actor.nombre);
+      setSeleccion([]);
+      setJustificacionLote("");
+      await cargar();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setMarcandoLote(false);
+    }
+  };
 
   const vivos = (cargos ?? []).filter((c) => !c.anulado);
   const totalServicio = vivos.reduce((s, c) => s + c.costo_total, 0);
@@ -140,18 +171,96 @@ export function CargosDelDia({
         <>
           {/* Dos columnas fijas por cargo: lo que valdría el servicio y lo que
               se factura (≠ cuando es no cobrable, excede tope, 48 h…). */}
-          <div className="flex items-center gap-3 px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            <span className="flex-1">Cargo</span>
-            <span className="w-20 text-right">Servicio</span>
-            <span className="w-20 text-right">Facturable</span>
-            <span className="w-[13px]" aria-hidden />
+          <div className="flex items-center gap-2 pb-1">
+            {marcables.length > 0 && (
+              <span className="w-4 flex-shrink-0 flex justify-center">
+                <input
+                  type="checkbox"
+                  aria-label="Seleccionar todos los cargos que se pueden marcar no cobrables"
+                  checked={seleccion.length === marcables.length}
+                  ref={(el) => { if (el) el.indeterminate = seleccion.length > 0 && seleccion.length < marcables.length; }}
+                  onChange={(e) => setSeleccion(e.target.checked ? marcables.map((c) => c.id) : [])}
+                  className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                />
+              </span>
+            )}
+            <div className="flex-1 flex items-center gap-3 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <span className="flex-1">Cargo</span>
+              <span className="w-20 text-right">Servicio</span>
+              <span className="w-20 text-right">Facturable</span>
+              <span className="w-[13px]" aria-hidden />
+            </div>
           </div>
+
+          {seleccion.length > 0 && (
+            <div className="mb-2 border border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/40 rounded-xl p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mr-1">
+                  Marcar {seleccion.length === 1 ? "1 cargo" : `${seleccion.length} cargos`} como no cobrable:
+                </p>
+                {MOTIVOS_NO_COBRABLE_MANUAL.map((m) => (
+                  <label
+                    key={m}
+                    className={`inline-flex items-center gap-1.5 cursor-pointer rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                      motivoLote === m
+                        ? "border-amber-400 bg-white text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 font-semibold"
+                        : "border-amber-200 text-amber-700 hover:bg-white dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-950"
+                    }`}
+                  >
+                    <input type="radio" name="motivo-lote" value={m} checked={motivoLote === m} onChange={() => setMotivoLote(m)} className="sr-only" />
+                    {MOTIVO_NO_FACTURABLE_LABEL[m]}
+                  </label>
+                ))}
+              </div>
+              {motivoLote === "DECISION_ISBM" && (
+                <input
+                  autoFocus
+                  value={justificacionLote}
+                  onChange={(e) => setJustificacionLote(e.target.value)}
+                  aria-label="Comentario de por qué el ISBM no lo cobra"
+                  placeholder="Por qué no se cobra (mínimo 10 caracteres)"
+                  className={inputCls}
+                />
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  disabled={marcandoLote}
+                  onClick={() => { setSeleccion([]); setJustificacionLote(""); }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={marcandoLote || (motivoLote === "DECISION_ISBM" && justificacionLote.trim().length < 10)}
+                  onClick={aplicarNoCobrableLote}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {marcandoLote ? "Guardando…" : "Marcar no cobrable"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1">
             {cargos.map((c) => (
+              <div key={c.id} className="flex items-center gap-2">
+              {marcables.length > 0 && (
+                <span className="w-4 flex-shrink-0 flex justify-center">
+                  {esMarcable(c) && (
+                    <input
+                      type="checkbox"
+                      aria-label={`Seleccionar ${c.arancel.descripcion}`}
+                      checked={seleccion.includes(c.id)}
+                      onChange={(e) => setSeleccion((prev) => e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id))}
+                      className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                    />
+                  )}
+                </span>
+              )}
               <button
-                key={c.id}
                 onClick={() => setDetalleId(c.id)}
-                className={`w-full text-left flex items-center gap-3 rounded-lg px-2.5 py-2 border transition-colors hover:border-blue-300 dark:hover:border-blue-700 ${
+                disabled={marcandoLote}
+                className={`flex-1 min-w-0 text-left flex items-center gap-3 rounded-lg px-2.5 py-2 border transition-colors hover:border-blue-300 dark:hover:border-blue-700 ${
                   c.no_realizado
                     ? "border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
                     : c.anulado
@@ -184,6 +293,9 @@ export function CargosDelDia({
                           {MOTIVO_NO_FACTURABLE_LABEL[c.motivo_no_facturable]}
                         </span>
                       )}
+                      {c.motivo_no_facturable === "DECISION_ISBM" && c.justificacion_no_facturable && (
+                        <span className="text-[10px] text-amber-700 dark:text-amber-300 self-center">{c.justificacion_no_facturable}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -196,6 +308,7 @@ export function CargosDelDia({
                 </span>
                 <ChevronRight size={13} className="text-slate-300 flex-shrink-0" />
               </button>
+              </div>
             ))}
           </div>
           <div className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-xs pt-2 text-slate-500">
@@ -521,6 +634,7 @@ function DetalleCargoFormulario({
   const [docRef, setDocRef] = useState(cargo.documento_respaldo_ref ?? "");
   const [enObservacion, setEnObservacion] = useState(cargo.pendiente_revision);
   const [justificacion, setJustificacion] = useState("");
+  const [motivoNoCobrable, setMotivoNoCobrable] = useState<MotivoNoCobrableManual>("INCLUIDO_EN_DIA_CAMA");
 
   // Diferido: regla react-hooks/set-state-in-effect.
   useEffect(() => {
@@ -535,7 +649,7 @@ function DetalleCargoFormulario({
   }, [cargo.id]);
 
   const editable = !diaCerrado && !cargo.anulado;
-  const esOverride = cargo.motivo_no_facturable === "DECISION_ISBM";
+  const esOverride = esNoCobrableManual(cargo.motivo_no_facturable);
 
   const ejecutar = async (fn: () => Promise<void>) => {
     if (enviando.current) return;
@@ -745,13 +859,30 @@ function DetalleCargoFormulario({
             <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
               Marcar como NO cobrable (decisión manual — queda en auditoría)
             </p>
-            <input
-              autoFocus
-              value={justificacion}
-              onChange={(e) => setJustificacion(e.target.value)}
-              aria-label="Justificación para no cobrar" placeholder="Justificación (mínimo 10 caracteres)"
-              className={inputCls}
-            />
+            <div className="flex flex-wrap gap-2">
+              {MOTIVOS_NO_COBRABLE_MANUAL.map((m) => (
+                <label
+                  key={m}
+                  className={`inline-flex items-center gap-1.5 cursor-pointer rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                    motivoNoCobrable === m
+                      ? "border-amber-400 bg-white text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 font-semibold"
+                      : "border-amber-200 text-amber-700 hover:bg-white dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-950"
+                  }`}
+                >
+                  <input type="radio" name="motivo-no-cobrable" value={m} checked={motivoNoCobrable === m} onChange={() => setMotivoNoCobrable(m)} className="sr-only" />
+                  {MOTIVO_NO_FACTURABLE_LABEL[m]}
+                </label>
+              ))}
+            </div>
+            {motivoNoCobrable === "DECISION_ISBM" && (
+              <input
+                autoFocus
+                value={justificacion}
+                onChange={(e) => setJustificacion(e.target.value)}
+                aria-label="Comentario de por qué el ISBM no lo cobra" placeholder="Por qué no se cobra (mínimo 10 caracteres)"
+                className={inputCls}
+              />
+            )}
           </div>
         )}
 
@@ -813,8 +944,8 @@ function DetalleCargoFormulario({
                 </button>
               ) : (
                 <button
-                  onClick={() => ejecutar(() => marcarNoCobrable(cargo.id, justificacion, actor.nombre))}
-                  disabled={ocupado || justificacion.trim().length < 10}
+                  onClick={() => ejecutar(() => marcarNoCobrable([cargo.id], motivoNoCobrable, justificacion, actor.nombre))}
+                  disabled={ocupado || (motivoNoCobrable === "DECISION_ISBM" && justificacion.trim().length < 10)}
                   className="px-4 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50 transition-colors"
                 >
                   {ocupado ? "Guardando…" : "Confirmar no cobrable"}
@@ -845,9 +976,9 @@ function DetalleCargoFormulario({
                 >
                   Volver cobrable
                 </button>
-              ) : (
+              ) : cargo.arancel.rubro !== "DIA_CAMA" && !cargo.arancel.es_no_cobrable && (
                 <button
-                  onClick={() => { setModo("nocobrable"); setJustificacion(""); setError(""); }}
+                  onClick={() => { setModo("nocobrable"); setMotivoNoCobrable("INCLUIDO_EN_DIA_CAMA"); setJustificacion(""); setError(""); }}
                   disabled={ocupado}
                   className="px-3.5 py-2 text-sm font-medium rounded-lg border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950 disabled:opacity-50 transition-colors"
                 >

@@ -177,6 +177,12 @@ export type MotivoNoFacturableIsbm =
   | "ANULADO"
   | "DECISION_ISBM";
 
+// No cobrables que marca el usuario a mano (el cierre los respeta tal cual).
+export type MotivoNoCobrableManual = "INCLUIDO_EN_DIA_CAMA" | "DECISION_ISBM";
+export const MOTIVOS_NO_COBRABLE_MANUAL: readonly MotivoNoCobrableManual[] = ["INCLUIDO_EN_DIA_CAMA", "DECISION_ISBM"];
+export const esNoCobrableManual = (m: MotivoNoFacturableIsbm | null | undefined): m is MotivoNoCobrableManual =>
+  m === "INCLUIDO_EN_DIA_CAMA" || m === "DECISION_ISBM";
+
 export interface CargoIsbm {
   id: number;
   censo_id: number;

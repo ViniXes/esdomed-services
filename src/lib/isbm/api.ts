@@ -9,6 +9,8 @@ import { db } from "@/lib/firebase";
 import { getSupabase } from "./supabase";
 import {
   RUBROS_EXAMENES,
+  esNoCobrableManual,
+  type MotivoNoCobrableManual,
   type AfiliacionIsbm,
   type ArancelIsbm,
   type AutorizacionConCargo,
@@ -651,7 +653,8 @@ export interface EdicionCargo {
 }
 
 // Edita cantidad/precio/documentación de un cargo (día abierto, no anulado).
-// Recalcula costo y facturable; el override manual DECISION_ISBM se conserva.
+// Recalcula costo y facturable; los overrides manuales (DECISION_ISBM,
+// INCLUIDO_EN_DIA_CAMA) se conservan.
 // Si el cargo tiene autorización PENDIENTE se actualiza su monto/nivel; si ya
 // fue resuelta, los montos no se tocan (habría que anular y recapturar).
 export async function editarCargo(
@@ -672,7 +675,7 @@ export async function editarCargo(
     throw new Error("La autorización de este cargo ya fue resuelta: no se puede cambiar el monto (anúlalo y captúralo de nuevo)");
   }
 
-  const esOverride = cargo.motivo_no_facturable === "DECISION_ISBM";
+  const esOverride = esNoCobrableManual(cargo.motivo_no_facturable);
   const esNoCobrable = cargo.arancel.es_no_cobrable;
   const { error } = await getSupabase()
     .from("cargos_paciente_dia")
@@ -682,7 +685,7 @@ export async function editarCargo(
       costo_total: costo,
       // El cierre reaplica las demás reglas (tope, 48 h, autorización)
       monto_facturable: esOverride || esNoCobrable ? 0 : costo,
-      motivo_no_facturable: esOverride ? "DECISION_ISBM" : esNoCobrable ? "NO_COBRABLE_ARANCEL" : null,
+      motivo_no_facturable: esOverride ? cargo.motivo_no_facturable : esNoCobrable ? "NO_COBRABLE_ARANCEL" : null,
       comentarios: ed.comentarios?.trim() || null,
       tipo_documento_respaldo: ed.tipoDocumentoRespaldo || null,
       documento_respaldo_ref: ed.documentoRespaldoRef?.trim() || null,
@@ -706,27 +709,31 @@ export async function editarCargo(
   }
 }
 
-// Override manual: fuerza un cargo cobrable a NO cobrable (con justificación
-// de auditoría). El recálculo del cierre respeta este override siempre.
+// Override manual: fuerza uno o varios cargos a NO cobrable. Decisión ISBM
+// exige justificación de auditoría; incluido en día-cama no pide nada. El
+// recálculo del cierre respeta ambos overrides siempre (fase 6).
 export async function marcarNoCobrable(
-  cargoId: number,
+  cargoIds: number[],
+  motivo: MotivoNoCobrableManual,
   justificacion: string,
   actorNombre: string
 ): Promise<void> {
-  if (justificacion.trim().length < 10) {
+  if (cargoIds.length === 0) return;
+  if (motivo === "DECISION_ISBM" && justificacion.trim().length < 10) {
     throw new Error("La justificación debe tener al menos 10 caracteres");
   }
   const { error } = await getSupabase()
     .from("cargos_paciente_dia")
     .update({
       monto_facturable: 0,
-      motivo_no_facturable: "DECISION_ISBM",
-      justificacion_no_facturable: justificacion.trim(),
+      motivo_no_facturable: motivo,
+      justificacion_no_facturable: motivo === "DECISION_ISBM" ? justificacion.trim() : null,
       modificado_por_nombre: actorNombre,
       modificado_en: new Date().toISOString(),
     })
-    .eq("id", cargoId);
-  lanzar("Error marcando el cargo como no cobrable", error);
+    .in("id", cargoIds)
+    .eq("anulado", false);
+  lanzar(cargoIds.length > 1 ? "Error marcando los cargos como no cobrables" : "Error marcando el cargo como no cobrable", error);
 }
 
 // Revierte el override: vuelve cobrable. Las reglas automáticas (tope, 48h,
