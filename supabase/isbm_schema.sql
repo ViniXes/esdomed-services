@@ -202,6 +202,10 @@ CREATE TABLE aranceles (
     -- Ítem del tarifario que se registra pero NO se factura al ISBM
     -- (fase 4): el cargo queda en $0 con motivo NO_COBRABLE_ARANCEL.
     es_no_cobrable          BOOLEAN NOT NULL DEFAULT FALSE,
+    -- (fase 7) Alta definición fuera del día cama: no entra al tope de
+    -- exámenes. 'SIEMPRE' = TAC/RMN; 'HOSPITALARIO' = Doppler/EEG.
+    fuera_tope_examenes     TEXT CHECK (fuera_tope_examenes IS NULL
+                                OR fuera_tope_examenes IN ('SIEMPRE', 'HOSPITALARIO')),
     -- Umbrales cláusula decimotercera: hasta el umbral aprueba el
     -- supervisor; por encima, el jefe (antes "gerente GTASS").
     monto_umbral_supervisor NUMERIC(10,2),
@@ -243,6 +247,7 @@ CREATE TABLE cargos_paciente_dia (
                                     'SIN_AUTORIZACION', 'INTERCONSULTA_DENTRO_48H',
                                     'EXCLUIDO_ART_25', 'INCLUIDO_EN_DIA_CAMA',
                                     'NO_COBRABLE_ARANCEL',
+                                    'EXAMEN_INCLUIDO_DIA_CAMA',
                                     'DUPLICADO', 'SIN_DOCUMENTO_RESPALDO',
                                     'ANULADO', 'DECISION_ISBM')),
     justificacion_no_facturable TEXT,               -- auditoría de overrides manuales
@@ -264,6 +269,10 @@ CREATE TABLE cargos_paciente_dia (
     -- de los totales) pero la app lo muestra como "No realizado".
     no_realizado                BOOLEAN NOT NULL DEFAULT FALSE,
     justificacion_no_realizado  TEXT,
+    -- (fase 7) El ISBM decide cobrar un examen que la regla dejó incluido
+    -- en el día cama: se cobra completo y el cierre lo respeta.
+    cobrar_por_decision_isbm    BOOLEAN NOT NULL DEFAULT FALSE,
+    justificacion_cobro         TEXT,
     capturado_por_uid          TEXT NOT NULL,
     capturado_por_nombre        TEXT NOT NULL,
     capturado_en                TIMESTAMPTZ NOT NULL DEFAULT NOW(),

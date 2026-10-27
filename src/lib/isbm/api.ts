@@ -8,7 +8,8 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getSupabase } from "./supabase";
 import {
-  RUBROS_EXAMENES,
+  examenIncluidoEnDiaCama,
+  formatoDolares,
   esNoCobrableManual,
   type MotivoNoCobrableManual,
   type AfiliacionIsbm,
@@ -546,22 +547,13 @@ export async function crearCargo(
     avisos.push("Ítem no cobrable según el convenio: queda registrado en $0.");
   }
 
-  // Tope diario de exámenes del servicio de facturación
-  if (!arancel.es_no_cobrable && RUBROS_EXAMENES.includes(arancel.rubro)) {
-    const delDia = await cargosDeCenso(censo.id);
-    const consumido = delDia
-      .filter((c) => !c.anulado && RUBROS_EXAMENES.includes(c.arancel.rubro))
-      .reduce((s, c) => s + c.monto_facturable, 0);
-    const disponible = redondear2(censo.servicio_facturacion.tope_diario_examenes - consumido);
-    if (disponible <= 0) {
-      facturable = 0;
-      motivo = "EXCEDE_TOPE_DIARIO_RUBRO";
-      avisos.push("Tope diario de exámenes agotado: el cargo queda NO facturable.");
-    } else if (costo > disponible) {
-      facturable = disponible;
-      motivo = "EXCEDE_TOPE_DIARIO_RUBRO";
-      avisos.push(`Solo ${disponible.toFixed(2)} del tope diario disponible: el excedente no se factura.`);
-    }
+  // Tope de exámenes POR EXAMEN: el que no excede el tope del servicio va
+  // incluido en el día cama; el que lo excede se cobra completo (no se acumula).
+  // TAC/RMN —y Doppler/EEG en hospitalario— van fuera del tope (convenio).
+  if (!arancel.es_no_cobrable && examenIncluidoEnDiaCama(arancel, precio, censo.servicio_facturacion)) {
+    facturable = 0;
+    motivo = "EXAMEN_INCLUIDO_DIA_CAMA";
+    avisos.push(`Examen de ${formatoDolares(precio)} (no pasa el tope de ${formatoDolares(censo.servicio_facturacion.tope_diario_examenes)}): va incluido en el día cama, queda en $0.`);
   }
 
   // Regla 48 h: interconsulta repetida de la misma especialidad. Solo entre
@@ -677,15 +669,22 @@ export async function editarCargo(
 
   const esOverride = esNoCobrableManual(cargo.motivo_no_facturable);
   const esNoCobrable = cargo.arancel.es_no_cobrable;
+  // Tope por examen: con el precio nuevo puede pasar a incluido o a cobrable
+  // (salvo que el ISBM haya decidido cobrarlo).
+  const cobroIsbm = Boolean(cargo.cobrar_por_decision_isbm);
+  const incluido = !cobroIsbm && !esOverride && !esNoCobrable &&
+    examenIncluidoEnDiaCama(cargo.arancel, precio, await servicioFacturacionDeCenso(cargo.censo_id));
   const { error } = await getSupabase()
     .from("cargos_paciente_dia")
     .update({
       cantidad: ed.cantidad,
       precio_unitario: precio,
       costo_total: costo,
-      // El cierre reaplica las demás reglas (tope, 48 h, autorización)
-      monto_facturable: esOverride || esNoCobrable ? 0 : costo,
-      motivo_no_facturable: esOverride ? cargo.motivo_no_facturable : esNoCobrable ? "NO_COBRABLE_ARANCEL" : null,
+      // El cierre reaplica las demás reglas (48 h, autorización)
+      monto_facturable: esOverride || esNoCobrable || incluido ? 0 : costo,
+      motivo_no_facturable: esOverride
+        ? cargo.motivo_no_facturable
+        : esNoCobrable ? "NO_COBRABLE_ARANCEL" : incluido ? "EXAMEN_INCLUIDO_DIA_CAMA" : null,
       comentarios: ed.comentarios?.trim() || null,
       tipo_documento_respaldo: ed.tipoDocumentoRespaldo || null,
       documento_respaldo_ref: ed.documentoRespaldoRef?.trim() || null,
@@ -709,6 +708,62 @@ export async function editarCargo(
   }
 }
 
+async function servicioFacturacionDeCenso(
+  censoId: number,
+): Promise<Pick<ServicioHospitalarioIsbm, "tipo_facturacion" | "tope_diario_examenes">> {
+  const { data, error } = await getSupabase()
+    .from("censo_diario")
+    .select("servicio_facturacion:servicios_hospitalarios!servicio_facturacion_id(tipo_facturacion, tope_diario_examenes)")
+    .eq("id", censoId)
+    .single();
+  lanzar("Error leyendo el servicio del censo", error);
+  return (data as unknown as { servicio_facturacion: Pick<ServicioHospitalarioIsbm, "tipo_facturacion" | "tope_diario_examenes"> }).servicio_facturacion;
+}
+
+// El ISBM decide cobrar un examen que la regla dejó incluido en el día cama:
+// se cobra completo y el cierre lo respeta. Exige justificación de auditoría.
+export async function cobrarPorDecisionIsbm(
+  cargo: CargoConArancel,
+  justificacion: string,
+  actorNombre: string
+): Promise<void> {
+  if (justificacion.trim().length < 10) {
+    throw new Error("La justificación debe tener al menos 10 caracteres");
+  }
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      cobrar_por_decision_isbm: true,
+      justificacion_cobro: justificacion.trim(),
+      monto_facturable: cargo.costo_total,
+      motivo_no_facturable: null,
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargo.id)
+    .eq("anulado", false);
+  lanzar("Error marcando el cargo para cobro", error);
+}
+
+// Quita el cobro por decisión ISBM: el examen vuelve a la regla del convenio.
+export async function quitarCobroPorDecisionIsbm(cargo: CargoConArancel, actorNombre: string): Promise<void> {
+  const servicio = await servicioFacturacionDeCenso(cargo.censo_id);
+  const incluido = !cargo.arancel.es_no_cobrable &&
+    examenIncluidoEnDiaCama(cargo.arancel, cargo.precio_unitario, servicio);
+  const { error } = await getSupabase()
+    .from("cargos_paciente_dia")
+    .update({
+      cobrar_por_decision_isbm: false,
+      justificacion_cobro: null,
+      monto_facturable: incluido ? 0 : cargo.costo_total,
+      motivo_no_facturable: incluido ? "EXAMEN_INCLUIDO_DIA_CAMA" : null,
+      modificado_por_nombre: actorNombre,
+      modificado_en: new Date().toISOString(),
+    })
+    .eq("id", cargo.id);
+  lanzar("Error quitando el cobro por decisión ISBM", error);
+}
+
 // Override manual: fuerza uno o varios cargos a NO cobrable. Decisión ISBM
 // exige justificación de auditoría; incluido en día-cama no pide nada. El
 // recálculo del cierre respeta ambos overrides siempre (fase 6).
@@ -727,6 +782,8 @@ export async function marcarNoCobrable(
     .update({
       monto_facturable: 0,
       motivo_no_facturable: motivo,
+      cobrar_por_decision_isbm: false,
+      justificacion_cobro: null,
       justificacion_no_facturable: motivo === "DECISION_ISBM" ? justificacion.trim() : null,
       modificado_por_nombre: actorNombre,
       modificado_en: new Date().toISOString(),

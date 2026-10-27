@@ -157,6 +157,10 @@ export interface ArancelIsbm {
   // Ítem del tarifario que se registra pero NO se factura al ISBM
   // (el hospital lo absorbe): el cargo queda en $0 automáticamente.
   es_no_cobrable: boolean;
+  // Estudios de alta definición que el convenio deja fuera del día cama: se
+  // cobran completos sin entrar al tope de exámenes (fase 7). SIEMPRE = TAC y
+  // RMN; HOSPITALARIO = Doppler y EEG solo en día cama hospitalario.
+  fuera_tope_examenes?: "SIEMPRE" | "HOSPITALARIO" | null;
   monto_umbral_supervisor: number | null;
   monto_umbral_gerente: number | null;
   vigente_desde: string;
@@ -171,6 +175,7 @@ export type MotivoNoFacturableIsbm =
   | "INTERCONSULTA_DENTRO_48H"
   | "EXCLUIDO_ART_25"
   | "INCLUIDO_EN_DIA_CAMA"
+  | "EXAMEN_INCLUIDO_DIA_CAMA"
   | "NO_COBRABLE_ARANCEL"
   | "DUPLICADO"
   | "SIN_DOCUMENTO_RESPALDO"
@@ -207,6 +212,10 @@ export interface CargoIsbm {
   // muestra como anotación con su justificación (fase 5).
   no_realizado: boolean;
   justificacion_no_realizado: string | null;
+  // El ISBM decidió cobrar un examen que la regla dejaba incluido en el día
+  // cama: se cobra completo y el cierre lo respeta (fase 7).
+  cobrar_por_decision_isbm?: boolean;
+  justificacion_cobro?: string | null;
   capturado_por_uid: string;
   capturado_por_nombre: string;
   capturado_en: string;
@@ -332,6 +341,7 @@ export const MOTIVO_NO_FACTURABLE_LABEL: Record<MotivoNoFacturableIsbm, string> 
   INTERCONSULTA_DENTRO_48H: "Interconsulta dentro de 48 h",
   EXCLUIDO_ART_25: "Excluido por Art. 25",
   INCLUIDO_EN_DIA_CAMA: "Incluido en día-cama",
+  EXAMEN_INCLUIDO_DIA_CAMA: "Incluido en día-cama (no pasa el tope)",
   NO_COBRABLE_ARANCEL: "No cobrable según el convenio",
   DUPLICADO: "Duplicado",
   SIN_DOCUMENTO_RESPALDO: "Sin documento de respaldo",
@@ -348,6 +358,40 @@ export const CONDICION_EGRESO_LABEL: Record<CondicionEgresoIsbm, string> = {
 };
 
 // Rubros que consumen el tope diario de exámenes del servicio.
+/** ¿El cargo de este arancel consume el tope diario de exámenes del servicio? */
+export function cuentaParaTopeExamenes(
+  arancel: Pick<ArancelIsbm, "rubro" | "fuera_tope_examenes">,
+  tipoFacturacion: TipoFacturacionIsbm,
+): boolean {
+  if (!RUBROS_EXAMENES.includes(arancel.rubro)) return false;
+  if (arancel.fuera_tope_examenes === "SIEMPRE") return false;
+  if (arancel.fuera_tope_examenes === "HOSPITALARIO" && tipoFacturacion === "HOSPITALARIO") return false;
+  return true;
+}
+
+const RUBROS_LABORATORIO: RubroArancelIsbm[] = [
+  "LABORATORIO_BASICO",
+  "LABORATORIO_ADICIONAL",
+  "LABORATORIO_BIOLOGIA_MOLECULAR",
+];
+
+/**
+ * Regla del convenio para exámenes (misma que isbm_examen_incluido_dia_cama
+ * en SQL): en UCI / UCI ECMO / Intermedios todo el laboratorio va incluido en
+ * el día cama; lo demás, por examen individual: precio unitario <= tope →
+ * incluido. El ISBM puede decidir cobrarlo igual (cobrar_por_decision_isbm).
+ */
+export function examenIncluidoEnDiaCama(
+  arancel: Pick<ArancelIsbm, "rubro" | "fuera_tope_examenes">,
+  precioUnitario: number,
+  servicio: Pick<ServicioHospitalarioIsbm, "tipo_facturacion" | "tope_diario_examenes">,
+): boolean {
+  if (!cuentaParaTopeExamenes(arancel, servicio.tipo_facturacion)) return false;
+  const esCritico = servicio.tipo_facturacion === "UCI" || servicio.tipo_facturacion === "UCI_ECMO" || servicio.tipo_facturacion === "CUIDADOS_INTERMEDIOS";
+  if (esCritico && RUBROS_LABORATORIO.includes(arancel.rubro)) return true;
+  return precioUnitario <= servicio.tope_diario_examenes;
+}
+
 export const RUBROS_EXAMENES: RubroArancelIsbm[] = [
   "LABORATORIO_BASICO",
   "LABORATORIO_ADICIONAL",

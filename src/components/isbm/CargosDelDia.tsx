@@ -16,6 +16,8 @@ import {
   marcarCobrable,
   marcarNoCobrable,
   marcarNoRealizado,
+  cobrarPorDecisionIsbm,
+  quitarCobroPorDecisionIsbm,
   obtenerAutorizacionDeCargo,
   type NuevoCargoInput,
 } from "@/lib/isbm/api";
@@ -295,6 +297,16 @@ export function CargosDelDia({
                       )}
                       {c.motivo_no_facturable === "DECISION_ISBM" && c.justificacion_no_facturable && (
                         <span className="text-[10px] text-amber-700 dark:text-amber-300 self-center">{c.justificacion_no_facturable}</span>
+                      )}
+                    </div>
+                  )}
+                  {!c.anulado && c.cobrar_por_decision_isbm && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-full px-2 py-0.5">
+                        Cobro por decisión ISBM
+                      </span>
+                      {c.justificacion_cobro && (
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-300 self-center">{c.justificacion_cobro}</span>
                       )}
                     </div>
                   )}
@@ -622,7 +634,7 @@ function DetalleCargoFormulario({
   onCambio: () => Promise<void>;
 }) {
   const enviando = useRef(false);
-  const [modo, setModo] = useState<"ver" | "editar" | "nocobrable" | "norealizado">("ver");
+  const [modo, setModo] = useState<"ver" | "editar" | "nocobrable" | "norealizado" | "cobrar">("ver");
   const [aut, setAut] = useState<AutorizacionIsbm | null | undefined>(undefined);
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -671,6 +683,11 @@ function DetalleCargoFormulario({
   const anular = () => {
     if (!window.confirm(`¿Anular "${cargo.arancel.descripcion}"? Queda en $0 pero visible para auditoría.`)) return;
     ejecutar(() => anularCargo(cargo.id, actor.nombre));
+  };
+
+  const quitarCobroIsbm = () => {
+    if (!window.confirm("¿Quitar el cobro por decisión ISBM? El examen vuelve a la regla del convenio (incluido en el día cama si corresponde).")) return;
+    ejecutar(() => quitarCobroPorDecisionIsbm(cargo, actor.nombre));
   };
 
   const volverCobrable = () => {
@@ -775,7 +792,12 @@ function DetalleCargoFormulario({
                   <p className="font-semibold">
                     <span className="text-slate-400 font-normal">Facturable:</span> {formatoDolares(cargo.monto_facturable)}
                   </p>
-                  {cargo.no_realizado ? (
+                  {cargo.cobrar_por_decision_isbm && !cargo.anulado ? (
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                      Se cobra por decisión ISBM aunque va incluido en el día cama
+                      {cargo.justificacion_cobro && ` — ${cargo.justificacion_cobro}`}
+                    </p>
+                  ) : cargo.no_realizado ? (
                     <p className="text-xs text-slate-600 dark:text-slate-300">
                       No realizado: no suma en Total servicio ni en Facturable
                       {cargo.justificacion_no_realizado && ` — ${cargo.justificacion_no_realizado}`}
@@ -886,6 +908,21 @@ function DetalleCargoFormulario({
           </div>
         )}
 
+        {modo === "cobrar" && (
+          <div className="mt-3 border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/40 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+              Cobrar por decisión ISBM — se factura completo ({formatoDolares(cargo.costo_total)}) aunque la regla lo incluya en el día cama
+            </p>
+            <input
+              autoFocus
+              value={justificacion}
+              onChange={(e) => setJustificacion(e.target.value)}
+              aria-label="Justificación de por qué el ISBM decidió cobrarlo" placeholder="Por qué se cobra (mínimo 10 caracteres)"
+              className={inputCls}
+            />
+          </div>
+        )}
+
         {modo === "norealizado" && (
           <div className="mt-3 border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/60 rounded-xl p-3 space-y-2">
             <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
@@ -934,6 +971,14 @@ function DetalleCargoFormulario({
                 >
                   {ocupado ? "Guardando…" : "Guardar cambios"}
                 </button>
+              ) : modo === "cobrar" ? (
+                <button
+                  onClick={() => ejecutar(() => cobrarPorDecisionIsbm(cargo, justificacion, actor.nombre))}
+                  disabled={ocupado || justificacion.trim().length < 10}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {ocupado ? "Guardando…" : "Confirmar cobro"}
+                </button>
               ) : modo === "norealizado" ? (
                 <button
                   onClick={() => ejecutar(() => marcarNoRealizado(cargo.id, justificacion, actor.nombre))}
@@ -968,6 +1013,24 @@ function DetalleCargoFormulario({
               >
                 <Ban size={14} /> Anular
               </button>
+              {cargo.motivo_no_facturable === "EXAMEN_INCLUIDO_DIA_CAMA" && (
+                <button
+                  onClick={() => { setModo("cobrar"); setJustificacion(""); setError(""); }}
+                  disabled={ocupado}
+                  className="px-3.5 py-2 text-sm font-medium rounded-lg border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 disabled:opacity-50 transition-colors"
+                >
+                  Cobrar por decisión ISBM
+                </button>
+              )}
+              {cargo.cobrar_por_decision_isbm && (
+                <button
+                  onClick={quitarCobroIsbm}
+                  disabled={ocupado}
+                  className="px-3.5 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  Quitar cobro ISBM
+                </button>
+              )}
               {esOverride ? (
                 <button
                   onClick={volverCobrable}
