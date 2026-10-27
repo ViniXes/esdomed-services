@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { FilaPlanTrabajo, PermisoTramitePlan, PlanTrabajo } from "@/types";
+import type { FilaPlanTrabajo, PermisoTramitePlan, PlanTrabajo, VacacionProgramada } from "@/types";
 import { permisoDelDia } from "@/lib/esdomed/permisos-plan";
+import { cargarProgramacionVacaciones, esVacacionDe, rangoQuincena } from "@/lib/esdomed/vacaciones";
 import {
   describirCelda,
   getHorario,
@@ -38,6 +39,21 @@ export default function MiHorarioPage() {
   const [diaSel, setDiaSel] = useState<number | null>(null);
 
   const periodos = useMemo(() => periodosCercanos(11, 2).reverse(), []);
+
+  // Programación anual de vacaciones del año que se está viendo: avisa desde
+  // ya, aunque el plan de ese mes todavía no exista.
+  const anioVista = Number(periodo.slice(0, 4));
+  const [vacacionesAnio, setVacacionesAnio] = useState<{ anio: number; lista: VacacionProgramada[] } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    cargarProgramacionVacaciones(anioVista)
+      .then((p) => { if (vivo) setVacacionesAnio({ anio: anioVista, lista: p?.asignaciones ?? [] }); })
+      .catch(() => { if (vivo) setVacacionesAnio({ anio: anioVista, lista: [] }); });
+    return () => { vivo = false; };
+  }, [anioVista]);
+  const misVacaciones = vacacionesAnio?.anio === anioVista && profile
+    ? vacacionesAnio.lista.filter((v) => esVacacionDe(v, { uid: profile.uid, codigoMarcacion: profile.codigoMarcacion ?? "" }))
+    : [];
 
   useEffect(() => {
     setLoading(true);
@@ -106,6 +122,16 @@ export default function MiHorarioPage() {
           ))}
         </select>
       </div>
+
+      {misVacaciones.length > 0 && (
+        <p className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+          <Plane size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <span>
+            Tus vacaciones {anioVista}:{" "}
+            <strong>{misVacaciones.map((v) => rangoQuincena(v.mes, v.quincena)).join(" y ")}</strong>
+          </span>
+        </p>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">

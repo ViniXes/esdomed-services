@@ -14,7 +14,7 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { FilaPlanTrabajo, PlanTrabajo, UserProfile } from "@/types";
+import type { FilaPlanTrabajo, PlanTrabajo, UserProfile, VacacionProgramada } from "@/types";
 import {
   contarMarca,
   esMarcaEspecial,
@@ -50,6 +50,12 @@ import {
   permisoDelDia,
 } from "@/lib/esdomed/permisos-plan";
 import { esDiaNoLaboralAdministrativo } from "@/lib/esdomed/calendario-plan";
+import {
+  cargarProgramacionVacaciones,
+  describirCambiosVacaciones,
+  mesSincronizable,
+  sincronizarVacacionesEnFilas,
+} from "@/lib/esdomed/vacaciones";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
 import { exportarPlanExcel, type TipoPlan } from "@/lib/esdomed/exportar-plan";
 import {
@@ -159,6 +165,9 @@ export default function EditorPlanPage() {
   // Versión guardada sobre la que está trabajando este editor (ver versionPlan).
   const versionBaseRef = useRef(0);
   const descartarBorradorRef = useRef(false);
+  // Vacaciones programadas del año que tocan este mes (null = no se sincroniza:
+  // mes ya pasado, sin programación o no se pudo leer).
+  const vacacionesRef = useRef<VacacionProgramada[] | null>(null);
   const borradorKey = useMemo(() => `plan-trabajo-borrador:${periodo}`, [periodo]);
 
   useEffect(() => {
@@ -279,11 +288,19 @@ export default function EditorPlanPage() {
       setLoading(true);
       try {
         const prevPeriodo = formatPeriodo(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
-        const [snap, lista, prevSnap] = await Promise.all([
+        const [snap, lista, prevSnap, programaVacaciones] = await Promise.all([
           getDoc(doc(db, "planes_trabajo", periodo)),
           cargarRoster(),
-          getDoc(doc(db, "planes_trabajo", prevPeriodo))
+          getDoc(doc(db, "planes_trabajo", prevPeriodo)),
+          mesSincronizable(anio, mes)
+            ? cargarProgramacionVacaciones(anio).catch((err) => {
+                console.error("No se pudo leer la programación de vacaciones", err);
+                return null;
+              })
+            : Promise.resolve(null),
         ]);
+        const vacaciones = programaVacaciones?.asignaciones ?? null;
+        vacacionesRef.current = vacaciones;
         
         if (prevSnap.exists()) {
           setPrevPlanData(prevSnap.data() as PlanTrabajo);
@@ -351,6 +368,15 @@ export default function EditorPlanPage() {
           window.localStorage.removeItem(borradorKey);
         }
 
+        // Vacaciones programadas del año: se pintan antes que los permisos, así
+        // un permiso no cae en un día que ya es VAC. Idempotente vía fila.vacaciones.
+        let mensajeVacaciones: string | null = null;
+        if (vacaciones) {
+          const r = sincronizarVacacionesEnFilas(filasBase, vacaciones, mes);
+          mensajeVacaciones = describirCambiosVacaciones(r);
+          if (mensajeVacaciones) filasBase = r.filas;
+        }
+
         // Respaldo del puente trámites → plan: aplica permisos personales
         // aprobados que aún no estén reflejados (p. ej. aprobados antes de que
         // existiera el plan de este mes). Idempotente vía fila.permisos.
@@ -375,12 +401,14 @@ export default function EditorPlanPage() {
         setNumeroHoras(numeroHorasBase);
         setMetaHorasAdmin(metaAdminBase);
         setMetaHorasOperativas(metaOperativaBase);
-        setGuardado(snap.exists() && !borradorRecuperado && !mensajePermisos);
-        if (mensajePermisos) {
+        setGuardado(snap.exists() && !borradorRecuperado && !mensajePermisos && !mensajeVacaciones);
+        if (mensajePermisos || mensajeVacaciones) {
           setModalState({
             tipo: "alerta",
-            titulo: "Permisos aprobados aplicados",
-            mensaje: `${mensajePermisos}${borradorRecuperado ? "\n\nAdemás se recuperaron cambios locales pendientes de guardar." : ""}\n\nGuarda el plan para que quede permanente.`,
+            titulo: mensajePermisos && mensajeVacaciones
+              ? "Vacaciones y permisos aplicados"
+              : mensajeVacaciones ? "Vacaciones programadas aplicadas" : "Permisos aprobados aplicados",
+            mensaje: `${[mensajeVacaciones, mensajePermisos].filter(Boolean).join("\n\n")}${borradorRecuperado ? "\n\nAdemás se recuperaron cambios locales pendientes de guardar." : ""}\n\nGuarda el plan para que quede permanente.`,
           });
         } else if (borradorRecuperado) {
           setModalState({
@@ -404,12 +432,9 @@ export default function EditorPlanPage() {
             textoConfirmar: "Recuperar mis cambios",
             onConfirm: () => {
               registrarUndo();
-              const filasBorrador = aplicarPermisosAprobados(
-                sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true }),
-                aprobados,
-                anio,
-                mes,
-              ).filas;
+              let filasBorrador = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
+              if (vacaciones) filasBorrador = sincronizarVacacionesEnFilas(filasBorrador, vacaciones, mes).filas;
+              filasBorrador = aplicarPermisosAprobados(filasBorrador, aprobados, anio, mes).filas;
               filasRef.current = filasBorrador;
               setFilas(filasBorrador);
               setNumeroHoras(borrador.numeroHoras ?? numeroHorasBase);
@@ -604,11 +629,15 @@ export default function EditorPlanPage() {
     }
     const prevPlan = snap.data() as PlanTrabajo;
     registrarUndo();
-    setFilas((prev) => copiarFilasMesAnterior(prev, prevPlan, anio, mes));
+    // La copia no trae vacaciones del mes anterior: se pintan las de este mes.
+    setFilas((prev) => {
+      const copiadas = copiarFilasMesAnterior(prev, prevPlan, anio, mes);
+      return vacacionesRef.current ? sincronizarVacacionesEnFilas(copiadas, vacacionesRef.current, mes).filas : copiadas;
+    });
     if (!numeroHoras && prevPlan.numeroHoras) setNumeroHoras(prevPlan.numeroHoras);
     if (metaHorasAdmin === "" && prevPlan.metaHorasAdmin) setMetaHorasAdmin(prevPlan.metaHorasAdmin);
     if (metaHorasOperativas === "" && prevPlan.metaHorasOperativas) setMetaHorasOperativas(prevPlan.metaHorasOperativas);
-    setModalState({ tipo: "exito", titulo: "Patrón Copiado", mensaje: `Se han copiado los turnos desde ${labelPeriodo(prevPeriodo)}. Por favor, ajusta los detalles antes de guardar.` });
+    setModalState({ tipo: "exito", titulo: "Patrón Copiado", mensaje: `Se han copiado los turnos desde ${labelPeriodo(prevPeriodo)}. Las vacaciones de ese mes no se copian; se marcan las programadas para este mes. Por favor, ajusta los detalles antes de guardar.` });
     setGuardado(false);
   };
 
@@ -725,6 +754,8 @@ export default function EditorPlanPage() {
           ...(typeof f.orden === "number" ? { orden: f.orden } : {}),
           // Procedencia de permisos de trámites aprobados aplicados este mes.
           ...(f.permisos?.length ? { permisos: f.permisos } : {}),
+          // Días VAC que pintó la programación anual (para poder moverlos).
+          ...(f.vacaciones?.length ? { vacaciones: f.vacaciones } : {}),
         })),
         creadoEn: creadoMeta?.creadoEn ?? ahora,
         creadoPorId: creadoMeta?.creadoPorId ?? profile.uid,

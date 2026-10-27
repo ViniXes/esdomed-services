@@ -1662,6 +1662,34 @@ export interface FilaPlanTrabajo {
   asignaciones: string[];
   observaciones?: string;  // nota libre por persona (columna final del Excel)
   permisos?: PermisoTramitePlan[]; // permisos de trámites aprobados aplicados este mes
+  vacaciones?: VacacionAplicadaPlan[]; // días VAC que pintó la programación anual
+}
+
+// Día que la programación anual de vacaciones marcó "VAC" en la fila, con lo
+// que había antes para poder devolverlo si la vacación se mueve. Si el
+// asistente cambia la celda a mano, el registro se queda y no se vuelve a pintar.
+export interface VacacionAplicadaPlan {
+  dia: number;          // 1..31
+  codigoTurno: string;  // lo que tenía la celda antes de VAC ("" = descanso)
+}
+
+// Programación anual de vacaciones del personal operativo de ESDOMED.
+// Colección `vacaciones_programadas`, doc id = año ("2027"). La arma el admin;
+// el editor del plan la aplica como marcas VAC (lib/esdomed/vacaciones).
+export interface VacacionProgramada {
+  uid: string;
+  codigoMarcacion: string;
+  nombre: string;       // snapshot
+  mes: number;          // 1-12
+  quincena: 1 | 2;      // 1 = del 1 al 15, 2 = del 16 al 30
+}
+
+export interface ProgramacionVacaciones {
+  anio: number;
+  asignaciones: VacacionProgramada[];
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
 }
 
 export interface PlanTrabajo {

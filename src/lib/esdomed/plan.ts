@@ -317,9 +317,11 @@ export function prepararFilasNuevoPeriodo(
   const anteriores = planAnterior?.filas ?? [];
   return sincronizarFilas(usuarios, anteriores, dias).map((fila) => {
     const origen = filaCoincidente(anteriores, fila);
-    // Los permisos aplicados pertenecen al mes de origen; un mes nuevo arranca sin ellos.
+    // Los permisos y vacaciones aplicados pertenecen al mes de origen; un mes
+    // nuevo arranca sin ellos (las vacaciones del mes las pinta la programación).
     const sinPermisos = { ...fila };
     delete sinPermisos.permisos;
+    delete sinPermisos.vacaciones;
     const normalizada = normalizarMetadatosFilaPlan(sinPermisos);
     if (!esAdministrativoPlan(normalizada)) {
       return { ...normalizada, asignaciones: Array(dias).fill("") };
@@ -335,6 +337,8 @@ export function prepararFilasNuevoPeriodo(
 /**
  * Copia explícitamente un mes anterior. Además de los turnos conserva grupo,
  * orden y observaciones; para administrativos reconstruye el calendario laboral.
+ * Las vacaciones NO se copian (cada quien tiene un solo periodo al año): sus
+ * días quedan de descanso y el editor vuelve a pintar las programadas del mes.
  */
 export function copiarFilasMesAnterior(
   filasActuales: FilaPlanTrabajo[],
@@ -346,8 +350,10 @@ export function copiarFilasMesAnterior(
   return filasActuales.map((fila) => {
     const origen = filaCoincidente(planAnterior.filas ?? [], fila);
     if (!origen) return normalizarMetadatosFilaPlan(fila);
+    const sinVacaciones = { ...fila };
+    delete sinVacaciones.vacaciones;
     const combinada = normalizarMetadatosFilaPlan({
-      ...fila,
+      ...sinVacaciones,
       grupo: origen.grupo ?? fila.grupo,
       tipoJornada: origen.tipoJornada ?? fila.tipoJornada,
       observaciones: origen.observaciones ?? fila.observaciones,
@@ -362,7 +368,10 @@ export function copiarFilasMesAnterior(
     }
     return {
       ...combinada,
-      asignaciones: Array.from({ length: dias }, (_, indice) => origen.asignaciones[indice] ?? ""),
+      asignaciones: Array.from({ length: dias }, (_, indice) => {
+        const celda = origen.asignaciones[indice] ?? "";
+        return celda.trim().toUpperCase() === "VAC" ? "" : celda;
+      }),
     };
   });
 }

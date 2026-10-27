@@ -108,6 +108,10 @@ Si al ingresar (o al inicio, en emergencia) el paciente ya tenía otra incapacid
 
 Regla para código nuevo: el período (desde/hasta/total) se calcula **solo** con `calcularPeriodoIncapacidad()` y los días adicionales guardados se derivan con `diasAdicionalesGuardados()` (`src/lib/incapacidades/helpers.ts`); nunca `alta + días` a mano, porque rompe las continuaciones.
 
+### Vacaciones programadas (plan de trabajo ESDOMED)
+
+El admin arma una vez al año la programación de vacaciones del personal operativo en `/esdomed-horarios/vacaciones` (colección `vacaciones_programadas/{año}`, importable desde el Excel de la jefatura). Reglas: 15 días exactos dentro del mes (1ra quincena 1–15, 2da 16–30; nunca cruza de mes), máximo 2 por quincena, bloqueadas la 2da de febrero, Semana Santa (calculada con `domingoPascua`), la 1ra de agosto y la 2da de diciembre. El editor del mes la pinta como VAC al abrir (mismo patrón idempotente que los permisos: registro en `fila.vacaciones` con el turno que había, para devolverlo si la vacación se mueve) y al guardar la programación se propaga a los planes ya guardados de meses no terminados; los meses pasados no se tocan. "Copiar mes anterior" nunca copia VAC. Lógica en `src/lib/esdomed/vacaciones.ts`.
+
 ### Creating Users
 
 Los usuarios no se registran solos — los crea el administrador directamente en Firebase Auth y luego se crea su documento en `usuarios/{uid}` con el rol correspondiente. No hay flujo de registro público.

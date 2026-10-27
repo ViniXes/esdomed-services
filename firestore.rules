@@ -791,6 +791,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Programación anual de vacaciones del personal operativo de ESDOMED
+    // (doc id = año). Solo el admin la arma; el personal la ve en "Mi horario"
+    // y el editor del plan la lee para marcar VAC.
+    match /vacaciones_programadas/{anio} {
+      allow read:  if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Planes de trabajo de las demás ÁREAS del hospital (Terapia Respiratoria,
     // etc.). Doc id = "{areaId}_{YYYY-MM}"; mismo formato que planes_trabajo.
     // Hoy los gestiona ESDOMED; cuando existan usuarios por área, aquí se les
