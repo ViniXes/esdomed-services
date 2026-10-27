@@ -11,7 +11,10 @@ import type { Paciente, SolicitudIncapacidad } from "@/types";
 import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
-import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput, pacienteDesdeIncapacidad, mapIncapacidadData } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularPeriodoIncapacidad, diasAdicionalesGuardados, parseDateInput, pacienteDesdeIncapacidad, mapIncapacidadData } from "@/lib/incapacidades/helpers";
+import {
+  cargarIncapacidadesDelExpediente, continuacionParaFirestore, incapacidadVigenteEn, vigenteDeContinuacion,
+} from "@/lib/incapacidades/continuacion";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -19,7 +22,7 @@ import {
 export default function EditarIncapacidadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [incapacidad, setIncapacidad] = useState<SolicitudIncapacidad | null>(null);
   const [paciente, setPaciente] = useState<Paciente | null>(null);
@@ -38,6 +41,10 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Continuación: otra incapacidad del expediente vigente cuando empieza esta.
+  const [previasExp, setPreviasExp] = useState<SolicitudIncapacidad[]>([]);
+  const [continuar, setContinuar] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -73,9 +80,7 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         // no puso días adicionales, así que el campo arranca vacío para que el
         // médico lo escriba (no un "0" que parezca decidido).
         const esEmerg = inc.origen === "emergencia";
-        const diasExtrasGuardados = esEmerg
-          ? inc.diasIncapacidad
-          : Math.round((inc.fechaHasta.getTime() - inc.fechaAlta.getTime()) / (1000 * 60 * 60 * 24));
+        const diasExtrasGuardados = esEmerg ? inc.diasIncapacidad : diasAdicionalesGuardados(inc);
         setForm({
           fechaAlta: toDateInput(inc.fechaAlta),
           diasExtras: inc.estado === "pendiente_medico" ? "" : String(Math.max(0, diasExtrasGuardados)),
@@ -104,6 +109,11 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
           }
         }
         setPaciente(pacReal ?? pacienteDesdeIncapacidad(inc));
+        setContinuar(!!inc.continuaDe);
+        try {
+          const previas = await cargarIncapacidadesDelExpediente(inc.pacienteExpediente);
+          if (!cancelado) setPreviasExp(previas);
+        } catch { /* no crítico: sin detección se edita como siempre */ }
         setLoading(false);
       } catch (e) {
         setBloqueoMotivo(`Error al cargar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -112,6 +122,22 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
     })();
     return () => { cancelado = true; };
   }, [id, user]);
+
+  const esEmergenciaInc = incapacidad?.origen === "emergencia";
+  const fechaIngresoInc = incapacidad
+    ? incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso ?? incapacidad.fechaDesde
+    : undefined;
+  // Ya guardada como continuación: su anterior. Si no, la que esté vigente al
+  // ingreso (o al inicio, en emergencia) según las fechas del formulario.
+  const inicioInc = esEmergenciaInc ? (form.fechaAlta ? parseDateInput(form.fechaAlta) : null) : fechaIngresoInc ?? null;
+  const vigente = incapacidad?.continuaDe
+    ? vigenteDeContinuacion(incapacidad.continuaDe, previasExp)
+    : inicioInc ? incapacidadVigenteEn(previasExp, inicioInc, {
+        id: incapacidad?.id,
+        pacienteId: incapacidad?.pacienteId,
+        atencionEmergenciaId: incapacidad?.atencionEmergenciaId,
+      }) : null;
+  const hastaAnterior = vigente && continuar ? vigente.hasta : null;
 
   const esReposicion = incapacidad?.origen === "reposicion";
   const porCompletar = incapacidad?.estado === "pendiente_medico";
@@ -129,28 +155,25 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
     try {
       const fAlta  = parseDateInput(form.fechaAlta);
       const esEmerg = incapacidad.origen === "emergencia";
-      let fDesde: Date, diasTotal: number, fHasta: Date;
+      let periodo;
       if (esEmerg) {
         // Emergencia: inicio = fecha indicada; días = total prescrito.
         if (diasExtras < 1) { setError("Los días de incapacidad deben ser 1 o más."); setGuardando(false); return; }
-        fDesde = fAlta;
-        diasTotal = diasExtras;
-        fHasta = calcularFechaHasta(fAlta, diasExtras - 1);
+        periodo = calcularPeriodoIncapacidad({ fechaAlta: fAlta, dias: diasExtras, emergencia: true, hastaAnterior });
       } else {
         // Si ESDOMED corrigió la fecha de ingreso, esa prevalece (igual que en
         // el detalle y en la constancia); si no, la del expediente / FIEH.
-        fDesde = incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso ?? incapacidad.fechaDesde;
+        const fIngreso = incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso ?? incapacidad.fechaDesde;
         // Por día calendario: mismo día de ingreso y alta es válido (alta voluntaria).
-        if (altaAntesDelIngreso(fAlta, fDesde)) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
-        diasTotal = calcularDiasHospitalizacion(fDesde, fAlta) + diasExtras;
-        fHasta = calcularFechaHasta(fAlta, diasExtras);
+        if (altaAntesDelIngreso(fAlta, fIngreso)) { setError("La fecha de alta no puede ser anterior a la fecha de ingreso del paciente."); setGuardando(false); return; }
+        periodo = calcularPeriodoIncapacidad({ fechaIngreso: fIngreso, fechaAlta: fAlta, dias: diasExtras, hastaAnterior });
       }
 
       const update: Record<string, unknown> = {
         fechaAlta: Timestamp.fromDate(fAlta),
-        diasIncapacidad: diasTotal,
-        fechaDesde: Timestamp.fromDate(fDesde),
-        fechaHasta: Timestamp.fromDate(fHasta),
+        diasIncapacidad: periodo.total,
+        fechaDesde: Timestamp.fromDate(periodo.desde),
+        fechaHasta: Timestamp.fromDate(periodo.hasta),
         diagnosticoEgreso: form.diagnosticoEgreso.trim(),
         tratamientoAlta: form.tratamientoAlta.trim(),
         condicionEgreso: form.condicionEgreso,
@@ -163,6 +186,16 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
         diasCorregidosEn: null,
         diasAclaracion: null,
       };
+      // Continuación: se conserva la ya guardada si sigue igual; si cambió la
+      // anterior o se activó ahora, se registra quién la aplicó; desmarcada, se quita.
+      const guardada = incapacidad.continuaDe;
+      if (vigente && hastaAnterior) {
+        if (!guardada || guardada.hastaAnterior.getTime() !== hastaAnterior.getTime()) {
+          update.continuaDe = continuacionParaFirestore(vigente, profile?.nombre ?? incapacidad.medicoNombre, guardada?.aclaracion);
+        }
+      } else if (guardada) {
+        update.continuaDe = null;
+      }
       // Reposición por completar: al guardar vuelve a ESDOMED como "pendiente"
       // de emitir, igual que una solicitud normal.
       if (incapacidad.estado === "pendiente_medico") {
@@ -289,8 +322,11 @@ export default function EditarIncapacidadPage({ params }: { params: Promise<{ id
       <IncapacidadFormFields
         value={form}
         onChange={setForm}
-        fechaIngreso={incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso ?? incapacidad.fechaDesde}
-        emergencia={incapacidad.origen === "emergencia"}
+        fechaIngreso={fechaIngresoInc}
+        emergencia={esEmergenciaInc}
+        vigente={vigente}
+        continuar={continuar}
+        onContinuarChange={setContinuar}
       />
 
       {/* Footer */}

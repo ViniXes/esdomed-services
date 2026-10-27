@@ -288,6 +288,12 @@ service cloud.firestore {
                     && request.resource.data.avisoRecibidoPor.size() >= 3
                     && request.resource.data.avisoLugar is string
                     && request.resource.data.avisoLugar.size() >= 3
+                    // Departamento y municipio de la sede (división política
+                    // vigente, 44 municipios), obligatorios desde 2026-10-27.
+                    && request.resource.data.avisoDepartamento is string
+                    && request.resource.data.avisoDepartamento.size() >= 3
+                    && request.resource.data.avisoMunicipio is string
+                    && request.resource.data.avisoMunicipio.size() >= 3
                     && !request.resource.data.keys().hasAny([
                          'revisadoPor', 'revisadoPorNombre', 'revisadoEn', 'notasComite',
                          'anuladoPor', 'anuladoPorNombre', 'anuladoEn', 'motivoAnulacion',

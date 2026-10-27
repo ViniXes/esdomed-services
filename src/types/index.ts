@@ -437,6 +437,11 @@ export interface NotificacionConapinaFgr {
   avisoFecha: Date;               // día en que se dio el aviso
   avisoRecibidoPor: string;       // nombre de quien lo recibió en la instancia
   avisoLugar: string;             // sede / lugar donde se dio
+  // Dónde queda esa sede, con la división política vigente desde mayo de 2024
+  // (lib/divisionPolitica). Obligatorios desde 2026-10-27; los avisos
+  // anteriores no los traen.
+  avisoDepartamento?: string;
+  avisoMunicipio?: string;
   avisoObservacion?: string | null;
   // Condición del paciente al momento del aviso. NO se le pregunta al médico:
   // se deriva del expediente al enviar (el formulario ya lo relee para validar
@@ -728,6 +733,22 @@ export interface ReposicionIncapacidad {
   fiehMedicoAlta?: string;        // "Nombre del médico responsable del alta"
   fiehJvpm?: string;
 }
+// Continuación de una incapacidad vigente: al ingresar, el paciente ya estaba
+// incapacitado por otra constancia que aún no terminaba. El período nuevo
+// arranca el día siguiente a que termine la anterior (los patronos rechazan
+// constancias traslapadas), la estancia ya cubierta no se cuenta otra vez y los
+// días adicionales corren desde ese fin. Ingreso y alta se imprimen tal cual.
+// Cálculo en calcularPeriodoIncapacidad (lib/incapacidades/helpers).
+export interface ContinuacionIncapacidad {
+  hastaAnterior: Date;            // último día cubierto por la incapacidad anterior
+  desdeAnterior?: Date;
+  incapacidadAnteriorId?: string; // ausente si la anterior no está en el sistema
+  aplicadaPor: string;            // nombre de quien la aplicó (médico o ESDOMED)
+  aplicadaEn: Date;
+  // Aclaración (obligatoria cuando la aplica ESDOMED). No se imprime.
+  aclaracion?: string;
+}
+
 export type InstitucionProvisional = "CRECER" | "CONFIA" | "INPEP" | "IPSFA" | "ISSS";
 export type BancoDeposito = "Promerica" | "Atlantida";
 
@@ -782,6 +803,7 @@ export interface SolicitudIncapacidad {
   diasIncapacidad: number;
   fechaDesde: Date;          // primer día de incapacidad (default = fechaAlta)
   fechaHasta: Date;          // se calcula: fechaDesde + (diasIncapacidad - 1) días
+  continuaDe?: ContinuacionIncapacidad; // inicia al terminar otra incapacidad vigente
   diagnosticoEgreso: string;
   tratamientoAlta: string;
   condicionEgreso: CondicionEgresoIncapacidad;

@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import {
   TIPO_CASO_LABEL, TIPO_CASO_CHIP, ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad,
-  INSTANCIA_LABEL, INSTANCIA_CHIP,
+  INSTANCIA_LABEL, INSTANCIA_CHIP, ubicacionAviso,
 } from "@/lib/conapinaFgr";
 import {
   ShieldAlert, Plus, X, CheckCircle2, AlertCircle, Search, ChevronLeft, ChevronRight,
@@ -543,6 +543,7 @@ export default function MedicoConapinaFgrPage() {
                       <Dato label="Fecha" valor={formatDia(detalle.avisoFecha)} />
                       <Dato label="Recibió" valor={detalle.avisoRecibidoPor || "—"} />
                       <Dato label="Lugar / sede" valor={detalle.avisoLugar || "—"} />
+                      {ubicacionAviso(detalle) && <Dato label="Ubicación" valor={ubicacionAviso(detalle)} />}
                       {detalle.avisoObservacion && <Dato label="Observación" valor={<span className="whitespace-pre-wrap italic">{detalle.avisoObservacion}</span>} />}
                     </div>
                   </section>

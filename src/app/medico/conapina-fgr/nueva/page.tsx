@@ -18,12 +18,13 @@ import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_AYUDA, esMenorDeEdad,
   INSTANCIAS, INSTANCIA_LABEL, INSTANCIA_CHIP, NOTA_MIN_SIN_CIE, NOTA_MAX,
   causaExternaCoincide, CAUSA_EXTERNA_AVISO, validarFechaHecho, validarFechaAviso,
-  duplicadosDeExpediente, AVISO_RECIBIDO_POR_MIN, AVISO_LUGAR_MIN,
+  duplicadosDeExpediente, AVISO_RECIBIDO_POR_MIN, AVISO_LUGAR_MIN, ubicacionAviso,
 } from "@/lib/conapinaFgr";
+import { DEPARTAMENTOS_SV, municipiosDe, esMunicipioDe } from "@/lib/divisionPolitica";
 import {
   ShieldAlert, X, CheckCircle2, AlertCircle, AlertTriangle, BedDouble, Car, HeartCrack,
   ChevronLeft, ArrowLeft, ArrowRight, Info, CalendarDays, Copy, MapPin, UserCheck,
-  Baby, Scale, StickyNote, ClipboardCheck, Ambulance,
+  Baby, Scale, StickyNote, ClipboardCheck, Ambulance, Building2,
 } from "lucide-react";
 import type {
   Paciente, AtencionEmergencia, DiagnosticoCIE, TipoCasoConapinaFgr, NotificacionConapinaFgr, InstanciaAviso,
@@ -104,6 +105,9 @@ function NuevaNotificacionConapinaFgr() {
   const [avisoFecha, setAvisoFecha] = useState(hoyISO());
   const [avisoRecibidoPor, setAvisoRecibidoPor] = useState("");
   const [avisoLugar, setAvisoLugar] = useState("");
+  // Dónde queda la sede, con la división política vigente (44 municipios).
+  const [avisoDepartamento, setAvisoDepartamento] = useState("");
+  const [avisoMunicipio, setAvisoMunicipio] = useState("");
   const [avisoObservacion, setAvisoObservacion] = useState("");
 
   useEffect(() => {
@@ -160,7 +164,8 @@ function NuevaNotificacionConapinaFgr() {
   const avisoListo =
     !!avisoInstancia && !!avisoFecha && !errorFechaAviso
     && avisoRecibidoPor.trim().length >= AVISO_RECIBIDO_POR_MIN
-    && avisoLugar.trim().length >= AVISO_LUGAR_MIN;
+    && avisoLugar.trim().length >= AVISO_LUGAR_MIN
+    && esMunicipioDe(avisoDepartamento, avisoMunicipio);
 
   const puedeAvanzar = () => {
     if (step === 1) return hayCaso;
@@ -228,6 +233,8 @@ function NuevaNotificacionConapinaFgr() {
         avisoFecha: Timestamp.fromDate(new Date(avisoFecha + "T00:00:00")),
         avisoRecibidoPor: avisoRecibidoPor.trim(),
         avisoLugar: avisoLugar.trim(),
+        avisoDepartamento,
+        avisoMunicipio,
         avisoObservacion: avisoObservacion.trim() || null,
         condicionPaciente: condicion,
         estado: "pendiente",
@@ -704,14 +711,77 @@ function NuevaNotificacionConapinaFgr() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-500">
-                  Lugar / sede <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <MapPin size={15} className="shrink-0 text-slate-400" />
-                  <input type="text" value={avisoLugar} onChange={e => setAvisoLugar(e.target.value)}
-                    placeholder="Sede u oficina donde se dio el aviso" className={inputCls} />
+              {/* Lugar: departamento → municipio (división de 2024) → sede. */}
+              <div className="space-y-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">
+                  Dónde se dio el aviso
+                </p>
+
+                <div className="sm:w-1/2 sm:pr-2">
+                  <label htmlFor="aviso-departamento" className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Departamento <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <MapPin size={15} className="shrink-0 text-slate-400" />
+                    {/* Los municipios son de un solo departamento: cambiarlo invalida el elegido. */}
+                    <select id="aviso-departamento" value={avisoDepartamento}
+                      onChange={e => { setAvisoDepartamento(e.target.value); setAvisoMunicipio(""); }}
+                      className={inputCls}>
+                      <option value="">Seleccione el departamento</option>
+                      {DEPARTAMENTOS_SV.map(d => <option key={d.nombre} value={d.nombre}>{d.nombre}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <p id="aviso-municipio" className="mb-1.5 text-xs font-medium text-slate-500">
+                    Municipio <span className="text-red-500">*</span>
+                    <span className="font-normal text-slate-400"> · división política vigente desde mayo de 2024</span>
+                  </p>
+                  {avisoDepartamento ? (
+                    <>
+                      <div role="group" aria-labelledby="aviso-municipio" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {municipiosDe(avisoDepartamento).map(m => {
+                          const activo = avisoMunicipio === m.nombre;
+                          return (
+                            <button key={m.nombre} type="button" aria-pressed={activo} onClick={() => setAvisoMunicipio(m.nombre)}
+                              className={`flex items-start gap-2 rounded-xl border p-3 text-left transition-all ${
+                                activo
+                                  ? "border-blue-300 bg-blue-50 text-blue-900 shadow-sm shadow-blue-950/5 dark:border-blue-700 dark:bg-blue-950/35 dark:text-blue-100"
+                                  : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-800"
+                              }`}>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold">{m.nombre}</span>
+                                <span className={`mt-0.5 block text-xs leading-4 ${activo ? "text-blue-800/80 dark:text-blue-200/80" : "text-slate-500 dark:text-slate-400"}`}>
+                                  {m.distritos.join(" · ")}
+                                </span>
+                              </span>
+                              {activo && <CheckCircle2 size={16} className="shrink-0 text-blue-600 dark:text-blue-300" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1.5 text-xs text-slate-400">
+                        Bajo cada municipio van sus distritos, que son los antiguos municipios: si conoce el lugar por
+                        su nombre de siempre (p. ej. Soyapango), búsquelo ahí.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-slate-300 px-3 py-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      Elija primero el departamento para ver sus municipios.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="aviso-sede" className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Sede u oficina <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Building2 size={15} className="shrink-0 text-slate-400" />
+                    <input id="aviso-sede" type="text" value={avisoLugar} onChange={e => setAvisoLugar(e.target.value)}
+                      placeholder="Ej.: Oficina Fiscal de Soyapango" className={inputCls} />
+                  </div>
                 </div>
               </div>
 
@@ -787,6 +857,7 @@ function NuevaNotificacionConapinaFgr() {
                 <Dato label="Fecha" valor={avisoFecha ? formatDia(new Date(avisoFecha + "T00:00:00")) : "—"} />
                 <Dato label="Recibió" valor={avisoRecibidoPor.trim() || "—"} />
                 <Dato label="Lugar / sede" valor={avisoLugar.trim() || "—"} />
+                <Dato label="Ubicación" valor={ubicacionAviso({ avisoMunicipio, avisoDepartamento }) || "—"} />
                 {avisoObservacion.trim() && <Dato label="Observación" valor={avisoObservacion.trim()} />}
               </div>
               </div>

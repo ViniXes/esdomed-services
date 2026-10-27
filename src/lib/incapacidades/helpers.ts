@@ -1,4 +1,4 @@
-import type { Paciente, ReposicionIncapacidad, SolicitudIncapacidad } from "@/types";
+import type { ContinuacionIncapacidad, Paciente, ReposicionIncapacidad, SolicitudIncapacidad } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 
 /**
@@ -107,6 +107,88 @@ export function calcularFechaHasta(fechaAlta: Date, diasExtras: number): Date {
   return hasta;
 }
 
+/** Día calendario siguiente, a medianoche local. */
+export function diaSiguiente(d: Date): Date {
+  const r = aMedianocheLocal(d);
+  r.setDate(r.getDate() + 1);
+  return r;
+}
+
+export interface PeriodoIncapacidad {
+  desde: Date;
+  hasta: Date;
+  /** Días de estancia que cuenta ESTA constancia (0 si los cubre la anterior). */
+  diasHospitalizacion: number;
+  total: number;
+}
+
+/**
+ * Período de la constancia — único cálculo para médico, ESDOMED y correcciones.
+ *
+ * - Hospitalización: desde = ingreso, hasta = alta + días adicionales,
+ *   total = estancia + adicionales.
+ * - Emergencia: desde = inicio (`fechaAlta`), hasta = inicio + (días − 1),
+ *   total = días prescritos.
+ * - Continuación (`hastaAnterior`: el paciente ya estaba incapacitado por otra
+ *   constancia que termina ese día): el período arranca el día siguiente para
+ *   no traslaparse, la estancia ya cubierta no se cuenta otra vez y los días
+ *   adicionales corren desde que termina la anterior (o desde el alta, si la
+ *   estancia siguió después). Ej.: anterior hasta 28/10, ingreso 19/10, alta
+ *   20/10, 90 días → del 29/10 al 26/01, 90 días.
+ *   Si la anterior termina antes del ingreso/inicio no hay traslape y se ignora.
+ */
+export function calcularPeriodoIncapacidad(p: {
+  fechaIngreso?: Date;
+  fechaAlta: Date;
+  dias: number;
+  emergencia?: boolean;
+  hastaAnterior?: Date | null;
+}): PeriodoIncapacidad {
+  const anterior = p.hastaAnterior ? aMedianocheLocal(p.hastaAnterior) : null;
+
+  if (p.emergencia || !p.fechaIngreso) {
+    const inicio = p.fechaAlta;
+    const desde = anterior && anterior.getTime() >= aMedianocheLocal(inicio).getTime()
+      ? diaSiguiente(anterior)
+      : inicio;
+    return { desde, hasta: calcularFechaHasta(desde, p.dias - 1), diasHospitalizacion: 0, total: p.dias };
+  }
+
+  if (!anterior || anterior.getTime() < aMedianocheLocal(p.fechaIngreso).getTime()) {
+    const diasHospitalizacion = calcularDiasHospitalizacion(p.fechaIngreso, p.fechaAlta);
+    return {
+      desde: p.fechaIngreso,
+      hasta: calcularFechaHasta(p.fechaAlta, p.dias),
+      diasHospitalizacion,
+      total: diasHospitalizacion + p.dias,
+    };
+  }
+
+  const desde = diaSiguiente(anterior);
+  const estanciaCubierta = aMedianocheLocal(p.fechaAlta).getTime() <= anterior.getTime();
+  const diasHospitalizacion = estanciaCubierta ? 0 : calcularDiasHospitalizacion(desde, p.fechaAlta);
+  return {
+    desde,
+    hasta: calcularFechaHasta(estanciaCubierta ? anterior : p.fechaAlta, p.dias),
+    diasHospitalizacion,
+    total: diasHospitalizacion + p.dias,
+  };
+}
+
+/**
+ * Días adicionales post-alta guardados (hospitalización), derivados de las
+ * fechas: hasta − alta, o hasta − fin de la anterior si es continuación y la
+ * anterior terminaba después del alta.
+ */
+export function diasAdicionalesGuardados(
+  inc: Pick<SolicitudIncapacidad, "fechaAlta" | "fechaHasta" | "continuaDe">,
+): number {
+  const alta = aMedianocheLocal(inc.fechaAlta);
+  const anterior = inc.continuaDe ? aMedianocheLocal(inc.continuaDe.hastaAnterior) : null;
+  const base = anterior && anterior.getTime() > alta.getTime() ? anterior : alta;
+  return Math.max(0, Math.round((aMedianocheLocal(inc.fechaHasta).getTime() - base.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
 // ── Formato de fechas para la constancia ─────────────────────────────────────
 
 const MESES_ES = [
@@ -207,6 +289,22 @@ export function reposicionDesdeData(raw: unknown): ReposicionIncapacidad | undef
   };
 }
 
+/** Convierte el bloque `continuaDe` crudo de Firestore (Timestamps) a fechas. */
+export function continuacionDesdeData(raw: unknown): ContinuacionIncapacidad | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const hastaAnterior = toDate(r.hastaAnterior);
+  if (!hastaAnterior) return undefined;
+  return {
+    hastaAnterior,
+    desdeAnterior: toDate(r.desdeAnterior),
+    incapacidadAnteriorId: r.incapacidadAnteriorId ? String(r.incapacidadAnteriorId) : undefined,
+    aplicadaPor: String(r.aplicadaPor ?? ""),
+    aplicadaEn: toDate(r.aplicadaEn) ?? new Date(),
+    aclaracion: r.aclaracion ? String(r.aclaracion) : undefined,
+  };
+}
+
 /** Mapea un documento de /incapacidades convirtiendo todas las fechas a Date. */
 export function mapIncapacidadData(id: string, data: Record<string, unknown>): SolicitudIncapacidad {
   return {
@@ -222,5 +320,6 @@ export function mapIncapacidadData(id: string, data: Record<string, unknown>): S
     fechaIngresoCorregidaEn: toDate(data.fechaIngresoCorregidaEn),
     diasCorregidosEn: toDate(data.diasCorregidosEn),
     reposicion: reposicionDesdeData(data.reposicion),
+    continuaDe: continuacionDesdeData(data.continuaDe),
   } as SolicitudIncapacidad;
 }

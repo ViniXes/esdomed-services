@@ -16,7 +16,10 @@ import {
   calcularEdad, formatFecha, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
 import { condicionEgreso, CONDICION_LABEL } from "@/lib/emergencia/helpers";
-import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, parseDateInput } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularPeriodoIncapacidad, parseDateInput } from "@/lib/incapacidades/helpers";
+import {
+  cargarIncapacidadesDelExpediente, continuacionParaFirestore, incapacidadVigenteEn,
+} from "@/lib/incapacidades/continuacion";
 import {
   IncapacidadFormFields, type IncapacidadFormValue,
 } from "@/components/incapacidades/IncapacidadFormFields";
@@ -95,6 +98,37 @@ export default function NuevaIncapacidadPage() {
     })();
     return () => { cancelado = true; };
   }, [paciente?.id, user]);
+
+  // Incapacidades previas del expediente: si una sigue vigente cuando empieza
+  // esta, se ofrece iniciarla al terminar aquella (continuación, sin traslape).
+  const expedienteSel = paciente?.expediente ?? atencion?.expediente ?? "";
+  // Ambos estados van amarrados al expediente: al cambiar de paciente se
+  // descartan solos (la detección vuelve a marcar "continuar" por defecto).
+  const [previas, setPrevias] = useState<{ exp: string; lista: SolicitudIncapacidad[] }>({ exp: "", lista: [] });
+  const [noContinuarExp, setNoContinuarExp] = useState<string | null>(null);
+  const previasExp = previas.exp === expedienteSel ? previas.lista : [];
+  const continuar = noContinuarExp !== expedienteSel;
+  const setContinuar = (v: boolean) => setNoContinuarExp(v ? null : expedienteSel);
+
+  useEffect(() => {
+    if (!expedienteSel) return;
+    let cancelado = false;
+    cargarIncapacidadesDelExpediente(expedienteSel)
+      .then((lista) => { if (!cancelado) setPrevias({ exp: expedienteSel, lista }); })
+      .catch(() => { /* no crítico: sin detección se calcula como siempre */ });
+    return () => { cancelado = true; };
+  }, [expedienteSel]);
+
+  const inicioNueva = esEmergencia
+    ? (form.fechaAlta ? parseDateInput(form.fechaAlta) : null)
+    : (paciente?.fechaIngreso ?? null);
+  const vigente = inicioNueva
+    ? incapacidadVigenteEn(previasExp, inicioNueva, {
+        pacienteId: esEmergencia ? undefined : paciente?.id,
+        atencionEmergenciaId: esEmergencia ? atencion?.id : undefined,
+      })
+    : null;
+  const hastaAnterior = vigente && continuar ? vigente.hasta : null;
 
   const cambiarFuente = (f: "hospitalizacion" | "emergencia") => {
     setFuente(f);
@@ -222,10 +256,11 @@ export default function NuevaIncapacidadPage() {
         doc.pacienteNombre = atencion.pacienteNombre;
         doc.servicioPaciente = "Emergencia";
         doc.medicoServicio = profile.servicio ?? (profile.servicios?.[0] ?? "Emergencia");
-        doc.diasIncapacidad = diasNum;
-        doc.fechaDesde = Timestamp.fromDate(fAlta);
         // El día de la consulta cuenta como primer día: hasta = inicio + (días − 1).
-        doc.fechaHasta = Timestamp.fromDate(calcularFechaHasta(fAlta, diasNum - 1));
+        const p = calcularPeriodoIncapacidad({ fechaAlta: fAlta, dias: diasNum, emergencia: true, hastaAnterior });
+        doc.diasIncapacidad = p.total;
+        doc.fechaDesde = Timestamp.fromDate(p.desde);
+        doc.fechaHasta = Timestamp.fromDate(p.hasta);
         if (atencion.dui)    doc.pacienteDui = atencion.dui;
         if (atencion.genero) doc.pacienteGenero = atencion.genero;
       } else if (paciente) {
@@ -238,13 +273,15 @@ export default function NuevaIncapacidadPage() {
         doc.pacienteNombre = nombreCompleto(paciente);
         doc.servicioPaciente = paciente.servicioActual;
         doc.medicoServicio = profile.tipoMedico ? paciente.servicioActual : (profile.servicio ?? (profile.servicios?.[0] ?? ""));
-        doc.diasIncapacidad = calcularDiasHospitalizacion(fDesde, fAlta) + diasNum;
-        doc.fechaDesde = Timestamp.fromDate(fDesde);
-        doc.fechaHasta = Timestamp.fromDate(calcularFechaHasta(fAlta, diasNum));
+        const p = calcularPeriodoIncapacidad({ fechaIngreso: fDesde, fechaAlta: fAlta, dias: diasNum, hastaAnterior });
+        doc.diasIncapacidad = p.total;
+        doc.fechaDesde = Timestamp.fromDate(p.desde);
+        doc.fechaHasta = Timestamp.fromDate(p.hasta);
         if (paciente.camaActual) doc.camaPaciente = paciente.camaActual;
         if (paciente.genero)     doc.pacienteGenero = paciente.genero;
         if (paciente.dui)        doc.pacienteDui = paciente.dui;
       }
+      if (vigente && hastaAnterior) doc.continuaDe = continuacionParaFirestore(vigente, profile.nombre);
 
       await addDoc(collection(db, "incapacidades"), doc);
       router.push("/medico/incapacidades");
@@ -265,12 +302,17 @@ export default function NuevaIncapacidadPage() {
 
   const fechaAltaPrevia = form.fechaAlta ? parseDateInput(form.fechaAlta) : null;
   const diasPosterioresPrevia = parseInt(form.diasExtras, 10);
-  const diasHospitalizacionPrevia = paciente && fechaAltaPrevia
-    ? calcularDiasHospitalizacion(paciente.fechaIngreso, fechaAltaPrevia)
+  const periodoPrevia = fechaAltaPrevia && !isNaN(diasPosterioresPrevia) && (esEmergencia || paciente)
+    ? calcularPeriodoIncapacidad({
+        fechaIngreso: esEmergencia ? undefined : paciente?.fechaIngreso,
+        fechaAlta: fechaAltaPrevia,
+        dias: diasPosterioresPrevia,
+        emergencia: esEmergencia,
+        hastaAnterior,
+      })
     : null;
-  const totalPeriodoPrevia = esEmergencia
-    ? (isNaN(diasPosterioresPrevia) ? null : diasPosterioresPrevia)
-    : (diasHospitalizacionPrevia === null || isNaN(diasPosterioresPrevia) ? null : diasHospitalizacionPrevia + diasPosterioresPrevia);
+  const diasHospitalizacionPrevia = !esEmergencia && periodoPrevia ? periodoPrevia.diasHospitalizacion : null;
+  const totalPeriodoPrevia = periodoPrevia ? periodoPrevia.total : null;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
@@ -469,6 +511,9 @@ export default function NuevaIncapacidadPage() {
           onChange={setForm}
           fechaIngreso={paciente?.fechaIngreso}
           emergencia={esEmergencia}
+          vigente={vigente}
+          continuar={continuar}
+          onContinuarChange={setContinuar}
         />
       )}
 
@@ -486,6 +531,12 @@ export default function NuevaIncapacidadPage() {
             <div className="rounded-xl border border-indigo-100 bg-white/70 p-3 dark:border-indigo-900/50 dark:bg-slate-900/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Días posteriores</p><p className="mt-1 text-sm font-semibold text-slate-800 dark:text-white">{isNaN(diasPosterioresPrevia) ? "—" : `${diasPosterioresPrevia} días`}</p><p className="mt-0.5 text-[11px] text-slate-500">{esEmergencia ? "Días prescritos" : "Posteriores al alta"}</p></div>
             <div className="rounded-xl border border-indigo-200 bg-indigo-100/70 p-3 dark:border-indigo-800 dark:bg-indigo-950/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Total del período</p><p className="mt-1 text-lg font-bold text-indigo-900 dark:text-indigo-100">{totalPeriodoPrevia === null ? "—" : `${totalPeriodoPrevia} días`}</p><p className="mt-0.5 text-[11px] text-indigo-700/80 dark:text-indigo-300/80">{esEmergencia ? "Incapacidad indicada" : `${diasHospitalizacionPrevia ?? 0} hosp. + ${isNaN(diasPosterioresPrevia) ? 0 : diasPosterioresPrevia} post-alta`}</p></div>
           </div>
+          {periodoPrevia && (
+            <p className="mt-2 rounded-xl border border-indigo-100 bg-white/70 px-3 py-2 text-xs text-slate-600 dark:border-indigo-900/50 dark:bg-slate-900/50 dark:text-slate-300">
+              Período de la constancia: del <span className="font-semibold">{formatFecha(periodoPrevia.desde)}</span> al <span className="font-semibold">{formatFecha(periodoPrevia.hasta)}</span>
+              {hastaAnterior && <> · inicia al terminar la incapacidad vigente (hasta el {formatFecha(hastaAnterior)})</>}
+            </p>
+          )}
           <div className="mt-3 rounded-xl border border-indigo-100 bg-white/70 p-3 text-sm dark:border-indigo-900/50 dark:bg-slate-900/50"><p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Diagnóstico de egreso</p><p className="mt-1 text-slate-700 dark:text-slate-200">{form.diagnosticoEgreso}</p><p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">Tratamiento al alta</p><p className="mt-1 text-slate-700 dark:text-slate-200">{form.tratamientoAlta}</p></div>
         </section>
       )}

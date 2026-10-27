@@ -175,6 +175,12 @@ export const NOTA_MAX = 1000;
 export const AVISO_RECIBIDO_POR_MIN = 3;
 export const AVISO_LUGAR_MIN = 3;
 
+// "San Salvador Este, San Salvador" (municipio, departamento); vacío en los
+// avisos anteriores a que se pidieran.
+export function ubicacionAviso(n: Pick<NotificacionConapinaFgr, "avisoMunicipio" | "avisoDepartamento">): string {
+  return [n.avisoMunicipio, n.avisoDepartamento].filter(Boolean).join(", ");
+}
+
 // ── Clasificación CIE-10 de lesiones intencionales ──────────────────────────
 // Un mismo criterio para dos usos: avisar al médico si la causa externa no
 // concuerda con el tipo de caso, y detectar los ingresos por lesión intencional
