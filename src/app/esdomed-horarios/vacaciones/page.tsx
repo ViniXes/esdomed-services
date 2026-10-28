@@ -11,6 +11,7 @@ import {
   bloqueoQuincena,
   cargarProgramacionVacaciones,
   claveQuincena,
+  CUPOS_POR_QUINCENA,
   diasQuincena,
   etiquetaCortaQuincena,
   guardarProgramacionVacaciones,
@@ -19,7 +20,7 @@ import {
   type Quincena,
 } from "@/lib/esdomed/vacaciones";
 import { ImportarVacacionesModal, type PersonaVacaciones } from "@/components/esdomed-horarios/ImportarVacacionesModal";
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Lock, Plane, Save, Users, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, FileSpreadsheet, Lock, Plane, Save, Users, XCircle } from "lucide-react";
 
 interface ProgramaLocal {
   anio: number;
@@ -33,11 +34,10 @@ interface ProgramaLocal {
 type Aviso = { tipo: "exito" | "error" | "alerta"; titulo: string; mensaje: string };
 type Confirmacion = { titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void };
 
-const selectCls = "w-full rounded-lg border border-slate-300 bg-slate-100 px-2.5 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
-
 const ANIO_HOY = new Date().getFullYear();
 // A partir de octubre se programa el año siguiente.
 const ANIO_INICIAL = new Date().getMonth() >= 9 ? ANIO_HOY + 1 : ANIO_HOY;
+const QUINCENAS: Quincena[] = [1, 2];
 
 const ordenarAsignaciones = (lista: VacacionProgramada[]) =>
   [...lista].sort((a, b) => a.mes - b.mes || a.quincena - b.quincena);
@@ -48,6 +48,15 @@ function milisegundos(valor: unknown): number | null {
     return (valor as { toMillis: () => number }).toMillis();
   }
   return null;
+}
+
+// En el cupo cabe poco: nombre + primer apellido cuando el nombre completo es
+// largo ("Gabriela Alejandra Calpaño Rodriguez" → "Gabriela Calpaño"). El
+// completo va en el tooltip y en la lista para elegir.
+const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y"]);
+function nombreCorto(nombre: string): string {
+  const palabras = nombre.trim().split(/\s+/).filter((p) => !PARTICULAS.has(p.toLowerCase()));
+  return palabras.length >= 4 ? `${palabras[0]} ${palabras[2]}` : nombre;
 }
 
 export default function VacacionesPage() {
@@ -191,7 +200,7 @@ export default function VacacionesPage() {
       setAviso({
         tipo: "alerta",
         titulo: "Programación importada",
-        mensaje: `Se cargaron ${lista.length} periodo(s). Revise los avisos de la derecha y presione Guardar para que quede firme.`,
+        mensaje: `Se cargaron ${lista.length} periodo(s). Revise los avisos de arriba y presione Guardar para que quede firme.`,
       });
     };
     if (asignaciones.length === 0) { usar(); return; }
@@ -269,17 +278,24 @@ export default function VacacionesPage() {
     });
   };
 
+  const conVacaciones = operativos.length - revision.sinVacaciones.length;
+  const estadoGuardado = sinGuardar
+    ? "Cambios sin guardar"
+    : programa?.actualizadoEn
+      ? `Guardada por ${programa.actualizadoPorNombre} el ${new Date(programa.actualizadoEn).toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short" })}`
+      : "Aún no hay programación guardada para este año";
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-blue-800 dark:text-blue-300">
             <Plane size={13} /> Plan de trabajo
           </div>
           <h1 className="mt-1 text-xl font-bold text-slate-900 dark:text-white sm:text-2xl font-heading">Vacaciones {anio}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            15 días por persona dentro del mes (1ra quincena del 1 al 15, 2da del 16 al 30), máximo dos personas por
-            quincena, solo personal operativo. El plan de cada mes las marca como VAC automáticamente.
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            15 días por persona dentro del mes · máximo dos por quincena · solo personal operativo. El plan de cada mes
+            las marca como VAC.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -318,136 +334,157 @@ export default function VacacionesPage() {
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         </div>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
-          {/* Quincenas del año */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5 text-xs dark:border-slate-800">
-              <span className="font-medium text-slate-600 dark:text-slate-300">
-                {asignaciones.length} periodo(s) programados
-              </span>
-              <span className={sinGuardar ? "font-semibold text-amber-700 dark:text-amber-300" : "text-slate-500 dark:text-slate-400"}>
-                {sinGuardar
-                  ? "Cambios sin guardar"
-                  : programa?.actualizadoEn
-                    ? `Guardada por ${programa.actualizadoPorNombre} el ${new Date(programa.actualizadoEn).toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short" })}`
-                    : "Aún no se ha guardado una programación para este año"}
-              </span>
-            </div>
-            {QUINCENAS_DEL_ANIO.map(({ mes, quincena }) => {
-              const bloqueo = bloqueoQuincena(anio, mes, quincena);
-              const lista = cuposDe(mes, quincena);
-              const { desde, hasta } = diasQuincena(quincena);
-              const grupoRepetido = revision.mismoGrupo.find((q) => q.mes === mes && q.quincena === quincena);
-              return (
-                <div key={claveQuincena(mes, quincena)}
-                  className={`grid gap-2 px-4 py-2.5 sm:grid-cols-[9.5rem_minmax(0,1fr)_minmax(0,1fr)] sm:items-center ${
-                    quincena === 1 && mes > 1 ? "border-t border-slate-200 dark:border-slate-800" : ""
-                  }`}>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {NOMBRES_MES[mes - 1]} <span className="font-normal text-slate-500 dark:text-slate-400">· {quincena === 1 ? "1ra" : "2da"}</span>
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">del {desde} al {hasta}</p>
-                  </div>
-                  {bloqueo ? (
-                    <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600 dark:bg-slate-800/70 dark:text-slate-300 sm:col-span-2">
-                      <Lock size={13} className="shrink-0" /> Sin vacaciones · {bloqueo}
-                      {lista.length > 0 && (
-                        <span className="ml-auto font-semibold text-rose-700 dark:text-rose-300">
-                          {lista.map((a) => a.nombre).join(", ")}: mover
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    [0, 1].map((idx) => {
-                      const actual = lista[idx];
-                      const repetido = !!actual && periodosDe(actual.uid).length > 1;
-                      if (!esAdmin) {
-                        return (
-                          <p key={idx} className={`truncate text-sm ${actual ? "text-slate-800 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}`}>
-                            {actual?.nombre ?? "Libre"}
-                          </p>
-                        );
-                      }
-                      return (
-                        <div key={idx}>
-                          <select value={actual?.uid ?? ""} disabled={idx === 1 && lista.length === 0}
-                            onChange={(e) => asignarCupo(mes, quincena, idx, e.target.value)}
-                            aria-label={`${NOMBRES_MES[mes - 1]}, ${quincena === 1 ? "primera" : "segunda"} quincena, cupo ${idx + 1}`}
-                            className={`${selectCls} ${repetido || grupoRepetido ? "border-amber-400 dark:border-amber-600" : ""}`}>
-                            <option value="">— Libre —</option>
-                            {actual && !operativos.some((p) => p.uid === actual.uid) && (
-                              <option value={actual.uid}>{actual.nombre} (no es operativo vigente)</option>
-                            )}
-                            {operativos.map((p) => {
-                              const otras = periodosDe(p.uid).filter((a) => !(a.mes === mes && a.quincena === quincena));
-                              const enEsta = lista.some((a, i) => i !== idx && a.uid === p.uid);
-                              return (
-                                <option key={p.uid} value={p.uid} disabled={enEsta}>
-                                  {p.nombre}{p.grupo ? ` · ${p.grupo}` : ""}
-                                  {otras.length > 0 ? ` — ya en ${otras.map((o) => etiquetaCortaQuincena(o.mes, o.quincena)).join(", ")}` : ""}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          {idx === 1 && grupoRepetido && (
-                            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">Los dos son de {grupoRepetido.grupo}.</p>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              );
-            })}
+        <>
+          {/* Revisión en una franja: libera el ancho para el calendario. */}
+          <section className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {conVacaciones} de {operativos.length} con vacaciones
+            </p>
+            <ul className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+              <Indicador ok={revision.sinVacaciones.length === 0}
+                texto={revision.sinVacaciones.length === 0 ? "Nadie sin vacaciones" : `${revision.sinVacaciones.length} sin programar`} />
+              <Indicador ok={revision.repetidos.length === 0}
+                texto={revision.repetidos.length === 0 ? "Nadie repetido" : `Repetido: ${revision.repetidos.map((l) => nombreCorto(l[0].nombre)).join(", ")}`} />
+              <Indicador ok={revision.mismoGrupo.length === 0}
+                texto={revision.mismoGrupo.length === 0 ? "Ningún grupo con dos fuera" : `${revision.mismoGrupo.length} quincena(s) con dos del mismo grupo`} />
+              {revision.noOperativos.length > 0 && (
+                <Indicador ok={false} texto={`${revision.noOperativos.length} que no son operativos vigentes`} />
+              )}
+            </ul>
+            <p className={`text-xs sm:ml-auto ${sinGuardar ? "font-semibold text-amber-700 dark:text-amber-300" : "text-slate-500 dark:text-slate-400"}`}>
+              {estadoGuardado}
+            </p>
           </section>
 
-          {/* Revisión y personal */}
-          <aside className="space-y-4">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">Revisión</p>
-              <ul className="space-y-2 text-sm">
-                <Indicador ok={revision.sinVacaciones.length === 0}
-                  texto={revision.sinVacaciones.length === 0 ? "Todo el personal operativo tiene vacaciones" : `${revision.sinVacaciones.length} sin vacaciones programadas`} />
-                <Indicador ok={revision.repetidos.length === 0}
-                  texto={revision.repetidos.length === 0 ? "Nadie repetido" : `${revision.repetidos.length} con más de un periodo: ${revision.repetidos.map((l) => l[0].nombre).join(", ")}`} />
-                <Indicador ok={revision.mismoGrupo.length === 0}
-                  texto={revision.mismoGrupo.length === 0 ? "Ninguna quincena deja a un grupo con dos fuera" : `${revision.mismoGrupo.length} quincena(s) con dos del mismo grupo`} />
-                {revision.noOperativos.length > 0 && (
-                  <Indicador ok={false} texto={`${revision.noOperativos.length} programado(s) que no son operativos vigentes`} />
-                )}
-              </ul>
-            </section>
+          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_18rem]">
+            {/* El año: un mes por fila, las dos quincenas lado a lado. */}
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+              <div className="hidden grid-cols-[7rem_minmax(0,1fr)] gap-4 border-b border-slate-200 bg-slate-50/80 px-4 py-2 dark:border-slate-800 dark:bg-slate-800/40 lg:grid">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Mes</span>
+                <div className="grid grid-cols-2 gap-4">
+                  {QUINCENAS.map((q) => {
+                    const { desde, hasta } = diasQuincena(q);
+                    return (
+                      <span key={q} className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                        {q === 1 ? "1ra" : "2da"} quincena · del {desde} al {hasta}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">
-                <Users size={12} /> Personal operativo · {operativos.length}
-              </p>
-              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-                {operativos.map((p) => {
-                  const periodos = periodosDe(p.uid);
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {NOMBRES_MES.map((nombreMes, i) => {
+                  const mes = i + 1;
+                  const disponibles = QUINCENAS.filter((q) => !bloqueoQuincena(anio, mes, q)).length * CUPOS_POR_QUINCENA;
+                  const ocupados = QUINCENAS.reduce((n, q) => n + (bloqueoQuincena(anio, mes, q) ? 0 : cuposDe(mes, q).length), 0);
                   return (
-                    <li key={p.uid} className="flex items-center gap-2 py-1.5">
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${COLOR_GRUPO[p.grupo]?.dot ?? "bg-slate-300 dark:bg-slate-600"}`} title={p.grupo || "Sin grupo"} />
-                      <span className="min-w-0 flex-1 truncate text-xs text-slate-700 dark:text-slate-200">{p.nombre}</span>
-                      {periodos.length === 0 ? (
-                        <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Sin programar</span>
-                      ) : (
-                        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-                          periodos.length > 1
-                            ? "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                            : "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200"
-                        }`}>
-                          {periodos.map((a) => etiquetaCortaQuincena(a.mes, a.quincena)).join(" + ")}
-                        </span>
-                      )}
-                    </li>
+                    <div key={mes} className="grid gap-x-4 gap-y-2 px-4 py-2.5 md:grid-cols-[7rem_minmax(0,1fr)] md:items-center">
+                      <div className="flex items-baseline justify-between gap-2 md:block">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{nombreMes}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{ocupados} de {disponibles} cupos</p>
+                      </div>
+                      <div className="grid gap-2 lg:grid-cols-2 lg:gap-4">
+                        {QUINCENAS.map((quincena) => {
+                          const bloqueo = bloqueoQuincena(anio, mes, quincena);
+                          const lista = cuposDe(mes, quincena);
+                          const { desde, hasta } = diasQuincena(quincena);
+                          const grupoRepetido = revision.mismoGrupo.find((q) => q.mes === mes && q.quincena === quincena);
+                          return (
+                            <div key={claveQuincena(mes, quincena)} className="min-w-0">
+                              <p className="mb-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 lg:hidden">
+                                {quincena === 1 ? "1ra" : "2da"} · del {desde} al {hasta}
+                              </p>
+                              {bloqueo ? (
+                                <div className="flex h-[2.375rem] items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-medium text-slate-600 dark:bg-slate-800/70 dark:text-slate-300">
+                                  <Lock size={13} className="shrink-0" />
+                                  <span className="truncate">Sin vacaciones · {bloqueo}</span>
+                                  {lista.length > 0 && (
+                                    <span className="ml-auto shrink-0 font-semibold text-rose-700 dark:text-rose-300" title={lista.map((a) => a.nombre).join(", ")}>
+                                      {lista.length} por mover
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {[0, 1].map((idx) => {
+                                    const actual = lista[idx];
+                                    const persona = actual ? porUid.get(actual.uid) : undefined;
+                                    const conAviso = !!actual && (periodosDe(actual.uid).length > 1 || !!grupoRepetido
+                                      || !persona || persona.administrativo);
+                                    return (
+                                      <Cupo key={idx}
+                                        actual={actual}
+                                        grupo={persona?.grupo ?? ""}
+                                        conAviso={conAviso}
+                                        editable={esAdmin}
+                                        deshabilitado={idx === 1 && lista.length === 0}
+                                        ariaLabel={`${nombreMes}, ${quincena === 1 ? "primera" : "segunda"} quincena, cupo ${idx + 1}`}
+                                        onChange={(uid) => asignarCupo(mes, quincena, idx, uid)}>
+                                        <option value="">— Libre —</option>
+                                        {actual && !operativos.some((p) => p.uid === actual.uid) && (
+                                          <option value={actual.uid}>{actual.nombre} (no es operativo vigente)</option>
+                                        )}
+                                        {operativos.map((p) => {
+                                          const otras = periodosDe(p.uid).filter((a) => !(a.mes === mes && a.quincena === quincena));
+                                          const enEsta = lista.some((a, j) => j !== idx && a.uid === p.uid);
+                                          return (
+                                            <option key={p.uid} value={p.uid} disabled={enEsta}>
+                                              {p.nombre}{p.grupo ? ` · ${p.grupo}` : ""}
+                                              {otras.length > 0 ? ` — ya en ${otras.map((o) => etiquetaCortaQuincena(o.mes, o.quincena)).join(", ")}` : ""}
+                                            </option>
+                                          );
+                                        })}
+                                      </Cupo>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {grupoRepetido && (
+                                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">Los dos son de {grupoRepetido.grupo}.</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             </section>
-          </aside>
-        </div>
+
+            {/* Personal: al lado solo en pantallas muy anchas; si no, debajo en columnas. */}
+            <aside className="2xl:sticky 2xl:top-4 2xl:self-start">
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 2xl:max-h-[calc(100vh-2rem)] 2xl:overflow-y-auto">
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800 dark:text-blue-300">
+                  <Users size={12} /> Personal operativo · {operativos.length}
+                </p>
+                <ul className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-1">
+                  {operativos.map((p) => {
+                    const periodos = periodosDe(p.uid);
+                    return (
+                      <li key={p.uid} className="flex items-center gap-2 border-b border-slate-100 py-1.5 dark:border-slate-800">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${COLOR_GRUPO[p.grupo]?.dot ?? "bg-slate-300 dark:bg-slate-600"}`} title={p.grupo || "Sin grupo"} />
+                        <span className="min-w-0 flex-1 truncate text-xs text-slate-700 dark:text-slate-200" title={p.nombre}>{p.nombre}</span>
+                        {periodos.length === 0 ? (
+                          <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Sin programar</span>
+                        ) : (
+                          <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                            periodos.length > 1
+                              ? "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                              : "bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-200"
+                          }`}>
+                            {periodos.map((a) => etiquetaCortaQuincena(a.mes, a.quincena)).join(" + ")}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            </aside>
+          </div>
+        </>
       )}
 
       {importando && (
@@ -491,12 +528,66 @@ export default function VacacionesPage() {
   );
 }
 
+/**
+ * Un cupo de la quincena: muestra a la persona (nombre corto + grupo) y, para
+ * el admin, lleva encima un select nativo transparente para elegir. Así se lee
+ * como una ficha pero conserva el teclado y el lector de pantalla del select.
+ */
+function Cupo({ actual, grupo, conAviso, editable, deshabilitado, ariaLabel, onChange, children }: {
+  actual?: VacacionProgramada;
+  grupo: string;
+  conAviso: boolean;
+  editable: boolean;
+  deshabilitado: boolean;
+  ariaLabel: string;
+  onChange: (uid: string) => void;
+  children: React.ReactNode;
+}) {
+  const corto = COLOR_GRUPO[grupo]?.corto;
+  return (
+    <div title={actual?.nombre}
+      className={`relative flex h-[2.375rem] min-w-0 items-center gap-2 rounded-lg border px-2.5 transition-colors ${
+        actual
+          ? conAviso
+            ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30"
+            : "border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30"
+          : "border-dashed border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900"
+      } ${editable && !deshabilitado ? "focus-within:ring-2 focus-within:ring-blue-500 hover:border-blue-400 dark:hover:border-blue-600" : ""} ${
+        deshabilitado ? "opacity-50" : ""
+      }`}>
+      {actual ? (
+        <>
+          <span className={`h-2 w-2 shrink-0 rounded-full ${COLOR_GRUPO[grupo]?.dot ?? "bg-slate-300 dark:bg-slate-600"}`} />
+          <span className={`min-w-0 flex-1 truncate text-sm font-medium ${conAviso ? "text-amber-950 dark:text-amber-100" : "text-blue-950 dark:text-blue-50"}`}>
+            {nombreCorto(actual.nombre)}
+          </span>
+          {corto && (
+            <span className={`shrink-0 text-[10px] font-semibold ${conAviso ? "text-amber-800 dark:text-amber-300" : "text-blue-800 dark:text-blue-300"}`}>{corto}</span>
+          )}
+        </>
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-sm text-slate-400 dark:text-slate-500">Libre</span>
+      )}
+      {editable && (
+        <>
+          <ChevronDown size={14} className={`shrink-0 ${actual ? (conAviso ? "text-amber-700 dark:text-amber-300" : "text-blue-700 dark:text-blue-300") : "text-slate-400"}`} />
+          <select value={actual?.uid ?? ""} disabled={deshabilitado} aria-label={ariaLabel}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed">
+            {children}
+          </select>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Indicador({ ok, texto }: { ok: boolean; texto: string }) {
   return (
-    <li className="flex items-start gap-2">
+    <li className="flex items-center gap-1.5">
       {ok
-        ? <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        : <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />}
+        ? <CheckCircle2 size={15} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+        : <AlertTriangle size={15} className="shrink-0 text-amber-600 dark:text-amber-400" />}
       <span className={ok ? "text-slate-600 dark:text-slate-300" : "text-amber-800 dark:text-amber-200"}>{texto}</span>
     </li>
   );
