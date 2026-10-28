@@ -19,8 +19,8 @@ import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 const DOCUMENTOS = [
   {
     href: "/documentos/tutorial-notificacion-avisos.pdf",
-    titulo: "Memorándum y tutorial: notificación de avisos CONAPINA / FGR",
-    desc: "Memorándum de la Dirección, paso a paso para notificar desde el portal, criterios de aviso y directorio de las juntas de protección",
+    titulo: "Tutorial: notificación de avisos CONAPINA / FGR",
+    desc: "Paso a paso para notificar desde el portal, criterios de aviso, directorio de las juntas de protección y formulario de aviso para NNA",
   },
 ];
 
