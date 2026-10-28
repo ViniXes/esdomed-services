@@ -86,6 +86,43 @@ export function esVacacionDe(
   return codigo !== "" && normalizarCodigoMarcacion(v.codigoMarcacion) === codigo;
 }
 
+export interface VacacionDePersona {
+  anio: number;
+  mes: number;
+  quincena: Quincena;
+  desde: Date;
+  hasta: Date;
+}
+
+/**
+ * La vacación en curso o la próxima de la persona entre las programaciones
+ * dadas (p. ej. este año y el siguiente), o null si ya no le queda ninguna.
+ */
+export function proximaVacacionDe(
+  programas: { anio: number; asignaciones: VacacionProgramada[] }[],
+  persona: Pick<FilaPlanTrabajo, "uid" | "codigoMarcacion">,
+  hoy: Date,
+): VacacionDePersona | null {
+  const dia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  return programas
+    .flatMap(({ anio, asignaciones }) =>
+      asignaciones
+        .filter((v) => esVacacionDe(v, persona))
+        .map((v) => {
+          const { desde, hasta } = diasQuincena(v.quincena);
+          return {
+            anio,
+            mes: v.mes,
+            quincena: v.quincena,
+            desde: new Date(anio, v.mes - 1, desde),
+            hasta: new Date(anio, v.mes - 1, hasta),
+          };
+        }),
+    )
+    .filter((v) => v.hasta >= dia)
+    .sort((a, b) => a.desde.getTime() - b.desde.getTime())[0] ?? null;
+}
+
 /**
  * Solo se sincronizan los meses que no han terminado: los pasados son
  * historial y una vacación movida no los reescribe.
