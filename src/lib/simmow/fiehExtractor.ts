@@ -1363,6 +1363,59 @@ function extraerDepartamentoMunicipioPorCoordenadas(doc: DocumentoExtraido): Dep
   return null;
 }
 
+// ─── Tipo de afiliación ─────────────────────────────────────────────────────
+
+/**
+ * "Tipo de afiliación:" cuyo valor envuelve a una segunda línea ("Bienestar
+ * Magisterial" en la fila y "Cotizante" una línea más abajo). Mismo bug que
+ * "Departamento"/"Traslado a:": el aplanado a texto corrido manda esa segunda
+ * línea al final de la fila (aparecía después de "Único Identidad"), el regex
+ * leía solo "Bienestar Magisterial" y sin "Cotizante"/"Beneficiario" no había
+ * opción de SIMMOW que elegir.
+ *
+ * Solo se intenta cuando el valor leído no trae ya Cotizante/Beneficiario ni
+ * es "N/A": se ubica el valor por coordenadas (entre la etiqueta y "No.") y
+ * únicamente se acepta, de la línea de abajo en esa misma columna, la palabra
+ * Cotizante o Beneficiario — así nunca se arrastra texto de la fila siguiente.
+ */
+function completarTipoAfiliacionEnvuelta(doc: DocumentoExtraido, valorLeido: string): string {
+  const LINEA_ABAJO_MIN = 6;
+  const LINEA_ABAJO_MAX = 16;
+  const valorNorm = sinAcentos(valorLeido).toLowerCase().trim();
+  if (!valorNorm || /cotizante|beneficiario/.test(valorNorm) || /^(n\/?a|ninguno|ninguna)$/.test(valorNorm)) {
+    return valorLeido;
+  }
+
+  for (const pagina of doc.paginas) {
+    const etiquetas = pagina.items.filter(
+      (it) => sinAcentos(it.str).trim().toLowerCase() === "afiliacion:"
+    );
+    for (const etiqueta of etiquetas) {
+      const fila0 = pagina.items
+        .filter((it) => Math.abs(it.y - etiqueta.y) <= 3)
+        .sort((a, b) => a.x - b.x);
+      const finEtiqueta = etiqueta.x + etiqueta.w;
+      const itemNo = fila0.find((it) => it.x > finEtiqueta && /^no\.?$/i.test(it.str.trim()));
+      const limiteDerecho = itemNo ? itemNo.x : Infinity;
+      const valorItems = fila0.filter((it) => it.x > finEtiqueta + 2 && it.x < limiteDerecho - 2);
+      if (!valorItems.length) continue;
+      if (!sinAcentos(juntarPalabras(valorItems)).toLowerCase().includes(valorNorm)) continue;
+
+      const xIni = Math.min(...valorItems.map((it) => it.x));
+      const palabra = pagina.items.find(
+        (it) =>
+          etiqueta.y - it.y >= LINEA_ABAJO_MIN &&
+          etiqueta.y - it.y <= LINEA_ABAJO_MAX &&
+          it.x >= xIni - 3 &&
+          it.x < limiteDerecho - 2 &&
+          /^(cotizante|beneficiario)$/i.test(it.str.trim())
+      );
+      if (palabra) return `${valorLeido} ${palabra.str.trim()}`;
+    }
+  }
+  return valorLeido;
+}
+
 // ─── Extractor principal ────────────────────────────────────────────────────
 
 export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
@@ -1413,6 +1466,7 @@ export function extraerFieh(doc: DocumentoExtraido): ResultadoExtraccion {
       /Tipo\s+de\s+(?:afiliaci[oó]n:?\s*)?.*?\s*No\.?\s*(?:Afiliaci[oó]n:?\s*)?([A-Z0-9\-/]+)/i
     )
   );
+  datos.TIPO_AFILIACION = completarTipoAfiliacionEnvuelta(doc, datos.TIPO_AFILIACION);
   datos.TIPO_AFILIACION_VALOR = tipoAfiliacionValor(datos.TIPO_AFILIACION);
 
   datos.APELLIDOS = limpiarDato(buscar(plano, /Apellidos:\s*(.*?)\s*Nombres:/i));

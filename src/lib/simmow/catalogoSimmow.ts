@@ -85,11 +85,16 @@ export function tipoDocumentoValor(tipo: string): string {
 
 export function tipoAfiliacionValor(tipo: string): string {
   const t = sinAcentos(tipo).toLowerCase();
+  // El FIEH escribe "Bienestar Magisterial Cotizante/Beneficiario"; SIMMOW lo
+  // llama "Cotizante/Beneficiario ISBM" (Instituto Salvadoreño de Bienestar
+  // Magisterial) — sin esta equivalencia no había coincidencia y el campo
+  // quedaba vacío.
+  const esIsbm = t.includes("isbm") || t.includes("bienestar magisterial");
   if (t.includes("isss") && t.includes("cotizante")) return "1";
   if (t.includes("isss") && t.includes("beneficiario")) return "2";
   if (t.includes("veterano")) return "3";
-  if (t.includes("isbm") && t.includes("cotizante")) return "4";
-  if (t.includes("isbm") && t.includes("beneficiario")) return "5";
+  if (esIsbm && t.includes("cotizante")) return "4";
+  if (esIsbm && t.includes("beneficiario")) return "5";
   if (t.includes("ipsfa") && t.includes("cotizante")) return "6";
   if (t.includes("ipsfa") && t.includes("beneficiario")) return "7";
   return "";
