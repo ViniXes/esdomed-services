@@ -24,3 +24,26 @@ export function getLecturaConfirmada(n: NotificacionFallecido): LecturaConfirmad
   }
   return null;
 }
+
+// ── Resguardo físico de certificados ──
+// Los certificados que no se entregan (privados de libertad y cuerpos no
+// reclamados) se archivan en este mueble, en una carpeta por año de defunción;
+// la carpeta de un año nuevo sale sola de `carpetaResguardo`. Si cambia el
+// archivero o la gaveta se edita aquí: los ya archivados conservan su propia
+// ubicación (`ubicacionCertificado` es una foto al momento de archivar).
+export const ARCHIVO_RESGUARDO = {
+  archivero: "Archivero H",
+  activoFijo: "0866-153-030-03-00063",
+  gaveta: 4,
+} as const;
+
+export function certificadoEnResguardo(n: NotificacionFallecido): boolean {
+  return !!n.privadoDeLibertad || n.estadoEntregaCertificado === "resguardado";
+}
+
+export function carpetaResguardo(fechaDefuncion: unknown): string {
+  const d = (fechaDefuncion as { toDate?: () => Date } | null)?.toDate?.()
+    ?? (fechaDefuncion ? new Date(fechaDefuncion as string) : new Date());
+  const anio = Number.isNaN(d.getTime()) ? new Date().getFullYear() : d.getFullYear();
+  return `HNES-CDCI-${anio}`;
+}

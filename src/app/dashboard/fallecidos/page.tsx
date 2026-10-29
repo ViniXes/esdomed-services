@@ -5,11 +5,11 @@ import { collection, query, orderBy, onSnapshot, getDocs, deleteDoc, doc, update
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
-import { getLecturaConfirmada } from "@/lib/fallecidos";
+import { getLecturaConfirmada, ARCHIVO_RESGUARDO, carpetaResguardo, certificadoEnResguardo } from "@/lib/fallecidos";
 import { BitacoraFallecido } from "@/components/BitacoraFallecido";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive, Inbox, History, FileSignature, PenLine } from "lucide-react";
+import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive, Inbox, History, FileSignature, PenLine, MapPin } from "lucide-react";
 
 // entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
 const COLUMNAS_SEGUIMIENTO = [
@@ -67,7 +67,7 @@ function tsToDate(ts: unknown): Date | null {
 // queda resguardado en archivo interno: en ambos casos la entrega y la recepción
 // por Psic./T.S. no aplican, así que no se exigen para cerrar ni cuentan en el progreso.
 function pasosRequeridos(n: NotificacionFallecido) {
-  return n.privadoDeLibertad || n.estadoEntregaCertificado === "resguardado"
+  return certificadoEnResguardo(n)
     ? COLUMNAS_SEGUIMIENTO.filter(c => c.key !== "entregaCertificado" && c.key !== "recibeDePs")
     : COLUMNAS_SEGUIMIENTO;
 }
@@ -252,7 +252,8 @@ export default function DashboardFallecidosPage() {
       if (!t) return true;
       return (n.pacienteExpediente?.toLowerCase() ?? "").includes(t)
         || (n.pacienteNombre?.toLowerCase() ?? "").includes(t)
-        || (n.servicio?.toLowerCase() ?? "").includes(t);
+        || (n.servicio?.toLowerCase() ?? "").includes(t)
+        || (n.ubicacionCertificado?.carpeta.toLowerCase() ?? "").includes(t);
     })
     // Los certificados vencidos suben al tope (sort estable → conserva el orden por fecha dentro de cada grupo).
     .sort((a, b) => Number(esVencido(b)) - Number(esVencido(a)));
@@ -348,6 +349,29 @@ export default function DashboardFallecidosPage() {
     setUpdatingCell(null);
   };
 
+  // Registra quién archivó un certificado en resguardo interno y dónde quedó.
+  // La primera vez toma el archivero del catálogo y la carpeta del año de
+  // defunción; al cambiar solo la persona se conserva el lugar ya guardado.
+  const registrarUbicacion = async (nombre: string) => {
+    if (!selected?.id || !selectedLive) return;
+    setUpdatingCell("ubicacionCertificado");
+    const actual = selectedLive.ubicacionCertificado;
+    const lugar = actual
+      ? { archivero: actual.archivero, activoFijo: actual.activoFijo, gaveta: actual.gaveta, carpeta: actual.carpeta }
+      : { ...ARCHIVO_RESGUARDO, carpeta: carpetaResguardo(selectedLive.fechaDefuncion) };
+    await updateDoc(doc(db, "notificaciones_fallecidos", selected.id), {
+      ubicacionCertificado: nombre ? {
+        ...lugar,
+        archivadoPor: nombre,
+        archivadoPorUid: personal.find(p => p.nombre === nombre)?.uid ?? null,
+        archivadoEn: Timestamp.now(),
+        registradoPor: profile?.nombre ?? null,
+      } : null,
+    });
+    refrescarBusqueda();
+    setUpdatingCell(null);
+  };
+
   const actualizarCampo = async (campo: string, valor: string | boolean | null) => {
     if (!selected?.id) return;
     setUpdatingCell(campo);
@@ -436,14 +460,16 @@ export default function DashboardFallecidosPage() {
   const isLocked    = !!(selectedLive?.tramiteCerrado && !selectedLive.tramiteDesbloqueado);
   const isUnlocked  = !!(selectedLive?.tramiteCerrado && selectedLive.tramiteDesbloqueado);
   const todos4      = selectedLive ? pasosRequeridos(selectedLive).every(col => !!selectedLive[col.key]) : false;
-  // La entrega debe estar resuelta para cerrar: entregado al familiar, resguardado
-  // en archivo interno (cuerpo no reclamado) o en custodia interna (privado de
-  // libertad). "Pendiente" o sin definir bloquean el cierre.
+  // La entrega debe estar resuelta para cerrar: entregado al familiar o, si queda
+  // en resguardo interno (cuerpo no reclamado o privado de libertad), archivado
+  // con su ubicación física registrada. "Pendiente" o sin definir bloquean el cierre.
+  const enResguardo = !!selectedLive && certificadoEnResguardo(selectedLive);
   const entregaResuelta = !!selectedLive && (
-    !!selectedLive.privadoDeLibertad ||
-    selectedLive.estadoEntregaCertificado === "entregado" ||
-    selectedLive.estadoEntregaCertificado === "resguardado"
+    enResguardo ? !!selectedLive.ubicacionCertificado : selectedLive.estadoEntregaCertificado === "entregado"
   );
+  // La ubicación se puede registrar aun con el trámite cerrado si nunca se
+  // registró (casos cerrados antes de existir el campo); una ya puesta, no.
+  const puedeEditarUbicacion = !isLocked || !selectedLive?.ubicacionCertificado;
   const puedeCerrar = todos4 && entregaResuelta && selectedLive?.estado === "confirmado" && (!selectedLive.tramiteCerrado || isUnlocked);
   const isAdmin     = profile?.role === "admin";
 
@@ -723,6 +749,17 @@ export default function DashboardFallecidosPage() {
                               <Archive size={10} /> Resguardado en archivo
                             </span>
                           )}
+                          {certificadoEnResguardo(n) && (n.ubicacionCertificado ? (
+                            <span title={`${n.ubicacionCertificado.archivero} (activo fijo ${n.ubicacionCertificado.activoFijo}) · Gaveta ${n.ubicacionCertificado.gaveta} · Archivó ${n.ubicacionCertificado.archivadoPor}`}
+                              className="flex w-fit items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              <MapPin size={10} /> {n.ubicacionCertificado.carpeta} · Gav. {n.ubicacionCertificado.gaveta}
+                            </span>
+                          ) : (
+                            <span title="Falta registrar quién archivó el certificado y dónde (pestaña Entrega)"
+                              className="flex w-fit items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400">
+                              <MapPin size={10} /> Sin ubicar
+                            </span>
+                          ))}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -879,6 +916,14 @@ export default function DashboardFallecidosPage() {
                         <InfoCell label="Causa de muerte" value={selectedLive.causaMuerte} />
                       </div>
                     )}
+                    {enResguardo && selectedLive.ubicacionCertificado && (
+                      <div className="col-span-2">
+                        <InfoCell
+                          label="Ubicación del certificado"
+                          value={`${selectedLive.ubicacionCertificado.archivero} · Gaveta ${selectedLive.ubicacionCertificado.gaveta} · ${selectedLive.ubicacionCertificado.carpeta}`}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Confirmación de LEÍDO por Psicología / Trabajo Social.
@@ -966,6 +1011,61 @@ export default function DashboardFallecidosPage() {
                       </span>
                     </div>
                   )}
+
+                  {/* Ubicación física del certificado en resguardo interno: archivero,
+                      gaveta y carpeta del año de defunción, más quién lo archivó. */}
+                  {enResguardo && (() => {
+                    const ub = selectedLive.ubicacionCertificado;
+                    const lugar = ub ?? { ...ARCHIVO_RESGUARDO, carpeta: carpetaResguardo(selectedLive.fechaDefuncion) };
+                    return (
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                          <MapPin size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Ubicación física</p>
+                        </div>
+                        <div className="p-4 space-y-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+                            <div className="col-span-2">
+                              <p className="text-xs text-slate-500">Archivero</p>
+                              <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5">{lugar.archivero}</p>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">Activo fijo {lugar.activoFijo}</p>
+                            </div>
+                            <InfoCell label="Gaveta" value={String(lugar.gaveta)} />
+                            <div>
+                              <p className="text-xs text-slate-500">Carpeta</p>
+                              <p className="text-slate-800 dark:text-slate-200 font-medium font-mono mt-0.5 whitespace-nowrap">{lugar.carpeta}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1.5">Archivado por</label>
+                            <div className="relative">
+                              <select
+                                value={ub?.archivadoPor ?? ""}
+                                disabled={updatingCell === "ubicacionCertificado" || !puedeEditarUbicacion}
+                                onChange={e => registrarUbicacion(e.target.value)}
+                                className={selectCls}
+                              >
+                                <option value="">— Sin archivar</option>
+                                {ub?.archivadoPor && !personal.some(p => p.nombre === ub.archivadoPor) && (
+                                  <option value={ub.archivadoPor}>{ub.archivadoPor}</option>
+                                )}
+                                {personal.map(p => (
+                                  <option key={p.uid} value={p.nombre}>{p.nombre}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                            {ub?.archivadoEn && (
+                              <p className="text-[11px] mt-1.5 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded-md w-fit">
+                                <CheckCircle2 size={11} /> {formatHora(ub.archivadoEn)}
+                                {ub.registradoPor && ub.registradoPor !== ub.archivadoPor && <> · registró {ub.registradoPor}</>}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Recibe Psic./TS */}
                   {(() => {
@@ -1281,11 +1381,18 @@ export default function DashboardFallecidosPage() {
               {activeTab === "entrega" && !isLocked && selectedLive.estado === "confirmado" && todos4 && !entregaResuelta && (
                 <div className="flex items-start gap-2.5 px-3 py-2.5 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
                   <FileWarning size={14} className="mt-0.5 shrink-0" />
-                  <span>
-                    No se puede cerrar el trámite: la entrega del certificado sigue pendiente.
-                    En la pestaña <strong>Certificado</strong>, márcala como <strong>Entregado</strong> o,
-                    si nadie reclamó el cuerpo, como <strong>Resguardado en archivo interno</strong>.
-                  </span>
+                  {enResguardo ? (
+                    <span>
+                      No se puede cerrar el trámite: falta registrar quién archivó el certificado
+                      en <strong>Ubicación física</strong>.
+                    </span>
+                  ) : (
+                    <span>
+                      No se puede cerrar el trámite: la entrega del certificado sigue pendiente.
+                      En la pestaña <strong>Certificado</strong>, márcala como <strong>Entregado</strong> o,
+                      si nadie reclamó el cuerpo, como <strong>Resguardado en archivo interno</strong>.
+                    </span>
+                  )}
                 </div>
               )}
               {puedeCerrar && activeTab === "entrega" && (

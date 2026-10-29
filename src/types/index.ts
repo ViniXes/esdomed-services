@@ -598,6 +598,9 @@ export interface NotificacionFallecido {
   // ESDOMED (no se entrega a nadie salvo requerimiento de la Fiscalía). Suprime
   // la alerta de certificado vencido y el conteo de pendientes.
   privadoDeLibertad?: boolean;
+  // Dónde quedó físicamente el certificado en resguardo interno (privado de
+  // libertad o "resguardado"). Obligatoria para cerrar esos trámites.
+  ubicacionCertificado?: UbicacionCertificado | null;
   tipoCertificado?: "digital" | "manual";
   actualizoFieh?: boolean | string;
   familiarNombre?: string;
@@ -612,6 +615,19 @@ export interface NotificacionFallecido {
   tramiteDesbloqueadoPor?: string;
   tramiteDesbloqueadoEn?: Date;
   tramiteJustificacion?: string;
+}
+
+// Foto de la ubicación al momento de archivar (catálogo en ARCHIVO_RESGUARDO de
+// lib/fallecidos): si el mueble o la gaveta cambian, lo ya archivado no se mueve.
+export interface UbicacionCertificado {
+  archivero: string;
+  activoFijo: string;
+  gaveta: number;
+  carpeta: string;              // HNES-CDCI-{año de defunción}
+  archivadoPor: string;         // operativo que lo archivó (nombre como snapshot)
+  archivadoPorUid?: string | null;
+  archivadoEn: Date;
+  registradoPor?: string | null; // quien lo registró en la app
 }
 
 // ── Bitácora interna del caso (solo ESDOMED / admin) ──
