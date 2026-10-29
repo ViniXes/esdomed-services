@@ -7,11 +7,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido, UserProfile } from "@/types";
 import { getLecturaConfirmada, ARCHIVO_RESGUARDO, carpetaResguardo, certificadoEnResguardo } from "@/lib/fallecidos";
 import { BitacoraFallecido } from "@/components/BitacoraFallecido";
+import { FallecidoDetalleModal, type VistaDetalleFallecido } from "@/components/fallecidos/FallecidoDetalleModal";
+import ui from "@/components/fallecidos/FallecidosUi.module.css";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive, Inbox, History, FileSignature, PenLine, MapPin } from "lucide-react";
+import { ArrowUpRight, Circle, ClipboardCheck, Clock, X, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, FileWarning, AlertTriangle, Loader2, Lock, LockOpen, Search, MessageCircle, Trash2, ShieldCheck, Archive, Inbox, History, FileSignature, PenLine, MapPin } from "lucide-react";
 
-// entregaCertificado permanece aquí para el cálculo de todos4 y puntos de progreso
+// Los mismos pasos alimentan los requisitos de cierre y el resumen visual.
 const COLUMNAS_SEGUIMIENTO = [
   { key: "tramitaDefuncion",   keyEn: "tramitaDefuncionEn",   label: "Tramita Defunción" },
   { key: "digitaSimmow",       keyEn: "digitaSimmowEn",       label: "Digita SIMMOW" },
@@ -26,7 +28,6 @@ const PARENTESCOS = [
 ] as const;
 
 type CampoSeguimiento = typeof COLUMNAS_SEGUIMIENTO[number]["key"];
-type ActiveTab = "expediente" | "seguimiento" | "entrega" | "certificado" | "bitacora";
 // Bandeja = trámites abiertos (en vivo). Buscar = histórico bajo demanda.
 type Vista = "bandeja" | "buscar";
 
@@ -75,6 +76,26 @@ function pasosRequeridos(n: NotificacionFallecido) {
     : COLUMNAS_SEGUIMIENTO;
 }
 
+
+// Resumen de presentación de las condiciones existentes de cierre. No añade requisitos.
+function requisitosCierre(n: NotificacionFallecido) {
+  const resguardo = certificadoEnResguardo(n);
+  const etiquetas: Record<CampoSeguimiento, string> = {
+    tramitaDefuncion: "Tramitación de defunción",
+    digitaSimmow: "Registro en SIMMOW",
+    entregaCertificado: "Responsable de entrega",
+    recibeDePs: "Asignación Psicología / T.S.",
+  };
+  return [
+    { key: "confirmacion", label: "Confirmación ESDOMED", completo: n.estado === "confirmado" },
+    ...pasosRequeridos(n).map(col => ({ key: col.key, label: etiquetas[col.key], completo: !!n[col.key] })),
+    {
+      key: "resolucion", label: resguardo ? "Ubicación física registrada" : "Certificado entregado",
+      completo: resguardo ? !!n.ubicacionCertificado : n.estadoEntregaCertificado === "entregado",
+    },
+  ];
+}
+
 export default function DashboardFallecidosPage() {
   const { profile, user } = useAuth();
   const [vista, setVista] = useState<Vista>("bandeja");
@@ -99,7 +120,7 @@ export default function DashboardFallecidosPage() {
   // Qué consulta produjo los resultados de Buscar, para repetir la misma al refrescar.
   const [modoBusqueda, setModoBusqueda] = useState<"criterio" | "resguardo">("criterio");
   const [selected, setSelected] = useState<NotificacionFallecido | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("expediente");
+  const [activeTab, setActiveTab] = useState<VistaDetalleFallecido>("gestion");
   const [saving, setSaving] = useState(false);
   const [cerrando, setCerrando] = useState(false);
   const [desbloqueando, setDesbloqueando] = useState(false);
@@ -256,7 +277,7 @@ export default function DashboardFallecidosPage() {
   if (selId !== selPrev) {
     setSelPrev(selId);
     if (selected) {
-      setActiveTab("expediente");
+      setActiveTab("gestion");
       setJustificacion("");
       setFiehPendiente(false);
       setFamiliarNombre(selected.familiarNombre ?? "");
@@ -509,14 +530,6 @@ export default function DashboardFallecidosPage() {
   const selectedLive   = selected ? notificaciones.find(n => n.id === selected.id) ?? selected : null;
   const lecturaSel     = selectedLive ? getLecturaConfirmada(selectedLive) : null;
 
-  const TABS: { id: ActiveTab; label: string }[] = [
-    { id: "expediente",  label: "Expediente"  },
-    { id: "seguimiento", label: "Seguimiento" },
-    { id: "certificado", label: "Certificado" },
-    { id: "entrega",     label: "Entrega"     },
-    { id: "bitacora",    label: "Bitácora"    },
-  ];
-
   const isLocked    = !!(selectedLive?.tramiteCerrado && !selectedLive.tramiteDesbloqueado);
   const isUnlocked  = !!(selectedLive?.tramiteCerrado && selectedLive.tramiteDesbloqueado);
   const todos4      = selectedLive ? pasosRequeridos(selectedLive).every(col => !!selectedLive[col.key]) : false;
@@ -538,52 +551,36 @@ export default function DashboardFallecidosPage() {
     : null;
   const fiehChequeado = fiehNombreGuardado !== null || fiehPendiente;
 
-  return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+  const requisitos = selectedLive ? requisitosCierre(selectedLive) : [];
+  const faltantes = requisitos.filter(r => !r.completo);
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900">
-            <HeartPulse size={17} className="text-rose-600 dark:text-rose-400" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Notificaciones de fallecidos</h1>
+  return (
+    <div className={`${ui.page} space-y-5`}>
+
+      <header className={ui.pageHeading}>
+        <div>
+          <div className={ui.eyebrow}>ESDOMED <span aria-hidden="true">/</span> Solicitudes y avisos</div>
+          <h1 className="font-heading">Seguimiento de defunciones</h1>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {pendientes > 0 && (
-            <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
-              <Clock size={14} />
-              {pendientes} sin confirmar
-            </div>
-          )}
-          {certPendientes > 0 && (
-            <button
-              onClick={() => setFiltro(filtro === "cert_pendiente" ? "todos" : "cert_pendiente")}
-              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl border transition-colors ${
-                filtro === "cert_pendiente"
-                  ? "bg-orange-600 text-white border-orange-600"
-                  : "text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-900 hover:bg-orange-100 dark:hover:bg-orange-900"
-              }`}
-            >
-              <FileWarning size={14} />
-              {certPendientes} cert. pendientes
-            </button>
-          )}
-          {certVencidos > 0 && (
-            <button
-              onClick={() => setFiltro(filtro === "cert_vencido" ? "todos" : "cert_vencido")}
-              title={`Certificados pendientes de entrega con más de ${DIAS_HABILES_CERT} días hábiles desde la defunción`}
-              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl border transition-colors ${
-                filtro === "cert_vencido"
-                  ? "bg-red-600 text-white border-red-600"
-                  : "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900 hover:bg-red-100 dark:hover:bg-red-900"
-              }`}
-            >
-              <AlertTriangle size={14} />
-              {certVencidos} cert. vencidos
-            </button>
-          )}
-        </div>
+        <span className={ui.viewLabel}>{vista === "bandeja" ? "Bandeja en vivo" : "Consulta de histórico"}</span>
+      </header>
+
+      <div className={ui.stats} aria-label="Pendientes de la bandeja">
+        {([
+          { label: "Sin confirmar", value: "pendiente", count: pendientes, icon: Clock, tone: "pending" },
+          { label: "Certificados pendientes", value: "cert_pendiente", count: certPendientes, icon: FileWarning, tone: "normal" },
+          { label: `Más de ${DIAS_HABILES_CERT} días hábiles`, value: "cert_vencido", count: certVencidos, icon: AlertTriangle, tone: "alert" },
+        ] as const).map(item => (
+          <button key={item.value} type="button" className={ui.stat} data-tone={item.tone}
+            aria-pressed={vista === "bandeja" && filtro === item.value}
+            onClick={() => {
+              setVista("bandeja"); setFiltro(vista === "bandeja" && filtro === item.value ? "todos" : item.value);
+              setFiltroCarpeta(null); setFiltroTexto("");
+            }}>
+            <span><item.icon size={17} aria-hidden="true" />{item.label}</span>
+            <strong>{item.count}</strong>
+          </button>
+        ))}
       </div>
 
       {/* Vistas: bandeja de trámites abiertos (en vivo) vs histórico (bajo demanda) */}
@@ -604,7 +601,7 @@ export default function DashboardFallecidosPage() {
             <v.icon size={14} />
             {v.label}
             {v.value === "bandeja" && bandeja.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
                 {bandeja.length}
               </span>
             )}
@@ -616,7 +613,7 @@ export default function DashboardFallecidosPage() {
       <div className="flex flex-wrap items-center gap-2">
         {[
           { label: "Todos",           value: "todos"          },
-          { label: "Pendientes",      value: "pendiente"      },
+          { label: "Sin confirmar",   value: "pendiente"      },
           { label: "Confirmados",     value: "confirmado"     },
           { label: "Cert. pendiente", value: "cert_pendiente" },
           { label: "Resguardo interno", value: "resguardo"    },
@@ -727,154 +724,95 @@ export default function DashboardFallecidosPage() {
         </div>
       )}
 
-      {/* Tabla */}
+      {/* La bandeja conserva sus consultas, filtros y paginación. */}
       {buscando ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={22} className="animate-spin text-blue-500" />
-        </div>
+        <div className="flex items-center justify-center py-16"><Loader2 size={22} className="animate-spin text-blue-500" aria-label="Buscando" /></div>
       ) : displayList.length === 0 ? (
-        <p className="text-sm text-slate-500 py-10 text-center">
-          {vista === "buscar"
-            ? (resultados === null
-                ? "Indica un expediente o un rango de fechas y pulsa Buscar."
-                : "Sin resultados para esa búsqueda.")
-            : (bandeja.length === 0
-                ? "No hay trámites pendientes de cierre."
-                : "Sin notificaciones en este filtro.")}
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 py-14 text-center dark:border-slate-700">
+          <Inbox size={26} strokeWidth={1.5} className="text-slate-400" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {vista === "buscar" ? (resultados === null ? "Busca por expediente, fecha o resguardo interno." : "Sin resultados para esa búsqueda.")
+              : (bandeja.length === 0 ? "No hay trámites pendientes de cierre." : "Sin notificaciones en este filtro.")}
+          </p>
+        </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Paciente</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Servicio / Fecha</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Médico</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Seguimiento</th>
-                  <th className="px-4 py-3" />
+                <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-400">
+                  <th className="px-5 py-3.5 font-medium">Expediente / Paciente</th>
+                  <th className="px-4 py-3.5 font-medium">Defunción</th>
+                  <th className="px-4 py-3.5 font-medium">Notificado por</th>
+                  <th className="px-4 py-3.5 font-medium">Confirmación</th>
+                  <th className="px-4 py-3.5 font-medium">Control del trámite</th>
+                  <th className="px-4 py-3.5"><span className="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginados.map(n => {
-                  const colsReq = pasosRequeridos(n);
-                  const pasos = colsReq.filter(col => !!n[col.key]).length;
+                  const req = requisitosCierre(n);
+                  const pendiente = req.find(r => !r.completo);
+                  const completos = req.filter(r => r.completo).length;
+                  const cerrado = n.tramiteCerrado && !n.tramiteDesbloqueado;
                   return (
-                    <tr key={n.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-sm">{n.pacienteExpediente}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{n.pacienteNombre}</p>
+                    <tr key={n.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30">
+                      <td className="px-5 py-4">
+                        <div className={ui.tablePatient}><strong>{n.pacienteExpediente}</strong><span>{n.pacienteNombre}</span></div>
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="text-slate-700 dark:text-slate-300">{n.servicio} · Cama {n.cama}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">† {formatFechaHora(n.fechaDefuncion)}</p>
+                      <td className="px-4 py-4">
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300">{formatFechaHora(n.fechaDefuncion)}</p>
+                        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">{n.servicio} · Cama {n.cama}</p>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
-                        <p>Dr. {n.medicoNombre}</p>
-                        {/* Hora en que el médico envió la notificación (no la de defunción) */}
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                          Reportado {formatFechaHora(n.creadoEn)}
-                        </p>
+                      <td className="px-4 py-4 text-xs">
+                        <p className="text-slate-600 dark:text-slate-300">Dr. {n.medicoNombre}</p>
+                        <p className="mt-1.5 text-slate-500 dark:text-slate-400">{formatFechaHora(n.creadoEn)}</p>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-1.5">
-                          <Badge estado={n.estado} />
-                          {/* Tipo de certificado de defunción: digital (SIMMOW) o manual (libreta) */}
-                          {n.tipoCertificado === "digital" ? (
-                            <span title="Certificado de defunción digital (SIMMOW)"
-                              className="flex w-fit items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-400">
-                              <FileSignature size={10} /> Digital
-                            </span>
-                          ) : n.tipoCertificado === "manual" ? (
-                            <span title="Certificado de defunción manual (llenado a mano)"
-                              className="flex w-fit items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-400">
-                              <PenLine size={10} /> Manual
-                            </span>
-                          ) : (
-                            <span title="Falta indicar si el certificado es digital o manual (pestaña Certificado)"
-                              className="flex w-fit items-center gap-1 rounded-md border border-dashed border-slate-300 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 dark:border-slate-600">
-                              Cert. sin definir
-                            </span>
-                          )}
-                        </div>
+                      <td className="px-4 py-4">
+                        <Badge estado={n.estado} />
+                        <span className={ui.certificateType}>
+                          {n.tipoCertificado === "digital" ? <><FileSignature size={12} aria-hidden="true" /> Digital</>
+                            : n.tipoCertificado === "manual" ? <><PenLine size={12} aria-hidden="true" /> Manual</> : "Certificado sin definir"}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {colsReq.map(col => (
-                              <div key={col.key} title={col.label}
-                                className={`w-2 h-2 rounded-full ${!!n[col.key] ? "bg-green-500" : "bg-slate-300 dark:bg-slate-600"}`} />
-                            ))}
-                            <span className="text-xs text-slate-500 ml-1">{pasos}/{colsReq.length}</span>
+                      <td className="px-4 py-4">
+                        <div className={ui.rowProgress}>
+                          <p>{cerrado ? <span className="inline-flex items-center gap-1.5"><Lock size={12} aria-hidden="true" /> Trámite cerrado</span>
+                            : n.tramiteDesbloqueado ? "Registro desbloqueado" : pendiente ? "Falta: " + pendiente.label : "Listo para cerrar"}</p>
+                          <div className={ui.progressTrack} aria-label={completos + " de " + req.length + " requisitos de cierre completos"}>
+                            {req.map(r => <span key={r.key} data-complete={r.completo} title={r.label + (r.completo ? ": completo" : ": pendiente")} />)}
+                            <small>{completos}/{req.length}</small>
                           </div>
-                          {n.tramiteCerrado && !n.tramiteDesbloqueado && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-1.5 py-0.5 rounded-md">
-                              <Lock size={9} /> Cerrado
-                            </span>
-                          )}
-                          {n.tramiteDesbloqueado && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-1.5 py-0.5 rounded-md">
-                              <LockOpen size={9} /> Desbloqueado
-                            </span>
-                          )}
-                          {n.privadoDeLibertad ? (
-                            <span title="Privado de libertad: el certificado queda en custodia interna de ESDOMED (no se entrega salvo requerimiento de la Fiscalía)"
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-900 px-1.5 py-0.5 rounded-md">
-                              <ShieldCheck size={10} /> En custodia interna
-                            </span>
-                          ) : n.estadoEntregaCertificado === "pendiente" ? (
-                            esVencido(n) ? (
-                              <span title={`Más de ${DIAS_HABILES_CERT} días hábiles desde la defunción sin entregar el certificado`}
-                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 px-1.5 py-0.5 rounded-md">
-                                <AlertTriangle size={10} /> {certDiasHabiles.get(n.id ?? "")} días háb. sin entregar
+                          <div className={ui.certificateStatus}>
+                            {certificadoEnResguardo(n) ? (
+                              <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                {n.privadoDeLibertad ? <ShieldCheck size={12} aria-hidden="true" /> : <Archive size={12} aria-hidden="true" />}
+                                {n.ubicacionCertificado ? n.ubicacionCertificado.carpeta + " · Gav. " + n.ubicacionCertificado.gaveta
+                                  : n.privadoDeLibertad ? "Custodia · Sin ubicar" : "Resguardo · Sin ubicar"}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 px-1.5 py-0.5 rounded-md">
-                                <FileWarning size={10} /> Cert. pendiente
+                            ) : n.estadoEntregaCertificado === "pendiente" ? (
+                              <span className={esVencido(n) ? "inline-flex items-center gap-1.5 font-medium text-red-700 dark:text-red-400" : "inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400"}>
+                                {esVencido(n) ? <AlertTriangle size={12} aria-hidden="true" /> : <Clock size={12} aria-hidden="true" />}
+                                {esVencido(n) ? certDiasHabiles.get(n.id ?? "") + " días háb. sin entregar" : "Certificado pendiente"}
                               </span>
-                            )
-                          ) : null}
-                          {!n.privadoDeLibertad && n.estadoEntregaCertificado === "entregado" && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 px-1.5 py-0.5 rounded-md">
-                              <CheckCircle2 size={10} /> Cert. entregado
-                            </span>
-                          )}
-                          {!n.privadoDeLibertad && n.estadoEntregaCertificado === "resguardado" && (
-                            <span title="Cuerpo no reclamado (desconocido / fosa común): el certificado queda resguardado en el archivo interno de ESDOMED"
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-900 px-1.5 py-0.5 rounded-md">
-                              <Archive size={10} /> Resguardado en archivo
-                            </span>
-                          )}
-                          {certificadoEnResguardo(n) && (n.ubicacionCertificado ? (
-                            <span title={`${n.ubicacionCertificado.archivero} (activo fijo ${n.ubicacionCertificado.activoFijo}) · Gaveta ${n.ubicacionCertificado.gaveta} · Archivó ${n.ubicacionCertificado.archivadoPor}`}
-                              className="flex w-fit items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                              <MapPin size={10} /> {n.ubicacionCertificado.carpeta} · Gav. {n.ubicacionCertificado.gaveta}
-                            </span>
-                          ) : (
-                            <span title="Falta registrar quién archivó el certificado y dónde (pestaña Entrega)"
-                              className="flex w-fit items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400">
-                              <MapPin size={10} /> Sin ubicar
-                            </span>
-                          ))}
+                            ) : n.estadoEntregaCertificado === "entregado" ? (
+                              <span className="inline-flex items-center gap-1.5 text-green-700 dark:text-green-400"><CheckCircle2 size={12} aria-hidden="true" /> Certificado entregado</span>
+                            ) : null}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button onClick={() => setSelected(n)}
-                          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 transition-colors">
-                          Ver detalle
-                        </button>
-                        {/* Eliminar duplicados: trámites cerrados solo el admin */}
-                        {(!n.tramiteCerrado || isAdmin) && (
-                          <button
-                            onClick={() => setAEliminar(n)}
-                            title="Eliminar notificación (duplicado)"
-                            aria-label="Eliminar notificación"
-                            className="ml-2.5 p-1 rounded-md text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors align-middle"
-                          >
-                            <Trash2 size={14} />
+                      <td className="px-4 py-4 text-right">
+                        <div className={ui.rowActions}>
+                          <button type="button" className={ui.openButton} onClick={() => setSelected(n)} aria-label={"Abrir expediente " + n.pacienteExpediente}>
+                            Abrir <ArrowUpRight size={14} aria-hidden="true" />
                           </button>
-                        )}
+                          {(!n.tramiteCerrado || isAdmin) && (
+                            <button type="button" onClick={() => setAEliminar(n)} title="Eliminar notificación duplicada" aria-label="Eliminar notificación duplicada"
+                              className="inline-flex w-8 items-center justify-center rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-500 dark:hover:bg-rose-950 dark:hover:text-rose-400">
+                              <Trash2 size={14} aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -882,7 +820,6 @@ export default function DashboardFallecidosPage() {
               </tbody>
             </table>
           </div>
-
           {/* Paginación */}
           <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between gap-4">
             <span className="text-xs text-slate-500 shrink-0">
@@ -912,156 +849,116 @@ export default function DashboardFallecidosPage() {
         </div>
       )}
 
-      {/* Modal de detalle */}
       {selectedLive && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-
-            {/* Header */}
-            <div className="px-5 pt-5 pb-0 flex-shrink-0">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div>
-                  <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest mb-0.5">Expediente</p>
-                  <h2 className="font-bold text-xl text-slate-900 dark:text-slate-100 font-mono leading-tight">
-                    {selectedLive.pacienteExpediente}
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    {selectedLive.pacienteNombre}
-                    <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
-                    {selectedLive.servicio} · Cama {selectedLive.cama}
-                    <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
-                    Dr. {selectedLive.medicoNombre}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {isLocked && (
-                    <span className="flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2 py-1 rounded-lg">
-                      <Lock size={11} /> Cerrado
-                    </span>
-                  )}
-                  {isUnlocked && (
-                    <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-1 rounded-lg">
-                      <LockOpen size={11} /> Desbloqueado
-                    </span>
-                  )}
-                  <Badge estado={selectedLive.estado} />
-                  <button onClick={() => setSelected(null)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors">
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Tab bar */}
-              {/* Con cinco pestañas la barra no cabe en un teléfono: se desplaza
-                  en horizontal sin barra visible en vez de desbordar el modal. */}
-              <div className="flex -mx-5 px-5 border-b border-slate-200 dark:border-slate-800 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {TABS.map(tab => (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                      activeTab === tab.id
-                        ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                    }`}>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Locked banner */}
-            {isLocked && (
-              <div className="mx-5 mt-4 flex items-center gap-3 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 flex-shrink-0">
-                <Lock size={15} className="text-slate-500 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Trámite cerrado — solo lectura</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Cerrado por <span className="font-medium">{selectedLive.tramiteCerradoPor}</span>
-                    {selectedLive.tramiteCerradoEn && <> · {formatHora(selectedLive.tramiteCerradoEn)}</>}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Unlocked banner */}
-            {isUnlocked && (
-              <div className="mx-5 mt-4 flex items-center gap-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl px-4 py-3 flex-shrink-0">
-                <LockOpen size={15} className="text-amber-600 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Registro desbloqueado</p>
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                    Por <span className="font-medium">{selectedLive.tramiteDesbloqueadoPor}</span>
-                    {selectedLive.tramiteJustificacion && <> · &quot;{selectedLive.tramiteJustificacion}&quot;</>}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Tab content */}
-            <div className="overflow-y-auto flex-1 p-5 space-y-4">
-
-              {/* ── Tab: Expediente ── */}
-              {activeTab === "expediente" && (
-                <div className="space-y-3">
-                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-x-6 gap-y-3">
-                    <InfoCell label="Fecha y hora de defunción" value={formatFechaHora(selectedLive.fechaDefuncion)} />
-                    <InfoCell label="Servicio" value={selectedLive.servicio} />
-                    <InfoCell label="Notificado por" value={`Dr. ${selectedLive.medicoNombre}`} />
-                    <InfoCell label="Hora del reporte" value={formatFechaHora(selectedLive.creadoEn)} />
-                    {selectedLive.causaMuerte && (
-                      <div className="col-span-2">
-                        <InfoCell label="Causa de muerte" value={selectedLive.causaMuerte} />
-                      </div>
-                    )}
-                    {enResguardo && selectedLive.ubicacionCertificado && (
-                      <div className="col-span-2">
-                        <InfoCell
-                          label="Ubicación del certificado"
-                          value={`${selectedLive.ubicacionCertificado.archivero} · Gaveta ${selectedLive.ubicacionCertificado.gaveta} · ${selectedLive.ubicacionCertificado.carpeta}`}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Confirmación de LEÍDO por Psicología / Trabajo Social.
-                      La registra el propio personal de esas áreas; es independiente
-                      de la asignación/entrega del certificado que hace ESDOMED. */}
-                  {lecturaSel && (
-                    <div className="flex items-start gap-2 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 rounded-xl px-3 py-2.5">
-                      <CheckCircle2 size={15} className="text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0 text-sm">
-                        <p className="font-semibold text-green-700 dark:text-green-400">
-                          Confirmado de leído por {lecturaSel.por}
-                          <span className="ml-1.5 align-middle"><AreaBadge rol={lecturaSel.rol} /></span>
-                        </p>
-                        {lecturaSel.en && (
-                          <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">{formatHora(lecturaSel.en)}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => enviarWhatsApp(selectedLive)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-xl hover:bg-green-500 transition-colors"
-                  >
-                    <MessageCircle size={15} /> Generar mensaje de WhatsApp
-                  </button>
-                </div>
-              )}
-
-              {/* ── Tab: Seguimiento ── */}
-              {activeTab === "seguimiento" && (
+        <FallecidoDetalleModal
+          notificacion={selectedLive} fechaDefuncion={formatFechaHora(selectedLive.fechaDefuncion)}
+          locked={isLocked} unlocked={isUnlocked}
+          busy={saving || cerrando || desbloqueando || savingFamiliar || !!updatingCell}
+          vista={activeTab} onVistaChange={setActiveTab} onClose={() => setSelected(null)}
+          resumen={
+            <>
+              <section className={ui.overviewSection}>
+                <h3>Control del trámite</h3>
+                <ol className={ui.checklist}>
+                  {requisitos.map(r => (
+                    <li key={r.key} data-complete={r.completo}>
+                      {r.completo ? <CheckCircle2 size={16} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />}
+                      <span>{r.label}</span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+              <section className={ui.overviewSection}>
+                <h3>Notificación</h3>
                 <div className="space-y-4">
+                  <InfoCell label="Médico que notifica" value={"Dr. " + selectedLive.medicoNombre} />
+                  <InfoCell label="Fecha del reporte" value={formatFechaHora(selectedLive.creadoEn)} />
+                  {selectedLive.causaMuerte && <InfoCell label="Causa de muerte" value={selectedLive.causaMuerte} />}
+                  {selectedLive.confirmadoPorNombre && <InfoCell label="Confirmación ESDOMED" value={selectedLive.confirmadoPorNombre} />}
+                </div>
+              </section>
+              <section className={ui.overviewSection}>
+                <h3>Lectura Psicología / T.S.</h3>
+                {lecturaSel ? (
+                  <div className="space-y-2">
+                    <p className="flex items-start gap-2 text-xs font-medium text-green-700 dark:text-green-400"><CheckCircle2 size={15} className="shrink-0" aria-hidden="true" />{lecturaSel.por}</p>
+                    <AreaBadge rol={lecturaSel.rol} />
+                    {lecturaSel.en && <p className="text-xs text-slate-500 dark:text-slate-400">{formatHora(lecturaSel.en)}</p>}
+                  </div>
+                ) : <p className="text-xs text-slate-500 dark:text-slate-400">Sin confirmación de lectura</p>}
+              </section>
+            </>
+          }
+          bitacora={selectedLive.id ? <BitacoraFallecido key={selectedLive.id} notificacionId={selectedLive.id} tramiteCerrado={isLocked} /> : null}
+          footer={
+            <>
+              <div className={ui.footerActions}>
+                <span className={ui.footerState} aria-live="polite">
+                  {isLocked ? <><Lock size={14} aria-hidden="true" /> Cerrado por {selectedLive.tramiteCerradoPor}</>
+                    : puedeCerrar ? <><CheckCircle2 size={15} className="text-green-600" aria-hidden="true" /> Requisitos de cierre completos</>
+                    : <><Clock size={14} aria-hidden="true" />{faltantes[0]?.label} · {faltantes.length} {faltantes.length === 1 ? "pendiente" : "pendientes"}</>}
+                </span>
+                <button type="button" onClick={() => enviarWhatsApp(selectedLive)} className={ui.secondaryButton}>
+                  <MessageCircle size={15} aria-hidden="true" /> Generar WhatsApp
+                </button>
+                {selectedLive.estado === "pendiente" && !isLocked && (
+                  <button type="button" onClick={confirmar} disabled={saving} className={ui.primaryButton}>
+                    {saving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <ClipboardCheck size={16} aria-hidden="true" />}
+                    {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
+                  </button>
+                )}
+                {puedeCerrar && (
+                  <button type="button" onClick={cerrarTramite} disabled={cerrando} className={ui.primaryButton}>
+                    {cerrando ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Lock size={15} aria-hidden="true" />}
+                    {cerrando ? "Cerrando..." : "Cerrar trámite"}
+                  </button>
+                )}
+              </div>
+              {isLocked && isAdmin && (
+                <details className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+                  <summary className="cursor-pointer text-xs font-medium text-amber-700 dark:text-amber-400">Desbloquear registro</summary>
+                  <div className="mt-3">                <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                    Desbloquear registro
+                  </p>
+                  <textarea
+                    value={justificacion}
+                    onChange={e => setJustificacion(e.target.value)}
+                    placeholder="Justificación para el desbloqueo..."
+                    rows={2}
+                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-400"
+                  />
+                  <button
+                    onClick={desbloquear}
+                    disabled={!justificacion.trim() || desbloqueando}
+                    className="w-full py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                    <LockOpen size={14} />
+                    {desbloqueando ? "Desbloqueando..." : "Desbloquear registro"}
+                  </button>
+                </div></div>
+                </details>
+              )}
+            </>
+          }
+        >
+          {isLocked && (
+            <div className={ui.notice}><Lock size={15} aria-hidden="true" /><span>Trámite cerrado · Solo lectura{selectedLive.tramiteCerradoEn && <> · {formatHora(selectedLive.tramiteCerradoEn)}</>}</span></div>
+          )}
+          {isUnlocked && (
+            <div className={ui.notice}><LockOpen size={15} aria-hidden="true" /><span>Desbloqueado por {selectedLive.tramiteDesbloqueadoPor}{selectedLive.tramiteJustificacion && <> · {selectedLive.tramiteJustificacion}</>}</span></div>
+          )}
+          <section className={ui.section} aria-labelledby="defuncion-tramitacion">
+            <h3 id="defuncion-tramitacion" className={ui.sectionTitle}><span className={ui.sectionNumber}>01</span>Tramitación y registro</h3>
+                <div className={ui.fieldsGrid}>
                   {COLUMNAS_SEGUIMIENTO.filter(col => col.key !== "entregaCertificado" && col.key !== "recibeDePs").map(col => {
                     const valor    = selectedLive[col.key] as string | undefined;
                     const fecha    = selectedLive[col.keyEn];
                     const isLoading = updatingCell === col.key;
                     return (
                       <div key={col.key}>
-                        <label className="block text-xs font-medium text-slate-500 mb-1.5">{col.label}</label>
+                        <label htmlFor={"seguimiento-" + col.key} className="block text-xs font-medium text-slate-500 mb-1.5">{col.label}</label>
                         <div className="relative">
-                          <select
+                          <select id={"seguimiento-" + col.key}
                             value={valor ?? ""}
                             disabled={isLoading || isLocked}
                             onChange={e => asignar(col.key, e.target.value)}
@@ -1083,157 +980,66 @@ export default function DashboardFallecidosPage() {
                     );
                   })}
                 </div>
-              )}
-
-              {/* ── Tab: Entrega ── */}
-              {activeTab === "entrega" && (
-                <div className="space-y-5">
-
-                  {selectedLive.privadoDeLibertad && (
-                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-[11px] text-indigo-700 dark:text-indigo-300">
-                      <ShieldCheck size={14} className="mt-0.5 shrink-0" />
-                      <span>
-                        Privado de libertad — certificado en custodia interna. La recepción por
-                        Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
-                      </span>
-                    </div>
-                  )}
-
-                  {!selectedLive.privadoDeLibertad && selectedLive.estadoEntregaCertificado === "resguardado" && (
-                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 text-[11px] text-teal-700 dark:text-teal-300">
-                      <Archive size={14} className="mt-0.5 shrink-0" />
-                      <span>
-                        Resguardado en archivo interno — cuerpo no reclamado (desconocido / fosa común).
-                        La recepción por Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Ubicación física del certificado en resguardo interno: archivero,
-                      gaveta y carpeta del año de defunción, más quién lo archivó. */}
-                  {enResguardo && (() => {
-                    const ub = selectedLive.ubicacionCertificado;
-                    const lugar = ub ?? { ...ARCHIVO_RESGUARDO, carpeta: carpetaResguardo(selectedLive.fechaDefuncion) };
-                    return (
-                      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
-                          <MapPin size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Ubicación física</p>
-                        </div>
-                        <div className="p-4 space-y-4">
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
-                            <div className="col-span-2">
-                              <p className="text-xs text-slate-500">Archivero</p>
-                              <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5">{lugar.archivero}</p>
-                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">Activo fijo {lugar.activoFijo}</p>
-                            </div>
-                            <InfoCell label="Gaveta" value={String(lugar.gaveta)} />
-                            <div>
-                              <p className="text-xs text-slate-500">Carpeta</p>
-                              <p className="text-slate-800 dark:text-slate-200 font-medium font-mono mt-0.5 whitespace-nowrap">{lugar.carpeta}</p>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-slate-500 mb-1.5">Archivado por</label>
-                            <div className="relative">
-                              <select
-                                value={ub?.archivadoPor ?? ""}
-                                disabled={updatingCell === "ubicacionCertificado" || !puedeEditarUbicacion}
-                                onChange={e => registrarUbicacion(e.target.value)}
-                                className={selectCls}
-                              >
-                                <option value="">— Sin archivar</option>
-                                {ub?.archivadoPor && !personal.some(p => p.nombre === ub.archivadoPor) && (
-                                  <option value={ub.archivadoPor}>{ub.archivadoPor}</option>
-                                )}
-                                {personal.map(p => (
-                                  <option key={p.uid} value={p.nombre}>{p.nombre}</option>
-                                ))}
-                              </select>
-                              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                            </div>
-                            {ub?.archivadoEn && (
-                              <p className="text-[11px] mt-1.5 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded-md w-fit">
-                                <CheckCircle2 size={11} /> {formatHora(ub.archivadoEn)}
-                                {ub.registradoPor && ub.registradoPor !== ub.archivadoPor && <> · registró {ub.registradoPor}</>}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Recibe Psic./TS */}
-                  {(() => {
-                    const col = COLUMNAS_SEGUIMIENTO.find(c => c.key === "recibeDePs")!;
-                    const valor = selectedLive[col.key] as string | undefined;
-                    const isLoading = updatingCell === col.key;
-                    return (
-                      <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1.5">{col.label}</label>
-                        <div className="relative">
-                          <select
-                            value={valor ?? ""}
-                            disabled={isLoading || isLocked}
-                            onChange={e => asignar(col.key, e.target.value)}
-                            className={selectCls}
-                          >
-                            <option value="">— Sin asignar</option>
-                            {personalPsTs.map(p => (
-                              <option key={p.uid} value={p.nombre}>{p.nombre}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        </div>
-                        {valor && selectedLive.recibeDePsEntregadoPor && (
-                          <p className="text-[11px] mt-1.5 flex items-center gap-1.5 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md w-fit">
-                            Entregado por {selectedLive.recibeDePsEntregadoPor}
-                            {selectedLive.recibeDePsEn && <> · {formatHora(selectedLive.recibeDePsEn)}</>}
-                          </p>
-                        )}
-                        {valor && (
-                          <div className="mt-1.5">
-                            {selectedLive.recibeDePsConfirmado ? (
-                              <p className="text-[11px] flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-2 py-1 rounded-md w-fit">
-                                <CheckCircle2 size={11} />
-                                Recepción confirmada · {formatHora(selectedLive.recibeDePsConfirmadoEn)}
-                              </p>
-                            ) : (
-                              <p className="text-[11px] flex items-center gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-1 rounded-md w-fit">
-                                <Clock size={11} />
-                                Pendiente de confirmar por {valor}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Quién entregó */}
+          </section>
+          <section className={ui.section} aria-labelledby="defuncion-certificado">
+            <h3 id="defuncion-certificado" className={ui.sectionTitle}><span className={ui.sectionNumber}>02</span>Certificado de defunción</h3>
+                <div className="space-y-4">
+                  <div className={ui.fieldsGrid}>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Quién entregó el certificado</label>
+                    <label htmlFor="certificado-estado" className="block text-xs font-medium text-slate-500 mb-1.5">Estado de entrega</label>
                     <div className="relative">
-                      <select
-                        value={selectedLive.entregaCertificado ?? ""}
-                        disabled={updatingCell === "entregaCertificado" || isLocked}
-                        onChange={e => asignar("entregaCertificado", e.target.value)}
+                      <select id="certificado-estado"
+                        value={selectedLive.estadoEntregaCertificado ?? ""}
+                        disabled={updatingCell === "estadoEntregaCertificado" || isLocked || !!selectedLive.privadoDeLibertad}
+                        onChange={e => actualizarCampo("estadoEntregaCertificado", e.target.value || null)}
                         className={selectCls}
                       >
-                        <option value="">— Sin asignar</option>
-                        {personal.map(p => (
-                          <option key={p.uid} value={p.nombre}>{p.nombre}</option>
-                        ))}
+                        <option value="">— Sin definir</option>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="entregado">Entregado</option>
+                        <option value="resguardado">Resguardado en archivo interno</option>
                       </select>
                       <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
-                    {selectedLive.entregaCertificado && selectedLive.entregaCertificadoEn && (
-                      <p className="text-[11px] mt-1.5 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded-md w-fit">
-                        <CheckCircle2 size={11} /> {formatHora(selectedLive.entregaCertificadoEn)}
+                    {selectedLive.privadoDeLibertad && (
+                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1.5">
+                        En custodia interna — la entrega no aplica mientras sea privado de libertad.
+                      </p>
+                    )}
+                    {!selectedLive.privadoDeLibertad && selectedLive.estadoEntregaCertificado === "resguardado" && (
+                      <p className="text-[11px] text-teal-600 dark:text-teal-400 mt-1.5">
+                        Para cuerpos no reclamados (desconocidos / fosa común): el certificado queda
+                        archivado en ESDOMED y el trámite puede cerrarse sin entrega.
                       </p>
                     )}
                   </div>
+
+                  <div>
+                    <label htmlFor="certificado-tipo" className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de certificado</label>
+                    <div className="relative">
+                      <select id="certificado-tipo"
+                        value={selectedLive.tipoCertificado ?? ""}
+                        disabled={updatingCell === "tipoCertificado" || isLocked}
+                        onChange={e => actualizarCampo("tipoCertificado", e.target.value || null)}
+                        className={selectCls}
+                      >
+                        <option value="">— Sin definir</option>
+                        <option value="digital">Digital</option>
+                        <option value="manual">Manual</option>
+                      </select>
+                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+                  </div>
+
+                  <label className={ui.validation}>
+                    <input type="checkbox" checked={!!selectedLive.privadoDeLibertad}
+                      disabled={updatingCell === "privadoDeLibertad" || isLocked}
+                      onChange={e => actualizarCampo("privadoDeLibertad", e.target.checked)} className="h-4 w-4" />
+                    <span className="inline-flex flex-wrap items-center gap-2"><ShieldCheck size={15} aria-hidden="true" />Privado de libertad
+                      {selectedLive.privadoDeLibertad && <span className="text-xs text-blue-700 dark:text-blue-300">Certificado en custodia interna</span>}
+                    </span>
+                  </label>
 
                   {/* FIEH */}
                   <div className="space-y-2">
@@ -1288,6 +1094,167 @@ export default function DashboardFallecidosPage() {
                     )}
                   </div>
 
+
+                </div>
+            <div className="mt-5">
+              {!isLocked ? (
+                <label className={ui.validation}>
+                  <input type="checkbox" checked={duiValidado} onChange={e => guardarDui(e.target.checked)} className="h-4 w-4" />
+                  <span>Foto de <strong>DUI validada</strong> · Vigente o con menos de un año de vencido</span>
+                </label>
+              ) : <InfoCell label="Foto de DUI validada" value={duiValidado ? "Sí" : "No"} />}
+            </div>
+          </section>
+          <section className={ui.section} aria-labelledby="defuncion-entrega">
+            <h3 id="defuncion-entrega" className={ui.sectionTitle}><span className={ui.sectionNumber}>03</span>{enResguardo ? "Resguardo y archivo" : "Entrega y recepción"}</h3>
+                <div className="space-y-5">
+
+                  {selectedLive.privadoDeLibertad && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-[11px] text-indigo-700 dark:text-indigo-300">
+                      <ShieldCheck size={14} className="mt-0.5 shrink-0" />
+                      <span>
+                        Privado de libertad — certificado en custodia interna. La recepción por
+                        Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
+                      </span>
+                    </div>
+                  )}
+
+                  {!selectedLive.privadoDeLibertad && selectedLive.estadoEntregaCertificado === "resguardado" && (
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 text-[11px] text-teal-700 dark:text-teal-300">
+                      <Archive size={14} className="mt-0.5 shrink-0" />
+                      <span>
+                        Resguardado en archivo interno — cuerpo no reclamado (desconocido / fosa común).
+                        La recepción por Psic./T.S. y la entrega no aplican y no se exigen para cerrar el trámite.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Ubicación física del certificado en resguardo interno: archivero,
+                      gaveta y carpeta del año de defunción, más quién lo archivó. */}
+                  {enResguardo && (() => {
+                    const ub = selectedLive.ubicacionCertificado;
+                    const lugar = ub ?? { ...ARCHIVO_RESGUARDO, carpeta: carpetaResguardo(selectedLive.fechaDefuncion) };
+                    return (
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                          <MapPin size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Ubicación física</p>
+                        </div>
+                        <div className="p-4 space-y-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+                            <div className="col-span-2">
+                              <p className="text-xs text-slate-500">Archivero</p>
+                              <p className="break-words text-sm text-slate-800 dark:text-slate-200 font-medium mt-0.5">{lugar.archivero}</p>
+                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">Activo fijo {lugar.activoFijo}</p>
+                            </div>
+                            <InfoCell label="Gaveta" value={String(lugar.gaveta)} />
+                            <div>
+                              <p className="text-xs text-slate-500">Carpeta</p>
+                              <p className="text-slate-800 dark:text-slate-200 font-medium font-mono mt-0.5 whitespace-nowrap">{lugar.carpeta}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="certificado-archivo" className="block text-xs font-medium text-slate-500 mb-1.5">Archivado por</label>
+                            <div className="relative">
+                              <select id="certificado-archivo"
+                                value={ub?.archivadoPor ?? ""}
+                                disabled={updatingCell === "ubicacionCertificado" || !puedeEditarUbicacion}
+                                onChange={e => registrarUbicacion(e.target.value)}
+                                className={selectCls}
+                              >
+                                <option value="">— Sin archivar</option>
+                                {ub?.archivadoPor && !personal.some(p => p.nombre === ub.archivadoPor) && (
+                                  <option value={ub.archivadoPor}>{ub.archivadoPor}</option>
+                                )}
+                                {personal.map(p => (
+                                  <option key={p.uid} value={p.nombre}>{p.nombre}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                            {ub?.archivadoEn && (
+                              <p className="text-[11px] mt-1.5 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded-md w-fit">
+                                <CheckCircle2 size={11} /> {formatHora(ub.archivadoEn)}
+                                {ub.registradoPor && ub.registradoPor !== ub.archivadoPor && <> · registró {ub.registradoPor}</>}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Recibe Psic./TS */}
+                  {(() => {
+                    const col = COLUMNAS_SEGUIMIENTO.find(c => c.key === "recibeDePs")!;
+                    const valor = selectedLive[col.key] as string | undefined;
+                    const isLoading = updatingCell === col.key;
+                    return (
+                      <div>
+                        <label htmlFor={"seguimiento-" + col.key} className="block text-xs font-medium text-slate-500 mb-1.5">{col.label}</label>
+                        <div className="relative">
+                          <select id={"seguimiento-" + col.key}
+                            value={valor ?? ""}
+                            disabled={isLoading || isLocked}
+                            onChange={e => asignar(col.key, e.target.value)}
+                            className={selectCls}
+                          >
+                            <option value="">— Sin asignar</option>
+                            {personalPsTs.map(p => (
+                              <option key={p.uid} value={p.nombre}>{p.nombre}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
+                        {valor && selectedLive.recibeDePsEntregadoPor && (
+                          <p className="text-[11px] mt-1.5 flex items-center gap-1.5 text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md w-fit">
+                            Entregado por {selectedLive.recibeDePsEntregadoPor}
+                            {selectedLive.recibeDePsEn && <> · {formatHora(selectedLive.recibeDePsEn)}</>}
+                          </p>
+                        )}
+                        {valor && (
+                          <div className="mt-1.5">
+                            {selectedLive.recibeDePsConfirmado ? (
+                              <p className="text-[11px] flex items-center gap-1.5 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-2 py-1 rounded-md w-fit">
+                                <CheckCircle2 size={11} />
+                                Recepción confirmada · {formatHora(selectedLive.recibeDePsConfirmadoEn)}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] flex items-center gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-1 rounded-md w-fit">
+                                <Clock size={11} />
+                                Pendiente de confirmar por {valor}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Quién entregó */}
+                  <div>
+                    <label htmlFor="certificado-entrega" className="block text-xs font-medium text-slate-500 mb-1.5">Quién entregó el certificado</label>
+                    <div className="relative">
+                      <select id="certificado-entrega"
+                        value={selectedLive.entregaCertificado ?? ""}
+                        disabled={updatingCell === "entregaCertificado" || isLocked}
+                        onChange={e => asignar("entregaCertificado", e.target.value)}
+                        className={selectCls}
+                      >
+                        <option value="">— Sin asignar</option>
+                        {personal.map(p => (
+                          <option key={p.uid} value={p.nombre}>{p.nombre}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    {selectedLive.entregaCertificado && selectedLive.entregaCertificadoEn && (
+                      <p className="text-[11px] mt-1.5 flex items-center gap-1.5 bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded-md w-fit">
+                        <CheckCircle2 size={11} /> {formatHora(selectedLive.entregaCertificadoEn)}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Familiar */}
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Familiar que recibe</p>
@@ -1316,9 +1283,9 @@ export default function DashboardFallecidosPage() {
                           disabled={isLocked}
                         />
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-500 mb-1.5">Parentesco</label>
+                          <label htmlFor="familiar-parentesco" className="block text-xs font-medium text-slate-500 mb-1.5">Parentesco</label>
                           <div className="relative">
-                            <select
+                            <select id="familiar-parentesco"
                               value={familiarParentesco}
                               onChange={e => setFamiliarParentesco(e.target.value)}
                               disabled={isLocked}
@@ -1337,7 +1304,7 @@ export default function DashboardFallecidosPage() {
                         <button
                           onClick={guardarFamiliar}
                           disabled={savingFamiliar || savedFamiliar}
-                          className={`w-full py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-all ${
+                          className={`w-full py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors ${
                             savedFamiliar
                               ? "bg-green-600 hover:bg-green-700 shadow-md shadow-green-500/20"
                               : "bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600"
@@ -1360,169 +1327,8 @@ export default function DashboardFallecidosPage() {
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* ── Tab: Certificado ── */}
-              {activeTab === "certificado" && (
-                <div className="space-y-4">
-                  {/* Privado de libertad: al marcarlo, el certificado queda en custodia
-                      interna de ESDOMED y deja de contar como pendiente/vencido. */}
-                  <label className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border select-none ${
-                    isLocked
-                      ? "opacity-60 cursor-not-allowed bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
-                      : "cursor-pointer bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900"
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={!!selectedLive.privadoDeLibertad}
-                      disabled={updatingCell === "privadoDeLibertad" || isLocked}
-                      onChange={e => actualizarCampo("privadoDeLibertad", e.target.checked)}
-                      className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
-                    />
-                    <span className="text-sm text-slate-700 dark:text-slate-200">
-                      <span className="inline-flex items-center gap-1.5 font-semibold text-indigo-700 dark:text-indigo-300">
-                        <ShieldCheck size={14} /> Privado de libertad
-                      </span>
-                      <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        El certificado queda en custodia interna de ESDOMED; no se entrega
-                        salvo requerimiento de la Fiscalía. No genera alerta de vencido.
-                      </span>
-                    </span>
-                  </label>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Estado de entrega</label>
-                    <div className="relative">
-                      <select
-                        value={selectedLive.estadoEntregaCertificado ?? ""}
-                        disabled={updatingCell === "estadoEntregaCertificado" || isLocked || !!selectedLive.privadoDeLibertad}
-                        onChange={e => actualizarCampo("estadoEntregaCertificado", e.target.value || null)}
-                        className={selectCls}
-                      >
-                        <option value="">— Sin definir</option>
-                        <option value="pendiente">Pendiente</option>
-                        <option value="entregado">Entregado</option>
-                        <option value="resguardado">Resguardado en archivo interno</option>
-                      </select>
-                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
-                    {selectedLive.privadoDeLibertad && (
-                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1.5">
-                        En custodia interna — la entrega no aplica mientras sea privado de libertad.
-                      </p>
-                    )}
-                    {!selectedLive.privadoDeLibertad && selectedLive.estadoEntregaCertificado === "resguardado" && (
-                      <p className="text-[11px] text-teal-600 dark:text-teal-400 mt-1.5">
-                        Para cuerpos no reclamados (desconocidos / fosa común): el certificado queda
-                        archivado en ESDOMED y el trámite puede cerrarse sin entrega.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1.5">Tipo de certificado</label>
-                    <div className="relative">
-                      <select
-                        value={selectedLive.tipoCertificado ?? ""}
-                        disabled={updatingCell === "tipoCertificado" || isLocked}
-                        onChange={e => actualizarCampo("tipoCertificado", e.target.value || null)}
-                        className={selectCls}
-                      >
-                        <option value="">— Sin definir</option>
-                        <option value="digital">Digital</option>
-                        <option value="manual">Manual</option>
-                      </select>
-                      <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* ── Tab: Bitácora (comentarios + adjuntos internos de ESDOMED) ──
-                  Va DENTRO del área con scroll (no en el footer) porque la lista
-                  de entradas crece sin tope. */}
-              {activeTab === "bitacora" && selectedLive.id && (
-                <BitacoraFallecido key={selectedLive.id} notificacionId={selectedLive.id} tramiteCerrado={isLocked} />
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 pb-5 flex-shrink-0 space-y-3">
-              {/* DUI validado — disponible en pendiente y también en confirmado
-                  (en confirmado se guarda al marcar; en pendiente, al confirmar). */}
-              {!isLocked && (
-                <label className="flex items-start gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={duiValidado}
-                    onChange={(e) => guardarDui(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-green-600 shrink-0"
-                  />
-                  <span className="text-sm text-slate-700 dark:text-slate-200">
-                    ¿Se cuenta con foto de <strong>DUI validada</strong> (vigente o con menos de un año de vencido)?
-                    {selectedLive.estado === "confirmado" && (
-                      <span className="block text-[11px] text-slate-400 mt-0.5">Se guarda al marcar.</span>
-                    )}
-                  </span>
-                </label>
-              )}
-              {selectedLive.estado === "pendiente" && !isLocked && (
-                <button onClick={confirmar} disabled={saving}
-                  className="w-full py-2.5 text-sm font-semibold text-white bg-green-700 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors">
-                  {saving ? "Confirmando..." : "Confirmar de leído y notificado"}
-                </button>
-              )}
-              {/* Bloqueo de cierre por entrega pendiente: todo lo demás está listo,
-                  pero el certificado no se ha entregado ni resguardado. */}
-              {activeTab === "entrega" && !isLocked && selectedLive.estado === "confirmado" && todos4 && !entregaResuelta && (
-                <div className="flex items-start gap-2.5 px-3 py-2.5 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-xl text-xs text-amber-700 dark:text-amber-400">
-                  <FileWarning size={14} className="mt-0.5 shrink-0" />
-                  {enResguardo ? (
-                    <span>
-                      No se puede cerrar el trámite: falta registrar quién archivó el certificado
-                      en <strong>Ubicación física</strong>.
-                    </span>
-                  ) : (
-                    <span>
-                      No se puede cerrar el trámite: la entrega del certificado sigue pendiente.
-                      En la pestaña <strong>Certificado</strong>, márcala como <strong>Entregado</strong> o,
-                      si nadie reclamó el cuerpo, como <strong>Resguardado en archivo interno</strong>.
-                    </span>
-                  )}
-                </div>
-              )}
-              {puedeCerrar && activeTab === "entrega" && (
-                <button onClick={cerrarTramite} disabled={cerrando}
-                  className="w-full py-2.5 text-sm font-semibold text-white bg-slate-800 dark:bg-slate-700 rounded-xl hover:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-                  <Lock size={14} />
-                  {cerrando ? "Cerrando..." : "Cerrar trámite"}
-                </button>
-              )}
-              {isLocked && isAdmin && (
-                <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">
-                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
-                    Desbloquear registro
-                  </p>
-                  <textarea
-                    value={justificacion}
-                    onChange={e => setJustificacion(e.target.value)}
-                    placeholder="Justificación para el desbloqueo..."
-                    rows={2}
-                    className="w-full bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 placeholder-slate-400"
-                  />
-                  <button
-                    onClick={desbloquear}
-                    disabled={!justificacion.trim() || desbloqueando}
-                    className="w-full py-2.5 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
-                    <LockOpen size={14} />
-                    {desbloqueando ? "Desbloqueando..." : "Desbloquear registro"}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          </section>
+        </FallecidoDetalleModal>
       )}
 
       {/* Confirmación de eliminación (duplicados) */}
@@ -1605,8 +1411,9 @@ function FamiliarInput({ label, value, onChange, placeholder, className = "", di
 }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
+      <label htmlFor={"familiar-" + label.replaceAll(" ", "-")} className="block text-xs font-medium text-slate-500 mb-1.5">{label}</label>
       <input
+        id={"familiar-" + label.replaceAll(" ", "-")}
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}

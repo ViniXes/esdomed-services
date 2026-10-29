@@ -8,6 +8,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject }
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AdjuntoBitacora, EntradaBitacoraFallecido, UserRole } from "@/types";
+import ui from "@/components/fallecidos/FallecidosUi.module.css";
 import {
   Paperclip, Send, Trash2, FileText, Loader2, X, Lock, MessageSquareText, ExternalLink, ImageOff,
 } from "lucide-react";
@@ -47,6 +48,10 @@ const formatFechaHora = (ts: unknown) => {
 };
 const formatTamano = (bytes: number) =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+const diaEntrada = (ts: unknown) => tsToDate(ts)?.toLocaleDateString("es-SV", {
+  day: "2-digit", month: "long", year: "numeric",
+}) ?? "Hoy";
 
 // Nombre seguro para la ruta de Storage (el nombre original se conserva en el doc).
 const nombreSeguro = (nombre: string) => nombre.replace(/[^\w.-]+/g, "_").slice(-120);
@@ -213,6 +218,10 @@ export function BitacoraFallecido({ notificacionId, tramiteCerrado }: Props) {
 
   return (
     <div className="space-y-4">
+      <div className={ui.notesHeading}>
+        <h3><MessageSquareText size={17} className="text-blue-700 dark:text-blue-300" aria-hidden="true" />Bitácora interna</h3>
+        {entradas && <span>{entradas.length} {entradas.length === 1 ? "anotación" : "anotaciones"}</span>}
+      </div>
       {tramiteCerrado && (
         <div className="flex items-start gap-2.5 px-3 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-600 dark:text-slate-400">
           <Lock size={14} className="mt-0.5 shrink-0" />
@@ -221,8 +230,10 @@ export function BitacoraFallecido({ notificacionId, tramiteCerrado }: Props) {
       )}
 
       {/* Redactor */}
-      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 p-3 space-y-2.5">
+      <div className={`${ui.composer} space-y-3`}>
+        <label htmlFor="nota-fallecido" className="block text-xs font-medium text-slate-600 dark:text-slate-300">Nueva anotación</label>
         <textarea
+          id="nota-fallecido"
           value={texto}
           onChange={e => setTexto(e.target.value)}
           onKeyDown={onKeyDown}
@@ -251,7 +262,7 @@ export function BitacoraFallecido({ notificacionId, tramiteCerrado }: Props) {
 
         {progreso !== null && (
           <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-            <div className="h-full bg-blue-600 transition-all" style={{ width: `${progreso}%` }} />
+            <div className="h-full bg-blue-600" style={{ width: `${progreso}%` }} />
           </div>
         )}
 
@@ -274,13 +285,13 @@ export function BitacoraFallecido({ notificacionId, tramiteCerrado }: Props) {
         </div>
 
         {error && (
-          <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+          <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
         )}
       </div>
 
       {/* Entradas */}
       {errorCarga ? (
-        <p className="text-sm text-rose-600 dark:text-rose-400">{errorCarga}</p>
+        <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{errorCarga}</p>
       ) : entradas === null ? (
         <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
           <Loader2 size={16} className="animate-spin" /> Cargando bitácora…
@@ -292,11 +303,14 @@ export function BitacoraFallecido({ notificacionId, tramiteCerrado }: Props) {
           <p className="text-xs text-slate-400 max-w-xs">Las notas y archivos que registres aquí solo los ve el personal de ESDOMED.</p>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {entradas.map(e => (
-            <li key={e.id} className="rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-bold shrink-0">
+        <ul className={ui.timeline} aria-label="Anotaciones, de la más reciente a la más antigua">
+          {entradas.map((e, index) => (
+            <li key={e.id}>
+              {(index === 0 || diaEntrada(e.creadoEn) !== diaEntrada(entradas[index - 1].creadoEn)) && (
+                <h4 className={ui.dayHeading}>{diaEntrada(e.creadoEn)}</h4>
+              )}
+              <div className={`${ui.timelineEntry} flex items-start gap-3`}>
+                <div className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                   {iniciales(e.autorNombre) || "?"}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -304,11 +318,13 @@ export function BitacoraFallecido({ notificacionId, tramiteCerrado }: Props) {
                     <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{e.autorNombre}</span>
                       {ROL_LABEL[e.autorRol] && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
                           {ROL_LABEL[e.autorRol]}
                         </span>
                       )}
-                      <span className="text-xs text-slate-400">· {formatFechaHora(e.creadoEn)}</span>
+                      <time className="text-xs text-slate-500 dark:text-slate-400" title={formatFechaHora(e.creadoEn)}>
+                        {tsToDate(e.creadoEn)?.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit", hour12: false }) ?? "ahora"}
+                      </time>
                     </div>
                     {puedeBorrar(e) && e.id && (
                       aBorrar === e.id ? (
@@ -372,7 +388,7 @@ function AdjuntoCard({ adjunto }: { adjunto: AdjuntoBitacora }) {
         )}
         <div className="px-2 py-1.5 flex items-center gap-1.5">
           <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate flex-1">{adjunto.nombre}</span>
-          <span className="text-[10px] text-slate-400 shrink-0">{formatTamano(adjunto.tamano)}</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatTamano(adjunto.tamano)}</span>
           <ExternalLink size={11} className="text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 shrink-0" />
         </div>
       </a>

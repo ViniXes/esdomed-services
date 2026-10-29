@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   collection, query, where, orderBy, onSnapshot, getDocs, limit,
   doc, updateDoc, Timestamp, QueryConstraint,
@@ -11,7 +12,10 @@ import { NotificacionFallecido } from "@/types";
 import { getLecturaConfirmada } from "@/lib/fallecidos";
 import { Badge } from "@/components/ui/Badge";
 import { DateField } from "@/components/ui/DateField";
-import { HeartPulse, X, CheckCircle2, Clock, Search, ChevronLeft, ChevronRight, History } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock, Eye, History, Inbox, Loader2, Search, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { FallecidoAvisoDetalle } from "@/components/fallecidos/FallecidoAvisoDetalle";
+import ui from "@/components/fallecidos/FallecidosUi.module.css";
+import review from "@/components/fallecidos/RevisionFallecidos.module.css";
 
 // Registros por página en la tabla (paginación de a 10).
 const PAGE_SIZE = 10;
@@ -45,12 +49,14 @@ export default function FallecidosRevisionView({
   rol?: "psicologia" | "trabajo_social";
 }) {
   const areaLabel = rol === "trabajo_social" ? "Trabajo Social" : "Psicología";
-  const reglaLabel = rol === "trabajo_social" ? "trabajo_social" : "psicologia";
+  const recepcionesHref = rol === "trabajo_social" ? "/dashboard/recepciones" : "/psicologia/recepciones";
 
   const { profile } = useAuth();
   // Zona 1: las más recientes, en vivo (worklist). Nuevos fallecidos aparecen al instante.
   const [notificaciones, setNotificaciones] = useState<NotificacionFallecido[]>([]);
   const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "todos">("todos");
+  const [filtroLectura, setFiltroLectura] = useState<"sin_leer" | "leidos" | "todos">("todos");
+  const [vista, setVista] = useState<"recientes" | "historico">("recientes");
 
   // Zona 2: búsqueda histórica bajo demanda (NO en vivo).
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
@@ -78,7 +84,9 @@ export default function FallecidosRevisionView({
     );
   }, []);
 
-  const recientes = filtro === "todos" ? notificaciones : notificaciones.filter(n => n.estado === filtro);
+  const porEstado = filtro === "todos" ? notificaciones : notificaciones.filter(n => n.estado === filtro);
+  const recientes = porEstado.filter(n => filtroLectura === "todos" || (filtroLectura === "leidos" ? !!getLecturaConfirmada(n) : !getLecturaConfirmada(n)));
+  const sinLeer = notificaciones.filter(n => !getLecturaConfirmada(n)).length;
   const pendientes = notificaciones.filter(n => n.estado === "pendiente").length;
 
   const dentroDelRango = (ts: unknown) => {
@@ -163,201 +171,74 @@ export default function FallecidosRevisionView({
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-rose-50 dark:bg-rose-950 rounded-xl flex items-center justify-center border border-rose-200 dark:border-rose-900">
-            <HeartPulse size={17} className="text-rose-600 dark:text-rose-400" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">
-            Notificaciones de fallecidos
-          </h1>
+    <div className={ui.page}>
+      <header className={ui.pageHeading}>
+        <div>
+          <div className={ui.eyebrow}>{areaLabel}<span aria-hidden="true">/</span>Defunciones</div>
+          <h1 className="font-heading">Avisos de defunción</h1>
         </div>
-        {pendientes > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
-            <Clock size={14} />
-            {pendientes} sin confirmar
-          </div>
-        )}
+        <Link href={recepcionesHref} prefetch={false} className={ui.secondaryButton}><Inbox size={16} aria-hidden="true" />Mis recepciones<ArrowUpRight size={14} aria-hidden="true" /></Link>
+      </header>
+      <div className={ui.stats} aria-label="Estado de los avisos recientes">
+        <button type="button" className={ui.stat} data-tone="pending" aria-pressed={vista === "recientes" && filtroLectura === "sin_leer"}
+          onClick={() => { setVista("recientes"); setFiltro("todos"); setFiltroLectura(filtroLectura === "sin_leer" ? "todos" : "sin_leer"); }}>
+          <span><Eye size={17} aria-hidden="true" />Sin lectura confirmada</span><strong>{sinLeer}</strong>
+        </button>
+        <button type="button" className={ui.stat} aria-pressed={vista === "recientes" && filtroLectura === "leidos"}
+          onClick={() => { setVista("recientes"); setFiltro("todos"); setFiltroLectura(filtroLectura === "leidos" ? "todos" : "leidos"); }}>
+          <span><CheckCircle2 size={17} aria-hidden="true" />Lectura confirmada</span><strong>{notificaciones.length - sinLeer}</strong>
+        </button>
+        <button type="button" className={ui.stat} aria-pressed={vista === "recientes" && filtro === "pendiente"}
+          onClick={() => { setVista("recientes"); setFiltroLectura("todos"); setFiltro(filtro === "pendiente" ? "todos" : "pendiente"); }}>
+          <span><Clock size={17} aria-hidden="true" />Pendientes en ESDOMED</span><strong>{pendientes}</strong>
+        </button>
       </div>
-
-      {/* Error de permisos */}
-      {permissionError && (
-        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
-          Sin permisos para leer notificaciones. Pide al administrador que agregue <strong>{reglaLabel}</strong> a las reglas de Firestore.
-        </div>
-      )}
-
-      {/* ── Zona 1: Recientes (en vivo) ── */}
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mr-1">Recientes</h2>
-          {[
-            { label: "Todos",       value: "todos"      },
-            { label: "Pendientes",  value: "pendiente"  },
-            { label: "Confirmados", value: "confirmado" },
-          ].map(f => (
-            <button
-              key={f.value}
-              onClick={() => setFiltro(f.value as typeof filtro)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                filtro === f.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-          <span className="ml-auto text-xs text-slate-500">Últimas {LIVE_LIMIT}</span>
-        </div>
-        <TablaNotificaciones lista={recientes} onSelect={setSelected} />
-      </section>
-
-      {/* ── Zona 2: Buscar notificaciones anteriores (bajo demanda) ── */}
-      <section className="border-t border-slate-200 dark:border-slate-800 pt-6 space-y-3">
-        <div className="flex items-center gap-2">
-          <History size={15} className="text-slate-400" />
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Buscar notificaciones anteriores</h2>
-        </div>
-        <p className="text-xs text-slate-500 -mt-1">
-          Busca por expediente (trae todas las de ese paciente) o por rango de fecha de defunción. La búsqueda se hace bajo demanda.
-        </p>
-
-        <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-          <div className="relative flex-1 min-w-[180px]">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Buscar por expediente…"
-              value={busquedaExpediente}
-              onChange={e => setBusquedaExpediente(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") buscar(); }}
-              className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-500 shrink-0">Desde</span>
-            <DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Fecha desde" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-500 shrink-0">Hasta</span>
-            <DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Fecha hasta" />
-          </div>
-          <button onClick={buscar} disabled={buscando || sinCriterio}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors shadow-sm">
-            <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
-          </button>
-          {(busquedaExpediente || fechaDesde || fechaHasta || resultados !== null) && (
-            <button onClick={limpiarBusqueda}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
-              <X size={12} /> Limpiar
-            </button>
-          )}
-        </div>
-
-        {errorBusqueda && (
-          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
-            {errorBusqueda}
-          </div>
-        )}
-
-        {resultados === null ? (
-          <p className="text-sm text-slate-400 py-8 text-center">
-            Escribe un expediente o elige un rango de fechas y pulsa Buscar.
-          </p>
-        ) : buscando ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            {resultados.length > 0 && <p className="text-xs text-slate-500">{resultados.length} resultado(s)</p>}
-            <TablaNotificaciones lista={resultados} onSelect={setSelected} />
-          </>
-        )}
-      </section>
-
-      {/* Modal de detalle */}
-      {selectedLive && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-[95vw] max-w-lg max-h-[90vh] flex flex-col">
-
-            {/* Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3 flex-shrink-0">
-              <div>
-                <p className="text-xs text-slate-500 font-medium mb-0.5">Expediente</p>
-                <h2 className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {selectedLive.pacienteExpediente}
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedLive.pacienteNombre} · {selectedLive.servicio} · Cama {selectedLive.cama}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Badge estado={selectedLive.estado} />
-                <button
-                  onClick={() => setSelected(null)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+      {permissionError && <p role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">No tienes permiso para consultar estos avisos. Contacta al administrador.</p>}
+      <nav className={review.tabs} aria-label="Consulta de avisos">
+        <button type="button" aria-pressed={vista === "recientes"} onClick={() => setVista("recientes")}><Inbox size={16} aria-hidden="true" />Avisos recientes</button>
+        <button type="button" aria-pressed={vista === "historico"} onClick={() => setVista("historico")}><History size={16} aria-hidden="true" />Buscar histórico</button>
+      </nav>
+      {vista === "recientes" ? (
+        <section aria-label="Avisos recientes" className="mt-5 space-y-5">
+          <div className={review.toolbar}>
+            <div className={review.filters}>
+              <label className={review.field}>Lectura del aviso
+                <select value={filtroLectura} onChange={e => setFiltroLectura(e.target.value as typeof filtroLectura)}>
+                  <option value="todos">Todas</option><option value="sin_leer">Sin lectura confirmada</option><option value="leidos">Lectura confirmada</option>
+                </select>
+              </label>
+              <label className={review.field}>Revisión de ESDOMED
+                <select value={filtro} onChange={e => setFiltro(e.target.value as typeof filtro)}>
+                  <option value="todos">Todos los estados</option><option value="pendiente">Pendiente de confirmación</option><option value="confirmado">Confirmado</option>
+                </select>
+              </label>
             </div>
-
-            <div className="overflow-y-auto flex-1 p-5 space-y-5">
-
-              {/* Datos del caso */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Datos del caso</p>
-                <InfoCell label="Fecha y hora de defunción"  value={formatFechaHora(selectedLive.fechaDefuncion)} />
-                <InfoCell label="Notificado por"   value={`Dr. ${selectedLive.medicoNombre}`} />
-                <InfoCell label="Servicio"         value={selectedLive.servicio} />
-                {selectedLive.causaMuerte && <InfoCell label="Causa" value={selectedLive.causaMuerte} />}
-                {selectedLive.estado === "confirmado" && (
-                  <InfoCell label="DUI validado (ESDOMED)" value={selectedLive.duiValidado ? "Sí — DUI ok" : "No — Sin DUI"} />
-                )}
-              </div>
-
-              {/* Confirmación del área */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Recepción</p>
-                {lecturaSel ? (
-                  <div className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 px-3 py-2.5 rounded-lg">
-                    <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" />
-                    <span>
-                      Confirmado por <span className="font-semibold">{lecturaSel.por}</span>
-                      {lecturaSel.rol && (
-                        <span className="ml-1.5 align-middle"><AreaBadge rol={lecturaSel.rol} /></span>
-                      )}
-                      {lecturaSel.en && (
-                        <><br /><span className="text-xs opacity-75">{formatHora(lecturaSel.en)}</span></>
-                      )}
-                    </span>
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500">Aún no confirmado.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Footer: confirmar visto */}
-            {!lecturaSel && (
-              <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
-                <button
-                  onClick={confirmarVisto}
-                  disabled={savingVisto}
-                  className="w-full py-2.5 text-sm font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-500 disabled:opacity-50 transition-colors"
-                >
-                  {savingVisto ? "Confirmando..." : `Confirmar visto por ${areaLabel}`}
-                </button>
-              </div>
-            )}
+            <span className={review.count}>{recientes.length} de {notificaciones.length} avisos recientes · Hasta {LIVE_LIMIT}</span>
           </div>
-        </div>
+          <TablaNotificaciones lista={recientes} onSelect={setSelected} />
+        </section>
+      ) : (
+        <section aria-label="Búsqueda histórica" className="mt-5 space-y-5">
+          <div className={review.search}>
+            <label className={review.field}>Expediente
+              <input type="text" placeholder="Expediente exacto" value={busquedaExpediente} onChange={e => setBusquedaExpediente(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") buscar(); }} />
+            </label>
+            <div className={review.field}><span>Defunción desde</span><DateField value={fechaDesde} onChange={setFechaDesde} clearable placeholder="Desde" ariaLabel="Fecha desde" /></div>
+            <div className={review.field}><span>Hasta</span><DateField value={fechaHasta} onChange={setFechaHasta} clearable placeholder="Hasta" ariaLabel="Fecha hasta" /></div>
+            <button type="button" onClick={buscar} disabled={buscando || sinCriterio} className={ui.primaryButton}>
+              {buscando ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Search size={15} aria-hidden="true" />}{buscando ? "Buscando…" : "Buscar"}
+            </button>
+            {(busquedaExpediente || fechaDesde || fechaHasta || resultados !== null) && <button type="button" onClick={limpiarBusqueda} className={ui.secondaryButton}><X size={14} aria-hidden="true" />Limpiar</button>}
+          </div>
+          {errorBusqueda && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">{errorBusqueda}</p>}
+          {buscando ? <div className={review.empty} role="status"><Loader2 size={22} className="animate-spin" aria-hidden="true" />Buscando avisos…</div>
+            : resultados === null ? <div className={review.empty}><History size={28} strokeWidth={1.5} aria-hidden="true" /><p>Consulta por expediente o fecha de defunción</p></div>
+            : <><p className={review.count}>{resultados.length} {resultados.length === 1 ? "resultado" : "resultados"}</p><TablaNotificaciones lista={resultados} onSelect={setSelected} /></>}
+        </section>
       )}
+      {selectedLive && <FallecidoAvisoDetalle notificacion={selectedLive} lectura={lecturaSel} area={areaLabel}
+        recepcionesHref={recepcionesHref} saving={savingVisto} onConfirm={confirmarVisto} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -372,142 +253,39 @@ function TablaNotificaciones({ lista, onSelect }: { lista: NotificacionFallecido
   const pageSafe = Math.min(page, totalPages);
   const paginados = lista.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  if (lista.length === 0) {
-    return <p className="text-sm text-slate-500 py-8 text-center">Sin notificaciones que coincidan.</p>;
-  }
-
+  if (lista.length === 0) return <div className={review.empty}><Inbox size={28} strokeWidth={1.5} aria-hidden="true" /><p>Sin avisos que coincidan</p></div>;
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+    <div className={review.tableWrap}>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Paciente</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Servicio / Fecha</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Médico</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Estado</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Recepción</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {paginados.map(n => (
-              <tr key={n.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                <td className="px-4 py-3">
-                  <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-sm">{n.pacienteExpediente}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{n.pacienteNombre}</p>
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-slate-700 dark:text-slate-300">{n.servicio} · Cama {n.cama}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">† {formatFechaHora(n.fechaDefuncion)}</p>
-                </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs">
-                  Dr. {n.medicoNombre}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col items-start gap-1">
-                    <Badge estado={n.estado} />
-                    {n.estado === "confirmado" && n.confirmadoPorNombre && (
-                      <span className="text-[11px] text-slate-500">por {n.confirmadoPorNombre}</span>
-                    )}
-                    {n.estado === "confirmado" && <DuiBadge ok={!!n.duiValidado} />}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  {(() => {
-                    const lectura = getLecturaConfirmada(n);
-                    return lectura ? (
-                      <div className="flex flex-col items-start gap-1">
-                        <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                          <CheckCircle2 size={13} /> Visto
-                        </span>
-                        <span className="text-[11px] text-slate-500">{lectura.por}</span>
-                        <AreaBadge rol={lectura.rol} />
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">Pendiente</span>
-                    );
-                  })()}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    onClick={() => onSelect(n)}
-                    className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 transition-colors whitespace-nowrap"
-                  >
-                    Ver detalle
-                  </button>
-                </td>
-              </tr>
-            ))}
+        <table className={review.table} aria-label="Avisos de defunción">
+          <thead><tr><th>Expediente / Paciente</th><th>Defunción</th><th>Revisión de ESDOMED</th><th>Lectura del aviso</th><th><span className="sr-only">Acciones</span></th></tr></thead>
+          <tbody>
+            {paginados.map(n => {
+              const lectura = getLecturaConfirmada(n);
+              return (
+                <tr key={n.id}>
+                  <td><div className={ui.tablePatient}><strong>{n.pacienteExpediente}</strong><span>{n.pacienteNombre}</span></div></td>
+                  <td><p className="font-medium text-slate-700 dark:text-slate-200">{n.servicio} · Cama {n.cama}</p><span className={review.secondaryLine}>{formatFechaHora(n.fechaDefuncion)}</span></td>
+                  <td><Badge estado={n.estado} />{n.estado === "confirmado" && <><span className={review.secondaryLine}>{n.confirmadoPorNombre}</span><span className={review.secondaryLine}>{n.duiValidado ? "DUI validado" : "DUI sin validar"}</span></>}</td>
+                  <td>
+                    <span className={review.status} data-complete={!!lectura}>{lectura ? <CheckCircle2 size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}{lectura ? "Lectura confirmada" : "Por confirmar lectura"}</span>
+                    {lectura && <><span className={review.secondaryLine}>{lectura.por}</span>{lectura.rol && <span className={review.secondaryLine}>{lectura.rol === "trabajo_social" ? "Trabajo Social" : lectura.rol === "psicologia" ? "Psicología" : lectura.rol}{lectura.en && <> · {formatHora(lectura.en)}</>}</span>}</>}
+                  </td>
+                  <td className="text-right"><button type="button" className={ui.openButton} onClick={() => onSelect(n)} aria-label={"Revisar expediente " + n.pacienteExpediente}>Revisar<ArrowUpRight size={14} aria-hidden="true" /></button></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-
-      {/* Paginación */}
-      <div className="border-t border-slate-200 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/30 flex items-center justify-between gap-4">
-        <span className="text-xs text-slate-500 shrink-0">
-          {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, lista.length)} de{" "}
-          <span className="font-medium text-slate-700 dark:text-slate-300">{lista.length}</span>
-        </span>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(Math.max(1, pageSafe - 1))}
-              disabled={pageSafe === 1}
-              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="text-xs text-slate-500 px-2 tabular-nums">{pageSafe} / {totalPages}</span>
-            <button
-              onClick={() => setPage(Math.min(totalPages, pageSafe + 1))}
-              disabled={pageSafe === totalPages}
-              className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
+      <div className={review.pagination}>
+        <span>{(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, lista.length)} de {lista.length}</span>
+        {totalPages > 1 && <div>
+          <button type="button" onClick={() => setPage(Math.max(1, pageSafe - 1))} disabled={pageSafe === 1} className={ui.iconButton} aria-label="Página anterior"><ChevronLeft size={16} aria-hidden="true" /></button>
+          <span>{pageSafe} / {totalPages}</span>
+          <button type="button" onClick={() => setPage(Math.min(totalPages, pageSafe + 1))} disabled={pageSafe === totalPages} className={ui.iconButton} aria-label="Página siguiente"><ChevronRight size={16} aria-hidden="true" /></button>
+        </div>}
       </div>
-    </div>
-  );
-}
-
-function AreaBadge({ rol }: { rol?: string }) {
-  if (rol === "trabajo_social") {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
-        Trabajo Social
-      </span>
-    );
-  }
-  if (rol === "psicologia") {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-        Psicología
-      </span>
-    );
-  }
-  return null;
-}
-
-function DuiBadge({ ok }: { ok: boolean }) {
-  return ok ? (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
-      DUI ok
-    </span>
-  ) : (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-      Sin DUI
-    </span>
-  );
-}
-
-function InfoCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5">{value}</p>
     </div>
   );
 }

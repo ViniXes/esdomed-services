@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { collection, query, where, onSnapshot, doc, updateDoc, Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { NotificacionFallecido } from "@/types";
-import { Inbox, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Inbox, Loader2, UserCheck } from "lucide-react";
+import ui from "@/components/fallecidos/FallecidosUi.module.css";
+import review from "@/components/fallecidos/RevisionFallecidos.module.css";
 
 export default function RecepcionesView() {
   const { profile } = useAuth();
@@ -53,94 +56,81 @@ export default function RecepcionesView() {
   const pendientes   = registros.filter(r => !r.recibeDePsConfirmado);
   const confirmados  = registros.filter(r => r.recibeDePsConfirmado);
 
+  const areaLabel = profile?.role === "trabajo_social" ? "Trabajo Social" : profile?.role === "psicologia" ? "Psicología" : "Mi área";
+  const avisosHref = profile?.role === "psicologia" ? "/psicologia/fallecidos" : "/dashboard/defunciones";
+
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
-
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-teal-50 dark:bg-teal-950 rounded-xl flex items-center justify-center border border-teal-200 dark:border-teal-900">
-          <Inbox size={17} className="text-teal-600 dark:text-teal-400" />
-        </div>
+    <div className={ui.page}>
+      <header className={ui.pageHeading}>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Recepciones</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Certificados que ESDOMED reporta como entregados a ti</p>
+          <div className={ui.eyebrow}>{areaLabel}<span aria-hidden="true">/</span>Defunciones</div>
+          <h1 className="font-heading">Recepción de certificados</h1>
         </div>
-        {pendientes.length > 0 && (
-          <div className="ml-auto flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-xl">
-            <Clock size={14} />
-            {pendientes.length} pendiente{pendientes.length !== 1 ? "s" : ""}
-          </div>
-        )}
+        <Link href={avisosHref} prefetch={false} className={ui.secondaryButton}><ArrowLeft size={15} aria-hidden="true" />Ver avisos</Link>
+      </header>
+      <div className={ui.stats + " " + review.twoStats} aria-label="Mis certificados asignados">
+        <div className={ui.stat} data-tone="pending"><span><Inbox size={17} aria-hidden="true" />Por confirmar recepción</span><strong>{pendientes.length}</strong></div>
+        <div className={ui.stat}><span><CheckCircle2 size={17} aria-hidden="true" />Recepciones confirmadas</span><strong>{confirmados.length}</strong></div>
       </div>
-
-      {permissionError && (
-        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded-xl px-4 py-3 text-sm text-red-700 dark:text-red-400">
-          Sin permisos para leer recepciones. Pide al administrador que actualice las reglas de Firestore.
-        </div>
-      )}
-
-      {/* Pendientes */}
+      {permissionError && <p role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400">No tienes permiso para consultar estas recepciones. Contacta al administrador.</p>}
       {pendientes.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Por confirmar</p>
-          {pendientes.map(r => (
-            <div key={r.id}
-              className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-4 space-y-3 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-bold text-slate-900 dark:text-slate-100 font-mono text-base">{r.pacienteExpediente}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{r.pacienteNombre}</p>
-                  <p className="text-xs text-slate-500 mt-1">{r.servicio} · Cama {r.cama} · {formatFecha(r.fechaDefuncion)}</p>
-                  {r.recibeDePsEntregadoPor && (
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
-                      Entregado por <span className="font-medium">{r.recibeDePsEntregadoPor}</span> (ESDOMED)
-                    </p>
-                  )}
+        <section aria-labelledby="recepciones-pendientes" className="mb-8">
+          <div className={review.sectionHeading}><h2 id="recepciones-pendientes"><Clock size={16} aria-hidden="true" />Por confirmar</h2><span>{pendientes.length} {pendientes.length === 1 ? "certificado" : "certificados"}</span></div>
+          <div className={review.receiptList}>
+            {pendientes.map(r => (
+              <article key={r.id} className={review.receiptCard}>
+                <header className={review.receiptHeader}>
+                  <div><strong>Exp. {r.pacienteExpediente}</strong><h3>{r.pacienteNombre}</h3></div>
+                  <span className={review.status} data-complete="false"><Clock size={14} aria-hidden="true" />Recepción pendiente</span>
+                </header>
+                <div className={review.receiptBody}>
+                  <dl className={review.receiptMeta}>
+                    <div><dt>Servicio / Cama</dt><dd>{r.servicio} · {r.cama}</dd></div>
+                    <div><dt>Fecha de defunción</dt><dd>{formatFecha(r.fechaDefuncion)}</dd></div>
+                    <div><dt>Entregado por ESDOMED</dt><dd>{r.recibeDePsEntregadoPor || "Sin responsable registrado"}</dd></div>
+                    {r.recibeDePsEn && <div><dt>Entrega al área</dt><dd>{formatMomento(r.recibeDePsEn)}</dd></div>}
+                  </dl>
                 </div>
-                <span className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 px-2 py-1 rounded-lg">
-                  <Clock size={11} /> Pendiente
-                </span>
-              </div>
-              <button
-                onClick={() => confirmar(r.id!)}
-                disabled={confirmando === r.id}
-                className="w-full py-2.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl disabled:opacity-50 transition-colors"
-              >
-                {confirmando === r.id ? "Confirmando..." : "Confirmar recepción del certificado"}
-              </button>
-            </div>
-          ))}
-        </div>
+                <footer className={review.receiptFooter}>
+                  <span className={ui.footerState}><UserCheck size={15} aria-hidden="true" />Asignado a {r.recibeDePs || profile?.nombre}</span>
+                  <button type="button" onClick={() => confirmar(r.id!)} disabled={confirmando === r.id} className={ui.primaryButton}>
+                    {confirmando === r.id ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
+                    {confirmando === r.id ? "Confirmando..." : "Confirmar recepción del certificado"}
+                  </button>
+                </footer>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
-
-      {/* Confirmados */}
       {confirmados.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Confirmados</p>
-          {confirmados.map(r => (
-            <div key={r.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-sm">{r.pacienteExpediente}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{r.pacienteNombre} · {r.servicio}</p>
-                {r.recibeDePsEntregadoPor && (
-                  <p className="text-xs text-slate-500 mt-0.5">Entregado por {r.recibeDePsEntregadoPor} (ESDOMED)</p>
-                )}
-              </div>
-              <span className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-900 px-2 py-1 rounded-lg">
-                <CheckCircle2 size={11} /> Confirmado
-              </span>
+        <section aria-labelledby="recepciones-confirmadas">
+          <div className={review.sectionHeading}><h2 id="recepciones-confirmadas"><CheckCircle2 size={16} aria-hidden="true" />Recepciones confirmadas</h2><span>{confirmados.length} {confirmados.length === 1 ? "certificado" : "certificados"}</span></div>
+          <div className={review.tableWrap}>
+            <div className="overflow-x-auto">
+              <table className={review.table} aria-label="Certificados con recepción confirmada">
+                <thead><tr><th>Expediente / Paciente</th><th>Servicio</th><th>Entregado por ESDOMED</th><th>Recepción confirmada</th></tr></thead>
+                <tbody>{confirmados.map(r => (
+                  <tr key={r.id}>
+                    <td><div className={ui.tablePatient}><strong>{r.pacienteExpediente}</strong><span>{r.pacienteNombre}</span></div></td>
+                    <td className="text-slate-600 dark:text-slate-300">{r.servicio}</td>
+                    <td><p className="text-slate-700 dark:text-slate-200">{r.recibeDePsEntregadoPor || "—"}</p>{r.recibeDePsEn && <span className={review.secondaryLine}>{formatMomento(r.recibeDePsEn)}</span>}</td>
+                    <td><span className={review.status} data-complete="true"><CheckCircle2 size={14} aria-hidden="true" />Confirmada</span>{r.recibeDePsConfirmadoEn && <span className={review.secondaryLine}>{formatMomento(r.recibeDePsConfirmadoEn)}</span>}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
             </div>
-          ))}
-        </div>
+          </div>
+        </section>
       )}
-
-      {registros.length === 0 && !permissionError && (
-        <div className="text-center py-16 text-slate-400">
-          <Inbox size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No tienes recepciones asignadas.</p>
-        </div>
-      )}
+      {registros.length === 0 && !permissionError && <div className={review.empty}><Inbox size={30} strokeWidth={1.5} aria-hidden="true" /><p>No tienes recepciones asignadas</p></div>}
     </div>
   );
+}
+
+function formatMomento(ts: unknown) {
+  const d = (ts as { toDate?: () => Date } | null)?.toDate?.() ?? (ts ? new Date(ts as string) : null);
+  return d && !Number.isNaN(d.getTime())
+    ? d.toLocaleString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+    : "—";
 }
