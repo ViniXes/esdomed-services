@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, CalendarDays, LayoutDashboard, LayoutPanelLeft, UsersRound } from "lucide-react";
+import { CalendarClock, CalendarDays, LayoutDashboard, LayoutPanelLeft, Plane, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar, type NavItem } from "@/components/Sidebar";
 
@@ -27,7 +27,11 @@ export default function EsdomedHorariosLayout({ children }: { children: React.Re
     { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock },
     { href: "/esdomed-horarios/mi-grupo", label: "Mi grupo", icon: UsersRound },
     ...(puedePlanificar
-      ? [{ href: "/esdomed-horarios/planes", label: "Planes de trabajo", icon: CalendarDays }]
+      ? [
+          { href: "/esdomed-horarios/planes", label: "Planes de trabajo", icon: CalendarDays },
+          // La programación la edita solo el admin; el asistente la consulta.
+          { href: "/esdomed-horarios/vacaciones", label: "Vacaciones", icon: Plane },
+        ]
       : []),
     ...(tienePanel
       ? [{ href: "/dashboard", label: "Volver al panel", icon: LayoutPanelLeft, group: "Otros" }]

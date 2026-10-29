@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, CheckCircle2, Clock, FileText, Printer, AlertTriangle,
-  User2, Stethoscope, Trash2, Pencil, FileClock, UserCheck, Search,
+  User2, Stethoscope, Trash2, Pencil, FileClock, UserCheck, Search, CalendarClock,
 } from "lucide-react";
 import { DateField } from "@/components/ui/DateField";
 import type {
@@ -18,9 +18,13 @@ import {
   calcularEdad, formatDuracion, formatFecha, formatFechaHora, nombreCompleto, toDate,
 } from "@/lib/pacientes/helpers";
 import {
-  altaAntesDelIngreso, calcularDiasHospitalizacion, formatFechaConstanciaCorta,
-  numeroALetras, pacienteDesdeIncapacidad, mapIncapacidadData, recibidaEnEsdomed,
+  aMedianocheLocal, altaAntesDelIngreso, calcularPeriodoIncapacidad, diaSiguiente, diasAdicionalesGuardados,
+  formatFechaConstanciaCorta, numeroALetras, pacienteDesdeIncapacidad, parseDateInput, mapIncapacidadData,
+  recibidaEnEsdomed,
 } from "@/lib/incapacidades/helpers";
+import {
+  cargarIncapacidadesDelExpediente, continuacionParaFirestore, incapacidadVigenteEn, vigenteDeContinuacion,
+} from "@/lib/incapacidades/continuacion";
 import { cargarMedicosAsignables, type MedicoAsignable } from "@/lib/incapacidades/reposicion";
 
 const INSTITUCIONES: InstitucionProvisional[] = ["CRECER", "CONFIA", "INPEP", "IPSFA", "ISSS"];
@@ -53,6 +57,15 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   const [diasEdit, setDiasEdit] = useState("");
   const [aclaracionDias, setAclaracionDias] = useState("");
   const [guardandoDias, setGuardandoDias] = useState(false);
+
+  // Continuación: la incapacidad inicia al terminar otra vigente del paciente
+  // (sin traslape). previasExp = todas las del expediente, para detectarla.
+  const [previasExp, setPreviasExp] = useState<SolicitudIncapacidad[] | null>(null);
+  const [editandoCont, setEditandoCont] = useState(false);
+  const [contOrigen, setContOrigen] = useState<"sistema" | "manual">("sistema");
+  const [contFechaManual, setContFechaManual] = useState("");
+  const [aclaracionCont, setAclaracionCont] = useState("");
+  const [guardandoCont, setGuardandoCont] = useState(false);
 
   // Reposición: reasignar el médico que debe completarla (mientras siga con él).
   const [reasignando, setReasignando] = useState(false);
@@ -110,6 +123,17 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
     return () => { cancelado = true; };
   }, [incapacidad]);
 
+  // Incapacidades del mismo expediente (una consulta al abrir; pocas por paciente).
+  const expedienteInc = incapacidad?.pacienteExpediente;
+  useEffect(() => {
+    if (!expedienteInc) return;
+    let cancelado = false;
+    cargarIncapacidadesDelExpediente(expedienteInc)
+      .then((lista) => { if (!cancelado) setPreviasExp(lista); })
+      .catch(() => { if (!cancelado) setPreviasExp([]); });
+    return () => { cancelado = true; };
+  }, [expedienteInc]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full p-10">
@@ -130,13 +154,10 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   }
 
   // Desglose de días: los "adicionales" son los que el médico otorga post-alta
-  // (fechaAlta → fechaHasta). No se guardan aparte; se derivan comparando solo
-  // el día calendario. El resto del total corresponde a la hospitalización.
-  const DIA_MS = 1000 * 60 * 60 * 24;
-  const aMedianoche = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diasAdicionales = Math.max(0, Math.round(
-    (aMedianoche(incapacidad.fechaHasta).getTime() - aMedianoche(incapacidad.fechaAlta).getTime()) / DIA_MS,
-  ));
+  // (fechaAlta → fechaHasta, o desde el fin de la anterior si es continuación).
+  // No se guardan aparte; se derivan comparando solo el día calendario. El
+  // resto del total corresponde a la hospitalización.
+  const diasAdicionales = diasAdicionalesGuardados(incapacidad);
   const diasHospitalizacion = Math.max(0, incapacidad.diasIncapacidad - diasAdicionales);
 
   // En emergencia no hay estancia: los días son solo los prescritos y no
@@ -146,6 +167,28 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
   // Días que otorgó el médico: los adicionales post-alta en hospitalización;
   // en emergencia el total prescrito. Es el número que ESDOMED puede corregir.
   const diasMedicoActuales = esEmergenciaInc ? incapacidad.diasIncapacidad : diasAdicionales;
+
+  // ── Continuación de una incapacidad vigente ──
+  const ingresoInc = incapacidad.fechaIngresoCorregida ?? paciente?.fechaIngreso;
+  const inicioInc = esEmergenciaInc ? incapacidad.fechaAlta : ingresoInc;
+  const vigenteGuardada = incapacidad.continuaDe ? vigenteDeContinuacion(incapacidad.continuaDe, previasExp ?? []) : null;
+  const vigenteDetectada = !incapacidad.continuaDe && previasExp && inicioInc
+    ? incapacidadVigenteEn(previasExp, inicioInc, {
+        id: incapacidad.id,
+        pacienteId: incapacidad.pacienteId,
+        atencionEmergenciaId: incapacidad.atencionEmergenciaId,
+      })
+    : null;
+
+  /** Período con o sin continuación, conservando los días que otorgó el médico. */
+  const periodoCon = (hastaAnterior: Date | null | undefined, fechaIngreso: Date | undefined = ingresoInc) =>
+    calcularPeriodoIncapacidad({
+      fechaIngreso: esEmergenciaInc ? undefined : fechaIngreso,
+      fechaAlta: incapacidad.fechaAlta,
+      dias: diasMedicoActuales,
+      emergencia: esEmergenciaInc,
+      hastaAnterior,
+    });
 
   const emitir = async () => {
     if (!profile || !incapacidad.id) return;
@@ -214,8 +257,10 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
       // de días y fechaDesde (= ingreso), igual que al crearla el médico. Los días
       // adicionales post-alta y fechaHasta no cambian.
       if (!esEmergenciaInc) {
-        update.diasIncapacidad = calcularDiasHospitalizacion(nuevaFecha, incapacidad.fechaAlta) + diasAdicionales;
-        update.fechaDesde = Timestamp.fromDate(nuevaFecha);
+        const p = periodoCon(incapacidad.continuaDe?.hastaAnterior, nuevaFecha);
+        update.diasIncapacidad = p.total;
+        update.fechaDesde = Timestamp.fromDate(p.desde);
+        update.fechaHasta = Timestamp.fromDate(p.hasta);
       }
       await updateDoc(doc(db, "incapacidades", incapacidad.id), update);
       setEditandoIngreso(false);
@@ -239,8 +284,10 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
       };
       // Restaurar el cálculo original con la fecha de ingreso del paciente.
       if (!esEmergenciaInc && paciente && !altaAntesDelIngreso(incapacidad.fechaAlta, paciente.fechaIngreso)) {
-        update.diasIncapacidad = calcularDiasHospitalizacion(paciente.fechaIngreso, incapacidad.fechaAlta) + diasAdicionales;
-        update.fechaDesde = Timestamp.fromDate(paciente.fechaIngreso);
+        const p = periodoCon(incapacidad.continuaDe?.hastaAnterior, paciente.fechaIngreso);
+        update.diasIncapacidad = p.total;
+        update.fechaDesde = Timestamp.fromDate(p.desde);
+        update.fechaHasta = Timestamp.fromDate(p.hasta);
       }
       await updateDoc(doc(db, "incapacidades", incapacidad.id), update);
       setEditandoIngreso(false);
@@ -309,6 +356,66 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
       setError(`Error al quitar la corrección: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally {
       setGuardandoDias(false);
+    }
+  };
+
+  // ── Continuación (ESDOMED) ──
+  const abrirEditarContinuacion = () => {
+    const c = incapacidad.continuaDe;
+    const desdeSistema = c ? !!c.incapacidadAnteriorId : !!vigenteDetectada;
+    setContOrigen(desdeSistema ? "sistema" : "manual");
+    setContFechaManual(c && !c.incapacidadAnteriorId ? aYMD(c.hastaAnterior) : "");
+    setAclaracionCont(c?.aclaracion ?? "");
+    setEditandoCont(true);
+  };
+
+  const vigenteSistema = vigenteGuardada?.id ? vigenteGuardada : vigenteDetectada;
+  const hastaContEdit = contOrigen === "sistema"
+    ? vigenteSistema?.hasta ?? null
+    : contFechaManual ? parseDateInput(contFechaManual) : null;
+  // Si la anterior terminó antes de que empezara esta, no hay traslape que evitar.
+  const contSinTraslape = !!hastaContEdit && !!inicioInc &&
+    aMedianocheLocal(hastaContEdit).getTime() < aMedianocheLocal(inicioInc).getTime();
+  const contPreview = editandoCont && hastaContEdit && !contSinTraslape ? periodoCon(hastaContEdit) : null;
+
+  const guardarContinuacion = async () => {
+    if (!incapacidad.id || !profile || !hastaContEdit || contSinTraslape || !aclaracionCont.trim()) return;
+    setError(null);
+    setGuardandoCont(true);
+    try {
+      const p = periodoCon(hastaContEdit);
+      const anterior = contOrigen === "sistema" && vigenteSistema ? vigenteSistema : { hasta: hastaContEdit };
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+        diasIncapacidad: p.total,
+        fechaDesde: Timestamp.fromDate(p.desde),
+        fechaHasta: Timestamp.fromDate(p.hasta),
+        continuaDe: continuacionParaFirestore(anterior, profile.nombre, aclaracionCont),
+      });
+      setEditandoCont(false);
+    } catch (e) {
+      setError(`Error al aplicar la continuación: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoCont(false);
+    }
+  };
+
+  const quitarContinuacion = async () => {
+    if (!incapacidad.id || !incapacidad.continuaDe) return;
+    setError(null);
+    setGuardandoCont(true);
+    try {
+      const p = periodoCon(null);
+      await updateDoc(doc(db, "incapacidades", incapacidad.id), {
+        diasIncapacidad: p.total,
+        fechaDesde: Timestamp.fromDate(p.desde),
+        fechaHasta: Timestamp.fromDate(p.hasta),
+        continuaDe: null,
+      });
+      setEditandoCont(false);
+    } catch (e) {
+      setError(`Error al quitar la continuación: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setGuardandoCont(false);
     }
   };
 
@@ -719,6 +826,7 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
         <p className="mt-3 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-800">
           <span className="font-semibold text-slate-700 dark:text-slate-300">{incapacidad.diasIncapacidad} días en total</span>
           {" = "}{diasHospitalizacion} de hospitalización + <span className="font-semibold text-slate-700 dark:text-slate-300">{diasAdicionales} adicionales</span> que otorgó el médico.
+          {incapacidad.continuaDe && !esEmergenciaInc && diasHospitalizacion === 0 && " La estancia ya la cubría la incapacidad anterior."}
           {esEsdomed && !editandoDias && (
             <button
               onClick={abrirEditarDias}
@@ -727,7 +835,161 @@ export default function IncapacidadDetallePage({ params }: { params: Promise<{ i
               <Pencil size={10} /> Corregir días
             </button>
           )}
+          {esEsdomed && !editandoCont && !incapacidad.continuaDe && !vigenteDetectada && (
+            <button
+              onClick={abrirEditarContinuacion}
+              className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline align-baseline"
+            >
+              <CalendarClock size={10} /> Inicia al terminar otra incapacidad
+            </button>
+          )}
         </p>
+
+        {/* Traslape detectado con otra incapacidad del expediente */}
+        {vigenteDetectada && !editandoCont && (
+          <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900 dark:bg-amber-950/40">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="min-w-0 flex-1 text-xs text-amber-800 dark:text-amber-300">
+              <p className="font-semibold">
+                Se traslapa con otra incapacidad del paciente: del {formatFechaConstanciaCorta(vigenteDetectada.desde ?? vigenteDetectada.hasta)} al {formatFechaConstanciaCorta(vigenteDetectada.hasta)}
+              </p>
+              <p className="mt-0.5 text-amber-700 dark:text-amber-400">
+                {vigenteDetectada.medicoNombre && <>Dr. {vigenteDetectada.medicoNombre} · {vigenteDetectada.dias} días. </>}
+                El patrono puede rechazar esta constancia por estar dentro del período de la anterior.
+              </p>
+              {esEsdomed && (
+                <button
+                  onClick={abrirEditarContinuacion}
+                  className="mt-1.5 inline-flex items-center gap-1 font-semibold text-blue-700 hover:underline dark:text-blue-300"
+                >
+                  <CalendarClock size={12} /> Iniciar el {formatFechaConstanciaCorta(diaSiguiente(vigenteDetectada.hasta))}, al terminar la anterior
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Continuación vigente (no se imprime: la constancia solo lleva las fechas) */}
+        {incapacidad.continuaDe && vigenteGuardada && !editandoCont && (
+          <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-[11px] text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+            <p className="flex items-center gap-1.5 font-semibold text-blue-800 dark:text-blue-300">
+              <CalendarClock size={12} />
+              Continúa la incapacidad {vigenteGuardada.desde ? `del ${formatFechaConstanciaCorta(vigenteGuardada.desde)} al` : "que terminaba el"} {formatFechaConstanciaCorta(vigenteGuardada.hasta)}
+              {vigenteGuardada.medicoNombre && <span className="font-normal"> · Dr. {vigenteGuardada.medicoNombre}</span>}
+            </p>
+            <p className="mt-0.5">
+              Inicia el {formatFechaConstanciaCorta(incapacidad.fechaDesde)} para no traslaparse. Aplicada por {incapacidad.continuaDe.aplicadaPor || "—"} el {formatFecha(incapacidad.continuaDe.aplicadaEn)}.
+              {vigenteGuardada.id && aMedianocheLocal(vigenteGuardada.hasta).getTime() !== aMedianocheLocal(incapacidad.continuaDe.hastaAnterior).getTime() && (
+                <span className="text-amber-700 dark:text-amber-400"> La anterior ahora termina el {formatFechaConstanciaCorta(vigenteGuardada.hasta)}: vuelve a aplicarla para recalcular.</span>
+              )}
+            </p>
+            {incapacidad.continuaDe.aclaracion && (
+              <p className="mt-1"><span className="font-semibold">Aclaración:</span> {incapacidad.continuaDe.aclaracion}</p>
+            )}
+            {esEsdomed && (
+              <div className="mt-1.5 flex flex-wrap gap-3">
+                <button onClick={abrirEditarContinuacion} className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline dark:text-blue-400">
+                  <Pencil size={10} /> Cambiar
+                </button>
+                <button
+                  onClick={quitarContinuacion}
+                  disabled={guardandoCont}
+                  className="font-medium text-amber-700 hover:underline disabled:opacity-50 dark:text-amber-400"
+                >
+                  Quitar continuación
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Editor de continuación (ESDOMED) */}
+        {editandoCont && (
+          <div className="mt-2 space-y-2.5 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-3 dark:border-amber-900 dark:bg-amber-950/30">
+            <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+              Iniciar esta incapacidad al terminar otra que seguía vigente
+            </p>
+            {vigenteSistema && (
+              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <input
+                  type="radio"
+                  name="cont-origen"
+                  checked={contOrigen === "sistema"}
+                  onChange={() => setContOrigen("sistema")}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-blue-600"
+                />
+                <span>
+                  La del sistema: del {formatFechaConstanciaCorta(vigenteSistema.desde ?? vigenteSistema.hasta)} al {formatFechaConstanciaCorta(vigenteSistema.hasta)}
+                  {vigenteSistema.medicoNombre && <> · Dr. {vigenteSistema.medicoNombre}</>}
+                </span>
+              </label>
+            )}
+            <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+              {vigenteSistema && (
+                <input
+                  type="radio"
+                  name="cont-origen"
+                  checked={contOrigen === "manual"}
+                  onChange={() => setContOrigen("manual")}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-blue-600"
+                />
+              )}
+              <span>Otra constancia que no está en el sistema (de otro establecimiento o anterior a la app)</span>
+            </label>
+            {contOrigen === "manual" && (
+              <div className="max-w-xs">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                  La incapacidad anterior terminaba el <span className="text-rose-500">*</span>
+                </label>
+                <DateField value={contFechaManual} onChange={setContFechaManual} ariaLabel="Fin de la incapacidad anterior" />
+              </div>
+            )}
+            {contSinTraslape && (
+              <p className="text-[11px] text-red-600 dark:text-red-400">
+                Esa incapacidad terminó antes {esEmergenciaInc ? "del inicio" : "del ingreso"} ({inicioInc && formatFecha(inicioInc)}): no hay traslape que evitar.
+              </p>
+            )}
+            {contPreview && (
+              <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                Quedará: del <span className="font-semibold">{formatFechaConstanciaCorta(contPreview.desde)}</span> al{" "}
+                <span className="font-semibold">{formatFechaConstanciaCorta(contPreview.hasta)}</span>,{" "}
+                <span className="font-semibold">{contPreview.total} días</span>
+                {!esEmergenciaInc && contPreview.diasHospitalizacion === 0
+                  ? ` (los ${diasMedicoActuales} que otorgó el médico; la estancia ya la cubría la anterior).`
+                  : "."}
+                {" "}Fecha de ingreso y de alta se imprimen sin cambios.
+              </p>
+            )}
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                Aclaración <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                value={aclaracionCont}
+                onChange={e => setAclaracionCont(e.target.value)}
+                rows={2}
+                placeholder="Ej. El patrono no aceptó la constancia porque estaba dentro del período de la incapacidad anterior..."
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={guardarContinuacion}
+                disabled={guardandoCont || !hastaContEdit || contSinTraslape || !aclaracionCont.trim()}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {guardandoCont ? "Guardando..." : "Aplicar"}
+              </button>
+              <button
+                onClick={() => setEditandoCont(false)}
+                disabled={guardandoCont}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Corrección de días vigente (badge + aclaración, no se imprime) */}
         {incapacidad.diasMedicoOriginal != null && !editandoDias && (

@@ -14,7 +14,7 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { FilaPlanTrabajo, PlanTrabajo, UserProfile } from "@/types";
+import type { FilaPlanTrabajo, PlanTrabajo, UserProfile, VacacionProgramada } from "@/types";
 import {
   contarMarca,
   esMarcaEspecial,
@@ -50,6 +50,12 @@ import {
   permisoDelDia,
 } from "@/lib/esdomed/permisos-plan";
 import { esDiaNoLaboralAdministrativo } from "@/lib/esdomed/calendario-plan";
+import {
+  cargarProgramacionVacaciones,
+  describirCambiosVacaciones,
+  mesSincronizable,
+  sincronizarVacacionesEnFilas,
+} from "@/lib/esdomed/vacaciones";
 import { CeldaPicker } from "@/components/esdomed-horarios/CeldaPicker";
 import { exportarPlanExcel, type TipoPlan } from "@/lib/esdomed/exportar-plan";
 import {
@@ -61,6 +67,7 @@ import {
   FileSpreadsheet,
   Printer,
   RefreshCw,
+  RotateCcw,
   Save,
   Trash2,
   UserMinus,
@@ -82,6 +89,10 @@ interface BajaRoster {
 interface BorradorPlanLocal {
   periodo: string;
   actualizadoEn: number;
+  // Versión guardada (ms de actualizadoEn) sobre la que se hicieron estos
+  // cambios. Si otro usuario guarda después, el borrador queda obsoleto y no
+  // debe pisar lo guardado. Ausente en borradores anteriores a este campo.
+  versionBase?: number;
   filas: FilaPlanTrabajo[];
   numeroHoras: string;
   metaHorasAdmin: number | "";
@@ -96,6 +107,20 @@ function parsearBloqueCodigos(texto: string): string[][] {
     const limpia = linea.trim();
     return limpia ? limpia.split(/[\s,;]+/) : [""];
   });
+}
+
+/** Versión del plan guardado: ms de su última actualización (0 si no existe). */
+function versionPlan(plan: Partial<PlanTrabajo> | null | undefined): number {
+  const fecha = (plan?.actualizadoEn ?? plan?.creadoEn) as unknown;
+  if (fecha instanceof Date) return fecha.getTime();
+  if (fecha && typeof (fecha as { toMillis?: unknown }).toMillis === "function") {
+    return (fecha as { toMillis: () => number }).toMillis();
+  }
+  return 0;
+}
+
+function fechaHoraCorta(ms: number): string {
+  return new Date(ms).toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default function EditorPlanPage() {
@@ -122,7 +147,9 @@ export default function EditorPlanPage() {
   const [bajas, setBajas] = useState<BajaRoster[]>([]);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
-  const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void } | null>(null);
+  const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void; textoCancelar?: string; onCancel?: () => void } | null>(null);
+  // Sube para volver a cargar el plan desde Firestore (descartar cambios locales).
+  const [recarga, setRecarga] = useState(0);
   const dragRef = useRef<{
     filaIdx: number;
     diaIdxOrigen: number;
@@ -135,6 +162,12 @@ export default function EditorPlanPage() {
   const filasRef = useRef<FilaPlanTrabajo[]>([]);
   const undoRef = useRef<FilaPlanTrabajo[][]>([]);
   const inicializadoRef = useRef(false);
+  // Versión guardada sobre la que está trabajando este editor (ver versionPlan).
+  const versionBaseRef = useRef(0);
+  const descartarBorradorRef = useRef(false);
+  // Vacaciones programadas del año que tocan este mes (null = no se sincroniza:
+  // mes ya pasado, sin programación o no se pudo leer).
+  const vacacionesRef = useRef<VacacionProgramada[] | null>(null);
   const borradorKey = useMemo(() => `plan-trabajo-borrador:${periodo}`, [periodo]);
 
   useEffect(() => {
@@ -255,11 +288,19 @@ export default function EditorPlanPage() {
       setLoading(true);
       try {
         const prevPeriodo = formatPeriodo(mes === 1 ? anio - 1 : anio, mes === 1 ? 12 : mes - 1);
-        const [snap, lista, prevSnap] = await Promise.all([
+        const [snap, lista, prevSnap, programaVacaciones] = await Promise.all([
           getDoc(doc(db, "planes_trabajo", periodo)),
           cargarRoster(),
-          getDoc(doc(db, "planes_trabajo", prevPeriodo))
+          getDoc(doc(db, "planes_trabajo", prevPeriodo)),
+          mesSincronizable(anio, mes)
+            ? cargarProgramacionVacaciones(anio).catch((err) => {
+                console.error("No se pudo leer la programación de vacaciones", err);
+                return null;
+              })
+            : Promise.resolve(null),
         ]);
+        const vacaciones = programaVacaciones?.asignaciones ?? null;
+        vacacionesRef.current = vacaciones;
         
         if (prevSnap.exists()) {
           setPrevPlanData(prevSnap.data() as PlanTrabajo);
@@ -293,27 +334,56 @@ export default function EditorPlanPage() {
           filasBase = prepararFilasNuevoPeriodo(lista, planAnterior, anio, mes);
         }
 
+        const planGuardado = snap.exists() ? snap.data() as PlanTrabajo : null;
+        const versionGuardada = versionPlan(planGuardado);
+        versionBaseRef.current = versionGuardada;
+
+        // El borrador local solo se aplica si se hizo sobre la versión que
+        // sigue guardada. Si otro usuario guardó después, se muestra lo guardado
+        // y se ofrece recuperar el borrador (avisando que lo reemplazaría).
         let borradorRecuperado = false;
+        let borradorObsoleto: BorradorPlanLocal | null = null;
+        if (descartarBorradorRef.current) {
+          descartarBorradorRef.current = false;
+          window.localStorage.removeItem(borradorKey);
+        }
         try {
           const raw = window.localStorage.getItem(borradorKey);
           const borrador = raw ? JSON.parse(raw) as BorradorPlanLocal : null;
           if (borrador?.periodo === periodo && Array.isArray(borrador.filas)) {
-            filasBase = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
-            numeroHorasBase = borrador.numeroHoras ?? numeroHorasBase;
-            metaAdminBase = borrador.metaHorasAdmin ?? metaAdminBase;
-            metaOperativaBase = borrador.metaHorasOperativas ?? metaOperativaBase;
-            borradorRecuperado = true;
+            const obsoleto = typeof borrador.versionBase === "number"
+              ? borrador.versionBase !== versionGuardada
+              : versionGuardada > borrador.actualizadoEn;
+            if (obsoleto) {
+              borradorObsoleto = borrador;
+            } else {
+              filasBase = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
+              numeroHorasBase = borrador.numeroHoras ?? numeroHorasBase;
+              metaAdminBase = borrador.metaHorasAdmin ?? metaAdminBase;
+              metaOperativaBase = borrador.metaHorasOperativas ?? metaOperativaBase;
+              borradorRecuperado = true;
+            }
           }
         } catch {
           window.localStorage.removeItem(borradorKey);
+        }
+
+        // Vacaciones programadas del año: se pintan antes que los permisos, así
+        // un permiso no cae en un día que ya es VAC. Idempotente vía fila.vacaciones.
+        let mensajeVacaciones: string | null = null;
+        if (vacaciones) {
+          const r = sincronizarVacacionesEnFilas(filasBase, vacaciones, mes);
+          mensajeVacaciones = describirCambiosVacaciones(r);
+          if (mensajeVacaciones) filasBase = r.filas;
         }
 
         // Respaldo del puente trámites → plan: aplica permisos personales
         // aprobados que aún no estén reflejados (p. ej. aprobados antes de que
         // existiera el plan de este mes). Idempotente vía fila.permisos.
         let mensajePermisos: string | null = null;
+        let aprobados: Awaited<ReturnType<typeof cargarPermisosAprobadosDelPeriodo>> = [];
         try {
-          const aprobados = await cargarPermisosAprobadosDelPeriodo(anio, mes);
+          aprobados = await cargarPermisosAprobadosDelPeriodo(anio, mes);
           const r = aplicarPermisosAprobados(filasBase, aprobados, anio, mes);
           if (r.completos + r.parciales > 0) {
             filasBase = r.filas;
@@ -331,12 +401,14 @@ export default function EditorPlanPage() {
         setNumeroHoras(numeroHorasBase);
         setMetaHorasAdmin(metaAdminBase);
         setMetaHorasOperativas(metaOperativaBase);
-        setGuardado(snap.exists() && !borradorRecuperado && !mensajePermisos);
-        if (mensajePermisos) {
+        setGuardado(snap.exists() && !borradorRecuperado && !mensajePermisos && !mensajeVacaciones);
+        if (mensajePermisos || mensajeVacaciones) {
           setModalState({
             tipo: "alerta",
-            titulo: "Permisos aprobados aplicados",
-            mensaje: `${mensajePermisos}${borradorRecuperado ? "\n\nAdemás se recuperaron cambios locales pendientes de guardar." : ""}\n\nGuarda el plan para que quede permanente.`,
+            titulo: mensajePermisos && mensajeVacaciones
+              ? "Vacaciones y permisos aplicados"
+              : mensajeVacaciones ? "Vacaciones programadas aplicadas" : "Permisos aprobados aplicados",
+            mensaje: `${[mensajeVacaciones, mensajePermisos].filter(Boolean).join("\n\n")}${borradorRecuperado ? "\n\nAdemás se recuperaron cambios locales pendientes de guardar." : ""}\n\nGuarda el plan para que quede permanente.`,
           });
         } else if (borradorRecuperado) {
           setModalState({
@@ -345,20 +417,49 @@ export default function EditorPlanPage() {
             mensaje: "Se recuperaron los cambios locales que estaban pendientes de guardar en este mes.",
           });
         }
+        if (borradorObsoleto) {
+          const borrador = borradorObsoleto;
+          const quien = planGuardado?.actualizadoPorNombre || planGuardado?.creadoPorNombre || "Otro usuario";
+          setConfirmState({
+            tipo: "alerta",
+            titulo: "Hay una versión guardada más reciente",
+            mensaje:
+              `${quien} guardó este plan el ${fechaHoraCorta(versionGuardada)}, después de tus cambios locales sin guardar ` +
+              `(${fechaHoraCorta(borrador.actualizadoEn)}).\n\nSe muestra la versión guardada. ` +
+              `Si recuperas tus cambios y luego guardas, reemplazarás la versión de ${quien}.`,
+            textoCancelar: "Quedarme con lo guardado",
+            onCancel: () => window.localStorage.removeItem(borradorKey),
+            textoConfirmar: "Recuperar mis cambios",
+            onConfirm: () => {
+              registrarUndo();
+              let filasBorrador = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
+              if (vacaciones) filasBorrador = sincronizarVacacionesEnFilas(filasBorrador, vacaciones, mes).filas;
+              filasBorrador = aplicarPermisosAprobados(filasBorrador, aprobados, anio, mes).filas;
+              filasRef.current = filasBorrador;
+              setFilas(filasBorrador);
+              setNumeroHoras(borrador.numeroHoras ?? numeroHorasBase);
+              setMetaHorasAdmin(borrador.metaHorasAdmin ?? metaAdminBase);
+              setMetaHorasOperativas(borrador.metaHorasOperativas ?? metaOperativaBase);
+              setGuardado(false);
+            },
+          });
+        }
         inicializadoRef.current = true;
       } finally {
         setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodo]);
+  }, [periodo, recarga]);
 
   useEffect(() => {
     if (loading || !inicializadoRef.current || guardado) return;
     const timer = window.setTimeout(() => {
+      if (!inicializadoRef.current) return;
       const borrador: BorradorPlanLocal = {
         periodo,
         actualizadoEn: Date.now(),
+        versionBase: versionBaseRef.current,
         filas,
         numeroHoras,
         metaHorasAdmin,
@@ -434,8 +535,9 @@ export default function EditorPlanPage() {
       i === filaIdx ? normalizarMetadatosFilaPlan({
         ...f,
         grupo,
+        // El grupo elegido decide la jornada; "Sin grupo" vuelve al valor del catálogo.
         tipoJornada:
-          configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo" || grupo === "Administrativo"
+          grupo === "Administrativo" || (!grupo && configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo")
             ? "Administrativo"
             : "Operativo",
       }) : f
@@ -527,12 +629,32 @@ export default function EditorPlanPage() {
     }
     const prevPlan = snap.data() as PlanTrabajo;
     registrarUndo();
-    setFilas((prev) => copiarFilasMesAnterior(prev, prevPlan, anio, mes));
+    // La copia no trae vacaciones del mes anterior: se pintan las de este mes.
+    setFilas((prev) => {
+      const copiadas = copiarFilasMesAnterior(prev, prevPlan, anio, mes);
+      return vacacionesRef.current ? sincronizarVacacionesEnFilas(copiadas, vacacionesRef.current, mes).filas : copiadas;
+    });
     if (!numeroHoras && prevPlan.numeroHoras) setNumeroHoras(prevPlan.numeroHoras);
     if (metaHorasAdmin === "" && prevPlan.metaHorasAdmin) setMetaHorasAdmin(prevPlan.metaHorasAdmin);
     if (metaHorasOperativas === "" && prevPlan.metaHorasOperativas) setMetaHorasOperativas(prevPlan.metaHorasOperativas);
-    setModalState({ tipo: "exito", titulo: "Patrón Copiado", mensaje: `Se han copiado los turnos desde ${labelPeriodo(prevPeriodo)}. Por favor, ajusta los detalles antes de guardar.` });
+    setModalState({ tipo: "exito", titulo: "Patrón Copiado", mensaje: `Se han copiado los turnos desde ${labelPeriodo(prevPeriodo)}. Las vacaciones de ese mes no se copian; se marcan las programadas para este mes. Por favor, ajusta los detalles antes de guardar.` });
     setGuardado(false);
+  };
+
+  const descartarCambios = () => {
+    setConfirmState({
+      tipo: "peligro",
+      titulo: "Descartar cambios sin guardar",
+      mensaje: creadoMeta
+        ? "Se perderán los cambios que no has guardado y se cargará la última versión guardada del plan."
+        : "Se perderán los cambios que no has guardado y el mes se volverá a armar a partir del plan anterior.",
+      textoConfirmar: "Descartar cambios",
+      onConfirm: () => {
+        descartarBorradorRef.current = true;
+        window.localStorage.removeItem(borradorKey);
+        setRecarga((n) => n + 1);
+      },
+    });
   };
 
   const guardar = () => {
@@ -556,7 +678,7 @@ export default function EditorPlanPage() {
       .map((count, idx) => count < 2 ? idx + 1 : null)
       .filter((val): val is number => val !== null);
     if (diasIncompletos.length > 0) {
-      advertencias.push(`Días con menos de 2 operativos de grupo asignados (sin contar emergencia ni apoyo diurno): ${diasIncompletos.join(", ")}.`);
+      advertencias.push(`Días con menos de 2 operativos de grupo asignados (sin contar emergencia, apoyo diurno ni consulta externa): ${diasIncompletos.join(", ")}.`);
     }
 
     // Las vacaciones siempre son un periodo de 15 días: avisar si alguien tiene
@@ -585,11 +707,32 @@ export default function EditorPlanPage() {
     void ejecutarGuardado();
   };
 
-  const ejecutarGuardado = async () => {
+  const ejecutarGuardado = async (reemplazarVersionAjena = false) => {
     if (!profile) return;
 
     setSaving(true);
     try {
+      // Si alguien guardó este mes mientras se editaba, no pisarlo sin avisar.
+      if (!reemplazarVersionAjena) {
+        const actual = await getDoc(doc(db, "planes_trabajo", periodo));
+        const planActual = actual.exists() ? actual.data() as PlanTrabajo : null;
+        const versionActual = versionPlan(planActual);
+        if (versionActual !== versionBaseRef.current) {
+          const quien = planActual?.actualizadoPorNombre || planActual?.creadoPorNombre || "Otro usuario";
+          setSaving(false);
+          setConfirmState({
+            tipo: "alerta",
+            titulo: "Otro usuario guardó este plan",
+            mensaje:
+              `${quien} guardó este plan el ${fechaHoraCorta(versionActual)}, mientras tú lo editabas.\n\n` +
+              `Si guardas, su versión se reemplaza por la tuya. Para ver la de ${quien}, usa "Descartar cambios".`,
+            textoConfirmar: "Reemplazar con la mía",
+            onConfirm: () => { void ejecutarGuardado(true); },
+          });
+          return;
+        }
+      }
+
       const ahora = new Date();
       const payload: PlanTrabajo = {
         periodo,
@@ -611,6 +754,8 @@ export default function EditorPlanPage() {
           ...(typeof f.orden === "number" ? { orden: f.orden } : {}),
           // Procedencia de permisos de trámites aprobados aplicados este mes.
           ...(f.permisos?.length ? { permisos: f.permisos } : {}),
+          // Días VAC que pintó la programación anual (para poder moverlos).
+          ...(f.vacaciones?.length ? { vacaciones: f.vacaciones } : {}),
         })),
         creadoEn: creadoMeta?.creadoEn ?? ahora,
         creadoPorId: creadoMeta?.creadoPorId ?? profile.uid,
@@ -622,6 +767,7 @@ export default function EditorPlanPage() {
       // Firestore no acepta `undefined`; uid puede faltar en filas sin usuario.
       payload.filas = payload.filas.map((f) => (f.uid ? f : { ...f, uid: "" }));
       await setDoc(doc(db, "planes_trabajo", periodo), payload);
+      versionBaseRef.current = ahora.getTime();
       window.localStorage.removeItem(borradorKey);
       undoRef.current = [];
       if (!creadoMeta) {
@@ -750,22 +896,28 @@ export default function EditorPlanPage() {
     }
   };
 
-  // Tres contadores EXCLUYENTES: cada turno operativo/hospitalario suma solo a
-  // uno según el grupo de la fila. El de operativos cubre a los grupos
-  // regulares (y filas sin grupo); los equipos de emergencia y de apoyo diurno
-  // llevan cada uno su propia fila de totales.
+  // Cuatro contadores EXCLUYENTES: cada turno suma solo a uno según el grupo
+  // de la fila. El de operativos cubre a los grupos regulares (y filas sin
+  // grupo); emergencia, apoyo diurno y consulta externa llevan cada uno su
+  // propia fila de totales y no cuentan para el mínimo de 2 operativos.
+  // Consulta externa y apoyo diurno cuentan cualquier jornada (son de día y
+  // pueden llevar un código administrativo, p. ej. un administrativo que pasa
+  // a apoyo); los demás, solo turnos operativos/hospitalarios.
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
   const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
   const conteoApoyoDiurnoPorDia = new Array(dias.length).fill(0);
+  const conteoConsultaExternaPorDia = new Array(dias.length).fill(0);
   filas.forEach((fila) => {
     const grupo = fila.grupo?.trim();
     fila.asignaciones.forEach((celda, diaIdx) => {
       const horario = getHorario(celda);
-      if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
+      if (horario && grupo === "Consulta Externa") {
+        conteoConsultaExternaPorDia[diaIdx]++;
+      } else if (horario && grupo === "Equipo de apoyo diurno / emergencia") {
+        conteoApoyoDiurnoPorDia[diaIdx]++;
+      } else if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
         if (grupo === "Equipo de emergencia") {
           conteoEmergenciaPorDia[diaIdx]++;
-        } else if (grupo === "Equipo de apoyo diurno / emergencia") {
-          conteoApoyoDiurnoPorDia[diaIdx]++;
         } else {
           conteoOperativosPorDia[diaIdx]++;
         }
@@ -775,7 +927,7 @@ export default function EditorPlanPage() {
 
   const colSpanTotal = dias.length + 2; // Personal + días + Hrs
 
-  const renderFilaTotal = (tipo: "emergencia" | "apoyo" | "operativos") => {
+  const renderFilaTotal = (tipo: "emergencia" | "apoyo" | "consulta" | "operativos") => {
     const configuracion = {
       emergencia: {
         etiqueta: "Total Emergencia / Día:",
@@ -794,6 +946,15 @@ export default function EditorPlanPage() {
         celda: "border-r border-orange-100 dark:border-orange-900/40",
         caja: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
         final: "border-l border-orange-200 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950",
+      },
+      consulta: {
+        etiqueta: "Total Consulta Externa / Día:",
+        conteos: conteoConsultaExternaPorDia,
+        fila: "bg-slate-100 dark:bg-slate-800/60 border-t-2 border-slate-300 dark:border-slate-600",
+        fija: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-r border-slate-300 dark:border-slate-600",
+        celda: "border-r border-slate-200 dark:border-slate-700/60",
+        caja: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+        final: "border-l border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800",
       },
       operativos: {
         etiqueta: "Total Operativos de Grupo / Día:",
@@ -870,6 +1031,16 @@ export default function EditorPlanPage() {
               <FileSpreadsheet size={14} /> Excel MPW
             </button>
           </div>
+          {!guardado && !loading && (
+            <button
+              onClick={descartarCambios}
+              disabled={saving}
+              title="Descarta los cambios sin guardar y carga la última versión guardada"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              <RotateCcw size={14} /> Descartar cambios
+            </button>
+          )}
           <button
             onClick={guardar}
             disabled={saving}
@@ -991,7 +1162,8 @@ export default function EditorPlanPage() {
                       "Grupo 4": "operativos",
                       "Equipo de emergencia": "emergencia",
                       "Equipo de apoyo diurno / emergencia": "apoyo",
-                    }[grupoActual] as "emergencia" | "apoyo" | "operativos" | undefined;
+                      "Consulta Externa": "consulta",
+                    }[grupoActual] as "emergencia" | "apoyo" | "consulta" | "operativos" | undefined;
 
                     return (
                       <Fragment key={fila.uid || fila.codigoMarcacion || filaIdx}>
@@ -1319,10 +1491,10 @@ export default function EditorPlanPage() {
               <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{confirmState.mensaje}</p>
               <div className="mt-6 flex justify-end gap-2">
                 <button
-                  onClick={() => setConfirmState(null)}
+                  onClick={() => { confirmState.onCancel?.(); setConfirmState(null); }}
                   className="px-4 py-2 text-sm font-bold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
-                  Cancelar
+                  {confirmState.textoCancelar ?? "Cancelar"}
                 </button>
                 <button
                   onClick={() => { confirmState.onConfirm(); setConfirmState(null); }}

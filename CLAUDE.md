@@ -102,6 +102,16 @@ ESDOMED Services arrancó el 23/06/2026; los egresos anteriores no existen en `/
 
 Vive en la misma colección `incapacidades` con `origen: "reposicion"`, `medicoId` = médico asignado, bloque `reposicion{...}` (quién la cargó, cuándo se asignó/completó, lo que decía el FIEH) y el estado propio **`pendiente_medico`** → el médico la ve en su bandeja `/medico/incapacidades/reposicion` (submenú + globo `pendientes.reposiciones`) y la completa con el editor normal (`/medico/incapacidades/[id]/editar`: días adicionales, tratamiento, etc.); al guardar pasa a `pendiente` y sigue el circuito habitual de ESDOMED (emitir → Hoja de Identificación → imprimir). Mientras esté `pendiente_medico` el detalle ESDOMED no deja emitir ni imprimir, pero sí **reasignar** el médico. El médico no puede borrar reposiciones. Regla para código nuevo: todo listado/contador de incapacidades debe contemplar `pendiente_medico` (no es "pendiente de emitir").
 
+### Continuación de incapacidad (sin traslape)
+
+Si al ingresar (o al inicio, en emergencia) el paciente ya tenía otra incapacidad vigente, los patronos rechazan la constancia nueva por traslape. La incapacidad se marca como **continuación** (`continuaDe{ hastaAnterior, incapacidadAnteriorId?, aplicadaPor, aclaracion? }`): el período arranca el día siguiente al fin de la anterior, la estancia ya cubierta no se cuenta otra vez y los días adicionales corren desde ese fin (ej. anterior hasta 28/10, ingreso 19/10, alta 20/10, 90 días → del 29/10 al 26/01, 90 días). Ingreso y alta se imprimen tal cual. El médico la ve detectada (y marcada por defecto) en el formulario; ESDOMED la aplica, cambia o quita desde el detalle (con aclaración obligatoria; también a mano si la anterior no está en el sistema), aun ya emitida, y reimprime. Detección en `src/lib/incapacidades/continuacion.ts` (ignora duplicados del mismo ingreso/atención).
+
+Regla para código nuevo: el período (desde/hasta/total) se calcula **solo** con `calcularPeriodoIncapacidad()` y los días adicionales guardados se derivan con `diasAdicionalesGuardados()` (`src/lib/incapacidades/helpers.ts`); nunca `alta + días` a mano, porque rompe las continuaciones.
+
+### Vacaciones programadas (plan de trabajo ESDOMED)
+
+El admin arma una vez al año la programación de vacaciones del personal operativo en `/esdomed-horarios/vacaciones` (colección `vacaciones_programadas/{año}`, importable desde el Excel de la jefatura). Reglas: 15 días exactos dentro del mes (1ra quincena 1–15, 2da 16–30; nunca cruza de mes), máximo 2 por quincena, bloqueadas la 2da de febrero, Semana Santa (calculada con `domingoPascua`), la 1ra de agosto y la 2da de diciembre. El editor del mes la pinta como VAC al abrir (mismo patrón idempotente que los permisos: registro en `fila.vacaciones` con el turno que había, para devolverlo si la vacación se mueve) y al guardar la programación se propaga a los planes ya guardados de meses no terminados; los meses pasados no se tocan. "Copiar mes anterior" nunca copia VAC. Lógica en `src/lib/esdomed/vacaciones.ts`.
+
 ### Creating Users
 
 Los usuarios no se registran solos — los crea el administrador directamente en Firebase Auth y luego se crea su documento en `usuarios/{uid}` con el rol correspondiente. No hay flujo de registro público.

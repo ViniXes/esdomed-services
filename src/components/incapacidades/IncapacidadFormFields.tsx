@@ -1,7 +1,9 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import type { CondicionEgresoIncapacidad } from "@/types";
-import { altaAntesDelIngreso, calcularDiasHospitalizacion, calcularFechaHasta, formatFechaCorta, parseDateInput } from "@/lib/incapacidades/helpers";
+import { altaAntesDelIngreso, calcularPeriodoIncapacidad, diaSiguiente, formatFechaCorta, parseDateInput } from "@/lib/incapacidades/helpers";
+import type { IncapacidadVigente } from "@/lib/incapacidades/continuacion";
 import { DateField } from "@/components/ui/DateField";
 
 const inputCls =
@@ -27,42 +29,80 @@ interface Props {
   fechaIngreso?: Date;          // requerido en hospitalización; ausente en emergencia
   emergencia?: boolean;          // emergencia: días = total prescrito, sin estancia
   disabled?: boolean;
+  // Otra incapacidad del paciente vigente al ingreso/inicio (ver lib/incapacidades/continuacion).
+  vigente?: IncapacidadVigente | null;
+  continuar?: boolean;           // iniciar al día siguiente de que termine la vigente
+  onContinuarChange?: (v: boolean) => void;
 }
 
-export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergencia, disabled }: Props) {
+export function IncapacidadFormFields({
+  value, onChange, fechaIngreso, emergencia, disabled, vigente, continuar, onContinuarChange,
+}: Props) {
   const set = <K extends keyof IncapacidadFormValue>(k: K, v: IncapacidadFormValue[K]) =>
     onChange({ ...value, [k]: v });
 
   const fAlta = value.fechaAlta ? parseDateInput(value.fechaAlta) : null;
   const diasNum = parseInt(value.diasExtras, 10);
-  const diasValido = !isNaN(diasNum) && diasNum >= 0;
+  const diasValido = !isNaN(diasNum) && diasNum >= (emergencia ? 1 : 0);
 
-  // Hospitalización: total = días de estancia + adicionales (fechaDesde = ingreso).
-  // Emergencia: total = solo los días prescritos (fechaDesde = la fecha de inicio).
   // Comparación por DÍA calendario: ingreso y alta el mismo día es válido
   // (alta voluntaria / retiro el mismo día) y cuenta 1 día de estancia.
   const altaAntesDqIngreso = !emergencia && fAlta !== null && !!fechaIngreso && altaAntesDelIngreso(fAlta, fechaIngreso);
 
-  const diasHosp = !emergencia && fAlta && fechaIngreso && !altaAntesDqIngreso
-    ? calcularDiasHospitalizacion(fechaIngreso, fAlta)
+  // Hospitalización: total = estancia + adicionales (hasta = alta + días).
+  // Emergencia: el día de inicio cuenta como primer día (hasta = inicio + días − 1).
+  // Continuación: arranca al día siguiente de la vigente (calcularPeriodoIncapacidad).
+  const enContinuacion = !!vigente && !!continuar;
+  const periodo = fAlta && !altaAntesDqIngreso && (emergencia || fechaIngreso)
+    ? calcularPeriodoIncapacidad({
+        fechaIngreso: emergencia ? undefined : fechaIngreso,
+        fechaAlta: fAlta,
+        dias: diasValido ? diasNum : (emergencia ? 1 : 0),
+        emergencia,
+        hastaAnterior: enContinuacion && vigente ? vigente.hasta : null,
+      })
     : null;
-
-  // Emergencia: el día de inicio (consulta) cuenta como primer día de incapacidad,
-  // por eso hasta = inicio + (días − 1). En hospitalización los adicionales
-  // empiezan DESPUÉS del alta: hasta = alta + días.
-  const fechaHasta = emergencia
-    ? (fAlta && diasValido && diasNum >= 1 ? calcularFechaHasta(fAlta, diasNum - 1) : null)
-    : (fAlta && diasValido && !altaAntesDqIngreso ? calcularFechaHasta(fAlta, diasNum) : null);
-
-  const diasTotal = emergencia
-    ? (diasValido ? diasNum : null)
-    : (diasHosp !== null && diasValido ? diasHosp + diasNum : null);
+  const desdeMostrado = periodo?.desde ?? (emergencia ? fAlta : fechaIngreso) ?? null;
+  const fechaHasta = periodo && diasValido ? periodo.hasta : null;
+  const diasTotal = periodo && diasValido ? periodo.total : null;
+  const diasHosp = !emergencia && periodo ? periodo.diasHospitalizacion : null;
+  const estanciaCubierta = enContinuacion && !emergencia && diasHosp === 0;
 
   return (
     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
       <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">
         Datos de la incapacidad
       </h3>
+
+      {vigente && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/40">
+          <p className="flex items-start gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            El paciente tiene una incapacidad vigente {vigente.desde ? `del ${formatFechaCorta(vigente.desde)} al` : "hasta el"} {formatFechaCorta(vigente.hasta)}
+          </p>
+          <p className="mt-1 pl-6 text-xs text-amber-700 dark:text-amber-400">
+            {vigente.medicoNombre
+              ? `${vigente.dias} días · Dr. ${vigente.medicoNombre}${vigente.servicio ? ` · ${vigente.servicio}` : ""}. `
+              : "Constancia que no está en el sistema, registrada por ESDOMED. "}
+            Los patronos rechazan constancias que se traslapan.
+          </p>
+          <label className="mt-2.5 flex items-start gap-2 pl-6 text-sm text-amber-900 dark:text-amber-200">
+            <input
+              type="checkbox"
+              checked={!!continuar}
+              onChange={(e) => onContinuarChange?.(e.target.checked)}
+              disabled={disabled}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+            />
+            <span>
+              Iniciar esta incapacidad el <strong>{formatFechaCorta(diaSiguiente(vigente.hasta))}</strong>, al terminar la anterior.
+              <span className="block text-xs text-amber-700 dark:text-amber-400">
+                La estancia que ya cubre la anterior no se vuelve a contar; los días que otorgue corren a partir de esa fecha.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
@@ -116,24 +156,24 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergenci
           <div>
             <p className={labelCls}>Desde</p>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-              {emergencia
-                ? (fAlta ? formatFechaCorta(fAlta) : <span className="text-slate-400">—</span>)
-                : (fechaIngreso ? formatFechaCorta(fechaIngreso) : <span className="text-slate-400">—</span>)}
+              {desdeMostrado ? formatFechaCorta(desdeMostrado) : <span className="text-slate-400">—</span>}
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">{emergencia ? "Inicio" : "Fecha de ingreso"}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              {enContinuacion ? "Al terminar la anterior" : emergencia ? "Inicio" : "Fecha de ingreso"}
+            </p>
           </div>
           <div>
             <p className={labelCls}>Hasta</p>
             <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
               {fechaHasta ? formatFechaCorta(fechaHasta) : <span className="text-slate-400">—</span>}
             </p>
-            {emergencia
-              ? (fAlta && diasValido && diasNum >= 1 && (
-                  <p className="text-[10px] text-slate-400 mt-0.5">{diasNum} días contando el día de inicio</p>
-                ))
-              : (fAlta && !altaAntesDqIngreso && diasValido && (
-                  <p className="text-[10px] text-slate-400 mt-0.5">Alta + {diasNum} días</p>
-                ))}
+            {fechaHasta && (
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {emergencia
+                  ? `${diasNum} días contando el día de inicio`
+                  : estanciaCubierta ? `Fin de la anterior + ${diasNum} días` : `Alta + ${diasNum} días`}
+              </p>
+            )}
           </div>
           <div>
             <p className={labelCls}>Total días</p>
@@ -143,7 +183,9 @@ export function IncapacidadFormFields({ value, onChange, fechaIngreso, emergenci
             {emergencia
               ? (diasValido && <p className="text-[10px] text-slate-400 mt-0.5">{diasNum} días de incapacidad</p>)
               : (diasHosp !== null && diasValido && (
-                  <p className="text-[10px] text-slate-400 mt-0.5">{diasHosp} hosp. + {diasNum} adic.</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {estanciaCubierta ? `${diasNum} adic. (estancia ya cubierta)` : `${diasHosp} hosp. + ${diasNum} adic.`}
+                  </p>
                 ))}
           </div>
         </div>

@@ -11,6 +11,7 @@ import { InicioTrabajoSocial } from "@/components/InicioTrabajoSocial";
 import { UltimaSincronizacionSis } from "@/components/esdomed/UltimaSincronizacionSis";
 import { EquipoDelDia, TurnoDeHoy, grupoActual, useJornadaEquipo } from "@/components/esdomed/JornadaEquipo";
 import { TramitesInicio } from "@/components/esdomed/TramitesInicio";
+import { MisVacacionesInicio } from "@/components/esdomed/MisVacacionesInicio";
 import { esPersonalPlan } from "@/lib/esdomed/plan";
 
 const MODULE_CONFIG = {
@@ -98,6 +99,8 @@ function PanelEsdomed() {
             <p className="mt-2 text-sm text-cyan-50/80">
               Estadística y Documentos Médicos{grupo ? ` · ${grupo}` : ""}
             </p>
+            {/* Solo aparece si la persona tiene vacaciones programadas por delante. */}
+            {vePlan && <MisVacacionesInicio persona={persona} />}
           </div>
           {vePlan && (
             <TurnoDeHoy
@@ -147,7 +150,7 @@ function PanelEsdomed() {
         })}
       </div>
 
-      {/* Tu equipo: quién viene, a qué hora, permisos, emergencia y apoyo diurno */}
+      {/* Tu equipo: quién viene, a qué hora, permisos, emergencia, apoyo diurno y consulta externa */}
       {vePlan && (
         <EquipoDelDia jornada={jornada} persona={persona}>
           <TramitesInicio />

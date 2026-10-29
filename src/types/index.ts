@@ -437,6 +437,11 @@ export interface NotificacionConapinaFgr {
   avisoFecha: Date;               // día en que se dio el aviso
   avisoRecibidoPor: string;       // nombre de quien lo recibió en la instancia
   avisoLugar: string;             // sede / lugar donde se dio
+  // Dónde queda esa sede, con la división política vigente desde mayo de 2024
+  // (lib/divisionPolitica). Obligatorios desde 2026-10-27; los avisos
+  // anteriores no los traen.
+  avisoDepartamento?: string;
+  avisoMunicipio?: string;
   avisoObservacion?: string | null;
   // Condición del paciente al momento del aviso. NO se le pregunta al médico:
   // se deriva del expediente al enviar (el formulario ya lo relee para validar
@@ -728,6 +733,22 @@ export interface ReposicionIncapacidad {
   fiehMedicoAlta?: string;        // "Nombre del médico responsable del alta"
   fiehJvpm?: string;
 }
+// Continuación de una incapacidad vigente: al ingresar, el paciente ya estaba
+// incapacitado por otra constancia que aún no terminaba. El período nuevo
+// arranca el día siguiente a que termine la anterior (los patronos rechazan
+// constancias traslapadas), la estancia ya cubierta no se cuenta otra vez y los
+// días adicionales corren desde ese fin. Ingreso y alta se imprimen tal cual.
+// Cálculo en calcularPeriodoIncapacidad (lib/incapacidades/helpers).
+export interface ContinuacionIncapacidad {
+  hastaAnterior: Date;            // último día cubierto por la incapacidad anterior
+  desdeAnterior?: Date;
+  incapacidadAnteriorId?: string; // ausente si la anterior no está en el sistema
+  aplicadaPor: string;            // nombre de quien la aplicó (médico o ESDOMED)
+  aplicadaEn: Date;
+  // Aclaración (obligatoria cuando la aplica ESDOMED). No se imprime.
+  aclaracion?: string;
+}
+
 export type InstitucionProvisional = "CRECER" | "CONFIA" | "INPEP" | "IPSFA" | "ISSS";
 export type BancoDeposito = "Promerica" | "Atlantida";
 
@@ -782,6 +803,7 @@ export interface SolicitudIncapacidad {
   diasIncapacidad: number;
   fechaDesde: Date;          // primer día de incapacidad (default = fechaAlta)
   fechaHasta: Date;          // se calcula: fechaDesde + (diasIncapacidad - 1) días
+  continuaDe?: ContinuacionIncapacidad; // inicia al terminar otra incapacidad vigente
   diagnosticoEgreso: string;
   tratamientoAlta: string;
   condicionEgreso: CondicionEgresoIncapacidad;
@@ -1633,13 +1655,41 @@ export interface FilaPlanTrabajo {
   nombre: string;          // NOMBRE COMPLETO (snapshot)
   puesto: string;          // PUESTO (snapshot)
   tipoJornada?: "Administrativo" | "Operativo"; // clasificación exclusiva del plan
-  grupo?: string;          // grupo del mes: Administrativo / Grupo 1-4 / Equipo de emergencia / Equipo de apoyo diurno
+  grupo?: string;          // grupo del mes: Administrativo / Grupo 1-4 / Equipo de emergencia / Equipo de apoyo diurno / Consulta Externa
   orden?: number;          // orden manual dentro del grupo (menor primero); si falta, alfabético
   // Asignación por día del mes. Índice 0 = día 1. Valor: código de horario
   // ("MA2", "TH34"), marca especial ("VAC"|"INC"|"PER") o "" (descanso).
   asignaciones: string[];
   observaciones?: string;  // nota libre por persona (columna final del Excel)
   permisos?: PermisoTramitePlan[]; // permisos de trámites aprobados aplicados este mes
+  vacaciones?: VacacionAplicadaPlan[]; // días VAC que pintó la programación anual
+}
+
+// Día que la programación anual de vacaciones marcó "VAC" en la fila, con lo
+// que había antes para poder devolverlo si la vacación se mueve. Si el
+// asistente cambia la celda a mano, el registro se queda y no se vuelve a pintar.
+export interface VacacionAplicadaPlan {
+  dia: number;          // 1..31
+  codigoTurno: string;  // lo que tenía la celda antes de VAC ("" = descanso)
+}
+
+// Programación anual de vacaciones del personal operativo de ESDOMED.
+// Colección `vacaciones_programadas`, doc id = año ("2027"). La arma el admin;
+// el editor del plan la aplica como marcas VAC (lib/esdomed/vacaciones).
+export interface VacacionProgramada {
+  uid: string;
+  codigoMarcacion: string;
+  nombre: string;       // snapshot
+  mes: number;          // 1-12
+  quincena: 1 | 2;      // 1 = del 1 al 15, 2 = del 16 al 30
+}
+
+export interface ProgramacionVacaciones {
+  anio: number;
+  asignaciones: VacacionProgramada[];
+  actualizadoEn?: Date;
+  actualizadoPorId?: string;
+  actualizadoPorNombre?: string;
 }
 
 export interface PlanTrabajo {
@@ -1723,7 +1773,10 @@ export interface TramitePersonal {
   // "ordinario" si se solicita en o antes de la fecha del permiso;
   // "diferido" si se solicita después (permiso retroactivo).
   tipoSolicitud?: "ordinario" | "diferido";
-  
+
+  // E. Inconsistencias de marcación presentada desde "Mis marcaciones"
+  reclamoMarcacion?: ReclamoMarcacion;
+
   estado: EstadoTramitePersonal;
 
   creadoEn: Date;
@@ -1754,6 +1807,109 @@ export interface EvaluacionPersonal {
   registradaPorId: string;
   registradaPorNombre: string;
   creadoEn: Date;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inconsistencias de marcación (estadísticas, solo admin)
+//
+// Espejo del "Reporte Descuentos {Mes} de {Año}" que RRHH genera del reloj
+// marcador (JasperReports). Cada mes el admin sube el PDF; se lee en el
+// navegador (src/lib/inconsistenciasMarcacion) y se guarda UN documento por mes
+// en `inconsistencias_marcacion/{YYYY-MM}`. Solo trae a quien tuvo descuentos y
+// solo los días con incidencia. El salario del encabezado NO se guarda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DiaInconsistenciaMarcacion {
+  fecha: string;          // "2026-09-02" — día en que INICIA el turno
+  horario: string;        // "07:00 - 15:00" (turno de 24 h: "07:00 - 07:00")
+  entrada: string;        // "HH:MM"; "00:00" = no hay marca
+  salida: string;
+  salidaComida: string;
+  entradaComida: string;
+  entradaPausa: string;
+  salidaPausa: string;
+  trabajadas: string;     // "HH:MM"
+  septimo: number;        // $
+  ausencia: number;       // $ descontado como ausencia (turno completo)
+  minutos: number;        // TIEMPO descontado
+  monto: number;          // $ descontado ese día
+}
+
+export interface ConceptoDescuentoMarcacion {
+  minutos: number;
+  monto: number;
+}
+
+export interface EmpleadoInconsistenciasMarcacion {
+  codigoMarcacion: string; // "C-043" — mismo código que UserProfile.codigoMarcacion
+  nombre: string;
+  plaza: string;           // "Técnico en Estadística y Documentos Médicos"
+  dias: DiaInconsistenciaMarcacion[];
+  // Resumen del reporte, tal cual (montos oficiales)
+  total: number;
+  tardanza: ConceptoDescuentoMarcacion;          // TARDANZA - SALIDA TEMP.
+  ausencias: ConceptoDescuentoMarcacion;
+  permisoSinGoce: ConceptoDescuentoMarcacion;
+  incapacidadSinGoce: ConceptoDescuentoMarcacion;
+  septimo: { cantidad: number; monto: number };
+  minutosPeriodoAnterior: number;
+}
+
+export interface ReporteInconsistenciasMarcacion {
+  id?: string;             // == periodo
+  periodo: string;         // "2026-09"
+  anio: number;
+  mes: number;             // 1-12
+  unidad: string;          // "ESDOMED"
+  fechaImpresion: string | null; // "01-oct-2026 5.42 PM" (texto del reporte)
+  totalGeneral: number;
+  empleados: EmpleadoInconsistenciasMarcacion[];
+  archivoNombre: string;
+  cargadoEn: Date;
+  cargadoPorId: string;
+  cargadoPorNombre: string;
+  // Lo pone el admin al revisar el mes y publicarlo al personal; sin él, nadie
+  // más que el admin ve el mes. Volver a subir el PDF lo retira.
+  publicacion?: PublicacionInconsistenciasMarcacion;
+}
+
+export interface PublicacionInconsistenciasMarcacion {
+  publicadoEn: Date;
+  publicadoPorId: string;
+  publicadoPorNombre: string;
+  personas: number;        // copias creadas (personas vinculadas a un usuario)
+  sinVincular: string[];   // códigos del reporte sin usuario: esas personas no lo ven
+}
+
+// Copia por persona de un mes PUBLICADO: `inconsistencias_marcacion_personal/
+// {YYYY-MM}_{CODIGO}`. Existe porque las reglas de Firestore no pueden filtrar
+// dentro del arreglo `empleados` del documento mensual; cada empleado lee solo
+// las suyas por `empleadoId` (uid resuelto por código de marcación al publicar).
+export interface InconsistenciasMarcacionPersonal extends EmpleadoInconsistenciasMarcacion {
+  id?: string;
+  periodo: string;
+  anio: number;
+  mes: number;
+  unidad: string;
+  fechaImpresion: string | null;
+  empleadoId: string;
+  publicadoEn: Date;
+}
+
+// Días que el empleado reclama en un trámite "E. Inconsistencias de marcación",
+// copiados del reporte al presentarlo (quien revisa no lee las copias personales).
+export interface DiaReclamadoMarcacion {
+  fecha: string;           // "2026-09-02"
+  horario: string;         // "07:00 - 15:00"
+  incidencia: string;      // "Olvidó marcar salida"
+  monto: number;
+  plan: string | null;     // lo que decía el plan ese día ("Vacaciones", "MA2 · 7:00 am – 3:00 pm")
+  motivo: string | null;   // por qué podría proceder ("El plan marca vacaciones ese día")
+}
+
+export interface ReclamoMarcacion {
+  periodo: string;         // "2026-09"
+  dias: DiaReclamadoMarcacion[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

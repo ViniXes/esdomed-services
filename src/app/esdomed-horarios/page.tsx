@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarClock, CalendarDays, ArrowRight, Clock, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { labelPeriodo, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
+import { MisVacacionesInicio } from "@/components/esdomed/MisVacacionesInicio";
 
 export default function EsdomedHorariosInicio() {
   const { profile } = useAuth();
@@ -21,6 +22,7 @@ export default function EsdomedHorariosInicio() {
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Consulta tu horario laboral{puedePlanificar ? " o gestiona el plan de trabajo del mes." : "."}
         </p>
+        <MisVacacionesInicio persona={{ uid: profile?.uid, codigoMarcacion: profile?.codigoMarcacion }} variante="tarjeta" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

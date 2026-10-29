@@ -288,6 +288,12 @@ service cloud.firestore {
                     && request.resource.data.avisoRecibidoPor.size() >= 3
                     && request.resource.data.avisoLugar is string
                     && request.resource.data.avisoLugar.size() >= 3
+                    // Departamento y municipio de la sede (división política
+                    // vigente, 44 municipios), obligatorios desde 2026-10-27.
+                    && request.resource.data.avisoDepartamento is string
+                    && request.resource.data.avisoDepartamento.size() >= 3
+                    && request.resource.data.avisoMunicipio is string
+                    && request.resource.data.avisoMunicipio.size() >= 3
                     && !request.resource.data.keys().hasAny([
                          'revisadoPor', 'revisadoPorNombre', 'revisadoEn', 'notasComite',
                          'anuladoPor', 'anuladoPorNombre', 'anuladoEn', 'motivoAnulacion',
@@ -785,6 +791,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Programación anual de vacaciones del personal operativo de ESDOMED
+    // (doc id = año). Solo el admin la arma; el personal la ve en "Mi horario"
+    // y el editor del plan la lee para marcar VAC.
+    match /vacaciones_programadas/{anio} {
+      allow read:  if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      allow write: if isAdmin();
+    }
+
     // Planes de trabajo de las demás ÁREAS del hospital (Terapia Respiratoria,
     // etc.). Doc id = "{areaId}_{YYYY-MM}"; mismo formato que planes_trabajo.
     // Hoy los gestiona ESDOMED; cuando existan usuarios por área, aquí se les
@@ -845,6 +859,20 @@ service cloud.firestore {
     match /evaluaciones_personal/{id} {
       allow read:   if isAdmin() || (isAuth() && resource.data.empleadoId == uid());
       allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Inconsistencias de marcación (estadísticas) ──────────────────────────
+    // Espejo mensual del "Reporte Descuentos" de RRHH (doc id = "YYYY-MM").
+    // Trae descuentos por persona: por ahora SOLO el admin lo ve y lo carga.
+    match /inconsistencias_marcacion/{periodo} {
+      allow read, write: if isAdmin();
+    }
+    // Copia por persona de un mes que el admin revisó y PUBLICÓ (id =
+    // "{YYYY-MM}_{CODIGO}"): cada empleado lee solo las suyas ("Mis marcaciones").
+    // Existe porque una regla no puede filtrar dentro del arreglo del doc mensual.
+    match /inconsistencias_marcacion_personal/{id} {
+      allow read:  if isAdmin() || (isAuth() && resource.data.empleadoId == uid());
+      allow write: if isAdmin();
     }
 
     // ─── Configuración global ────────────────────────────────────────────────

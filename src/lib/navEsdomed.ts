@@ -1,7 +1,7 @@
 import {
   Activity, Ambulance, ArrowRightLeft, BarChart3, BedDouble, Briefcase, Building2, CalendarClock,
   CalendarRange, ChartColumn, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
-  DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FolderOpen, HandHeart, HeartPulse,
+  DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FingerprintPattern, FolderOpen, HandHeart, HeartPulse,
   History, LayoutDashboard, LayoutGrid, ListChecks, LogIn, NotebookPen, Phone, PhoneCall, Printer, Radar,
   SearchCheck, Send, Settings, ShieldAlert, ShieldCheck, Siren, Stethoscope, Syringe, Table2, TrendingUp,
   UserCheck, UserPlus, Users, UserSearch, UsersRound,
@@ -11,6 +11,7 @@ import type { Pendientes } from "@/contexts/NotificacionesContext";
 import type { UserProfile } from "@/types";
 import { construirMenu, type SeccionNav } from "@/lib/navRegistro";
 import { esJefeCuidadosCriticos, puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
+import { esPersonalPlan } from "@/lib/esdomed/plan";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -24,6 +25,8 @@ const esdomedOAdmin = (p: Perfil) => esEsdomed(p) || esAdmin(p);
 const veSimmow = (p: Perfil) => p?.role === "esdomed" || esAdmin(p);
 // Solicitudes SIS y aprobación de trámites: superusuario + auxiliar administrativo.
 const adminOAsistente = (p: Perfil) => esAdmin(p) || p?.role === "asistente_esdomed";
+// Personal con fila en el plan (ESDOMED, auxiliar, o admin con código de marcación).
+const esPersonalDelPlan = (p: Perfil) => esPersonalPlan(p?.role ?? "", p?.codigoMarcacion);
 
 // Menú de ESDOMED y admin por tarea, en acordeón como los portales de área.
 // Pacientes va primero (pedido del usuario); luego las bandejas (lo que llega
@@ -131,6 +134,8 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/personal", label: "Personal de trabajo", icon: UsersRound },
       { href: "/horarios", label: "Horarios por área", icon: CalendarRange },
       { href: "/dashboard/mis-tramites", label: "Trámites de Personal", icon: ClipboardList },
+      // Sus descuentos del reloj marcador, de los meses que el admin publicó.
+      { href: "/dashboard/mis-marcaciones", label: "Mis marcaciones", icon: FingerprintPattern, visibleSi: esPersonalDelPlan },
       { href: "/dashboard/directorio-extensiones", label: "Directorio de extensiones", icon: PhoneCall },
     ],
   },
@@ -143,6 +148,7 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/registros-medicos", label: "Registros de médicos", icon: Stethoscope, visibleSi: esAdmin },
       { href: "/dashboard/solicitudes-usuarios-sis", label: "Solicitudes SIS", icon: UserPlus, globo: "solicitudesSis" },
       { href: "/dashboard/aprobacion-tramites", label: "Gestión de Trámites", icon: ClipboardCheck },
+      { href: "/dashboard/inconsistencias-marcacion", label: "Inconsistencias de marcación", icon: FingerprintPattern, visibleSi: esAdmin },
       { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, visibleSi: esAdmin },
     ],
   },

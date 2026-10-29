@@ -20,7 +20,7 @@ const DOCUMENTOS = [
   {
     href: "/documentos/tutorial-notificacion-avisos.pdf",
     titulo: "Tutorial: notificación de avisos CONAPINA / FGR",
-    desc: "Paso a paso para notificar los avisos desde el portal, con el directorio de las juntas de protección",
+    desc: "Paso a paso para notificar desde el portal, criterios de aviso, directorio de las juntas de protección y formulario de aviso para NNA",
   },
 ];
 

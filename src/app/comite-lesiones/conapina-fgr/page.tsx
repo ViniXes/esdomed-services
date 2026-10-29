@@ -17,7 +17,7 @@ import { soloConsultaAvisos } from "@/lib/accesoComiteLesiones";
 import {
   TIPOS_CASO, TIPO_CASO_LABEL, TIPO_CASO_CHIP,
   ESTADO_LABEL, ESTADO_CHIP, esMenorDeEdad, duplicadosDeExpediente,
-  INSTANCIA_LABEL, INSTANCIA_CHIP, CONDICION_LABEL,
+  INSTANCIA_LABEL, INSTANCIA_CHIP, CONDICION_LABEL, ubicacionAviso,
 } from "@/lib/conapinaFgr";
 import type {
   NotificacionConapinaFgr, EstadoNotificacionConapinaFgr, TipoCasoConapinaFgr, OficioEgreso, InstanciaAviso,
@@ -299,6 +299,8 @@ export default function ComiteConapinaFgrPage() {
         "NOMBRE DE PERSONA QUE RECIBIO EL AVISO": n.avisoRecibidoPor ?? "",
         "FECHA DEL AVISO": n.avisoFecha ? formatFecha(n.avisoFecha) : "",
         "LUGAR / SEDE": n.avisoLugar ?? "",
+        DEPARTAMENTO: n.avisoDepartamento ?? "",
+        MUNICIPIO: n.avisoMunicipio ?? "",
         "CONDICION DEL PACIENTE": n.condicionPaciente ? CONDICION_LABEL[n.condicionPaciente] : "",
         ESTADO: ESTADO_LABEL[n.estado] ?? "",
         "FECHA DEL HECHO": n.fechaHecho ? formatFecha(n.fechaHecho) : "",
@@ -555,7 +557,10 @@ export default function ComiteConapinaFgrPage() {
                         </td>
                         <td className="px-3 py-2.5 text-xs text-slate-700 dark:text-slate-300">{n.avisoRecibidoPor || <span className="text-slate-400">—</span>}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">{n.avisoFecha ? formatFecha(n.avisoFecha) : <span className="text-slate-400">—</span>}</td>
-                        <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">{n.avisoLugar || <span className="text-slate-400">—</span>}</td>
+                        <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
+                          {n.avisoLugar || <span className="text-slate-400">—</span>}
+                          {ubicacionAviso(n) && <span className="mt-0.5 block text-[11px] text-slate-400">{ubicacionAviso(n)}</span>}
+                        </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           {n.condicionPaciente ? (
                             <span className={`text-xs font-medium ${n.condicionPaciente === "fallecido" ? "text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-300"}`}>
@@ -728,6 +733,7 @@ export default function ComiteConapinaFgrPage() {
                       <Row label="Recibió" value={selected.avisoRecibidoPor || "—"} />
                       <Row label="Fecha" value={formatFecha(selected.avisoFecha)} />
                       <Row label="Lugar/sede" value={selected.avisoLugar || "—"} />
+                      {ubicacionAviso(selected) && <Row label="Ubicación" value={ubicacionAviso(selected)} />}
                       <Row label="Condición" value={selected.condicionPaciente ? CONDICION_LABEL[selected.condicionPaciente] : "—"} />
                       {selected.avisoObservacion && <Row label="Observación" value={selected.avisoObservacion} />}
                     </div>
