@@ -35,6 +35,9 @@ const LIMIT_BUSQUEDA = 500;
 
 const selectCls = "w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer shadow-sm disabled:cursor-not-allowed";
 
+// Valor de filtroCarpeta para los resguardos sin ubicación registrada.
+const SIN_UBICAR = "__sin_ubicar__";
+
 // Registros por página en la tabla (paginación de a 10).
 const PAGE_SIZE = 10;
 
@@ -90,7 +93,11 @@ export default function DashboardFallecidosPage() {
   const [page, setPage] = useState(1);
   const [personal, setPersonal] = useState<UserProfile[]>([]);
   const [personalPsTs, setPersonalPsTs] = useState<UserProfile[]>([]);
-  const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "cert_pendiente" | "cert_vencido" | "todos">("todos");
+  const [filtro, setFiltro] = useState<"pendiente" | "confirmado" | "cert_pendiente" | "cert_vencido" | "resguardo" | "todos">("todos");
+  // Dentro del filtro de resguardo: una carpeta HNES-CDCI-{año} o SIN_UBICAR.
+  const [filtroCarpeta, setFiltroCarpeta] = useState<string | null>(null);
+  // Qué consulta produjo los resultados de Buscar, para repetir la misma al refrescar.
+  const [modoBusqueda, setModoBusqueda] = useState<"criterio" | "resguardo">("criterio");
   const [selected, setSelected] = useState<NotificacionFallecido | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("expediente");
   const [saving, setSaving] = useState(false);
@@ -157,6 +164,8 @@ export default function DashboardFallecidosPage() {
   const buscar = async () => {
     const exp = busquedaExpediente.trim();
     if (sinCriterio) return;
+    if (modoBusqueda === "resguardo") { setFiltro("todos"); setFiltroCarpeta(null); }
+    setModoBusqueda("criterio");
     setBuscando(true);
     setErrorBusqueda("");
     try {
@@ -192,14 +201,50 @@ export default function DashboardFallecidosPage() {
     }
   };
 
+  // Todos los certificados en resguardo interno (privados de libertad + cuerpos
+  // no reclamados) de cualquier fecha, abiertos o cerrados. Dos igualdades
+  // simples fusionadas en cliente, sin orderBy: no exigen índice compuesto y son
+  // pocos por año. El rango de fechas, si se indicó, se afina en cliente.
+  const buscarResguardo = async ({ refresco = false } = {}) => {
+    setModoBusqueda("resguardo");
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      const col = collection(db, "notificaciones_fallecidos");
+      const [ppl, resg] = await Promise.all([
+        getDocs(query(col, where("privadoDeLibertad", "==", true))),
+        getDocs(query(col, where("estadoEntregaCertificado", "==", "resguardado"))),
+      ]);
+      const m = new Map<string, NotificacionFallecido>();
+      [...ppl.docs, ...resg.docs].forEach(d => m.set(d.id, { id: d.id, ...d.data() } as NotificacionFallecido));
+      let docs = [...m.values()];
+      if (fechaDesde) docs = docs.filter(n => (tsToDate(n.fechaDefuncion)?.getTime() ?? 0) >= new Date(fechaDesde + "T00:00:00").getTime());
+      if (fechaHasta) docs = docs.filter(n => (tsToDate(n.fechaDefuncion)?.getTime() ?? 0) <= new Date(fechaHasta + "T23:59:59").getTime());
+      setResultados(docs.sort(
+        (a, b) => (tsToDate(b.fechaDefuncion)?.getTime() ?? 0) - (tsToDate(a.fechaDefuncion)?.getTime() ?? 0),
+      ));
+      if (!refresco) { setFiltro("resguardo"); setFiltroCarpeta(null); setPage(1); }
+    } catch (e) {
+      setErrorBusqueda(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
   const limpiarBusqueda = () => {
     setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta("");
     setResultados(null); setErrorBusqueda(""); setPage(1);
+    if (modoBusqueda === "resguardo") { setFiltro("todos"); setFiltroCarpeta(null); }
+    setModoBusqueda("criterio");
   };
 
   // Tras editar/cerrar desde un resultado de búsqueda (que es una foto, no un
   // listener) se relee esa misma búsqueda para no dejar datos viejos en pantalla.
-  const refrescarBusqueda = () => { if (vista === "buscar" && resultados !== null) void buscar(); };
+  const refrescarBusqueda = () => {
+    if (vista !== "buscar" || resultados === null) return;
+    void (modoBusqueda === "resguardo" ? buscarResguardo({ refresco: true }) : buscar());
+  };
 
   // Al abrir el modal para otro registro (o reabrir uno tras cerrarlo), reinicia
   // el formulario de edición. Ajuste de estado en render, no en efecto — patrón
@@ -239,9 +284,24 @@ export default function DashboardFallecidosPage() {
   const esVencido = (n: NotificacionFallecido) => (certDiasHabiles.get(n.id ?? "") ?? 0) > DIAS_HABILES_CERT;
   const certVencidos = [...certDiasHabiles.values()].filter(d => d > DIAS_HABILES_CERT).length;
 
+  // Resguardo interno y su desglose por carpeta (inventario de la gaveta).
+  const enResguardoLista = filtro === "resguardo" ? notificaciones.filter(certificadoEnResguardo) : [];
+  const conteoCarpetas = new Map<string, number>();
+  let sinUbicar = 0;
+  enResguardoLista.forEach(n => {
+    const c = n.ubicacionCertificado?.carpeta;
+    if (c) conteoCarpetas.set(c, (conteoCarpetas.get(c) ?? 0) + 1);
+    else sinUbicar++;
+  });
+  const carpetas = [...conteoCarpetas.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
   const filtered = filtro === "todos"       ? notificaciones
     : filtro === "cert_pendiente"           ? notificaciones.filter(n => n.estadoEntregaCertificado === "pendiente" && !n.privadoDeLibertad)
     : filtro === "cert_vencido"             ? notificaciones.filter(esVencido)
+    : filtro === "resguardo"                ? enResguardoLista.filter(n =>
+        !filtroCarpeta ? true
+        : filtroCarpeta === SIN_UBICAR ? !n.ubicacionCertificado
+        : n.ubicacionCertificado?.carpeta === filtroCarpeta)
     : notificaciones.filter(n => n.estado === filtro);
 
   const displayList = filtered
@@ -261,7 +321,7 @@ export default function DashboardFallecidosPage() {
   // Paginación (10 por página). Reinicia a la página 1 al cambiar filtros;
   // pageSafe protege contra el snapshot en vivo que encoge la lista.
   const totalPages = Math.max(1, Math.ceil(displayList.length / PAGE_SIZE));
-  const filtrosKey = `${vista}|${filtro}|${filtroTexto}`;
+  const filtrosKey = `${vista}|${filtro}|${filtroCarpeta}|${filtroTexto}`;
   const [filtrosPrevios, setFiltrosPrevios] = useState(filtrosKey);
   if (filtrosPrevios !== filtrosKey) { setFiltrosPrevios(filtrosKey); setPage(1); }
   const pageSafe = Math.min(page, totalPages);
@@ -559,8 +619,9 @@ export default function DashboardFallecidosPage() {
           { label: "Pendientes",      value: "pendiente"      },
           { label: "Confirmados",     value: "confirmado"     },
           { label: "Cert. pendiente", value: "cert_pendiente" },
+          { label: "Resguardo interno", value: "resguardo"    },
         ].map(f => (
-          <button key={f.value} onClick={() => setFiltro(f.value as typeof filtro)}
+          <button key={f.value} onClick={() => { setFiltro(f.value as typeof filtro); setFiltroCarpeta(null); }}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               filtro === f.value
                 ? "bg-blue-600 text-white"
@@ -571,6 +632,34 @@ export default function DashboardFallecidosPage() {
         ))}
         <span className="ml-auto text-sm text-slate-500">{displayList.length} registros</span>
       </div>
+
+      {/* Desglose del resguardo por carpeta de la gaveta */}
+      {filtro === "resguardo" && enResguardoLista.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <MapPin size={13} className="text-blue-600 dark:text-blue-400 mr-0.5" />
+          {[
+            { value: null,       label: "Todas",      n: enResguardoLista.length },
+            ...carpetas.map(([c, n]) => ({ value: c, label: c, n })),
+            ...(sinUbicar > 0 ? [{ value: SIN_UBICAR, label: "Sin ubicar", n: sinUbicar }] : []),
+          ].map(c => {
+            const activo = filtroCarpeta === c.value;
+            const esSin  = c.value === SIN_UBICAR;
+            return (
+              <button key={c.value ?? "todas"} onClick={() => setFiltroCarpeta(c.value)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  activo
+                    ? esSin ? "bg-amber-600 text-white border-amber-600" : "bg-blue-600 text-white border-blue-600"
+                    : esSin
+                      ? "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900 hover:bg-amber-100 dark:hover:bg-amber-900"
+                      : "text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                } ${c.value && !esSin ? "font-mono" : ""}`}>
+                {c.label}
+                <span className={`tabular-nums ${activo ? "text-white/80" : "opacity-70"}`}>{c.n}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {vista === "bandeja" ? (
         <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -611,6 +700,14 @@ export default function DashboardFallecidosPage() {
               className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
               <Search size={13} /> {buscando ? "Buscando…" : "Buscar"}
             </button>
+            <button onClick={() => buscarResguardo()} disabled={buscando}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                modoBusqueda === "resguardo" && resultados !== null
+                  ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900"
+                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}>
+              <Archive size={13} /> Resguardo interno
+            </button>
             {(busquedaExpediente || fechaDesde || fechaHasta || resultados !== null) && (
               <button onClick={limpiarBusqueda}
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
@@ -624,7 +721,7 @@ export default function DashboardFallecidosPage() {
             </div>
           ) : (
             <p className="text-xs text-slate-500">
-              Consulta bajo demanda: expediente exacto (trae todas sus defunciones) o rango de fecha de defunción. Incluye los trámites ya cerrados.
+              Consulta bajo demanda: expediente exacto (trae todas sus defunciones), rango de fecha de defunción o todo el resguardo interno. Incluye los trámites ya cerrados.
             </p>
           )}
         </div>
