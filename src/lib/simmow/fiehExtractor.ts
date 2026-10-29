@@ -1131,6 +1131,22 @@ function extraerCausaExternaYCirugias(texto: string): {
     .replace(/\s+/g, " ")
     .trim();
 
+  // Mismo aplanado pero conservando tildes: sinAcentos() no cambia el largo
+  // del texto, así que un fragmento hallado en `plano` se puede leer con sus
+  // tildes en esta misma posición (si por algún motivo los largos no
+  // coinciden, se usa el fragmento sin tildes).
+  const planoConAcentos = String(texto || "")
+    .replace(/\r/g, "\n")
+    .replace(/\t/g, " ")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const conAcentos = (coincidencia: RegExpMatchArray, fragmento: string): string => {
+    if (planoConAcentos.length !== plano.length) return fragmento;
+    const inicio = plano.indexOf(fragmento, coincidencia.index ?? 0);
+    return inicio >= 0 ? planoConAcentos.slice(inicio, inicio + fragmento.length) : fragmento;
+  };
+
   const cie = "([A-Z]\\s*\\d\\s*\\d(?:\\s*[\\.,]\\s*\\d{1,2})?)";
   // "10" opcional: a veces queda desplazado DESPUÉS del código en vez de
   // antes (ver comentario en extraerFieh, Diagnóstico principal).
@@ -1158,6 +1174,25 @@ function extraerCausaExternaYCirugias(texto: string): {
   // "externa:" y el texto en la segunda), y si no matchea así se intenta
   // el orden "normal" (texto antes que código, como Diagnóstico Principal)
   // por si acaso.
+  //
+  // ORDEN REAL (confirmado con un FIEH que sí trae causa externa llena, NEC
+  // 11612-26): la etiqueta envuelve ("Diagnóstico de causa" / "externa:") y
+  // el texto y el código quedan ENTRE las dos mitades — en texto corrido
+  // queda "Diagnóstico de causa <texto> Código CIE-10: V09.3 externa:
+  // Discapacidad principal". El supuesto de arriba (código primero) estaba
+  // equivocado y por eso la causa externa llegaba vacía. Este es ahora el
+  // primer intento; los otros dos órdenes quedan de respaldo.
+  const mCausaExternaEntreMitades = plano.match(
+    new RegExp(
+      "Diagnostico\\s+de\\s+causa\\s+(?:externa\\s*:?\\s*)?" +
+        "((?:(?!Discapacidad\\s+principal)[\\s\\S])*?)\\s*" +
+        patronCodigoCIE10 +
+        "\\s*" +
+        cie +
+        "(?:\\s*externa\\s*:?)?\\s*(?=Discapacidad\\s+principal|Procedimientos|Condicion\\s+de\\s+egreso|$)",
+      "i"
+    )
+  );
   const mCausaExternaEnvuelta = plano.match(
     new RegExp(
       "Diagnostico\\s+de\\s+causa\\s+" +
@@ -1168,7 +1203,12 @@ function extraerCausaExternaYCirugias(texto: string): {
       "i"
     )
   );
-  if (mCausaExternaEnvuelta) {
+  if (mCausaExternaEntreMitades && limpiarTextoLocal(mCausaExternaEntreMitades[1])) {
+    res.causaExterna.texto = limpiarTextoLocal(
+      conAcentos(mCausaExternaEntreMitades, mCausaExternaEntreMitades[1])
+    );
+    res.causaExterna.codigo = normalizarCodigoCIE(mCausaExternaEntreMitades[2]);
+  } else if (mCausaExternaEnvuelta) {
     res.causaExterna.codigo = normalizarCodigoCIE(mCausaExternaEnvuelta[1]);
     res.causaExterna.texto = limpiarTextoLocal(mCausaExternaEnvuelta[2]);
   } else {
