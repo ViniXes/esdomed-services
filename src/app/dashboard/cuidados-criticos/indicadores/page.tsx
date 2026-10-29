@@ -7,6 +7,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { puedeVerIndicadoresCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { CAMAS_POR_SERVICIO } from "@/lib/servicios";
+import { resumirCalidadRegistrosCuidadosCriticos } from "@/lib/calidadRegistrosCuidadosCriticos";
+import { valorIndicadorGlobal } from "@/lib/valorIndicadorGlobal";
 import {
   servicioCanonicoCuidadosCriticos,
   servicioCoincideCuidadosCriticos,
@@ -34,7 +36,7 @@ import type { ConfigIndicadoresCuidadosCriticos, FichaCuidadosCriticos } from "@
 const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
 const SERVICIOS_UCI = serviciosPorTipoMedico("uci");
 const SERVICIOS_UCIN = serviciosPorTipoMedico("ucin");
-type VistaTablaIndicadores = "indicadores" | "datos" | "graficos";
+type VistaTablaIndicadores = "indicadores" | "datos" | "graficos" | "calidad";
 type TipoUnidadIndicadores = "uci" | "ucin";
 type VistaGraficoIndicadores = "cama" | "porcentajes" | "tasas";
 type MesIndicadores = number | "todos";
@@ -200,6 +202,16 @@ export default function IndicadoresCuidadosCriticosPage() {
     () => calcularIndicadoresCuidadosCriticos(fichas, { anio, mes, servicio, tipo: tipoUnidad, config: configParaCalculo }),
     [anio, configParaCalculo, fichas, mes, servicio, tipoUnidad],
   );
+  const resumenCalidad = useMemo(() => {
+    const fichasPeriodo = fichas.filter(ficha => {
+      if (!serviciosUnidad.some(item => servicioCoincideCuidadosCriticos(item, ficha.servicio))) return false;
+      if (servicio !== "todos" && !servicioCoincideCuidadosCriticos(ficha.servicio, servicio)) return false;
+      const ingreso = toDate(ficha.datos?.fecha_ingreso_al_servicio);
+      if (!ingreso || ingreso.getFullYear() !== anio) return false;
+      return mes === "todos" || ingreso.getMonth() + 1 === mes;
+    });
+    return resumirCalidadRegistrosCuidadosCriticos(fichasPeriodo);
+  }, [anio, fichas, mes, servicio, serviciosUnidad]);
   const datosBase = useMemo(
     () => calcularDatosBaseCuidadosCriticos(fichas, { anio, servicio, tipo: tipoUnidad, configs, camasAsignadas: camasSistema }),
     [anio, camasSistema, configs, fichas, servicio, tipoUnidad],
@@ -399,6 +411,13 @@ export default function IndicadoresCuidadosCriticosPage() {
             >
               Graficos
             </button>
+            <button
+              type="button"
+              onClick={() => setVistaTabla("calidad")}
+              className={`rounded-lg px-3 py-2 ${vistaTabla === "calidad" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"}`}
+            >
+              Calidad
+            </button>
           </div>
         </div>
         {vistaTabla === "indicadores" ? <TablaIndicadores indicadores={indicadores} mostrarFormulas={mostrarFormulas} onCambiarFormulas={() => setMostrarFormulas(actual => !actual)} /> : vistaTabla === "datos" ? (
@@ -418,12 +437,15 @@ export default function IndicadoresCuidadosCriticosPage() {
               setMessage("");
             }}
           />
+        ) : vistaTabla === "calidad" ? (
+          <TablaCalidadRegistro resumen={resumenCalidad} />
         ) : (
           <GraficosIndicadores
             tipo={tipoUnidad}
             vista={vistaGrafico}
             servicioSeleccionado={servicio}
             datos={datosGraficos}
+            indicadores={indicadores}
             onCambiarVista={setVistaGrafico}
           />
         )}
@@ -437,12 +459,14 @@ function GraficosIndicadores({
   vista,
   servicioSeleccionado,
   datos,
+  indicadores,
   onCambiarVista,
 }: {
   tipo: TipoUnidadIndicadores;
   vista: VistaGraficoIndicadores;
   servicioSeleccionado: string;
   datos: DatoGraficoServicio[];
+  indicadores: IndicadorCuidadosCriticos[];
   onCambiarVista: (vista: VistaGraficoIndicadores) => void;
 }) {
   const sinServicios = datos.length === 0;
@@ -468,7 +492,7 @@ function GraficosIndicadores({
           El servicio seleccionado no pertenece a {tipo.toUpperCase()}. Cambia el switch o selecciona otro servicio.
         </div>
       ) : (
-        <VistaGraficos datos={datos} vista={vista} />
+        <VistaGraficos datos={datos} vista={vista} indicadores={indicadores} />
       )}
     </div>
   );
@@ -486,7 +510,7 @@ function BotonGrafico({ actual, value, onClick, children }: { actual: VistaGrafi
   );
 }
 
-function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: VistaGraficoIndicadores }) {
+function VistaGraficos({ datos, vista, indicadores }: { datos: DatoGraficoServicio[]; vista: VistaGraficoIndicadores; indicadores: IndicadorCuidadosCriticos[] }) {
   if (vista === "porcentajes") {
     return (
       <div className="grid min-h-[600px] gap-2 xl:grid-cols-2">
@@ -520,7 +544,7 @@ function VistaGraficos({ datos, vista }: { datos: DatoGraficoServicio[]; vista: 
     <div className="min-h-[600px] space-y-3">
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {GRAFICOS_CAMA.map(columna => (
-          <TarjetaGrafico key={columna.id} label={columna.label} value={promedioIndicador(datos, columna.id)} suffix={columna.suffix} />
+          <TarjetaGrafico key={columna.id} label={columna.label} value={valorIndicadorGlobal(indicadores, columna.id)} suffix={columna.suffix} />
         ))}
       </div>
 
@@ -786,7 +810,45 @@ function resultadoTabla(indicador: IndicadorCuidadosCriticos) {
 function tituloVista(vista: VistaTablaIndicadores) {
   if (vista === "datos") return "Datos base del periodo evaluado";
   if (vista === "graficos") return "Graficos del periodo evaluado";
+  if (vista === "calidad") return "Calidad de registro";
   return "Tabla de indicadores";
+}
+
+function TablaCalidadRegistro({ resumen }: { resumen: ReturnType<typeof resumirCalidadRegistrosCuidadosCriticos> }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500">
+        Agrupado por creador de la ficha. No identifica quién digitó o modificó el diagnóstico.
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+        <table className="w-full border-collapse text-left text-xs">
+          <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <tr>
+              <th className="px-3 py-2">Creador de ficha</th>
+              <th className="px-3 py-2 text-right">Fichas</th>
+              <th className="px-3 py-2 text-right">Estancias cerradas</th>
+              <th className="px-3 py-2 text-right">Cerradas con diagnóstico</th>
+              <th className="px-3 py-2 text-right">Cerradas sin diagnóstico</th>
+            </tr>
+          </thead>
+          <tbody>
+            {resumen.map(row => (
+              <tr key={row.creadorId} className="border-t border-slate-200 dark:border-slate-700">
+                <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{row.creadorNombre}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.fichas}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.estanciasCerradas}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.cerradasConDiagnostico}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.cerradasSinDiagnostico}</td>
+              </tr>
+            ))}
+            {resumen.length === 0 && (
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">No hay fichas en el periodo seleccionado.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function camasServicio(servicio: string) {
