@@ -10,17 +10,24 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useServicios } from "@/contexts/ServiciosContext";
 import {
   ArrowLeft, Upload, FileSpreadsheet, Loader2, AlertTriangle, CheckCircle2,
-  UserPlus, ArrowRightLeft, MinusCircle, HelpCircle, LogOut, ChevronDown,
+  UserPlus, ArrowRightLeft, MinusCircle, HelpCircle, LogOut, ChevronDown, UserX,
 } from "lucide-react";
 import { mapearFilaReporte } from "@/lib/pacientes/importMapper";
 import { mismoServicio, mismaCama } from "@/lib/servicios";
 import { construirDatosPersonales, construirDocIngreso, limpiarResponsable } from "@/lib/pacientes/persona";
+import {
+  cargarHistorialEgresos, evaluarRetencion, mismoEgreso, VENTANA_REINGRESO_HORAS, type Retencion,
+} from "@/lib/pacientes/egresoReciente";
+import { ESTADO_LABEL, formatDuracion, formatFechaHora } from "@/lib/pacientes/helpers";
 import type { PacienteFormValue } from "@/components/pacientes/PacienteForm";
-import type { DiagnosticoCIE, ResponsablePaciente } from "@/types";
+import type { DiagnosticoCIE, EstadoPaciente, ResponsablePaciente } from "@/types";
 
 type Paso = "subir" | "previsualizar" | "hecho";
 
 interface Nuevo { expediente: string; nombre: string; servicio: string; cama?: string; form: PacienteFormValue; }
+// Candidato a nuevo cuyo expediente ya egresó (alta < 24 h, mismo ingreso o defunción).
+interface Retenido extends Nuevo { retencion: Retencion; fechaIngresoReporte: Date | null; }
+interface Omitido { expediente: string; nombre: string; motivo: string; }
 interface CambioPersonal { campo: string; anterior: string; nuevo: string; }
 interface Actualizar {
   id: string; expediente: string; nombre: string;
@@ -41,6 +48,7 @@ interface AdvCama { expediente: string; advertencia: string; }
 
 interface Diff {
   nuevos: Nuevo[];
+  retenidos: Retenido[];
   actualizar: Actualizar[];
   sinCambios: SinCambios[];
   noReconocidos: NoReconocido[];
@@ -52,6 +60,12 @@ interface Diff {
 
 const nombreDe = (f: PacienteFormValue) => `${f.nombres ?? ""} ${f.apellidos ?? ""}`.replace(/\s+/g, " ").trim();
 const dxKey = (d?: DiagnosticoCIE) => `${(d?.codigo ?? "").trim()}|${(d?.descripcion ?? "").trim()}`.toLowerCase();
+// form.fechaIngreso viene como "YYYY-MM-DDTHH:mm" (hora local).
+const fechaIngresoDe = (f: PacienteFormValue): Date | null => {
+  if (!f.fechaIngreso) return null;
+  const d = new Date(f.fechaIngreso);
+  return isNaN(d.getTime()) ? null : d;
+};
 
 export default function ImportarReportePage() {
   const { profile, user } = useAuth();
@@ -65,9 +79,18 @@ export default function ImportarReportePage() {
   const [error, setError] = useState<string | null>(null);
   const [diff, setDiff] = useState<Diff | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const [resultado, setResultado] = useState<{ creados: number; actualizados: number } | null>(null);
+  const [resultado, setResultado] = useState<{ creados: number; reingresos: number; actualizados: number; omitidos: Omitido[] } | null>(null);
   const [errorSincronizacion, setErrorSincronizacion] = useState(false);
   const [registrandoHora, setRegistrandoHora] = useState(false);
+  // Expedientes retenidos que ESDOMED confirmó como reingreso real.
+  const [reingresosConfirmados, setReingresosConfirmados] = useState<Set<string>>(new Set());
+
+  const toggleReingreso = (exp: string) =>
+    setReingresosConfirmados((prev) => {
+      const s = new Set(prev);
+      if (s.has(exp)) s.delete(exp); else s.add(exp);
+      return s;
+    });
 
   const reset = () => {
     setPaso("subir");
@@ -76,6 +99,7 @@ export default function ImportarReportePage() {
     setError(null);
     setResultado(null);
     setErrorSincronizacion(false);
+    setReingresosConfirmados(new Set());
   };
 
   const registrarHoraSincronizacion = async () => {
@@ -144,7 +168,7 @@ export default function ImportarReportePage() {
       });
 
       const d: Diff = {
-        nuevos: [], actualizar: [], sinCambios: [], noReconocidos: [],
+        nuevos: [], retenidos: [], actualizar: [], sinCambios: [], noReconocidos: [],
         ausentes: [], invalidos: [], advertenciasCama: [], totalFilas: rows.length,
       };
       const expedientesEnReporte = new Set<string>();
@@ -250,6 +274,28 @@ export default function ImportarReportePage() {
         }
       });
 
+      // Un "nuevo" puede ser un paciente al que ESDOMED ya le dio el alta o la
+      // defunción y que el reporte del SIS todavía trae (reporte descargado antes,
+      // o alta aún no digitada en el SIS). Esos se retienen: no se importan salvo
+      // reingreso confirmado. Ver lib/pacientes/egresoReciente.
+      if (d.nuevos.length > 0) {
+        const historial = await cargarHistorialEgresos(d.nuevos.map((n) => n.expediente));
+        const ahora = new Date();
+        const libres: Nuevo[] = [];
+        for (const n of d.nuevos) {
+          const fechaIngresoReporte = fechaIngresoDe(n.form);
+          const retencion = evaluarRetencion(fechaIngresoReporte, historial.get(n.expediente)?.ultimoEgreso, ahora);
+          if (retencion) d.retenidos.push({ ...n, retencion, fechaIngresoReporte });
+          else libres.push(n);
+        }
+        d.nuevos = libres;
+        // Defunciones primero, luego lo más reciente.
+        d.retenidos.sort((a, b) =>
+          Number(b.retencion.motivo === "defuncion") - Number(a.retencion.motivo === "defuncion") ||
+          a.retencion.horasDesdeEgreso - b.retencion.horasDesdeEgreso);
+      }
+
+      setReingresosConfirmados(new Set());
       setDiff(d);
       setPaso("previsualizar");
     } catch (e) {
@@ -272,11 +318,58 @@ export default function ImportarReportePage() {
       const flush = async () => { if (ops > 0) { await batch.commit(); batch = writeBatch(db); ops = 0; } };
       const bump = async (n: number) => { ops += n; if (ops >= 400) await flush(); };
 
-      // Nuevos ingresos + persona canónica
-      for (const n of diff.nuevos) {
+      // Nuevos ingresos + reingresos confirmados de los retenidos.
+      const aCrear: { n: Nuevo; reingreso: Retencion | null }[] = [
+        ...diff.nuevos.map((n) => ({ n, reingreso: null })),
+        ...diff.retenidos
+          .filter((r) => r.retencion.confirmable && reingresosConfirmados.has(r.expediente))
+          .map((r) => ({ n: r as Nuevo, reingreso: r.retencion })),
+      ];
+
+      // Revalidar justo antes de escribir: mientras se revisaba la vista previa,
+      // otra importación pudo crear el ingreso, o un compañero pudo procesar el
+      // alta o la defunción. Sin esto, dos importaciones seguidas duplicaban activos.
+      const historial = await cargarHistorialEgresos(aCrear.map((x) => x.n.expediente));
+      const ahoraD = ahora.toDate();
+      const omitidos: Omitido[] = [];
+      let creados = 0;
+      let reingresos = 0;
+
+      for (const { n, reingreso } of aCrear) {
+        const h = historial.get(n.expediente);
+        if (h?.hayActivo) {
+          omitidos.push({ expediente: n.expediente, nombre: n.nombre, motivo: "Ya tiene un ingreso activo (otra importación lo registró)." });
+          continue;
+        }
+        const ret = evaluarRetencion(fechaIngresoDe(n.form), h?.ultimoEgreso, ahoraD);
+        if (ret && (!ret.confirmable || !reingreso || !mismoEgreso(ret.egreso, reingreso.egreso))) {
+          omitidos.push({
+            expediente: n.expediente, nombre: n.nombre,
+            motivo: ret.motivo === "defuncion"
+              ? "Se confirmó su defunción mientras revisabas."
+              : "Le registraron un egreso mientras revisabas; vuelve a importar para decidir.",
+          });
+          continue;
+        }
+
         const dp = construirDatosPersonales(n.form);
-        const ingresoRef = doc(collection(db, "pacientes"));
-        batch.set(ingresoRef, construirDocIngreso(n.form, dp, profile));
+        const docIngreso = construirDocIngreso(n.form, dp, profile);
+        if (reingreso) {
+          const e = reingreso.egreso;
+          docIngreso.reingresoConfirmado = {
+            motivo: reingreso.motivo,
+            ...(e.pacienteId ? { egresoPrevioPacienteId: e.pacienteId } : {}),
+            egresoPrevioEstado: e.estado,
+            egresoPrevioFecha: Timestamp.fromDate(e.fechaEgreso),
+            confirmadoPorId: profile.uid,
+            confirmadoPorNombre: profile.nombre,
+            confirmadoEn: ahora,
+          };
+          reingresos++;
+        } else {
+          creados++;
+        }
+        batch.set(doc(collection(db, "pacientes")), docIngreso);
         const personaRef = doc(db, "personas", n.expediente);
         batch.set(personaRef, { ...dp, actualizadoEn: ahora, actualizadoPor: profile.uid }, { merge: true });
         await bump(2);
@@ -328,7 +421,7 @@ export default function ImportarReportePage() {
 
       await flush();
       await registrarHoraSincronizacion();
-      setResultado({ creados: diff.nuevos.length, actualizados: diff.actualizar.length });
+      setResultado({ creados, reingresos, actualizados: diff.actualizar.length, omitidos });
       setPaso("hecho");
     } catch (e) {
       setError(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -358,7 +451,8 @@ export default function ImportarReportePage() {
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Sube el reporte de pacientes ingresados (.xlsx). Se agregan solo los nuevos; los
-            activos no presentes y los ya dados de alta no se tocan.
+            activos no presentes y los ya dados de alta no se tocan. Si el reporte trae a alguien
+            que egresó en las últimas {VENTANA_REINGRESO_HORAS} h o que falleció, se retiene.
           </p>
         </div>
       </div>
@@ -419,13 +513,34 @@ export default function ImportarReportePage() {
           </div>
 
           {/* Tarjetas resumen */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <ResumenCard icon={UserPlus}     color="emerald" label="Nuevos"        n={diff.nuevos.length} />
+            <ResumenCard icon={UserX}        color="amber"   label="Ya egresados"  n={diff.retenidos.length} />
             <ResumenCard icon={ArrowRightLeft} color="blue"    label="Actualizar"   n={diff.actualizar.length} />
             <ResumenCard icon={MinusCircle}  color="slate"   label="Sin cambios"   n={diff.sinCambios.length} />
             <ResumenCard icon={LogOut}       color="amber"   label="Ausentes"      n={diff.ausentes.length} />
             <ResumenCard icon={HelpCircle}   color="rose"    label="No reconocidos" n={diff.noReconocidos.length} />
           </div>
+
+          {/* Retenidos: va primero porque es lo único que pide una decisión. */}
+          {diff.retenidos.length > 0 && (
+            <Seccion titulo="Ya egresados: no se importan salvo reingreso confirmado" vacioMsg="" items={diff.retenidos}>
+              <p className="pt-1 pb-2 text-xs text-slate-600 dark:text-slate-400">
+                El reporte del SIS todavía trae a estos pacientes, pero en ESDOMED Services ya tienen un alta
+                o una defunción registrada. Lo normal es que el reporte se haya descargado antes del alta o que el
+                alta aún no esté en el SIS. Marca solo los que de verdad salieron y volvieron a ingresar; queda
+                registrado quién lo confirmó.
+              </p>
+              {diff.retenidos.map((r) => (
+                <FilaRetenido
+                  key={r.expediente}
+                  r={r}
+                  confirmado={reingresosConfirmados.has(r.expediente)}
+                  onToggle={() => toggleReingreso(r.expediente)}
+                />
+              ))}
+            </Seccion>
+          )}
 
           {/* Listas */}
           <Seccion titulo="Nuevos ingresos a crear" vacioMsg="No hay ingresos nuevos en el reporte." items={diff.nuevos}>
@@ -512,13 +627,13 @@ export default function ImportarReportePage() {
             </button>
             <button
               onClick={confirmar}
-              disabled={guardando || (diff.nuevos.length === 0 && diff.actualizar.length === 0 && diff.sinCambios.length === 0)}
+              disabled={guardando || (diff.nuevos.length === 0 && reingresosConfirmados.size === 0 && diff.actualizar.length === 0 && diff.sinCambios.length === 0)}
               className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 transition-colors"
             >
               {guardando ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
               {guardando
                 ? "Guardando..."
-                : `Confirmar (${diff.nuevos.length} nuevos · ${diff.actualizar.length} actualizaciones)`}
+                : `Confirmar (${diff.nuevos.length} nuevos${reingresosConfirmados.size ? ` · ${reingresosConfirmados.size} reingresos` : ""} · ${diff.actualizar.length} actualizaciones)`}
             </button>
           </div>
         </div>
@@ -533,9 +648,25 @@ export default function ImportarReportePage() {
           <div>
             <p className="text-base font-semibold text-slate-900 dark:text-slate-100">Importación completa</p>
             <p className="text-sm text-slate-500 mt-1">
-              {resultado.creados} ingresos creados · {resultado.actualizados} activos actualizados
+              {resultado.creados} ingresos creados
+              {resultado.reingresos > 0 && ` · ${resultado.reingresos} reingresos confirmados`}
+              {" · "}{resultado.actualizados} activos actualizados
             </p>
           </div>
+          {resultado.omitidos.length > 0 && (
+            <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" role="status">
+              <p className="font-medium">
+                {resultado.omitidos.length === 1 ? "1 paciente no se creó" : `${resultado.omitidos.length} pacientes no se crearon`} porque su situación cambió mientras revisabas:
+              </p>
+              <ul className="mt-1.5 space-y-1 text-xs">
+                {resultado.omitidos.map((o) => (
+                  <li key={o.expediente}>
+                    <span className="font-mono">{o.expediente}</span> {o.nombre}: {o.motivo}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {errorSincronizacion && (
             <div className="mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" role="status">
               <p>Los pacientes se importaron, pero no se pudo registrar la hora de sincronización en Inicio.</p>
@@ -631,5 +762,69 @@ function Fila({ exp, nombre, detalle, href }: { exp: string; nombre: string; det
     </Link>
   ) : (
     contenido
+  );
+}
+
+function FilaRetenido({ r, confirmado, onToggle }: { r: Retenido; confirmado: boolean; onToggle: () => void }) {
+  const { motivo, egreso, horasDesdeEgreso, confirmable } = r.retencion;
+  const fallecido = motivo === "defuncion";
+  const estadoLabel = ESTADO_LABEL[egreso.estado as EstadoPaciente] ?? "Egreso";
+  const hace = formatDuracion(Math.max(0, horasDesdeEgreso) * 3_600_000);
+  const ingresoPosterior = !!r.fechaIngresoReporte && r.fechaIngresoReporte.getTime() > egreso.fechaEgreso.getTime();
+  const href = egreso.pacienteId ? `/dashboard/pacientes/${egreso.pacienteId}` : undefined;
+  const checkboxId = `reingreso-${r.expediente}`;
+
+  const explicacion =
+    motivo === "defuncion"
+      ? "Tiene una defunción confirmada: una persona fallecida no puede reingresar, así que no se importa. Si el expediente no corresponde, revísalo en el SIS y en Defunciones."
+      : motivo === "mismo_ingreso"
+        ? "El reporte trae el mismo ingreso que ya egresó: el SIS todavía no refleja el alta. Si el alta fue un error, reviértela desde Notificación de altas en lugar de importarlo."
+        : ingresoPosterior
+          ? `Egresó hace menos de ${VENTANA_REINGRESO_HORAS} h, pero el reporte trae un ingreso posterior al egreso: parece un reingreso real. Confírmalo para importarlo.`
+          : `Egresó hace menos de ${VENTANA_REINGRESO_HORAS} h. Lo más probable es que el reporte sea anterior al alta en el SIS.`;
+
+  return (
+    <div className="py-2.5 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-mono text-xs text-slate-500 w-20 flex-shrink-0">{r.expediente}</span>
+        <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[60%] sm:max-w-[40%]">{r.nombre}</span>
+        <span
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            fallecido
+              ? "bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-400"
+              : "bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400"
+          }`}
+        >
+          {fallecido ? "Defunción" : `${estadoLabel} hace ${hace}`}
+        </span>
+      </div>
+      <div className="mt-1 space-y-1.5 text-xs text-slate-500 sm:ml-[5.75rem]">
+        <p>
+          {fallecido ? "Defunción" : "Egreso"}: {formatFechaHora(egreso.fechaEgreso)}
+          {" · "}Ingreso en el reporte: {formatFechaHora(r.fechaIngresoReporte)}
+          {href && (
+            <>
+              {" · "}
+              <Link prefetch={false} href={href} className="font-medium text-blue-700 hover:underline dark:text-blue-400">
+                Ver ficha
+              </Link>
+            </>
+          )}
+        </p>
+        <p className={fallecido ? "text-rose-700 dark:text-rose-400" : "text-amber-700 dark:text-amber-400"}>{explicacion}</p>
+        {confirmable && (
+          <label htmlFor={checkboxId} className="inline-flex cursor-pointer items-center gap-2 py-1 text-slate-700 dark:text-slate-300">
+            <input
+              id={checkboxId}
+              type="checkbox"
+              checked={confirmado}
+              onChange={onToggle}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800"
+            />
+            Confirmo que es un reingreso real: salió de alta y volvió a ingresar
+          </label>
+        )}
+      </div>
+    </div>
   );
 }

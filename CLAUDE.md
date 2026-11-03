@@ -92,6 +92,16 @@ El SIS escribe los mismos servicios de varias formas (mayúsculas/minúsculas, t
 - Los nombres realmente distintos (siglas como “UCI General 1 Adultos”, formas cortas, nombres históricos) se agregan a `ALIAS_CRUDOS` en `src/lib/servicios.ts`. Las variantes de caja/tilde/espacio NO necesitan alias: las absorbe `claveServicio()`.
 - Limpieza de datos ya afectados: `node scripts/limpiar-traslados-fantasma.mjs --dry-run`.
 
+### Importación de activos — retención de ya egresados
+
+Al procesar un alta efectiva o confirmar una defunción, el ingreso deja de estar `activo`. Si luego se importa un reporte del SIS que todavía lo trae (descargado antes del alta, o el alta aún no está en el SIS), la importación lo veía como "nuevo" y duplicaba el activo. `src/lib/pacientes/egresoReciente.ts` evalúa el **último egreso** del expediente (ingresos en `pacientes` + defunciones confirmadas en `notificaciones_fallecidos`):
+
+- **Defunción** → nunca se importa, sin confirmación posible.
+- **Mismo ingreso** (la fecha de ingreso del reporte no es posterior al día en que empezó la estancia que egresó) → retenido aunque hayan pasado más de 24 h.
+- **Alta de hace menos de 24 h** (`VENTANA_REINGRESO_HORAS`, medido desde lo último entre `fechaEgreso` y `egresadoAutoEn`) → retenido.
+
+Los dos últimos entran solo si ESDOMED marca "reingreso real"; el ingreso nuevo guarda `reingresoConfirmado{...}` (quién, cuándo, contra qué egreso). Justo antes de escribir, la importación **revalida** los expedientes a crear (otra importación simultánea o un alta procesada durante la revisión) y omite los que cambiaron. Regla para código nuevo que cree ingresos en lote: pasar por `cargarHistorialEgresos` + `evaluarRetencion`.
+
 ### APIs de integración (máquina a máquina)
 
 `src/app/api/integraciones/*` expone datos a OTROS sistemas (tableros externos). Auth por header `x-api-key` = env `INTEGRACIONES_API_KEY` (helper `src/lib/integraciones/auth.ts`, responde 503 si la variable falta); usan `adminDb` (firebase-admin), nunca el SDK cliente. Los tableros por grupo de servicios (Medicina Interna, Cirugía, Convenios, UCI, UCIN, Paliativos, apoyo a RIISS) se definen en `src/lib/integraciones/tableros.ts` y se sirven en `/api/integraciones/tableros/{id}`; `GET /api/integraciones/tableros` devuelve el contrato y `docs/api-integraciones-tableros.md` es la guía para el consumidor. Rangos en hora de El Salvador, `Cache-Control: private, no-store` + caché en memoria de 10 min, conteos con agregación cuando no hace falta agrupar por servicio.

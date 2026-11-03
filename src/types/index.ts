@@ -1162,6 +1162,19 @@ export interface Paciente {
   egresadoAutoEn?: Date;
   notificacionAltaId?: string;
 
+  // Reingreso confirmado al importar el reporte del SIS: el expediente tenía un
+  // egreso de menos de 24 h (o el reporte traía el mismo ingreso ya egresado) y
+  // ESDOMED confirmó que salió y volvió a ingresar. Ver lib/pacientes/egresoReciente.
+  reingresoConfirmado?: {
+    motivo: "mismo_ingreso" | "alta_reciente";
+    egresoPrevioPacienteId?: string;
+    egresoPrevioEstado: string;
+    egresoPrevioFecha: Date;
+    confirmadoPorId: string;
+    confirmadoPorNombre: string;
+    confirmadoEn: Date;
+  };
+
   // COVID (legado del CSV)
   fechaPruebaCovid?: Date;
   estadoVacunaCovid?: string;
