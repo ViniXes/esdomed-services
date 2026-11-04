@@ -4,8 +4,9 @@
 // meses que el admin revisó y PUBLICÓ (copias por persona en
 // `inconsistencias_marcacion_personal`, ver lib/inconsistenciasMarcacion/personal).
 // Cada día se cruza con su plan de trabajo para señalar los que podría
-// reclamar; los días elegidos abren el trámite "E. Inconsistencias de
-// marcación" ya armado en Trámites de Personal.
+// reclamar. Solo se reclaman los días a los que les falta UNA marca: los
+// elegidos abren la hoja de inconsistencia ya llena (./formato) y, firmada,
+// se adjunta al trámite "E. Inconsistencias de marcación".
 // Lecturas: 1 consulta de copias + 1 de trámites propios al entrar, y 1 plan
 // por mes que se abre.
 
@@ -27,6 +28,7 @@ import {
   formatoDuracion,
   tipoIncidencia,
 } from "@/lib/inconsistenciasMarcacion/analisis";
+import { marcaFaltante } from "@/lib/inconsistenciasMarcacion/formato";
 import { COLECCION_INCONSISTENCIAS_PERSONAL, contextoPlanDia, type ContextoPlanDia } from "@/lib/inconsistenciasMarcacion/personal";
 import { ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL } from "@/lib/tramitesPersonal";
 import { Marca, Tarjeta } from "@/components/marcacion/Piezas";
@@ -149,7 +151,7 @@ export default function MisMarcacionesPage() {
     return t;
   }, [actual]);
 
-  const posibles = dias.filter((x) => x.contexto?.motivo && esSeleccionable(datos, x.d.fecha)).length;
+  const posibles = dias.filter((x) => x.contexto?.motivo && esSeleccionable(x.d, datos?.reclamados.get(x.d.fecha))).length;
   const montoSeleccion = dias.filter((x) => seleccion.has(x.d.fecha)).reduce((a, x) => a + x.d.monto, 0);
   const anios = new Set(datos?.meses.map((m) => m.anio));
 
@@ -163,8 +165,8 @@ export default function MisMarcacionesPage() {
 
   const presentar = () => {
     if (!actual || !seleccion.size) return;
-    const params = new URLSearchParams({ reclamo: actual.periodo, dias: [...seleccion].sort().join(",") });
-    router.push(`/dashboard/mis-tramites?${params}`);
+    const params = new URLSearchParams({ periodo: actual.periodo, dias: [...seleccion].sort().join(",") });
+    router.push(`/dashboard/mis-marcaciones/formato?${params}`);
   };
 
   if (authLoading || !profile || (puedeVer && datos === null)) {
@@ -269,8 +271,8 @@ export default function MisMarcacionesPage() {
               <div>
                 <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">Días con descuento</h2>
                 <p className="text-xs text-slate-500">
-                  Si falta una marca, el reloj descuenta el turno completo; si están las dos, solo los minutos. Marca los días que quieras reclamar
-                  y se arma el trámite &quot;E. Inconsistencias de marcación&quot;: solo te falta adjuntar el formulario.
+                  Si falta una marca, el reloj descuenta el turno completo; si están las dos, solo los minutos. La inconsistencia se presenta
+                  cuando falta la entrada o la salida: marca esos días, imprime la hoja ya llena y adjúntala firmada para enviar el trámite.
                 </p>
                 {dias.length > 0 && dias.every((x) => x.contexto === null) && (
                   <p className="mt-1 text-xs text-slate-500">No hay plan de trabajo de este mes (o no estás en él) para comparar cada día.</p>
@@ -331,9 +333,8 @@ export default function MisMarcacionesPage() {
   );
 }
 
-function esSeleccionable(datos: Datos | null, fecha: string) {
-  const estado = datos?.reclamados.get(fecha);
-  return !estado || estado === "rechazado";
+function esSeleccionable(d: DiaInconsistenciaMarcacion, estado: EstadoTramitePersonal | undefined) {
+  return !!marcaFaltante(d) && (!estado || estado === "rechazado");
 }
 
 function FilaDia({
@@ -349,7 +350,7 @@ function FilaDia({
   marcado: boolean;
   onAlternar: () => void;
 }) {
-  const seleccionable = !estado || estado === "rechazado";
+  const seleccionable = esSeleccionable(d, estado);
   const { tarde, temprano } = desgloseMinutos(d);
   const Contenedor = seleccionable ? "label" : "div";
 
@@ -405,9 +406,18 @@ function FilaDia({
               </span>
             </p>
           )}
+          {tipoIncidencia(d) === "sin_marcacion" && !estado && (
+            <p className="mt-2 text-xs text-slate-500">
+              Sin ninguna marca no aplica la hoja de inconsistencia: es un proceso especial con RRHH que pide documentación de respaldo.
+            </p>
+          )}
           {estado && (
             <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${ESTADO_TRAMITE_PILL[estado]}`}>
-              {estado === "rechazado" ? "Reclamo rechazado · puedes volver a presentarlo" : `Reclamado · ${ESTADO_TRAMITE_LABEL[estado]}`}
+              {estado !== "rechazado"
+                ? `Reclamado · ${ESTADO_TRAMITE_LABEL[estado]}`
+                : seleccionable
+                  ? "Reclamo rechazado · puedes volver a presentarlo"
+                  : "Reclamo rechazado"}
             </span>
           )}
         </div>

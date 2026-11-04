@@ -13,6 +13,7 @@ import { getHorario, esMarcaEspecial, labelMarca } from "@/lib/esdomed/horarios"
 import { filaDeUsuario, formatPeriodo, labelPeriodo, parsePeriodo, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
 import { minutosDeEtiqueta, periodoDeFecha } from "@/lib/esdomed/permisos-plan";
 import { fechaCorta, formatoDinero } from "@/lib/inconsistenciasMarcacion/analisis";
+import { marcaFaltante } from "@/lib/inconsistenciasMarcacion/formato";
 import { COLECCION_INCONSISTENCIAS_PERSONAL, contextoPlanDia, diaReclamado } from "@/lib/inconsistenciasMarcacion/personal";
 
 const toLocalInput = (val: unknown): string => {
@@ -215,7 +216,7 @@ function MisTramitesVista() {
     (async () => {
       const copias = await getDocs(query(collection(db, COLECCION_INCONSISTENCIAS_PERSONAL), where("empleadoId", "==", user.uid)));
       const copia = copias.docs.map(d => d.data() as InconsistenciasMarcacionPersonal).find(c => c.periodo === pedidoReclamo.periodo);
-      const elegidos = (copia?.dias ?? []).filter(d => pedidoReclamo.fechas.includes(d.fecha));
+      const elegidos = (copia?.dias ?? []).filter(d => pedidoReclamo.fechas.includes(d.fecha) && marcaFaltante(d));
       if (!elegidos.length) throw new Error("sin días");
       const periodos = [...new Set(elegidos.map(d => periodoDeFecha(d.fecha)))];
       const planesDia = Object.fromEntries(await Promise.all(periodos.map(p =>

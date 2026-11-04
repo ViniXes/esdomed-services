@@ -118,6 +118,10 @@ Si al ingresar (o al inicio, en emergencia) el paciente ya tenía otra incapacid
 
 Regla para código nuevo: el período (desde/hasta/total) se calcula **solo** con `calcularPeriodoIncapacidad()` y los días adicionales guardados se derivan con `diasAdicionalesGuardados()` (`src/lib/incapacidades/helpers.ts`); nunca `alta + días` a mano, porque rompe las continuaciones.
 
+### Hoja de inconsistencia de marcación (art. 60)
+
+En `/dashboard/mis-marcaciones` solo se reclaman los días a los que les falta **una** marca (`marcaFaltante()` en `src/lib/inconsistenciasMarcacion/formato.ts`). Sin ninguna marca es un proceso especial de RRHH con documentación de respaldo, y con las dos marcas hay registro: ninguno de los dos se reclama aquí. "Presentar inconsistencia" abre `/dashboard/mis-marcaciones/formato` con una hoja carta por día ya llena (manda el plan; si ese día no tiene turno en él, el horario del reloj); ahí no se guarda nada. El trámite E se envía después, adjuntando la hoja firmada. El texto de la hoja es el oficial tal cual, con sus erratas: no corregirlo sin que RRHH lo pida. El Vo. Bo. sale de `jefeDe()`: Benjamín Cardoza para todo el personal, y Roberto Centeno Zambrano (Jefe de Unidad de Planificación) cuando quien presenta es Benjamín.
+
 ### Vacaciones programadas (plan de trabajo ESDOMED)
 
 El admin arma una vez al año la programación de vacaciones del personal operativo en `/esdomed-horarios/vacaciones` (colección `vacaciones_programadas/{año}`, importable desde el Excel de la jefatura). Reglas: 15 días exactos dentro del mes (1ra quincena 1–15, 2da 16–30; nunca cruza de mes), máximo 2 por quincena, bloqueadas la 2da de febrero, Semana Santa (calculada con `domingoPascua`), la 1ra de agosto y la 2da de diciembre. El editor del mes la pinta como VAC al abrir (mismo patrón idempotente que los permisos: registro en `fila.vacaciones` con el turno que había, para devolverlo si la vacación se mueve) y al guardar la programación se propaga a los planes ya guardados de meses no terminados; los meses pasados no se tocan. "Copiar mes anterior" nunca copia VAC. Lógica en `src/lib/esdomed/vacaciones.ts`.
