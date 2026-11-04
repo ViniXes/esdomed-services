@@ -5,14 +5,16 @@
 // `inconsistencias_marcacion_personal`, ver lib/inconsistenciasMarcacion/personal).
 // Cada día se cruza con su plan de trabajo para señalar los que podría
 // reclamar. Solo se reclaman los días a los que les falta UNA marca: los
-// elegidos abren la hoja de inconsistencia ya llena (./formato) y, firmada,
-// se adjunta al trámite "E. Inconsistencias de marcación".
+// elegidos abren la hoja de inconsistencia ya llena (./formato); al imprimirla
+// queda el trámite "E. Inconsistencias de marcación" esperando la foto del
+// recibido de RRHH, que se anexa desde aquí.
 // Lecturas: 1 consulta de copias + 1 de trámites propios al entrar, y 1 plan
 // por mes que se abre.
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, FingerprintPattern, Lightbulb, Send, Timer, Wallet } from "lucide-react";
+import { AlertTriangle, FingerprintPattern, Lightbulb, Paperclip, Printer, Send, Timer, Wallet } from "lucide-react";
 import { collection, doc, getDoc, getDocs, query, where, type Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,9 +30,9 @@ import {
   formatoDuracion,
   tipoIncidencia,
 } from "@/lib/inconsistenciasMarcacion/analisis";
-import { marcaFaltante } from "@/lib/inconsistenciasMarcacion/formato";
+import { marcaFaltante, rutaHojaInconsistencia } from "@/lib/inconsistenciasMarcacion/formato";
 import { COLECCION_INCONSISTENCIAS_PERSONAL, contextoPlanDia, type ContextoPlanDia } from "@/lib/inconsistenciasMarcacion/personal";
-import { ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL } from "@/lib/tramitesPersonal";
+import { ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, faltaRecibidoRrhh } from "@/lib/tramitesPersonal";
 import { Marca, Tarjeta } from "@/components/marcacion/Piezas";
 
 const aFecha = (v: unknown) => ((v as Timestamp | null | undefined)?.toDate ? (v as Timestamp).toDate() : new Date());
@@ -41,10 +43,17 @@ const fechaLarga = (iso: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+interface ReclamoDia {
+  estado: EstadoTramitePersonal;
+  tramiteId: string;
+  /** Hoja ya impresa a la que le falta la foto del recibido: dónde reimprimirla. */
+  rutaHoja: string | null;
+}
+
 interface Datos {
   meses: InconsistenciasMarcacionPersonal[];
-  /** Fecha ya reclamada → estado de su trámite (un rechazado se puede volver a reclamar). */
-  reclamados: Map<string, EstadoTramitePersonal>;
+  /** Fecha ya reclamada → su trámite (un rechazado se puede volver a reclamar). */
+  reclamados: Map<string, ReclamoDia>;
 }
 
 async function cargar(uid: string): Promise<Datos> {
@@ -58,11 +67,16 @@ async function cargar(uid: string): Promise<Datos> {
       return { ...(data as InconsistenciasMarcacionPersonal), id: d.id, publicadoEn: aFecha(data.publicadoEn) };
     })
     .sort((a, b) => b.periodo.localeCompare(a.periodo));
-  const reclamados = new Map<string, EstadoTramitePersonal>();
-  for (const t of tramites.docs.map((d) => d.data() as TramitePersonal)) {
-    for (const dia of t.reclamoMarcacion?.dias ?? []) {
-      const previo = reclamados.get(dia.fecha);
-      if (!previo || previo === "rechazado") reclamados.set(dia.fecha, t.estado);
+  const reclamados = new Map<string, ReclamoDia>();
+  for (const s of tramites.docs) {
+    const t = s.data() as TramitePersonal;
+    const reclamo = t.reclamoMarcacion;
+    if (!reclamo) continue;
+    const fechas = reclamo.dias.map((d) => d.fecha);
+    const rutaHoja = faltaRecibidoRrhh(t) ? rutaHojaInconsistencia(reclamo.periodo, fechas) : null;
+    for (const fecha of fechas) {
+      const previo = reclamados.get(fecha);
+      if (!previo || previo.estado === "rechazado") reclamados.set(fecha, { estado: t.estado, tramiteId: s.id, rutaHoja });
     }
   }
   return { meses, reclamados };
@@ -151,7 +165,7 @@ export default function MisMarcacionesPage() {
     return t;
   }, [actual]);
 
-  const posibles = dias.filter((x) => x.contexto?.motivo && esSeleccionable(x.d, datos?.reclamados.get(x.d.fecha))).length;
+  const posibles = dias.filter((x) => x.contexto?.motivo && esSeleccionable(x.d, datos?.reclamados.get(x.d.fecha)?.estado)).length;
   const montoSeleccion = dias.filter((x) => seleccion.has(x.d.fecha)).reduce((a, x) => a + x.d.monto, 0);
   const anios = new Set(datos?.meses.map((m) => m.anio));
 
@@ -165,8 +179,7 @@ export default function MisMarcacionesPage() {
 
   const presentar = () => {
     if (!actual || !seleccion.size) return;
-    const params = new URLSearchParams({ periodo: actual.periodo, dias: [...seleccion].sort().join(",") });
-    router.push(`/dashboard/mis-marcaciones/formato?${params}`);
+    router.push(rutaHojaInconsistencia(actual.periodo, [...seleccion]));
   };
 
   if (authLoading || !profile || (puedeVer && datos === null)) {
@@ -272,7 +285,7 @@ export default function MisMarcacionesPage() {
                 <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 font-heading">Días con descuento</h2>
                 <p className="text-xs text-slate-500">
                   Si falta una marca, el reloj descuenta el turno completo; si están las dos, solo los minutos. La inconsistencia se presenta
-                  cuando falta la entrada o la salida: marca esos días, imprime la hoja ya llena y adjúntala firmada para enviar el trámite.
+                  cuando falta la entrada o la salida: marca esos días, imprime la hoja ya llena y, cuando RRHH la reciba, anexa la foto del recibido.
                 </p>
                 {dias.length > 0 && dias.every((x) => x.contexto === null) && (
                   <p className="mt-1 text-xs text-slate-500">No hay plan de trabajo de este mes (o no estás en él) para comparar cada día.</p>
@@ -285,7 +298,7 @@ export default function MisMarcacionesPage() {
                     key={`${d.fecha}-${d.horario}`}
                     d={d}
                     contexto={contexto}
-                    estado={datos.reclamados.get(d.fecha)}
+                    reclamo={datos.reclamados.get(d.fecha)}
                     marcado={seleccion.has(d.fecha)}
                     onAlternar={() => alternar(d.fecha)}
                   />
@@ -340,16 +353,17 @@ function esSeleccionable(d: DiaInconsistenciaMarcacion, estado: EstadoTramitePer
 function FilaDia({
   d,
   contexto,
-  estado,
+  reclamo,
   marcado,
   onAlternar,
 }: {
   d: DiaInconsistenciaMarcacion;
   contexto: ContextoPlanDia | null | undefined;
-  estado: EstadoTramitePersonal | undefined;
+  reclamo: ReclamoDia | undefined;
   marcado: boolean;
   onAlternar: () => void;
 }) {
+  const estado = reclamo?.estado;
   const seleccionable = esSeleccionable(d, estado);
   const { tarde, temprano } = desgloseMinutos(d);
   const Contenedor = seleccionable ? "label" : "div";
@@ -411,7 +425,24 @@ function FilaDia({
               Sin ninguna marca no aplica la hoja de inconsistencia: es un proceso especial con RRHH que pide documentación de respaldo.
             </p>
           )}
-          {estado && (
+          {reclamo?.rutaHoja ? (
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${ESTADO_TRAMITE_PILL.pendiente}`}>
+                Impresa · falta foto de recibido de RRHH
+              </span>
+              <Link
+                href={`/dashboard/mis-tramites?anexar=${reclamo.tramiteId}`}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline dark:text-blue-300"
+              >
+                <Paperclip size={13} />
+                Anexar foto
+              </Link>
+              <Link href={reclamo.rutaHoja} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:underline dark:text-slate-300">
+                <Printer size={13} />
+                Ver hoja
+              </Link>
+            </div>
+          ) : estado && (
             <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${ESTADO_TRAMITE_PILL[estado]}`}>
               {estado !== "rechazado"
                 ? `Reclamado · ${ESTADO_TRAMITE_LABEL[estado]}`

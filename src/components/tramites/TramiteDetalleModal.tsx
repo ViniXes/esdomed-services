@@ -5,13 +5,13 @@ import {
   AlertTriangle, ArrowRight, CheckCircle2, ExternalLink, FileImage, FileText, MessageSquareText,
   CalendarRange, Clock, FingerprintPattern, Paperclip, Pencil, RefreshCw, Route, X, XCircle,
 } from "lucide-react";
-import type { EstadoTramitePersonal, TramitePersonal } from "@/types";
+import type { TramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { esPermisoDeUnTurno } from "@/lib/esdomed/permisos-plan";
 import { labelPeriodo } from "@/lib/esdomed/plan";
 import { fechaCorta, formatoDinero } from "@/lib/inconsistenciasMarcacion/analisis";
 import {
-  ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, docsDeTramite, fechaLegible, partesCategoria,
+  docsDeTramite, estadoVisibleTramite, faltaRecibidoRrhh, fechaLegible, partesCategoria,
   type ConflictoPermisoGrupo,
 } from "@/lib/tramitesPersonal";
 
@@ -229,7 +229,7 @@ function pasosDe(t: TramitePersonal): Paso[] {
   const revisado = toDate(t.revisadoEn);
   const actualizado = toDate(t.actualizadoEn);
   const pasos: Paso[] = [
-    { titulo: t.estado === "subido" ? "Subido" : "Presentado", detalle: creado ? fechaHora(creado) : undefined, por: t.empleadoNombre, tono: "azul", hecho: true },
+    { titulo: faltaRecibidoRrhh(t) ? "Hoja impresa" : t.estado === "subido" ? "Subido" : "Presentado", detalle: creado ? fechaHora(creado) : undefined, por: t.empleadoNombre, tono: "azul", hecho: true },
   ];
   if (t.estado === "aprobado" || t.estado === "rechazado") {
     pasos.push({
@@ -247,6 +247,8 @@ function pasosDe(t: TramitePersonal): Paso[] {
       if (actualizado && actualizado > revisado) pasos.push({ titulo: "Reenviado", detalle: fechaHora(actualizado), por: t.empleadoNombre, tono: "azul", hecho: true });
     }
     pasos.push({ titulo: "En revisión", tono: "ambar", hecho: false });
+  } else if (faltaRecibidoRrhh(t)) {
+    pasos.push({ titulo: "Falta la foto del recibido de RRHH", tono: "ambar", hecho: false });
   }
   return pasos;
 }
@@ -387,7 +389,7 @@ export function TramiteDetalleModal({
     };
   }, []);
 
-  const estado: EstadoTramitePersonal = t.estado;
+  const estado = estadoVisibleTramite(t);
 
   return (
     <div
@@ -410,8 +412,8 @@ export function TramiteDetalleModal({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${ESTADO_TRAMITE_PILL[estado]}`}>
-                {ESTADO_TRAMITE_LABEL[estado]}
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${estado.pill}`}>
+                {estado.label}
               </span>
               {t.tipoSolicitud && (
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${

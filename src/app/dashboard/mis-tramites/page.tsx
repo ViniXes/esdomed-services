@@ -1,20 +1,21 @@
 "use client";
 
 import { Suspense, useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, getDoc, getDocs, deleteField, Timestamp } from "@/lib/firestoreMeter";
+import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, getDoc, deleteField, Timestamp } from "@/lib/firestoreMeter";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Plus, Upload, X, CheckCircle2, Clock, File, Pencil, AlertTriangle, Paperclip, CalendarDays, ChevronLeft, Wallet, WalletCards, Check, Trash2 } from "lucide-react";
-import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal, PlanTrabajo, FilaPlanTrabajo, InconsistenciasMarcacionPersonal, ReclamoMarcacion } from "@/types";
+import { FileText, Plus, Upload, X, CheckCircle2, Clock, File, Pencil, AlertTriangle, Paperclip, Printer, CalendarDays, ChevronLeft, Wallet, WalletCards, Check, Trash2 } from "lucide-react";
+import type { TramitePersonal, CategoriaTramitePersonal, EstadoTramitePersonal, PlanTrabajo, FilaPlanTrabajo, ReclamoMarcacion } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { getHorario, esMarcaEspecial, labelMarca } from "@/lib/esdomed/horarios";
 import { filaDeUsuario, formatPeriodo, labelPeriodo, parsePeriodo, PERIODO_ACTUAL } from "@/lib/esdomed/plan";
-import { minutosDeEtiqueta, periodoDeFecha } from "@/lib/esdomed/permisos-plan";
+import { minutosDeEtiqueta } from "@/lib/esdomed/permisos-plan";
 import { fechaCorta, formatoDinero } from "@/lib/inconsistenciasMarcacion/analisis";
-import { marcaFaltante } from "@/lib/inconsistenciasMarcacion/formato";
-import { COLECCION_INCONSISTENCIAS_PERSONAL, contextoPlanDia, diaReclamado } from "@/lib/inconsistenciasMarcacion/personal";
+import { rutaHojaInconsistencia } from "@/lib/inconsistenciasMarcacion/formato";
+import { faltaRecibidoRrhh } from "@/lib/tramitesPersonal";
 
 const toLocalInput = (val: unknown): string => {
   const d = toDate(val);
@@ -138,27 +139,20 @@ function MisTramitesVista() {
   const { user, profile } = useAuth();
   // "Nuevo trámite" del inicio de ESDOMED llega con ?nuevo=1: abre el asistente
   // directo (el formulario ya arranca en blanco). "Mis marcaciones" llega con
-  // ?reclamo=YYYY-MM&dias=YYYY-MM-DD,…: abre el trámite E con esos días.
+  // ?anexar={id}: abre la foto del recibido de ese trámite.
   const searchParams = useSearchParams();
   const nuevoDesdeUrl = searchParams.get("nuevo") === "1";
-  const [pedidoReclamo] = useState(() => {
-    const periodo = searchParams.get("reclamo");
-    const fechas = (searchParams.get("dias") ?? "").split(",").filter(Boolean);
-    return periodo && fechas.length ? { periodo, fechas } : null;
-  });
+  const [anexarId] = useState(() => searchParams.get("anexar"));
+  const anexarAtendido = useRef(false);
   const [tramites, setTramites] = useState<TramitePersonal[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ── Wizard ──
-  const [showWizard, setShowWizard] = useState(nuevoDesdeUrl || !!pedidoReclamo);
-  const [paso, setPaso] = useState<1 | 2 | 3>(pedidoReclamo ? 2 : 1);
-  const [categoria, setCategoria] = useState<CategoriaTramitePersonal>(pedidoReclamo ? CATEGORIA_MARCACION : "A1_permiso_con_goce");
-  // Días del reporte de marcación que se reclaman (trámite E desde "Mis marcaciones").
+  const [showWizard, setShowWizard] = useState(nuevoDesdeUrl);
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
+  const [categoria, setCategoria] = useState<CategoriaTramitePersonal>("A1_permiso_con_goce");
+  // Días reclamados del trámite E que se está editando.
   const [reclamo, setReclamo] = useState<ReclamoMarcacion | null>(null);
-  const [cargandoReclamo, setCargandoReclamo] = useState(!!pedidoReclamo);
-  // El pedido de la URL se arma una sola vez (que un refresco del perfil no lo
-  // vuelva a meter en otro trámite abierto después).
-  const reclamoAtendido = useRef(false);
   const [notas, setNotas] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -182,8 +176,9 @@ function MisTramitesVista() {
   const [fechaFin, setFechaFin] = useState("");
   const [horas, setHoras] = useState("");
 
-  // Documentos de un trámite ya aprobado (no cambia el estado): se agregan o
-  // se quitan. `docsAdjuntar` es la lista de trabajo de los ya subidos (los que
+  // Documentos de un trámite ya aprobado, o la foto del recibido de una hoja
+  // impresa (no cambia el estado): se agregan o se quitan. `docsAdjuntar` es la
+  // lista de trabajo de los ya subidos (los que
   // el dueño quite desaparecen de aquí y se borran al guardar).
   const [adjuntarA, setAdjuntarA] = useState<TramitePersonal | null>(null);
   const [docsAdjuntar, setDocsAdjuntar] = useState<{ url: string; nombre: string }[]>([]);
@@ -198,54 +193,24 @@ function MisTramitesVista() {
       orderBy("creadoEn", "desc")
     );
     return onSnapshot(q, (snap) => {
-      setTramites(snap.docs.map(d => ({ id: d.id, ...d.data() } as TramitePersonal)));
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() } as TramitePersonal));
+      setTramites(lista);
       setLoading(false);
+      // Se abre una sola vez: que un cambio en la lista no lo reabra al cerrarlo.
+      const pedido = anexarAtendido.current ? undefined : lista.find(t => t.id === anexarId);
+      if (pedido) {
+        anexarAtendido.current = true;
+        setAdjuntarA(pedido);
+        setDocsAdjuntar(docsDe(pedido));
+      }
     });
-  }, [user]);
+  }, [user, anexarId]);
 
-  // Quita ?nuevo=1 / ?reclamo=… de la URL para que recargar no vuelva a abrir el asistente.
+  // Quita ?nuevo=1 / ?anexar=… de la URL para que recargar no vuelva a abrirlos.
   useEffect(() => {
-    if (nuevoDesdeUrl || pedidoReclamo) window.history.replaceState(null, "", window.location.pathname);
-  }, [nuevoDesdeUrl, pedidoReclamo]);
+    if (nuevoDesdeUrl || anexarId) window.history.replaceState(null, "", window.location.pathname);
+  }, [nuevoDesdeUrl, anexarId]);
 
-  // Arma el reclamo con los días tal como vienen en la copia publicada y lo que
-  // decía el plan (quien revisa el trámite no lee las copias personales).
-  useEffect(() => {
-    if (!pedidoReclamo || reclamoAtendido.current || !user || !profile) return;
-    let cancelado = false;
-    (async () => {
-      const copias = await getDocs(query(collection(db, COLECCION_INCONSISTENCIAS_PERSONAL), where("empleadoId", "==", user.uid)));
-      const copia = copias.docs.map(d => d.data() as InconsistenciasMarcacionPersonal).find(c => c.periodo === pedidoReclamo.periodo);
-      const elegidos = (copia?.dias ?? []).filter(d => pedidoReclamo.fechas.includes(d.fecha) && marcaFaltante(d));
-      if (!elegidos.length) throw new Error("sin días");
-      const periodos = [...new Set(elegidos.map(d => periodoDeFecha(d.fecha)))];
-      const planesDia = Object.fromEntries(await Promise.all(periodos.map(p =>
-        getDoc(doc(db, "planes_trabajo", p))
-          .then(s => [p, s.exists() ? ({ id: s.id, ...s.data() } as PlanTrabajo) : null] as const)
-          .catch(() => [p, null] as const),
-      )));
-      if (cancelado) return;
-      reclamoAtendido.current = true;
-      setReclamo({
-        periodo: pedidoReclamo.periodo,
-        dias: elegidos.map(d => {
-          const plan = planesDia[periodoDeFecha(d.fecha)];
-          return diaReclamado(d, plan ? contextoPlanDia(filaDeUsuario(plan, profile), d) : null);
-        }),
-      });
-    })()
-      .catch(() => {
-        if (cancelado) return;
-        reclamoAtendido.current = true;
-        setFeedback({ tipo: "error", mensaje: "No se pudieron cargar los días a reclamar. Puedes indicarlos en las notas." });
-      })
-      .finally(() => {
-        if (!cancelado) setCargandoReclamo(false);
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [pedidoReclamo, user, profile]);
 
   const esPermiso = REQUIERE_APROBACION(categoria);
   const totalPasos = esPermiso ? 3 : 2;
@@ -424,7 +389,6 @@ function MisTramitesVista() {
         };
         if (notas.trim()) payload.notas = notas.trim();
         if (documentos.length) payload.documentos = documentos;
-        if (categoria === CATEGORIA_MARCACION && reclamo) payload.reclamoMarcacion = reclamo;
         if (datos) {
           payload.fechaInicio = Timestamp.fromDate(datos.inicio);
           payload.fechaFin = Timestamp.fromDate(datos.fin);
@@ -463,8 +427,8 @@ function MisTramitesVista() {
     setFilesAdjuntar([]);
   };
 
-  // Documentos de un trámite APROBADO: se agregan o se quitan sin que el estado
-  // cambie. Solo se reclasifica ordinario/diferido cuando se AGREGA un documento,
+  // Documentos de un trámite APROBADO o foto del recibido de una hoja impresa: se
+  // agregan o se quitan sin que el estado cambie. Solo se reclasifica ordinario/diferido cuando se AGREGA un documento,
   // según el día en que se sube respecto a la fecha del permiso; quitar uno no
   // mueve la clasificación.
   const guardarAdjuntos = async () => {
@@ -495,7 +459,10 @@ function MisTramitesVista() {
           : subidos.length > 0
             ? (subidos.length === 1 ? "Documento agregado." : `${subidos.length} documentos agregados.`)
             : (quitados.length === 1 ? "Documento eliminado." : `${quitados.length} documentos eliminados.`);
-      setFeedback({ tipo: "exito", mensaje: `${mensaje} El trámite sigue aprobado.` });
+      setFeedback({
+        tipo: "exito",
+        mensaje: faltaRecibidoRrhh(adjuntarA) ? "Foto anexada. Tu inconsistencia quedó presentada." : `${mensaje} El trámite sigue aprobado.`,
+      });
     } catch (err) {
       console.error(err);
       setFeedback({ tipo: "error", mensaje: "No se pudieron guardar los documentos. Intenta de nuevo." });
@@ -519,7 +486,6 @@ function MisTramitesVista() {
     setPeriodoSel(PERIODO_ACTUAL);
     setModoManual(false);
     setReclamo(null);
-    setCargandoReclamo(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -595,13 +561,14 @@ function MisTramitesVista() {
             const isAprobacion = REQUIERE_APROBACION(t.categoria);
             const fecha = toDate(t.creadoEn) ?? new Date();
             const docs = docsDe(t);
+            const faltaRecibido = faltaRecibidoRrhh(t);
 
             return (
               <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-blue-300 dark:hover:border-blue-900/50 shadow-sm">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${ESTADO_BADGE[t.estado]}`}>
-                      {ESTADO_LABEL[t.estado]}
+                    <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${ESTADO_BADGE[faltaRecibido ? "pendiente" : t.estado]}`}>
+                      {faltaRecibido ? "Falta foto de recibido" : ESTADO_LABEL[t.estado]}
                     </span>
                     {t.tipoSolicitud && (
                       <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${t.tipoSolicitud === "diferido" ? "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300" : "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"}`}>
@@ -659,12 +626,27 @@ function MisTramitesVista() {
                         <File size={16} className="shrink-0" /> <span className="truncate">{docs.length > 1 ? `Documento ${i + 1}` : "Ver Documento"}</span>
                       </a>
                     ))
-                  ) : (
+                  ) : !faltaRecibido && (
                     <span className="text-xs font-medium text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 text-center">
                       Sin anexo
                     </span>
                   )}
-                  {t.estado === "aprobado" ? (
+                  {faltaRecibido && t.reclamoMarcacion ? (
+                    <>
+                      <button
+                        onClick={() => abrirAdjuntar(t)}
+                        className="flex items-center justify-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/70 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto"
+                      >
+                        <Paperclip size={14} /> Anexar foto de recibido
+                      </button>
+                      <Link
+                        href={rutaHojaInconsistencia(t.reclamoMarcacion.periodo, t.reclamoMarcacion.dias.map(d => d.fecha))}
+                        className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto"
+                      >
+                        <Printer size={14} /> Ver hoja
+                      </Link>
+                    </>
+                  ) : t.estado === "aprobado" ? (
                     // Un trámite aprobado ya no se reabre: solo se gestiona el
                     // respaldo físico escaneado (agregar o quitar, antes o después
                     // del permiso).
@@ -891,28 +873,24 @@ function MisTramitesVista() {
               {/* ── Paso 2 (otros trámites) y Paso 3 (permisos): documentos + notas ── */}
               {((paso === 2 && !esPermiso) || (paso === 3 && esPermiso)) && (
                 <>
-                  {paso === 2 && categoria === CATEGORIA_MARCACION && (reclamo || cargandoReclamo) && (
+                  {paso === 2 && categoria === CATEGORIA_MARCACION && reclamo && (
                     <div className="rounded-2xl border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-2">
                       <p className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">
-                        Días que reclamas{reclamo ? ` · ${labelPeriodo(reclamo.periodo)}` : ""}
+                        Días que reclamas · {labelPeriodo(reclamo.periodo)}
                       </p>
-                      {!reclamo ? (
-                        <p className="text-sm text-blue-900 dark:text-blue-200">Cargando los días…</p>
-                      ) : (
-                        <ul className="space-y-1.5">
-                          {reclamo.dias.map(d => (
-                            <li key={`${d.fecha}-${d.horario}`} className="flex items-baseline justify-between gap-3 text-sm text-blue-950 dark:text-blue-100">
-                              <span className="min-w-0">
-                                <span className="font-semibold">{fechaCorta(d.fecha)}</span> · {d.incidencia}
-                                {d.motivo && <span className="block text-xs text-blue-800/80 dark:text-blue-300/80">{d.motivo}</span>}
-                              </span>
-                              <span className="shrink-0 font-semibold tabular-nums">{formatoDinero(d.monto)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      <ul className="space-y-1.5">
+                        {reclamo.dias.map(d => (
+                          <li key={`${d.fecha}-${d.horario}`} className="flex items-baseline justify-between gap-3 text-sm text-blue-950 dark:text-blue-100">
+                            <span className="min-w-0">
+                              <span className="font-semibold">{fechaCorta(d.fecha)}</span> · {d.incidencia}
+                              {d.motivo && <span className="block text-xs text-blue-800/80 dark:text-blue-300/80">{d.motivo}</span>}
+                            </span>
+                            <span className="shrink-0 font-semibold tabular-nums">{formatoDinero(d.monto)}</span>
+                          </li>
+                        ))}
+                      </ul>
                       <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80">
-                        Adjunta el formulario de inconsistencia firmado; administración verá estos días en la ficha del trámite.
+                        Adjunta la foto del recibido de RRHH; administración verá estos días en la ficha del trámite.
                       </p>
                     </div>
                   )}
@@ -1065,17 +1043,18 @@ function MisTramitesVista() {
         </div>
       )}
 
-      {/* ── Modal: documentos de un trámite aprobado (agregar o quitar) ── */}
+      {/* ── Modal: documentos de un trámite aprobado o foto del recibido de RRHH ── */}
       {adjuntarA && (() => {
         const quitados = docsDe(adjuntarA).filter(d => !docsAdjuntar.some(a => a.url === d.url));
         const total = docsAdjuntar.length + filesAdjuntar.length;
         const hayCambios = filesAdjuntar.length > 0 || quitados.length > 0;
+        const paraRecibido = faltaRecibidoRrhh(adjuntarA);
         return (
           <div className="fixed inset-0 z-50 flex justify-center items-start pt-10 px-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md overflow-y-auto">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden mb-10">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 bg-emerald-50 dark:bg-emerald-950/20">
-                <h2 className="text-lg font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
-                  <Paperclip size={20} /> Documentos del trámite
+              <div className={`flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/60 ${paraRecibido ? "bg-blue-50 dark:bg-blue-950/20" : "bg-emerald-50 dark:bg-emerald-950/20"}`}>
+                <h2 className={`text-lg font-bold flex items-center gap-2 ${paraRecibido ? "text-blue-800 dark:text-blue-300" : "text-emerald-800 dark:text-emerald-400"}`}>
+                  <Paperclip size={20} /> {paraRecibido ? "Foto de recibido de RRHH" : "Documentos del trámite"}
                 </h2>
                 <button onClick={cerrarAdjuntar} disabled={saving} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">
                   <X size={20} />
@@ -1084,11 +1063,18 @@ function MisTramitesVista() {
               <div className="p-6 space-y-5">
                 <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
                   <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{CATEGORIAS[adjuntarA.categoria]}</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    El trámite <span className="font-bold text-emerald-600 dark:text-emerald-400">sigue aprobado</span>; aquí solo se gestiona el respaldo:
-                    puedes agregar archivos o quitar los que ya no correspondan. Si agregas uno después de la fecha del permiso,
-                    quedará como <span className="font-bold">diferido</span>; si es antes o el mismo día, como <span className="font-bold">ordinario</span>.
-                  </p>
+                  {paraRecibido ? (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Anexa la foto de la hoja con el recibido de RRHH. Con eso queda presentada tu inconsistencia
+                      {adjuntarA.reclamoMarcacion && <> de {adjuntarA.reclamoMarcacion.dias.map(d => fechaCorta(d.fecha)).join(", ")}</>}.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 mt-1">
+                      El trámite <span className="font-bold text-emerald-600 dark:text-emerald-400">sigue aprobado</span>; aquí solo se gestiona el respaldo:
+                      puedes agregar archivos o quitar los que ya no correspondan. Si agregas uno después de la fecha del permiso,
+                      quedará como <span className="font-bold">diferido</span>; si es antes o el mismo día, como <span className="font-bold">ordinario</span>.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -1141,6 +1127,7 @@ function MisTramitesVista() {
                   <input
                     type="file"
                     multiple
+                    accept={paraRecibido ? "image/*,application/pdf" : undefined}
                     ref={adjuntarInputRef}
                     onChange={(e) => {
                       const elegidos = Array.from(e.target.files ?? []);
@@ -1148,7 +1135,7 @@ function MisTramitesVista() {
                       const espacio = MAX_ADJUNTOS - docsAdjuntar.length - filesAdjuntar.length;
                       setFilesAdjuntar(prev => [...prev, ...elegidos.slice(0, Math.max(0, espacio))]);
                     }}
-                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 transition-colors file:cursor-pointer cursor-pointer"
+                    className={`block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:text-white transition-colors file:cursor-pointer cursor-pointer ${paraRecibido ? "file:bg-blue-600 hover:file:bg-blue-500" : "file:bg-emerald-600 hover:file:bg-emerald-500"}`}
                   />
                 ) : (
                   <p className="text-[11px] text-slate-500">Llegaste al máximo de {MAX_ADJUNTOS} adjuntos. Quita uno para agregar otro.</p>
@@ -1167,12 +1154,12 @@ function MisTramitesVista() {
                     type="button"
                     onClick={guardarAdjuntos}
                     disabled={saving || !hayCambios}
-                    className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className={`px-6 py-2.5 text-sm font-bold text-white rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${paraRecibido ? "bg-blue-600 hover:bg-blue-500" : "bg-emerald-600 hover:bg-emerald-500"}`}
                   >
                     {saving ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      "Guardar cambios"
+                      paraRecibido ? "Anexar foto" : "Guardar cambios"
                     )}
                   </button>
                 </div>

@@ -7,7 +7,7 @@ import { collection, getCountFromServer, getDocs, limit, orderBy, query, where }
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { TramitePersonal } from "@/types";
-import { ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, partesCategoria } from "@/lib/tramitesPersonal";
+import { estadoVisibleTramite, partesCategoria } from "@/lib/tramitesPersonal";
 import { toDate } from "@/lib/pacientes/helpers";
 
 // Acceso a Trámites de personal desde el inicio de ESDOMED: el estado de los
@@ -90,8 +90,8 @@ export function TramitesInicio() {
                   <p className="truncate text-xs font-medium text-slate-700 dark:text-slate-200" title={nombre}>{nombre}</p>
                   <p className="text-[11px] tabular-nums text-slate-400 dark:text-slate-500">{fechaCorta(t.fechaInicio ?? t.creadoEn)}</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${ESTADO_TRAMITE_PILL[t.estado]}`}>
-                  {ESTADO_TRAMITE_LABEL[t.estado]}
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${estadoVisibleTramite(t).pill}`}>
+                  {estadoVisibleTramite(t).label}
                 </span>
               </li>
             );

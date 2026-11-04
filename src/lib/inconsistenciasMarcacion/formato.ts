@@ -27,6 +27,10 @@ const JEFE_DEL_JEFE_ESDOMED: JefeFormato = { nombre: "ROBERTO CENTENO ZAMBRANO",
 export const jefeDe = (codigoMarcacion?: string | null): JefeFormato =>
   normalizarCodigoMarcacion(codigoMarcacion) === CODIGO_JEFE_ESDOMED ? JEFE_DEL_JEFE_ESDOMED : JEFE_ESDOMED;
 
+/** Pantalla de la hoja para esos días: la imprime y, la primera vez, registra el trámite. */
+export const rutaHojaInconsistencia = (periodo: string, fechas: string[]) =>
+  `/dashboard/mis-marcaciones/formato?${new URLSearchParams({ periodo, dias: [...fechas].sort().join(",") })}`;
+
 export type MarcaFaltante = "entrada" | "salida";
 
 /** La marca que falta, o null si el día no admite el formato. */

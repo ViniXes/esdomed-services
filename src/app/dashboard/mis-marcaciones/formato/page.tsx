@@ -1,22 +1,23 @@
 "use client";
 
 // Hoja de inconsistencia ya llena para los días elegidos en "Mis marcaciones".
-// Aquí no se guarda nada: el empleado la imprime, la firma, consigue el Vo. Bo.
-// y el trámite E se envía después, adjuntando esa hoja firmada.
-// Lecturas: 1 consulta de copias + 1 plan por mes de los días elegidos.
+// Al imprimir queda registrado el trámite E con esos días y sin adjuntos: lo único
+// que le falta es la foto del recibido de RRHH (ver faltaRecibidoRrhh), que el
+// empleado anexa después. Abrir una hoja ya registrada solo la reimprime.
+// Lecturas: 1 consulta de copias + 1 de trámites propios + 1 plan por mes de los días.
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Paperclip, Printer } from "lucide-react";
-import { collection, doc, getDoc, getDocs, query, where } from "@/lib/firestoreMeter";
+import { ArrowLeft, Printer } from "lucide-react";
+import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { InconsistenciasMarcacionPersonal, PlanTrabajo } from "@/types";
+import type { DiaReclamadoMarcacion, InconsistenciasMarcacionPersonal, PlanTrabajo, TramitePersonal } from "@/types";
 import { esPersonalPlan, filaDeUsuario } from "@/lib/esdomed/plan";
 import { periodoDeFecha } from "@/lib/esdomed/permisos-plan";
 import { datosFormato, fechaFormato, jefeDe, type DatosFormato } from "@/lib/inconsistenciasMarcacion/formato";
-import { COLECCION_INCONSISTENCIAS_PERSONAL } from "@/lib/inconsistenciasMarcacion/personal";
+import { COLECCION_INCONSISTENCIAS_PERSONAL, contextoPlanDia, diaReclamado } from "@/lib/inconsistenciasMarcacion/personal";
 import { FormatoInconsistenciaPrintLayout } from "@/components/marcacion/FormatoInconsistenciaPrintLayout";
 
 // `useSearchParams` obliga a un límite de Suspense en el App Router.
@@ -47,6 +48,11 @@ function FormatoVista() {
   const [hojas, setHojas] = useState<DatosFormato[] | null>(null);
   const [plaza, setPlaza] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [reclamados, setReclamados] = useState<DiaReclamadoMarcacion[]>([]);
+  // Ya hay un trámite vivo con estos días: imprimir no crea otro.
+  const [registrado, setRegistrado] = useState(false);
+  const [registrando, setRegistrando] = useState(false);
+  const [errorRegistro, setErrorRegistro] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && profile && !puedeVer) router.replace("/dashboard");
@@ -57,7 +63,10 @@ function FormatoVista() {
     const fechas = (dias ?? "").split(",").filter(Boolean);
     let cancelado = false;
     (async () => {
-      const copias = await getDocs(query(collection(db, COLECCION_INCONSISTENCIAS_PERSONAL), where("empleadoId", "==", profile.uid)));
+      const [copias, tramites] = await Promise.all([
+        getDocs(query(collection(db, COLECCION_INCONSISTENCIAS_PERSONAL), where("empleadoId", "==", profile.uid))),
+        getDocs(query(collection(db, "tramites_personal"), where("empleadoId", "==", profile.uid))),
+      ]);
       const copia = copias.docs.map((d) => d.data() as InconsistenciasMarcacionPersonal).find((c) => c.periodo === periodo);
       const elegidos = (copia?.dias ?? []).filter((d) => fechas.includes(d.fecha)).sort((a, b) => a.fecha.localeCompare(b.fecha));
       const periodos = [...new Set(elegidos.map((d) => periodoDeFecha(d.fecha)))];
@@ -71,13 +80,21 @@ function FormatoVista() {
         ),
       );
       if (cancelado) return;
+      const filas = elegidos.flatMap((d) => {
+        const plan = planes[periodoDeFecha(d.fecha)];
+        const fila = plan ? filaDeUsuario(plan, profile) : undefined;
+        const hoja = datosFormato(d, fila);
+        return hoja ? [{ hoja, reclamado: diaReclamado(d, contextoPlanDia(fila, d)) }] : [];
+      });
       setPlaza(copia?.plaza ?? "");
-      setHojas(
-        elegidos.flatMap((d) => {
-          const plan = planes[periodoDeFecha(d.fecha)];
-          return datosFormato(d, plan ? filaDeUsuario(plan, profile) : undefined) ?? [];
+      setReclamados(filas.map((f) => f.reclamado));
+      setRegistrado(
+        tramites.docs.some((s) => {
+          const t = s.data() as TramitePersonal;
+          return t.estado !== "rechazado" && t.reclamoMarcacion?.dias.some((d) => fechas.includes(d.fecha));
         }),
       );
+      setHojas(filas.map((f) => f.hoja));
     })().catch((e) => {
       if (!cancelado) setError(`No se pudo armar el formato: ${e instanceof Error ? e.message : "error"}`);
     });
@@ -87,6 +104,34 @@ function FormatoVista() {
   }, [profile, puedeVer, periodo, dias]);
 
   const emision = useMemo(() => fechaFormato(new Date()), []);
+
+  // El navegador no avisa si el diálogo de impresión se canceló: se registra al
+  // pedir la impresión y, si no salió, se reimprime desde la misma hoja.
+  const imprimir = async () => {
+    if (!registrado) {
+      if (!profile || !periodo) return;
+      setRegistrando(true);
+      setErrorRegistro(null);
+      try {
+        await addDoc(collection(db, "tramites_personal"), {
+          categoria: "E_inconsistencias_marcacion",
+          empleadoId: profile.uid,
+          empleadoNombre: profile.nombre,
+          estado: "subido",
+          reclamoMarcacion: { periodo, dias: reclamados },
+          creadoEn: Timestamp.now(),
+        });
+        setRegistrado(true);
+      } catch (e) {
+        console.error(e);
+        setErrorRegistro("No se pudo registrar el trámite, así que no se imprimió. Intenta de nuevo.");
+        return;
+      } finally {
+        setRegistrando(false);
+      }
+    }
+    window.print();
+  };
 
   if (error) {
     return (
@@ -118,7 +163,6 @@ function FormatoVista() {
     );
   }
 
-  const adjuntar = new URLSearchParams({ reclamo: periodo ?? "", dias: dias ?? "" });
 
   return createPortal(
     <div className="formato-impresion fixed inset-0 z-[220] overflow-y-auto bg-slate-200 print:static print:inset-auto print:overflow-visible print:bg-white dark:bg-slate-950">
@@ -131,27 +175,22 @@ function FormatoVista() {
             <ArrowLeft size={15} />
             Volver
           </button>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => router.push(`/dashboard/mis-tramites?${adjuntar}`)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <Paperclip size={14} />
-              Ya está firmada: adjuntar
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500"
-            >
-              <Printer size={14} />
-              Imprimir / Guardar PDF
-            </button>
-          </div>
+          <button
+            onClick={imprimir}
+            disabled={registrando}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
+          >
+            <Printer size={14} />
+            {registrando ? "Registrando…" : "Imprimir / Guardar PDF"}
+          </button>
         </div>
         <p className="mx-auto max-w-5xl px-4 pb-3 text-xs text-slate-500 dark:text-slate-400">
-          {hojas.length === 1 ? "Una hoja." : `${hojas.length} hojas, una por día.`} Imprímela, fírmala y pide el Vo. Bo. de tu jefe. El trámite se envía
-          cuando adjuntas la hoja firmada.
+          {hojas.length === 1 ? "Una hoja." : `${hojas.length} hojas, una por día.`}{" "}
+          {registrado
+            ? "Ya quedó registrada: fírmala, pide el Vo. Bo. de tu jefe y llévala a RRHH. Después solo anexas la foto del recibido desde Mis marcaciones."
+            : "Al imprimir queda registrado tu trámite; después solo anexas la foto del recibido de RRHH."}
         </p>
+        {errorRegistro && <p className="mx-auto max-w-5xl px-4 pb-3 text-xs font-medium text-red-700 dark:text-red-400">{errorRegistro}</p>}
       </div>
 
       <div className="overflow-x-auto py-6 print:overflow-visible print:py-0">

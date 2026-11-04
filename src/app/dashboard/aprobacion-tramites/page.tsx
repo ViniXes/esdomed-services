@@ -24,7 +24,7 @@ import {
 import { getHorario } from "@/lib/esdomed/horarios";
 import { labelPeriodo, parsePeriodo } from "@/lib/esdomed/plan";
 import {
-  CATEGORIAS_TRAMITE, ESTADO_TRAMITE_LABEL, ESTADO_TRAMITE_PILL, docsDeTramite, fechaLegible, partesCategoria,
+  CATEGORIAS_TRAMITE, ESTADO_TRAMITE_LABEL, docsDeTramite, estadoVisibleTramite, fechaLegible, partesCategoria,
   type ConflictoPermisoGrupo,
 } from "@/lib/tramitesPersonal";
 import { DateField } from "@/components/ui/DateField";
@@ -820,6 +820,7 @@ function TablaTramites({ items, onAbrir }: { items: TramitePersonal[]; onAbrir: 
             const { codigo, nombre } = partesCategoria(t.categoria);
             const nDocs = docsDeTramite(t).length;
             const conRespuesta = !!t.comentariosRevision && t.estado !== "subido";
+            const estado = estadoVisibleTramite(t);
             return (
               <tr key={t.id} onClick={() => onAbrir(t)} className="group cursor-pointer transition-colors hover:bg-blue-50/40 dark:hover:bg-slate-800/40">
                 <td className="whitespace-nowrap px-4 py-3 align-top text-xs text-slate-500 tabular-nums dark:text-slate-400">
@@ -847,8 +848,8 @@ function TablaTramites({ items, onAbrir }: { items: TramitePersonal[]; onAbrir: 
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 align-top">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${ESTADO_TRAMITE_PILL[t.estado]}`}>
-                    {ESTADO_TRAMITE_LABEL[t.estado]}
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${estado.pill}`}>
+                    {estado.label}
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 align-top">

@@ -60,3 +60,13 @@ export const docsDeTramite = (t: TramitePersonal): { url: string; nombre: string
     : t.documentoUrl
       ? [{ url: t.documentoUrl, nombre: t.documentoNombre ?? "Documento" }]
       : [];
+
+/** Trámite E con la hoja ya impresa: solo le falta la foto del recibido de RRHH. */
+export const faltaRecibidoRrhh = (t: TramitePersonal): boolean =>
+  t.estado === "subido" && !!t.reclamoMarcacion && docsDeTramite(t).length === 0;
+
+/** Estado que se muestra: un "subido" sin esa foto todavía no tiene ningún documento. */
+export const estadoVisibleTramite = (t: TramitePersonal) =>
+  faltaRecibidoRrhh(t)
+    ? { label: "Falta foto de recibido", pill: ESTADO_TRAMITE_PILL.pendiente }
+    : { label: ESTADO_TRAMITE_LABEL[t.estado], pill: ESTADO_TRAMITE_PILL[t.estado] };
