@@ -68,3 +68,6 @@ next-env.d.ts
 /transporte
 
 /esdomed
+
+# Respaldos locales de scripts
+respaldo-configuracion-servicios-*.json

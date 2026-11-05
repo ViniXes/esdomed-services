@@ -121,6 +121,7 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/reportes", label: "Reportería de egresos", icon: ChartColumn },
       { href: "/dashboard/reportes/tabuladores", label: "Tabuladores", icon: Table2 },
       { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid },
+      { href: "/dashboard/reportes/ocupacion-camas", label: "Ocupación de camas", icon: BedDouble },
       { href: "/dashboard/reportes/traslados", label: "Traslados de cama", icon: ArrowRightLeft },
       { href: "/dashboard/productividad/esdomed", label: "Productividad", icon: TrendingUp },
     ],
