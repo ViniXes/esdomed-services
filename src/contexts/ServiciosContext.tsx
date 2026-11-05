@@ -3,14 +3,21 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { doc, onSnapshot } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import { SERVICIOS_HOSPITALARIOS, CAMAS_POR_SERVICIO } from "@/lib/servicios";
+import { SERVICIOS_HOSPITALARIOS, CAMAS_POR_SERVICIO, CAMAS_EXTRA_POR_SERVICIO } from "@/lib/servicios";
 
-export type ServicioConfig = { nombre: string; camas: string[] };
+export type ServicioConfig = {
+  nombre: string;
+  /** Todas las camas asignables, incluidas las extras. */
+  camas: string[];
+  /** Subconjunto de `camas` que no es oficial. */
+  camasExtra?: string[];
+};
 
 const DEFAULT_LISTA: ServicioConfig[] = (SERVICIOS_HOSPITALARIOS as readonly string[]).map(
   (nombre) => ({
     nombre,
     camas: CAMAS_POR_SERVICIO[nombre as keyof typeof CAMAS_POR_SERVICIO] ?? [],
+    camasExtra: CAMAS_EXTRA_POR_SERVICIO[nombre as keyof typeof CAMAS_EXTRA_POR_SERVICIO] ?? [],
   })
 );
 

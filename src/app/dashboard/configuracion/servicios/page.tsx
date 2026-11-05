@@ -134,7 +134,29 @@ export default function ConfiguracionServiciosPage() {
 
   const removeBed = (svcIdx: number, bed: string) => {
     setDraft((d) =>
-      d.map((s, i) => (i === svcIdx ? { ...s, camas: s.camas.filter((c) => c !== bed) } : s))
+      d.map((s, i) =>
+        i === svcIdx
+          ? {
+              ...s,
+              camas: s.camas.filter((c) => c !== bed),
+              camasExtra: (s.camasExtra ?? []).filter((c) => c !== bed),
+            }
+          : s
+      )
+    );
+    markDirty();
+  };
+
+  const toggleExtra = (svcIdx: number, bed: string) => {
+    setDraft((d) =>
+      d.map((s, i) => {
+        if (i !== svcIdx) return s;
+        const extras = s.camasExtra ?? [];
+        return {
+          ...s,
+          camasExtra: extras.includes(bed) ? extras.filter((c) => c !== bed) : [...extras, bed],
+        };
+      })
     );
     markDirty();
   };
@@ -155,7 +177,7 @@ export default function ConfiguracionServiciosPage() {
   };
 
   const clearBeds = (idx: number) => {
-    setDraft((d) => d.map((s, i) => (i === idx ? { ...s, camas: [] } : s)));
+    setDraft((d) => d.map((s, i) => (i === idx ? { ...s, camas: [], camasExtra: [] } : s)));
     markDirty();
   };
 
@@ -325,7 +347,9 @@ export default function ConfiguracionServiciosPage() {
                       {svc.nombre}
                     </span>
                     <span className="text-xs text-slate-400 flex-shrink-0">
-                      {svc.camas.length} cama{svc.camas.length !== 1 ? "s" : ""}
+                      {(svc.camasExtra?.length ?? 0) > 0
+                        ? `${svc.camas.length - (svc.camasExtra?.length ?? 0)} + ${svc.camasExtra?.length} extra${svc.camasExtra?.length !== 1 ? "s" : ""}`
+                        : `${svc.camas.length} cama${svc.camas.length !== 1 ? "s" : ""}`}
                     </span>
                   </>
                 )}
@@ -371,21 +395,43 @@ export default function ConfiguracionServiciosPage() {
                 <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-4 space-y-4">
                   {/* Bed chips */}
                   {svc.camas.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {svc.camas.map((c) => (
-                        <span
-                          key={c}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-mono rounded-lg"
-                        >
-                          {c}
-                          <button
-                            onClick={() => removeBed(idx, c)}
-                            className="text-slate-400 hover:text-red-500 transition-colors"
-                          >
-                            <X size={10} />
-                          </button>
-                        </span>
-                      ))}
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {svc.camas.map((c) => {
+                          const esExtra = svc.camasExtra?.includes(c) ?? false;
+                          return (
+                            <span
+                              key={c}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono rounded-lg ${
+                                esExtra
+                                  ? "bg-cyan-100 dark:bg-cyan-950 text-cyan-800 dark:text-cyan-200"
+                                  : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => toggleExtra(idx, c)}
+                                aria-pressed={esExtra}
+                                title={esExtra ? "Quitar marca de extra" : "Marcar como extra"}
+                                className="hover:underline"
+                              >
+                                {c}
+                              </button>
+                              <button
+                                onClick={() => removeBed(idx, c)}
+                                aria-label={`Quitar cama ${c}`}
+                                className="text-slate-400 hover:text-red-500 transition-colors"
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        Toca una cama para marcarla como extra. Las extras se asignan a pacientes,
+                        pero no cuentan entre las camas oficiales.
+                      </p>
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400 italic">

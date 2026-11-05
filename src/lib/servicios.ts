@@ -79,15 +79,15 @@ export const CAMAS_POR_SERVICIO: Record<ServicioHospitalario, string[]> = {
   "Unidad de Cuidados Intermedios":                                    [],
 
   // Bienestar Magisterial
-  "Bienestar Magisterial":                                             bedsN(2),
+  "Bienestar Magisterial":                                             bedsN(10),
   "Unidad de Cuidados Intensivos Adultos BM":                         bedsN(10),
   "Unidad de Cuidados Intermedios Adultos BM":                        bedsN(10),
 
   // Cirugía
   "Cirugía Hombres 1":                                                bedsZP(12),
   "Cirugía Mujeres 1":                                                bedsZP(12),
-  "Cirugía Cardiovascular":                                           beds("CCV", 8),
-  "Neurocirugia":                                                     beds("NEU", 10),
+  "Cirugía Cardiovascular":                                           beds("CCV", 10),
+  "Neurocirugia":                                                     beds("NEU", 12),
 
   // Dolor / Paliativos  (1P, 2P, …)
   "Dolor y cuidados Paliativos":                                      bedsNS(10, "P"),
@@ -98,16 +98,16 @@ export const CAMAS_POR_SERVICIO: Record<ServicioHospitalario, string[]> = {
   "Unidad de Cuidados Intermedios Crónicos Adultos":                  bedsPN("CR", 21),
 
   // Medicina Interna
-  "Medicina Interna Hombres 1":                                       beds("MH1", 45),
-  "Medicina Interna Hombres 2":                                       beds("MH2", 25),
-  "Medicina Interna Hombres 3":                                       beds("MH3", 20),
-  "Medicina Interna Mujeres 1":                                       beds("MM1", 50),
-  "Medicina Interna Mujeres 2":                                       beds("MM2", 30),
-  "Medicina Interna Mujeres 3":                                       beds("MM3", 32),
-  "Servicio de Cardiologia":                                          beds("CAR", 8),
-  "Servicio de Hematologia":                                          beds("HEM", 50),
-  "Servicio de Aislados":                                             beds("MAI", 12),
-  "Servicio de Oncologia":                                            beds("ONC", 15),
+  "Medicina Interna Hombres 1":                                       beds("MH1", 47),
+  "Medicina Interna Hombres 2":                                       beds("MH2", 27),
+  "Medicina Interna Hombres 3":                                       beds("MH3", 22),
+  "Medicina Interna Mujeres 1":                                       beds("MM1", 52),
+  "Medicina Interna Mujeres 2":                                       beds("MM2", 32),
+  "Medicina Interna Mujeres 3":                                       beds("MM3", 34),
+  "Servicio de Cardiologia":                                          beds("CAR", 10),
+  "Servicio de Hematologia":                                          beds("HEM", 52),
+  "Servicio de Aislados":                                             beds("MAI", 14),
+  "Servicio de Oncologia":                                            beds("ONC", 17),
 
   // UCI — Cuidados Intensivos
   "Unidad de cuidados intensivos General 1 Adultos":                  bedsNS(10, "G1"),
@@ -120,7 +120,7 @@ export const CAMAS_POR_SERVICIO: Record<ServicioHospitalario, string[]> = {
 
   // Servicios ambulatorios y especiales
   "Unidad de Evaluacion y Observación Medica":                        beds("EOM", 10),
-  "Quimioterapia Ambulatoria":                                        bedsPN("QTA", 20),
+  "Quimioterapia Ambulatoria":                                        bedsPN("QTA", 14),
   "Unidad de Terapia Intervencionista Endovascular":                  ["UTE-1", "UTE-2", "UTE-3"],
   "Dialisis Peritoneal":                                              bedsN(60),
   "Terapias Sanguíneas Extracorpórea":                                bedsN(10),
@@ -130,6 +130,28 @@ export const CAMAS_POR_SERVICIO: Record<ServicioHospitalario, string[]> = {
     ...bedsPN("Q", 5),
     ...Array.from({ length: 12 }, (_, i) => `R${i + 1}`),
   ],
+};
+
+// ── Camas extra ───────────────────────────────────────────────────────────────
+// Las camas de arriba incluyen las extras: se asignan a pacientes como cualquier
+// otra, pero NO son camas oficiales. El reporte de ocupación las separa: el
+// denominador usa solo las oficiales (camas menos extras).
+export const CAMAS_EXTRA_POR_SERVICIO: Partial<Record<ServicioHospitalario, string[]>> = {
+  "Bienestar Magisterial":      ["3", "4", "5", "6", "7", "8", "9", "10"],
+  "Cirugía Hombres 1":          ["11", "12"],
+  "Cirugía Mujeres 1":          ["11", "12"],
+  "Cirugía Cardiovascular":     ["CCV-09", "CCV-10"],
+  "Neurocirugia":               ["NEU-11", "NEU-12"],
+  "Medicina Interna Hombres 1": ["MH1-46", "MH1-47"],
+  "Medicina Interna Hombres 2": ["MH2-26", "MH2-27"],
+  "Medicina Interna Hombres 3": ["MH3-21", "MH3-22"],
+  "Medicina Interna Mujeres 1": ["MM1-51", "MM1-52"],
+  "Medicina Interna Mujeres 2": ["MM2-31", "MM2-32"],
+  "Medicina Interna Mujeres 3": ["MM3-33", "MM3-34"],
+  "Servicio de Cardiologia":    ["CAR-09", "CAR-10"],
+  "Servicio de Hematologia":    ["HEM-51", "HEM-52"],
+  "Servicio de Aislados":       ["MAI-13", "MAI-14"],
+  "Servicio de Oncologia":      ["ONC-16", "ONC-17"],
 };
 
 // ── Abreviaturas de servicio ────────────────────────────────────────────────────

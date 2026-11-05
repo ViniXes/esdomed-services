@@ -92,6 +92,10 @@ El SIS escribe los mismos servicios de varias formas (mayúsculas/minúsculas, t
 - Los nombres realmente distintos (siglas como “UCI General 1 Adultos”, formas cortas, nombres históricos) se agregan a `ALIAS_CRUDOS` en `src/lib/servicios.ts`. Las variantes de caja/tilde/espacio NO necesitan alias: las absorbe `claveServicio()`.
 - Limpieza de datos ya afectados: `node scripts/limpiar-traslados-fantasma.mjs --dry-run`.
 
+### Camas oficiales y camas extra
+
+`camas` de cada servicio (catálogo vivo y `CAMAS_POR_SERVICIO`) trae **todas** las camas asignables; `camasExtra` es el subconjunto que no es oficial (`CAMAS_EXTRA_POR_SERVICIO`, se marca en Configuración de servicios). Las extras se asignan a pacientes como cualquier otra, pero no cuentan en el denominador del reporte de ocupación: oficiales = `camas` menos `camasExtra` (592 = 397 censables + 195 no censables, más 36 extras). Regla para código nuevo: todo denominador de ocupación excluye `camasExtra`.
+
 ### Importación de activos — retención de ya egresados
 
 Al procesar un alta efectiva o confirmar una defunción, el ingreso deja de estar `activo`. Si luego se importa un reporte del SIS que todavía lo trae (descargado antes del alta, o el alta aún no está en el SIS), la importación lo veía como "nuevo" y duplicaba el activo. `src/lib/pacientes/egresoReciente.ts` evalúa el **último egreso** del expediente (ingresos en `pacientes` + defunciones confirmadas en `notificaciones_fallecidos`):
