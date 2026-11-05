@@ -121,7 +121,7 @@ export default function OcupacionCamasPage() {
   if (authLoading || !puedeVer) return null;
 
   return (
-    <div className="space-y-5">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
@@ -132,14 +132,14 @@ export default function OcupacionCamasPage() {
             <p className="text-xs text-slate-500">Reporte diario para Dirección, en el formato oficial</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-40">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="w-full sm:w-40">
             <DateField value={fecha} onChange={setFecha} />
           </div>
           <button
             onClick={cargar}
             disabled={cargando}
-            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 text-sm font-medium px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             <RefreshCw size={15} className={cargando ? "animate-spin" : ""} />
             Actualizar
@@ -147,7 +147,7 @@ export default function OcupacionCamasPage() {
           <button
             onClick={generar}
             disabled={generando || cargando || !fecha}
-            className="flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
           >
             <Download size={15} />
             {generando ? "Generando..." : "Descargar Excel"}
@@ -185,7 +185,15 @@ export default function OcupacionCamasPage() {
             </Aviso>
           )}
 
-          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+          {/* Hasta xl una tarjeta por ambiente: las 9 columnas del formulario no caben junto al menú. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 xl:hidden">
+            {filas.map((f) => (
+              <TarjetaAmbiente key={f.fila} fila={f} onAjustar={ajustar} />
+            ))}
+            <ResumenTotales totales={totales} />
+          </div>
+
+          <section className="hidden xl:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -213,19 +221,23 @@ export default function OcupacionCamasPage() {
                       {f.tipo === "censable" ? (
                         <>
                           <Numero valor={f.oficiales} />
-                          <Editable
-                            etiqueta={`Ocupadas en ${f.ambiente}`}
-                            valor={f.ocupadas}
-                            excedida={f.ocupadas > f.oficiales}
-                            onChange={(v) => ajustar(f.fila, "ocupadas", v)}
-                          />
+                          <td className="px-2 py-1 text-center">
+                            <CampoOcupadas
+                              etiqueta={`Ocupadas en ${f.ambiente}`}
+                              valor={f.ocupadas}
+                              excedida={f.ocupadas > f.oficiales}
+                              onChange={(v) => ajustar(f.fila, "ocupadas", v)}
+                            />
+                          </td>
                           <Numero valor={extrasDisponibles(f) || null} />
                           {f.extras > 0 ? (
-                            <Editable
-                              etiqueta={`Ocupadas en extras de ${f.ambiente}`}
-                              valor={f.ocupadasExtra}
-                              onChange={(v) => ajustar(f.fila, "ocupadasExtra", v)}
-                            />
+                            <td className="px-2 py-1 text-center">
+                              <CampoOcupadas
+                                etiqueta={`Ocupadas en extras de ${f.ambiente}`}
+                                valor={f.ocupadasExtra}
+                                onChange={(v) => ajustar(f.fila, "ocupadasExtra", v)}
+                              />
+                            </td>
                           ) : <Numero valor={null} />}
                           <Numero valor={null} />
                           <Numero valor={null} />
@@ -237,15 +249,17 @@ export default function OcupacionCamasPage() {
                           <Numero valor={null} />
                           <Numero valor={null} />
                           <Numero valor={f.oficiales} />
-                          <Editable
-                            etiqueta={`Ocupadas en ${f.ambiente}`}
-                            valor={f.ocupadas}
-                            excedida={f.ocupadas > f.oficiales}
-                            onChange={(v) => ajustar(f.fila, "ocupadas", v)}
-                          />
+                          <td className="px-2 py-1 text-center">
+                            <CampoOcupadas
+                              etiqueta={`Ocupadas en ${f.ambiente}`}
+                              valor={f.ocupadas}
+                              excedida={f.ocupadas > f.oficiales}
+                              onChange={(v) => ajustar(f.fila, "ocupadas", v)}
+                            />
+                          </td>
                         </>
                       )}
-                      <td className="px-3 py-1.5 text-center font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                      <td className="px-3 py-1.5 text-center font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">
                         {porcentaje(ocupacionFila(f))}
                       </td>
                     </tr>
@@ -259,7 +273,7 @@ export default function OcupacionCamasPage() {
                       totales.extrasDisponibles, totales.ocupadasExtra,
                       totales.camasNoCensables, totales.ocupadasNoCensables,
                     ].map((v, i) => <td key={i} className="px-2 py-2.5 text-center tabular-nums">{v}</td>)}
-                    <td className="px-3 py-2.5 text-center tabular-nums">{porcentaje(totales.ocupacionHospitalizacion)}</td>
+                    <td className="px-3 py-2.5 text-center tabular-nums whitespace-nowrap">{porcentaje(totales.ocupacionHospitalizacion)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -292,27 +306,94 @@ function Numero({ valor }: { valor: number | null }) {
   );
 }
 
-function Editable({ etiqueta, valor, excedida = false, onChange }: {
+function CampoOcupadas({ etiqueta, valor, excedida = false, onChange }: {
   etiqueta: string;
   valor: number;
   excedida?: boolean;
   onChange: (valor: string) => void;
 }) {
   return (
-    <td className="px-2 py-1 text-center">
-      <input
-        type="number"
-        min={0}
-        aria-label={etiqueta}
-        value={valor}
-        onChange={(e) => onChange(e.target.value)}
-        className={`w-16 rounded-lg border px-1.5 py-1 text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          excedida
-            ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-            : "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-        }`}
-      />
-    </td>
+    <input
+      type="number"
+      min={0}
+      aria-label={etiqueta}
+      value={valor}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-16 rounded-lg border px-1.5 py-1 text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        excedida
+          ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+          : "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+      }`}
+    />
+  );
+}
+
+function TarjetaAmbiente({ fila: f, onAjustar }: {
+  fila: FilaReporte;
+  onAjustar: (fila: number, campo: "ocupadas" | "ocupadasExtra", valor: string) => void;
+}) {
+  return (
+    <article className="flex flex-col gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500">
+            {f.especialidad} · {f.tipo === "censable" ? "Censable" : "No censable"}
+          </p>
+          <h2 className="text-sm font-medium text-slate-800 dark:text-slate-200">{f.ambiente}</h2>
+        </div>
+        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+          {porcentaje(ocupacionFila(f))}
+        </p>
+      </div>
+      <div className="mt-auto flex flex-wrap items-start gap-x-5 gap-y-2">
+        <div>
+          <p className="mb-0.5 text-xs text-slate-500">Disponibles</p>
+          <p className="py-1 text-sm tabular-nums text-slate-700 dark:text-slate-300">{f.oficiales}</p>
+        </div>
+        <div>
+          <p className="mb-0.5 text-xs text-slate-500">Ocupadas</p>
+          <CampoOcupadas
+            etiqueta={`Ocupadas en ${f.ambiente}`}
+            valor={f.ocupadas}
+            excedida={f.ocupadas > f.oficiales}
+            onChange={(v) => onAjustar(f.fila, "ocupadas", v)}
+          />
+        </div>
+        {f.extras > 0 && (
+          <div>
+            <p className="mb-0.5 text-xs text-slate-500">En extra ({f.extras})</p>
+            <CampoOcupadas
+              etiqueta={`Ocupadas en extras de ${f.ambiente}`}
+              valor={f.ocupadasExtra}
+              onChange={(v) => onAjustar(f.fila, "ocupadasExtra", v)}
+            />
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ResumenTotales({ totales }: { totales: ReturnType<typeof totalesOcupacion> }) {
+  const grupos = [
+    { titulo: "Censables", disponibles: totales.camasCensables, ocupadas: totales.ocupadasCensables },
+    { titulo: "Extra", disponibles: totales.extrasDisponibles, ocupadas: totales.ocupadasExtra },
+    { titulo: "No censables", disponibles: totales.camasNoCensables, ocupadas: totales.ocupadasNoCensables },
+  ];
+  return (
+    <section className="md:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+      <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Total</h2>
+      <dl className="mt-2 grid grid-cols-3 gap-3">
+        {grupos.map((g) => (
+          <div key={g.titulo}>
+            <dt className="text-xs text-slate-500">{g.titulo}</dt>
+            <dd className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+              {g.ocupadas} / {g.disponibles}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
