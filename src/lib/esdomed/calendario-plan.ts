@@ -41,7 +41,7 @@ export function esAsuetoAdministrativo(anio: number, mes: number, dia: number): 
   if (DIAS_ADICIONALES.has(fechaClave(anio, mes, dia))) return true;
   if ((mes === 5 && dia === 10) || (mes === 6 && dia === 17) || (mes === 9 && dia === 15) || (mes === 11 && dia === 2)) return true;
   if (mes === 8 && dia >= 1 && dia <= 6) return true;
-  if (mes === 12 && dia >= 23) return true;
+  if (mes === 12 && dia >= 24) return true;
   if (mes === 1 && dia < diaRegresoEnero(anio)) return true;
 
   const pascua = domingoPascua(anio);
