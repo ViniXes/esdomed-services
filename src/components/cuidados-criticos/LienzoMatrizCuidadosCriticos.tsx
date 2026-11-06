@@ -7,6 +7,7 @@ import { collection, doc, serverTimestamp, updateDoc, writeBatch } from "@/lib/f
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
+import { detectarGruposPosibleDuplicado, ponerGruposPosiblesDuplicadosJuntos } from "@/lib/duplicadosCuidadosCriticos";
 import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, normalizarValorSiNo, VALOR_NO_REGISTRADO, valorComoTexto, valorNumericoEnteroComoTexto, type CampoMatrizCuidadosCriticos, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
@@ -45,6 +46,7 @@ export function LienzoMatrizCuidadosCriticos({
   const mostrarAcciones = puedeGestionarAcciones && modoAcciones;
   const [exportando, setExportando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [avisosDuplicadoDescartados, setAvisosDuplicadoDescartados] = useState<Set<string>>(() => new Set());
   const [pagina, setPagina] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const campos = useMemo(() => camposMatrizPorTipo(tipo), [tipo]);
@@ -56,17 +58,66 @@ export function LienzoMatrizCuidadosCriticos({
     ...ficha,
     datos: aplicarCalculosBasicos(ficha.datos ?? {}),
   })), [fichasOriginales]);
+  const gruposPosiblesDuplicados = useMemo(() => detectarGruposPosibleDuplicado(filas), [filas]);
+  const gruposPorFicha = useMemo(() => {
+    const resultado = new Map<string, (typeof gruposPosiblesDuplicados)[number]>();
+    gruposPosiblesDuplicados.forEach(grupo => grupo.fichas.forEach(ficha => {
+      if (ficha.id) resultado.set(ficha.id, grupo);
+    }));
+    return resultado;
+  }, [gruposPosiblesDuplicados]);
+  const filasOrdenadas = useMemo(
+    () => ponerGruposPosiblesDuplicadosJuntos(filas, gruposPosiblesDuplicados),
+    [filas, gruposPosiblesDuplicados],
+  );
   const mostrarCreador = Boolean(fichas);
   const busquedaNormalizada = normalizarBusqueda(busqueda);
   const filasFiltradas = useMemo(() => {
-    if (!busquedaNormalizada) return filas;
-    return filas.filter(fila => textoBusquedaFila(fila, campos).includes(busquedaNormalizada));
-  }, [busquedaNormalizada, campos, filas]);
+    if (!busquedaNormalizada) return filasOrdenadas;
+    return filasOrdenadas.filter(fila => textoBusquedaFila(fila, campos).includes(busquedaNormalizada));
+  }, [busquedaNormalizada, campos, filasOrdenadas]);
   const totalPaginas = Math.max(1, Math.ceil(filasFiltradas.length / pageSize));
   const paginaActual = Math.min(pagina, totalPaginas);
   const inicio = (paginaActual - 1) * pageSize;
   const fin = Math.min(inicio + pageSize, filasFiltradas.length);
   const filasPagina = filasFiltradas.slice(inicio, fin);
+
+  useEffect(() => {
+    let vigente = true;
+    queueMicrotask(() => {
+      if (!vigente) return;
+      if (!user?.uid || typeof window === "undefined") {
+        setAvisosDuplicadoDescartados(new Set());
+        return;
+      }
+      try {
+        const guardados = JSON.parse(window.localStorage.getItem(`cuidados-criticos:duplicados-revisados:v1:${user.uid}`) ?? "[]");
+        setAvisosDuplicadoDescartados(new Set(Array.isArray(guardados) ? guardados.filter((value): value is string => typeof value === "string") : []));
+      } catch {
+        setAvisosDuplicadoDescartados(new Set());
+      }
+    });
+    return () => { vigente = false; };
+  }, [user?.uid]);
+
+  const descartarAvisoDuplicado = (grupo: (typeof gruposPosiblesDuplicados)[number]) => {
+    const ids = grupo.fichas.map(ficha => ficha.id).filter((id): id is string => Boolean(id)).sort();
+    const claveAviso = `${grupo.clave}|${ids.join(",")}`;
+    const expedientes = grupo.fichas.map(ficha => ficha.pacienteExpediente).join(", ");
+    const continuar = window.confirm(
+      `Coincidencia: expediente ${expedientes}; mismo servicio, cama, fecha y hora de ingreso.\n\n¿Confirmas que revisaste las fichas y que son estancias reales distintas? El aviso se ocultará solo en este navegador. No se modificará ni eliminará ningún registro.`,
+    );
+    if (!continuar) return;
+    const siguientes = new Set(avisosDuplicadoDescartados).add(claveAviso);
+    setAvisosDuplicadoDescartados(siguientes);
+    if (user?.uid) {
+      try {
+        window.localStorage.setItem(`cuidados-criticos:duplicados-revisados:v1:${user.uid}`, JSON.stringify([...siguientes]));
+      } catch {
+        // La confirmacion sigue vigente durante esta sesion aunque el navegador no permita almacenamiento local.
+      }
+    }
+  };
 
   useEffect(() => {
     setPagina(1);
@@ -173,8 +224,11 @@ export function LienzoMatrizCuidadosCriticos({
         <table className="min-w-max border-collapse text-xs">
           <thead className="bg-slate-100 dark:bg-slate-800">
             <tr>
+              <th className="sticky left-0 z-20 min-w-24 border-l border-t border-r border-slate-200 bg-slate-100 px-2 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                Revisión
+              </th>
               {mostrarAcciones && (
-                <th className="sticky left-0 z-20 min-w-28 border-l border-t border-r border-slate-200 bg-slate-100 px-2 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <th className="sticky left-24 z-20 min-w-28 border-l border-t border-r border-slate-200 bg-slate-100 px-2 py-2 text-left font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   Acción
                 </th>
               )}
@@ -203,10 +257,29 @@ export function LienzoMatrizCuidadosCriticos({
           <tbody>
             {filasPagina.map((fila, index) => {
               const esUltimaFila = index === filasPagina.length - 1;
+              const grupoDuplicado = fila.id ? gruposPorFicha.get(fila.id) : undefined;
+              const claveAviso = grupoDuplicado
+                ? `${grupoDuplicado.clave}|${grupoDuplicado.fichas.map(item => item.id).filter((id): id is string => Boolean(id)).sort().join(",")}`
+                : "";
+              const alertaDuplicadoVisible = Boolean(grupoDuplicado && !avisosDuplicadoDescartados.has(claveAviso));
               return (
               <tr key={fila.id ?? `fila-${inicio + index}`}>
+                <td className={`sticky left-0 z-10 min-w-24 border-l border-r border-t border-slate-200 px-2 py-2 align-top dark:border-slate-700 ${alertaDuplicadoVisible ? "bg-amber-50/80 dark:bg-amber-950/30" : "bg-white dark:bg-slate-900"}`}>
+                  {alertaDuplicadoVisible && grupoDuplicado && (
+                    <button
+                      type="button"
+                      onClick={() => descartarAvisoDuplicado(grupoDuplicado)}
+                      title="Revisar posible duplicado"
+                      aria-label={`Revisar posible duplicado de ${fila.pacienteExpediente}`}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 font-semibold text-amber-800 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                    >
+                      <AlertTriangle size={15} />
+                      Revisar
+                    </button>
+                  )}
+                </td>
                 {mostrarAcciones && (
-                  <td className="sticky left-0 z-10 min-w-28 border-l border-r border-t border-slate-200 bg-white px-2 py-2 align-top dark:border-slate-700 dark:bg-slate-900">
+                  <td className="sticky left-24 z-10 min-w-28 border-l border-r border-t border-slate-200 bg-white px-2 py-2 align-top dark:border-slate-700 dark:bg-slate-900">
                     {profile?.role === "admin" ? (
                       <AccionesAdmin ficha={fila} onEliminada={onFichaEliminada} onActualizada={onFichaActualizada} />
                     ) : profile?.role === "medico" ? (
@@ -223,7 +296,7 @@ export function LienzoMatrizCuidadosCriticos({
                   return (
                     <Fragment key={campo.key}>
                       <td
-                        className={`max-w-56 border-r border-t border-slate-200 bg-white px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${
+                        className={`max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:text-slate-300 ${alertaDuplicadoVisible ? "bg-amber-50/80 dark:bg-amber-950/30" : "bg-white dark:bg-slate-900"} ${
                           esPrimera ? `border-l${esUltimaFila ? " rounded-bl-xl" : ""}` : ""
                         } ${esUltima && esUltimaFila ? "rounded-br-xl" : ""}`}
                       >
@@ -255,7 +328,7 @@ export function LienzoMatrizCuidadosCriticos({
             })}
             {filasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={campos.length + (mostrarCreador ? 1 : 0) + (mostrarAcciones ? 1 : 0)} className="rounded-b-xl border-x border-b border-t border-slate-200 bg-white px-4 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900">
+                <td colSpan={campos.length + (mostrarCreador ? 1 : 0) + (mostrarAcciones ? 1 : 0) + 1} className="rounded-b-xl border-x border-b border-t border-slate-200 bg-white px-4 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900">
                   {filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
                 </td>
               </tr>
