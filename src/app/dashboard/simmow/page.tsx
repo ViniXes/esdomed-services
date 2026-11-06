@@ -200,6 +200,7 @@ export default function SimmowPage() {
   const [seleccionadoAmb, setSeleccionadoAmb] = useState<PacienteAmbulatorio | null>(null);
   const [copiadoAmb, setCopiadoAmb] = useState(false);
   const [listoParaPersistirAmb, setListoParaPersistirAmb] = useState(false);
+  const [revisionConsultaExterna, setRevisionConsultaExterna] = useState(false);
 
   // Restaura el progreso guardado apenas monta EN EL CLIENTE — tiene que ser
   // un efecto, no un initializer perezoso de useState: esta página se
@@ -563,7 +564,9 @@ export default function SimmowPage() {
   // disponible; el resto de los pasos (elegir flujo, cargar, lista) se
   // queda en el ancho normal de la página.
   const enPasoRevision =
-    (flujo === "hospitalaria" && paso === "revision") || (flujo === "ambulatoria" && pasoAmb === "revision");
+    (flujo === "hospitalaria" && paso === "revision") ||
+    (flujo === "ambulatoria" && pasoAmb === "revision") ||
+    (flujo === "consulta_externa" && revisionConsultaExterna);
 
   return (
     <>
@@ -858,7 +861,7 @@ export default function SimmowPage() {
         </>
       )}
 
-      {flujo === "consulta_externa" && esAdmin && <FlujoConsultaExterna />}
+      {flujo === "consulta_externa" && esAdmin && <FlujoConsultaExterna onRevisionChange={setRevisionConsultaExterna} />}
       </div>
     </>
   );

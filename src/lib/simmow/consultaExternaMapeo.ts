@@ -274,7 +274,10 @@ export async function enriquecerPacientesConsultaExterna(
         advertencias.push(`${etiqueta}: "${texto}" no se encontró en el catálogo de establecimientos de SIMMOW.`);
         return { codigo: "", radio: "" };
       }
-      return { codigo: establecimiento.codigo, radio: esEstablecimientoPrivado(establecimiento.nombre) ? "2" : "3" };
+      // El radio de SIMMOW distingue Priv / Establec / Interconsulta: si el censo marca
+      // el tipo como interconsulta (campo 41 = 2) manda el valor 4.
+      const radio = datos.refTipoValor === "2" ? "4" : esEstablecimientoPrivado(establecimiento.nombre) ? "2" : "3";
+      return { codigo: establecimiento.codigo, radio };
     };
 
     const referidoA = resolverReferencia(datos.refATexto, "Referido A");

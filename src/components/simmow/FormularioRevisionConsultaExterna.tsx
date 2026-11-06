@@ -3,15 +3,12 @@
 import { ArrowLeft } from "lucide-react";
 import { MedicoCombobox } from "./MedicoCombobox";
 import type { DatosSimmowConsultaExterna } from "@/lib/simmow/consultaExternaTypes";
-import { campoEdadSimmow } from "@/lib/simmow/consultaExternaGeneradorScript";
 import {
-  OP_AREA,
   OP_CONTROL,
   OP_DEPARTAMENTO,
   OP_DERECHOHABIENTE_OTROS,
   OP_DETECCION_CANCER,
   OP_DISCAPACIDAD,
-  OP_ESPECIALISTA,
   OP_EVALUACION_INFANTIL,
   OP_IMC,
   OP_INSCRIPCION,
@@ -22,26 +19,23 @@ import {
   OP_PF_METODO,
   OP_PRIVADO_LIBERTAD,
   OP_PROC_SALUD_MENTAL,
-  OP_REF_RADIO,
-  OP_SEXO,
   OP_TABAQUISMO,
   OP_TALLA_EDAD,
-  OP_TIPO_CONSULTA,
   OP_TIPO_ISSS,
   OP_VICTIMA_DH,
   OP_VIOLENCIA_AMBITO,
   OP_VIOLENCIA_CONDICION,
   type OpcionSimmow,
 } from "@/lib/simmow/consultaExternaOpciones";
+import styles from "./FormularioRevision.module.css";
 
 interface Props {
   datos: DatosSimmowConsultaExterna;
+  /** Semana epidemiológica calculada a partir de la fecha ("" si la fecha no es válida). */
+  semana: string;
   onChange: (patch: Partial<DatosSimmowConsultaExterna>) => void;
   onVolver: () => void;
 }
-
-const INPUT =
-  "w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100";
 
 type CampoTexto = {
   [K in keyof DatosSimmowConsultaExterna]: DatosSimmowConsultaExterna[K] extends string ? K : never;
@@ -50,189 +44,500 @@ type CampoBool = {
   [K in keyof DatosSimmowConsultaExterna]: DatosSimmowConsultaExterna[K] extends boolean ? K : never;
 }[keyof DatosSimmowConsultaExterna];
 
-function Seccion({ titulo, nota, children }: { titulo: string; nota?: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300 mb-1">{titulo}</h3>
-      {nota && <p className="text-xs text-slate-500 mb-3">{nota}</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">{children}</div>
-    </section>
-  );
-}
-
-function Campo({ etiqueta, ancho, children }: { etiqueta: string; ancho?: "doble" | "triple"; children: React.ReactNode }) {
-  const span = ancho === "triple" ? "lg:col-span-3 sm:col-span-2" : ancho === "doble" ? "sm:col-span-2" : "";
-  return (
-    <label className={`block ${span}`}>
-      <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">{etiqueta}</span>
-      {children}
-    </label>
-  );
-}
+const RADIO_REFERENCIA: OpcionSimmow[] = [
+  { valor: "1", etiqueta: "Sin Ref" },
+  { valor: "2", etiqueta: "Priv" },
+  { valor: "3", etiqueta: "Establec" },
+  { valor: "4", etiqueta: "Interconsulta" },
+];
 
 /**
- * Formulario de revisión de Consulta Externa. Agrupa los campos por sección del
- * formulario de SIMMOW (conrec.php) y deja corregir cualquier dato antes de
- * copiar el código. Los selects usan las opciones reales de SIMMOW: su value es
- * el mismo número que trae el censo.
+ * Réplica visual de la tabla real de SIMMOW "Ingreso/Edición Consulta Curativa /
+ * Atención Preventiva" para Consulta Externa (colores, filas y combinación de
+ * celdas leídos en vivo de conrec.php) — mismo criterio que
+ * FormularioRevisionAmbulatorio: el personal compara campo por campo contra la
+ * pantalla real. A diferencia de Ambulatoria, incluye la sección de Atención
+ * Preventiva (la que el censo sí llena). Los campos sin dato de origen se
+ * muestran deshabilitados.
  */
-export function FormularioRevisionConsultaExterna({ datos, onChange, onVolver }: Props) {
-  const texto = (campo: CampoTexto, etiqueta: string, ancho?: "doble" | "triple", maxLength?: number) => (
-    <Campo etiqueta={etiqueta} ancho={ancho}>
-      <input
-        className={INPUT}
-        value={datos[campo]}
-        maxLength={maxLength}
-        onChange={(e) => onChange({ [campo]: e.target.value } as Partial<DatosSimmowConsultaExterna>)}
-      />
-    </Campo>
+export function FormularioRevisionConsultaExterna({ datos, semana, onChange, onVolver }: Props) {
+  const v = (campo: CampoTexto): string => datos[campo];
+  const set =
+    (campo: CampoTexto) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      onChange({ [campo]: e.target.value } as Partial<DatosSimmowConsultaExterna>);
+    };
+
+  const texto = (campo: CampoTexto, className: string, maxLength?: number) => (
+    <input key={campo} className={className} value={v(campo)} maxLength={maxLength} onChange={set(campo)} />
   );
 
-  const select = (campo: CampoTexto, etiqueta: string, opciones: OpcionSimmow[], ancho?: "doble" | "triple") => {
-    const actual = datos[campo];
+  const areaTexto = (campo: CampoTexto, className: string) => (
+    <textarea key={campo} className={className} value={v(campo)} onChange={set(campo)} />
+  );
+
+  // Select con el value numérico de SIMMOW; si el reporte trajo un valor que no es opción, se muestra para poder corregirlo.
+  const selectOp = (campo: CampoTexto, opciones: OpcionSimmow[], className?: string) => {
+    const actual = v(campo);
     const conocida = !actual || opciones.some((o) => o.valor === actual);
     return (
-      <Campo etiqueta={etiqueta} ancho={ancho}>
-        <select
-          className={INPUT}
-          value={actual}
-          onChange={(e) => onChange({ [campo]: e.target.value } as Partial<DatosSimmowConsultaExterna>)}
-        >
-          <option value=""></option>
-          {!conocida && <option value={actual}>{actual} (no es opción de SIMMOW)</option>}
-          {opciones.map((o) => (
-            <option key={o.valor} value={o.valor}>
-              {o.etiqueta}
-            </option>
-          ))}
-        </select>
-      </Campo>
+      <select key={campo} className={className} value={actual} onChange={set(campo)}>
+        <option value=""></option>
+        {!conocida && <option value={actual}>{actual} (no es opción de SIMMOW)</option>}
+        {opciones.map((o) => (
+          <option key={o.valor} value={o.valor}>
+            {o.etiqueta}
+          </option>
+        ))}
+      </select>
     );
   };
 
-  const casilla = (campo: CampoBool, etiqueta: string) => (
-    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-5">
+  const selectVacio = (titulo = "(sin dato de origen)") => (
+    <select disabled title={titulo}>
+      <option value=""></option>
+    </select>
+  );
+
+  const radioGrupo = (campo: CampoTexto, opciones: OpcionSimmow[], nombreGrupo: string) =>
+    opciones.map((op) => (
+      <label key={op.valor}>
+        <input
+          type="radio"
+          name={nombreGrupo}
+          checked={v(campo) === op.valor}
+          onChange={() => onChange({ [campo]: op.valor } as Partial<DatosSimmowConsultaExterna>)}
+        />{" "}
+        {op.etiqueta}{" "}
+      </label>
+    ));
+
+  const checkbox = (campo: CampoBool, etiqueta: string) => (
+    <label>
       <input
         type="checkbox"
         checked={datos[campo]}
         onChange={(e) => onChange({ [campo]: e.target.checked } as Partial<DatosSimmowConsultaExterna>)}
-      />
+      />{" "}
       {etiqueta}
     </label>
   );
 
-  const edadSimmow = campoEdadSimmow(datos);
-  const etiquetaEdad = { edad: "años", meses: "meses", dias: "días" }[edadSimmow.campo];
+  const checkboxVacio = (etiqueta: string) => (
+    <label>
+      <input type="checkbox" disabled title="(sin dato de origen)" /> {etiqueta}
+    </label>
+  );
+
+  const TIPO_CONSULTA: OpcionSimmow[] = [
+    { valor: "1", etiqueta: "Primera vez" },
+    { valor: "2", etiqueta: "Subsecuente" },
+  ];
+  const ESPECIALISTA: OpcionSimmow[] = [
+    { valor: "0", etiqueta: "N/A" },
+    { valor: "1", etiqueta: "1a. Vez" },
+    { valor: "2", etiqueta: "Subsecuente" },
+  ];
 
   return (
-    <div className="space-y-4">
-      <button
-        onClick={onVolver}
-        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-      >
+    <div>
+      <button onClick={onVolver} className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white mb-3">
         <ArrowLeft size={14} /> Volver a la lista
       </button>
 
-      <Seccion titulo="Consulta">
-        {texto("fecha", "Fecha (DD/MM/AAAA)", undefined, 10)}
-        {texto("expediente", "Expediente")}
-        <Campo etiqueta="Especialidad del reporte (solo referencia)">
-          <input className={`${INPUT} opacity-70`} value={datos.especialidadTexto} readOnly />
-        </Campo>
-        <Campo etiqueta="Médico (código y nombre de SIMMOW)" ancho="triple">
-          <MedicoCombobox
-            nombre={datos.medicoNombre}
-            codigo={datos.medicoCodigoSimmow}
-            onChange={(nombre, codigo) => onChange({ medicoNombre: nombre, medicoCodigoSimmow: codigo })}
-            codigoClassName={`${INPUT} !w-28`}
-            nombreClassName={INPUT}
-          />
-        </Campo>
-      </Seccion>
+      <div className={styles.wrap}>
+        <div className={styles.form}>
+          <table className={styles.table}>
+            <tbody>
+              <tr>
+                <td className={styles.title} colSpan={4}>
+                  Ingreso / Edición Consulta Curativa / Atención Preventiva
+                </td>
+              </tr>
 
-      <Seccion titulo="Paciente">
-        {texto("paciente", "Nombre (máx. 40)", "doble", 40)}
-        {texto("dui", "DUI")}
-        {select("sexoValor", "Sexo", OP_SEXO)}
-        {texto("edadAnios", "Edad — años")}
-        {texto("edadMeses", "Edad — meses")}
-        {texto("edadDias", "Edad — días")}
-        <p className="sm:col-span-2 lg:col-span-3 text-xs text-slate-500 -mt-1">
-          SIMMOW solo admite un tramo de edad: se digitará{" "}
-          <b>
-            {edadSimmow.valor ? `${edadSimmow.valor} ${etiquetaEdad}` : "nada (queda en 0)"}
-          </b>
-          .
-        </p>
-        {select("departamentoValor", "Departamento", OP_DEPARTAMENTO)}
-        {texto("municipio", "Municipio (texto del reporte, con sufijo de departamento)")}
-        {select("areaValor", "Área", OP_AREA)}
-      </Seccion>
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Establecimiento</td>
+                <td className={styles.cell}>
+                  <select defaultValue="">
+                    <option>Hospital Nacional San Salvador SS El Salvador</option>
+                  </select>
+                </td>
+                <td className={styles.labelDer}>&nbsp;&nbsp;Amenorrea</td>
+                <td className={styles.cell}>
+                  {texto("amenorreaSemanas", styles.mini, 2)}&nbsp;Semanas
+                </td>
+              </tr>
 
-      <Seccion titulo="Diagnóstico">
-        {select("dptconValor", "Tipo de consulta (Dx principal)", OP_TIPO_CONSULTA)}
-        {select("especialistaValor", "Consulta de especialista", OP_ESPECIALISTA)}
-        {casilla("dpstMarcado", "Sospecha")}
-        {texto("diagPrincipalCodigo", "Dx principal — CIE-10", undefined, 5)}
-        {texto("diagPrincipalTexto", "Dx principal — descripción", "doble")}
-        {select("dstconValor", "Tipo de consulta (Dx secundario)", OP_TIPO_CONSULTA)}
-        {texto("diagSecundarioCodigo", "Dx secundario — CIE-10", undefined, 5)}
-        {texto("diagSecundarioTexto", "Dx secundario — descripción")}
-        {texto("causaExternaCodigo", "Causa externa — CIE-10", undefined, 5)}
-        {texto("causaExternaTexto", "Causa externa — descripción", "doble")}
-      </Seccion>
+              <tr>
+                <td className={styles.label}></td>
+                <td className={styles.cell}>
+                  Modalidad {selectVacio("La modalidad no se coloca en Consulta Externa.")}
+                  <br />
+                  Fecha{" "}
+                  <input
+                    className={styles.fecha}
+                    value={v("fecha")}
+                    maxLength={10}
+                    onChange={set("fecha")}
+                    title="Sale del encabezado del censo (DD/MM/AAAA). Corríjala aquí si el censo trae un rango."
+                  />
+                  <br />
+                  Semana Epidemiológica{" "}
+                  <input
+                    className={styles.mini}
+                    value={semana}
+                    readOnly
+                    title="Se calcula sola a partir de la fecha (calendario epidemiológico MMWR/CDC)."
+                  />
+                  <br />
+                  {checkboxVacio("Solo Preventivo")}
+                  <br />
+                  Tipo Atención {selectVacio()}
+                </td>
+                <td className={styles.labelDer}>&nbsp;&nbsp;Diagnóstico Principal</td>
+                <td className={styles.cell}>
+                  {radioGrupo("dptconValor", TIPO_CONSULTA, "dptcon_ui")}
+                  {checkbox("dpstMarcado", "Sospecha?")}
+                  <br />
+                  Especialista {radioGrupo("especialistaValor", ESPECIALISTA, "especialista_ui")}
+                  <br />
+                  &nbsp;Código:
+                  {texto("diagPrincipalCodigo", styles.codigo, 5)}
+                  &nbsp;&nbsp;
+                  {areaTexto("diagPrincipalTexto", styles.dx)}
+                </td>
+              </tr>
 
-      <Seccion titulo="Atención preventiva" nota="Solo se llena lo que trae el censo.">
-        {select("tabaquismoValor", "Tabaquismo", OP_TABAQUISMO)}
-        {select("inscripcionValor", "Inscripción", OP_INSCRIPCION)}
-        {select("controlValor", "Control subsecuente", OP_CONTROL)}
-        {select("evaluacionInfantilValor", "Evaluación del desarrollo infantil", OP_EVALUACION_INFANTIL)}
-        {texto("perimetroCefalico", "Perímetro cefálico", undefined, 5)}
-        {select("pesoEdadValor", "Peso / edad", OP_PESO_EDAD)}
-        {select("tallaEdadValor", "Longitud o talla / edad", OP_TALLA_EDAD)}
-        {select("pesoTallaValor", "Peso / talla", OP_PESO_TALLA)}
-        {select("imcValor", "Índice de masa corporal", OP_IMC)}
-        {select("lactanciaValor", "Lactancia materna", OP_LACTANCIA)}
-        {select("pfInscripcionControlValor", "Planificación familiar — inscripción/control", OP_PF_IN_CON)}
-        {select("pfMetodoValor", "Planificación familiar — método", OP_PF_METODO)}
-        {select("pfUsuariaValor", "Usuaria activa", OP_PF_METODO)}
-        {select("deteccionCancerValor", "Detección precoz del cáncer", OP_DETECCION_CANCER, "doble")}
-        {texto("amenorreaSemanas", "Semanas de amenorrea", undefined, 2)}
-      </Seccion>
+              <tr>
+                <td className={styles.labelKhaki}></td>
+                <td className={styles.cell}>
+                  <b>Servicio: Consulta Externa</b>
+                  <br />
+                  <b>Recurso: Médico</b>
+                  <br />
+                  <b>MINSAL</b>
+                </td>
+                <td className={styles.labelDer}>&nbsp;&nbsp;Diagnóstico Secundario</td>
+                <td className={styles.cell}>
+                  {radioGrupo("dstconValor", TIPO_CONSULTA, "dstcon_ui")}
+                  <br />
+                  &nbsp;Código:
+                  {texto("diagSecundarioCodigo", styles.codigo, 5)}
+                  &nbsp;&nbsp;
+                  {areaTexto("diagSecundarioTexto", styles.dx)}
+                </td>
+              </tr>
 
-      <Seccion titulo="Otros">
-        {select("discapacidadValor", "Tipo de discapacidad", OP_DISCAPACIDAD)}
-        {select("violenciaCondicionValor", "Violencia — condición", OP_VIOLENCIA_CONDICION)}
-        {select("violenciaAmbitoValor", "Violencia — ámbito", OP_VIOLENCIA_AMBITO)}
-        {select("procSaludMentalValor", "Procedimiento de salud mental", OP_PROC_SALUD_MENTAL)}
-        {casilla("ingresoHospitalario", "Ingreso hospitalario")}
-      </Seccion>
+              <tr>
+                <td className={styles.labelKhaki}>&nbsp;&nbsp;Código Recurso</td>
+                <td className={styles.cell} colSpan={1}>
+                  <MedicoCombobox
+                    nombre={v("medicoNombre")}
+                    codigo={v("medicoCodigoSimmow")}
+                    codigoClassName={styles.codigo}
+                    nombreClassName={styles.nombre}
+                    onChange={(nombreNuevo, codigoNuevo) =>
+                      onChange({ medicoNombre: nombreNuevo, medicoCodigoSimmow: codigoNuevo })
+                    }
+                  />
+                </td>
+                <td className={styles.labelDer} rowSpan={2}>
+                  &nbsp;&nbsp;Causa Externa de Morbilidad
+                </td>
+                <td className={styles.cell} rowSpan={2}>
+                  &nbsp;Código:
+                  {texto("causaExternaCodigo", styles.codigo, 5)}
+                  &nbsp;&nbsp;
+                  {areaTexto("causaExternaTexto", styles.dx)}
+                </td>
+              </tr>
 
-      <Seccion titulo="Referencia / interconsulta" nota="El tipo (referencia o interconsulta) se muestra como dato del reporte; SIMMOW solo registra los establecimientos.">
-        <Campo etiqueta="Tipo en el reporte">
-          <input
-            className={`${INPUT} opacity-70`}
-            value={datos.refTipoValor === "1" ? "Referencia" : datos.refTipoValor === "2" ? "Interconsulta" : ""}
-            readOnly
-          />
-        </Campo>
-        {texto("refDeTexto", "Referido DE (texto del reporte)", "doble")}
-        {select("refDeValor", "Referido DE — tipo", OP_REF_RADIO)}
-        {texto("refDeEstablecimientoCodigo", "Referido DE — código SIMMOW", undefined, 4)}
-        {texto("refATexto", "Referido A (texto del reporte)", "doble")}
-        {select("refAValor", "Referido A — tipo", OP_REF_RADIO)}
-        {texto("refAEstablecimientoCodigo", "Referido A — código SIMMOW", undefined, 4)}
-      </Seccion>
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Especialidad</td>
+                <td className={styles.cell}>
+                  <input
+                    className={styles.nombre}
+                    value={v("especialidadTexto")}
+                    readOnly
+                    title="Especialidad tal cual la trae el censo. Aún no tiene equivalencia en el select de SIMMOW: no se envía."
+                  />
+                </td>
+              </tr>
 
-      <Seccion titulo="Afiliación">
-        {casilla("isss", "Afiliado ISSS")}
-        {select("tipoIsssValor", "Tipo ISSS", OP_TIPO_ISSS)}
-        {texto("numeroAfiliacion", "N° de afiliación ISSS", undefined, 12)}
-        {select("derechohabienteOtrosValor", "Otros derechohabientes", OP_DERECHOHABIENTE_OTROS)}
-        {texto("derechohabienteOtrosNumero", "N° otros derechohabientes", undefined, 12)}
-        {select("victimaDHValor", "Víctima de violaciones a DD. HH.", OP_VICTIMA_DH)}
-        {select("privadoLibertadValor", "Persona privada de libertad", OP_PRIVADO_LIBERTAD, "doble")}
-      </Seccion>
+              <tr>
+                <td className={styles.label}></td>
+                <td className={styles.cell}>
+                  Expediente Clínico {texto("expediente", styles.exp)}
+                  <br />
+                  DUI {texto("dui", styles.doc)} (sin guion)
+                  <br />
+                  {checkboxVacio("Escuela Promotora de la Salud")}
+                </td>
+                <td className={styles.labelDer}></td>
+                <td className={styles.cell}>
+                  Discapacidad {selectOp("discapacidadValor", OP_DISCAPACIDAD)}
+                  <br />
+                  Violencia — Tipo {selectVacio()}
+                  <br />
+                  Condición {selectOp("violenciaCondicionValor", OP_VIOLENCIA_CONDICION)}
+                  <br />
+                  Ámbito {selectOp("violenciaAmbitoValor", OP_VIOLENCIA_AMBITO)}
+                  <br />
+                  Procedimiento Salud Mental {selectOp("procSaludMentalValor", OP_PROC_SALUD_MENTAL)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Nombre del Paciente</td>
+                <td className={styles.cell}>{texto("paciente", styles.dir, 40)}</td>
+                <td className={styles.labelDer}>&nbsp;&nbsp;Ingreso Hospitalario</td>
+                <td className={styles.cell}>{checkbox("ingresoHospitalario", "")}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Sexo</td>
+                <td className={styles.cell}>
+                  {radioGrupo(
+                    "sexoValor",
+                    [
+                      { valor: "1", etiqueta: "Masculino" },
+                      { valor: "2", etiqueta: "Femenino" },
+                      { valor: "3", etiqueta: "Intersexual" },
+                    ],
+                    "sexo_ui"
+                  )}
+                </td>
+                <td className={styles.labelDer} rowSpan={2}>
+                  &nbsp;&nbsp;Afiliación ISSS
+                </td>
+                <td className={styles.cell}>
+                  {checkbox("isss", "")}&nbsp;N° de Afiliación:
+                  {texto("numeroAfiliacion", styles.doc, 12)}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Edad</td>
+                <td className={styles.cell}>
+                  {texto("edadAnios", styles.mini)} años&nbsp;&nbsp;
+                  {texto("edadMeses", styles.mini)} meses&nbsp;&nbsp;
+                  {texto("edadDias", styles.mini)} días
+                  <br />
+                  <span style={{ fontSize: "7pt", color: "#555" }}>
+                    SIMMOW solo admite un tramo: se digita años; si es 0, meses; si es 0, días.
+                  </span>
+                </td>
+                <td className={styles.cellWhite}>
+                  {radioGrupo(
+                    "tipoIsssValor",
+                    OP_TIPO_ISSS.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta.replace(/^\d+ - /, "") })),
+                    "tipoisss_ui"
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Dirección</td>
+                <td className={styles.cell}>
+                  <textarea className={styles.dir} value="" readOnly placeholder="(sin dato de origen)" />
+                </td>
+                <td className={styles.cellWhite} colSpan={2}>
+                  <table className={styles.subTable}>
+                    <tbody>
+                      <tr>
+                        <td className={styles.subLabel}>
+                          &nbsp;Derechohabiente
+                          <br />
+                          &nbsp;Otros
+                        </td>
+                        <td className={styles.subCell}>
+                          {selectOp("derechohabienteOtrosValor", OP_DERECHOHABIENTE_OTROS)} N°{" "}
+                          {texto("derechohabienteOtrosNumero", styles.doc, 12)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className={styles.subLabel}>&nbsp;Víctima DH</td>
+                        <td className={styles.subCell}>
+                          {selectOp("victimaDHValor", OP_VICTIMA_DH)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Departamento</td>
+                <td className={styles.cell}>{selectOp("departamentoValor", OP_DEPARTAMENTO, styles.nombre)}</td>
+                <td className={styles.labelDer}>&nbsp;&nbsp;Referido De / Interconsulta De</td>
+                <td className={styles.cell}>
+                  {radioGrupo("refDeValor", RADIO_REFERENCIA, "refde_ui")}
+                  <br />
+                  Establecimiento {texto("refDeEstablecimientoCodigo", styles.codigo, 4)}
+                  <br />
+                  <span style={{ fontSize: "7pt", color: "#555" }}>{v("refDeTexto") || "(sin referido)"}</span>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Distrito</td>
+                <td className={styles.cell}>{texto("municipio", styles.nombre)}</td>
+                <td className={styles.labelDer} rowSpan={2}>
+                  &nbsp;&nbsp;Referido A / Interconsulta A
+                </td>
+                <td className={styles.cell} rowSpan={2}>
+                  {radioGrupo("refAValor", RADIO_REFERENCIA, "refa_ui")}
+                  <br />
+                  Establecimiento {texto("refAEstablecimientoCodigo", styles.codigo, 4)}
+                  <br />
+                  <span style={{ fontSize: "7pt", color: "#555" }}>{v("refATexto") || "(sin referido)"}</span>
+                  <br />
+                  {checkboxVacio("Referido A Fisioterapia")}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;Área</td>
+                <td className={styles.cell}>
+                  {radioGrupo(
+                    "areaValor",
+                    [
+                      { valor: "1", etiqueta: "Urbana" },
+                      { valor: "2", etiqueta: "Rural" },
+                    ],
+                    "area_ui"
+                  )}
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.label}>&nbsp;&nbsp;UCSF / UCSFE</td>
+                <td className={styles.cell}>
+                  <input className={styles.mini} value="" readOnly />
+                  <input className={styles.nombre} value="" readOnly placeholder="(sin dato de origen)" />
+                </td>
+                <td className={styles.labelDer}>&nbsp;&nbsp;Privado de Libertad</td>
+                <td className={styles.cell}>{selectOp("privadoLibertadValor", OP_PRIVADO_LIBERTAD)}</td>
+              </tr>
+
+              {/* ── Atención Preventiva ─────────────────────────────────────── */}
+              <tr>
+                <td className={styles.section} colSpan={4}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelTan}>&nbsp;&nbsp;Tabaquismo</td>
+                <td className={styles.cellTan}>{selectOp("tabaquismoValor", OP_TABAQUISMO)}</td>
+                <td className={styles.section} colSpan={2}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelTan}>&nbsp;&nbsp;Inscripcion</td>
+                <td className={styles.cellTan}>{selectOp("inscripcionValor", OP_INSCRIPCION, styles.ancho)}</td>
+                <td className={styles.cellBeige} colSpan={2}>
+                  <b>&nbsp;&nbsp;Planificación Familiar ( Método Temporal )</b>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelTan}>&nbsp;&nbsp;Control</td>
+                <td className={styles.cellTan}>{selectOp("controlValor", OP_CONTROL, styles.ancho)}</td>
+                <td className={styles.labelBeige}>&nbsp;&nbsp;Inscripción / Control</td>
+                <td className={styles.cellBeige}>{selectOp("pfInscripcionControlValor", OP_PF_IN_CON)}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelTan}>&nbsp;&nbsp;Evaluacion Desarrollo Infantil</td>
+                <td className={styles.cellTan}>
+                  {selectOp("evaluacionInfantilValor", OP_EVALUACION_INFANTIL)}
+                  &nbsp;&nbsp;Perimetro Cefalico {texto("perimetroCefalico", styles.mini, 5)}
+                </td>
+                <td className={styles.section} colSpan={2}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelTan}>&nbsp;&nbsp;Grupo Dispensarial</td>
+                <td className={styles.cellTan}>
+                  {selectVacio()} Tipo {selectVacio()}
+                </td>
+                <td className={styles.labelBeige}>&nbsp;&nbsp;Método</td>
+                <td className={styles.cellBeige}>{selectOp("pfMetodoValor", OP_PF_METODO)}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelNut}>&nbsp;&nbsp;Estado Nutricional</td>
+                <td className={styles.cellAlt}>{selectVacio()} 2009-2012</td>
+                <td className={styles.labelBeige}>&nbsp;&nbsp;Usuaria Activa</td>
+                <td className={styles.cellBeige}>{selectOp("pfUsuariaValor", OP_PF_METODO)}</td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelNut}>&nbsp;&nbsp;Peso - Edad</td>
+                <td className={styles.cellAlt}>{selectOp("pesoEdadValor", OP_PESO_EDAD)}</td>
+                <td className={styles.cellBeige}></td>
+                <td className={styles.cellBeige}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelNut}>&nbsp;&nbsp;Longitud/Talla - Edad</td>
+                <td className={styles.cellAlt}>{selectOp("tallaEdadValor", OP_TALLA_EDAD)}</td>
+                <td className={styles.cellBeige}></td>
+                <td className={styles.cellBeige}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelNut}>&nbsp;&nbsp;Peso - Talla</td>
+                <td className={styles.cellAlt}>{selectOp("pesoTallaValor", OP_PESO_TALLA)}</td>
+                <td className={styles.cellBeige}></td>
+                <td className={styles.cellBeige}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelNut}>&nbsp;&nbsp;Masa Corporal</td>
+                <td className={styles.cellAlt}>{selectOp("imcValor", OP_IMC)}</td>
+                <td className={styles.cellBeige}></td>
+                <td className={styles.cellBeige}></td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelTan}>&nbsp;&nbsp;Lactancia Materna</td>
+                <td className={styles.cellTan}>{selectOp("lactanciaValor", OP_LACTANCIA, styles.ancho)}</td>
+                <td className={styles.cellBeige} colSpan={2}>
+                  <b>&nbsp;&nbsp;Planificación Familiar ( Método Permanente )</b>
+                </td>
+              </tr>
+
+              <tr>
+                <td className={styles.cellCancer} colSpan={2}>
+                  <b>&nbsp;&nbsp;Detección Precoz del Cáncer</b>
+                </td>
+                <td className={styles.labelBeige}>&nbsp;&nbsp;Control</td>
+                <td className={styles.cellBeige}>{selectVacio()} 2009-2012</td>
+              </tr>
+
+              <tr>
+                <td className={styles.labelCancer}>&nbsp;&nbsp;Examen Clínico</td>
+                <td className={styles.cellCancer}>
+                  {selectOp("deteccionCancerValor", OP_DETECCION_CANCER, styles.ancho)}
+                  <br />
+                  {checkboxVacio("Examen de Mama")}
+                </td>
+                <td className={styles.labelBeige}>&nbsp;&nbsp;Técnica</td>
+                <td className={styles.cellBeige}>{selectVacio()} 2009-2012</td>
+              </tr>
+
+              <tr>
+                <td className={styles.section} colSpan={4}></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p style={{ color: "#ffffff", fontSize: "7pt", marginTop: 10, opacity: 0.8 }}>
+            Los campos sin dato de origen en los reportes del SIS quedan vacíos (los deshabilitados no se envían a SIMMOW).
+            Complete aquí mismo los que sí se pueden editar y se incluirán en el código generado.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

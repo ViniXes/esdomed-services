@@ -69,10 +69,10 @@ export interface DatosSimmowConsultaExterna {
   refTipoValor: string;
   refATexto: string;
   refAEstablecimientoCodigo: string;
-  refAValor: string; // radio refa: "2" Priv | "3" Establec
+  refAValor: string; // radio refa: "2" Priv | "3" Establec | "4" Interconsulta
   refDeTexto: string;
   refDeEstablecimientoCodigo: string;
-  refDeValor: string; // radio refde: "2" Priv | "3" Establec
+  refDeValor: string; // radio refde: "2" Priv | "3" Establec | "4" Interconsulta
 
   // Afiliación
   isss: boolean;

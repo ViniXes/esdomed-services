@@ -101,7 +101,8 @@ export const OP_PRIVADO_LIBERTAD = lista(
   "7 - Acogimiento emergencia e institucional"
 );
 export const OP_REF_TIPO = lista("1 - Referencia", "2 - Interconsulta");
-export const OP_REF_RADIO = lista("2 - Privado", "3 - Establecimiento");
+// Radios refde/refa de SIMMOW: 1 Sin Ref, 2 Priv, 3 Establec, 4 Interconsulta.
+export const OP_REF_RADIO = lista("1 - Sin Ref", "2 - Priv", "3 - Establec", "4 - Interconsulta");
 
 // Orden del select p_dept de SIMMOW (alfabético); el value es el código del reporte.
 export const OP_DEPARTAMENTO: OpcionSimmow[] = [

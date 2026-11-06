@@ -187,3 +187,56 @@
   box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.25);
   background: #fff7ed !important;
 }
+
+/* Sección de Atención Preventiva del formulario de Consulta Externa (filas
+   extraídas en vivo de conrec.php): etiquetas tostadas a la izquierda, beige a
+   la derecha (planificación familiar), verde grisáceo para estado nutricional
+   y azul acero para detección precoz del cáncer. */
+.labelTan {
+  background: #d2b48c;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.cellTan {
+  background: #d2b48c;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.labelNut {
+  background: #cccc99;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.labelBeige {
+  background: #f5f5dc;
+  color: #000000;
+  font-size: 8pt;
+  width: 250px;
+}
+
+.cellBeige {
+  background: #f5f5dc;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.labelCancer {
+  background: #b0c4de;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.cellCancer {
+  background: #b0c4de;
+  color: #000000;
+  font-size: 8pt;
+}
+
+.ancho {
+  width: 330px !important;
+}

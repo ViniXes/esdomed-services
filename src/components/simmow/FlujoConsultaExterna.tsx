@@ -81,7 +81,7 @@ const Aviso = ({ children }: { children: React.ReactNode }) => (
  * código que llena el formulario de conrec.php. Solo administración mientras
  * está en pruebas (el control de acceso lo pone la página que lo monta).
  */
-export function FlujoConsultaExterna() {
+export function FlujoConsultaExterna({ onRevisionChange }: { onRevisionChange?: (enRevision: boolean) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [analizando, setAnalizando] = useState(false);
@@ -126,6 +126,12 @@ export function FlujoConsultaExterna() {
       /* sin almacenamiento disponible: el lote simplemente no sobrevive a una recarga */
     }
   }, [listoParaPersistir, paso, pacientes, advertenciasGlobales, claveSeleccionada]);
+
+  // La tabla de revisión (réplica de SIMMOW, 980 px) necesita que la página ensanche su contenedor.
+  useEffect(() => {
+    onRevisionChange?.(paso === "revision");
+    return () => onRevisionChange?.(false);
+  }, [paso, onRevisionChange]);
 
   const seleccionado = useMemo(
     () => pacientes.find((p) => p.clave === claveSeleccionada) ?? null,
@@ -496,7 +502,12 @@ export function FlujoConsultaExterna() {
             </button>
           </div>
 
-          <FormularioRevisionConsultaExterna datos={seleccionado.datos} onChange={actualizar} onVolver={() => setPaso("lista")} />
+          <FormularioRevisionConsultaExterna
+            datos={seleccionado.datos}
+            semana={semanaDeFecha(seleccionado.datos.fecha)}
+            onChange={actualizar}
+            onVolver={() => setPaso("lista")}
+          />
         </div>
       )}
     </div>
