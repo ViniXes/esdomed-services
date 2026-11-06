@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, ExternalLink, FileImage, FileText, MessageSquareText,
+  AlertTriangle, ArrowRight, Ban, CheckCircle2, ExternalLink, FileImage, FileText, MessageSquareText,
   CalendarRange, Clock, FingerprintPattern, Paperclip, Pencil, RefreshCw, Route, X, XCircle,
 } from "lucide-react";
 import type { TramitePersonal } from "@/types";
@@ -37,6 +37,14 @@ export interface AjusteHorasProps {
   error: string | null;
   /** Devuelve true si se guardó (el formulario se cierra). */
   onGuardar: (horas: number, justificacion: string, extremo: "inicio" | "fin") => Promise<boolean>;
+}
+
+/** Solo el admin: anula un permiso aprobado que el empleado al final no tomó. */
+export interface AnulacionProps {
+  guardando: boolean;
+  error: string | null;
+  /** Devuelve true si se anuló. */
+  onAnular: (motivo: string) => Promise<boolean>;
 }
 
 const MIN_JUSTIFICACION = 10;
@@ -179,6 +187,84 @@ function AjusteHoras({ t, ajuste }: { t: TramitePersonal; ajuste: AjusteHorasPro
   );
 }
 
+function AnularPermiso({ t, anulacion }: { t: TramitePersonal; anulacion: AnulacionProps }) {
+  const [abierto, setAbierto] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const motivoLimpio = motivo.trim();
+  const valido = motivoLimpio.length >= MIN_JUSTIFICACION;
+
+  // Un adjunto significa que el permiso sí se hizo.
+  if (docsDeTramite(t).length > 0) {
+    return (
+      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+        Este permiso no se puede anular porque tiene documentos adjuntos: se considera realizado.
+      </p>
+    );
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+      >
+        <Ban size={13} /> Anular permiso
+      </button>
+    );
+  }
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!valido || anulacion.guardando) return;
+    await anulacion.onAnular(motivoLimpio);
+  };
+
+  return (
+    <form onSubmit={enviar} className="space-y-3 rounded-2xl border border-rose-200 bg-white p-4 dark:border-rose-900/70 dark:bg-slate-900">
+      <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+        Úsalo si el empleado al final no tomó el permiso. El plan de trabajo recupera su turno y se libera el cupo del grupo.
+        Esto no se puede deshacer: si luego hace falta, el empleado presenta otro trámite.
+      </p>
+      <div>
+        <label htmlFor="anulacion-motivo" className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+          Motivo de la anulación <span className="font-normal text-rose-500">(obligatorio)</span>
+        </label>
+        <textarea
+          id="anulacion-motivo"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          rows={3}
+          placeholder="Ej: El empleado se presentó a trabajar y no hizo uso del permiso."
+          className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+        />
+      </div>
+      {anulacion.error && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">{anulacion.error}</p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => { setAbierto(false); setMotivo(""); }}
+          disabled={anulacion.guardando}
+          className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={!valido || anulacion.guardando}
+          className="inline-flex min-w-[8rem] items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {anulacion.guardando
+            ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            : "Anular permiso"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 const fechaHora = (d: Date) =>
   d.toLocaleString("es-SV", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -214,13 +300,14 @@ function HojaFecha({ etiqueta, fecha }: { etiqueta: string; fecha: Date }) {
   );
 }
 
-type Paso = { titulo: string; detalle?: string; por?: string; tono: "azul" | "ambar" | "verde" | "rose"; hecho: boolean };
+type Paso = { titulo: string; detalle?: string; por?: string; tono: "azul" | "ambar" | "verde" | "rose" | "gris"; hecho: boolean };
 
 const PUNTO: Record<Paso["tono"], string> = {
   azul: "bg-blue-600 ring-blue-100 dark:bg-cyan-400 dark:ring-cyan-950",
   ambar: "bg-white ring-amber-300 dark:bg-slate-900 dark:ring-amber-700",
   verde: "bg-emerald-500 ring-emerald-100 dark:ring-emerald-950",
   rose: "bg-rose-500 ring-rose-100 dark:ring-rose-950",
+  gris: "bg-slate-400 ring-slate-100 dark:bg-slate-500 dark:ring-slate-800",
 };
 
 /** Recorrido del trámite: presentado → (rechazo previo y reenvío) → revisión o resolución. */
@@ -231,14 +318,19 @@ function pasosDe(t: TramitePersonal): Paso[] {
   const pasos: Paso[] = [
     { titulo: faltaRecibidoRrhh(t) ? "Hoja impresa" : t.estado === "subido" ? "Subido" : "Presentado", detalle: creado ? fechaHora(creado) : undefined, por: t.empleadoNombre, tono: "azul", hecho: true },
   ];
-  if (t.estado === "aprobado" || t.estado === "rechazado") {
+  if (t.estado === "aprobado" || t.estado === "rechazado" || t.estado === "anulado") {
+    const rechazado = t.estado === "rechazado";
     pasos.push({
-      titulo: t.estado === "aprobado" ? "Aprobado" : "Rechazado",
+      titulo: rechazado ? "Rechazado" : "Aprobado",
       detalle: revisado ? fechaHora(revisado) : undefined,
       por: t.revisadoPorNombre,
-      tono: t.estado === "aprobado" ? "verde" : "rose",
+      tono: rechazado ? "rose" : "verde",
       hecho: true,
     });
+    if (t.estado === "anulado") {
+      const anulado = toDate(t.anuladoEn);
+      pasos.push({ titulo: "Anulado", detalle: anulado ? fechaHora(anulado) : undefined, por: t.anuladoPorNombre, tono: "gris", hecho: true });
+    }
   } else if (t.estado === "pendiente") {
     // Un pendiente con revisión es uno que se rechazó y el empleado reenvió
     // (un aprobado no vuelve a revisión).
@@ -291,7 +383,8 @@ const RESPUESTA_TONO: Record<"aprobado" | "rechazado", { caja: string; icono: st
 
 function RespuestaAdministracion({ t, anterior }: { t: TramitePersonal; anterior: boolean }) {
   // La resolución vigente; o, en un pendiente reenviado, la del rechazo previo.
-  const resultado: "aprobado" | "rechazado" = anterior ? "rechazado" : (t.estado as "aprobado" | "rechazado");
+  // Un anulado se aprobó antes: aquí se muestra esa respuesta.
+  const resultado: "aprobado" | "rechazado" = anterior || t.estado === "rechazado" ? "rechazado" : "aprobado";
   const tono = RESPUESTA_TONO[resultado];
   const revisado = toDate(t.revisadoEn);
   const Icono = resultado === "aprobado" ? CheckCircle2 : XCircle;
@@ -312,6 +405,27 @@ function RespuestaAdministracion({ t, anterior }: { t: TramitePersonal; anterior
           ) : (
             <p className="mt-2 text-sm italic text-slate-500 dark:text-slate-400">Sin comentario.</p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnulacionRegistrada({ t }: { t: TramitePersonal }) {
+  const anulado = toDate(t.anuladoEn);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+          <Ban size={18} strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            Anulado
+            {t.anuladoPorNombre && <span className="font-normal"> por {t.anuladoPorNombre}</span>}
+          </p>
+          {anulado && <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">{fechaHora(anulado)}</p>}
+          <p className="mt-2.5 whitespace-pre-line text-sm leading-relaxed text-slate-800 dark:text-slate-100">{t.motivoAnulacion}</p>
         </div>
       </div>
     </div>
@@ -343,7 +457,7 @@ function AvisoPermisos({ tono, titulo, texto, items }: { tono: "ambar" | "rose";
 const esImagen = (nombre: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(nombre);
 
 export function TramiteDetalleModal({
-  tramite: t, onClose, resolucion, ajusteHoras,
+  tramite: t, onClose, resolucion, ajusteHoras, anulacion,
 }: {
   tramite: TramitePersonal;
   onClose: () => void;
@@ -351,16 +465,18 @@ export function TramiteDetalleModal({
   resolucion?: ResolucionTramite;
   /** Solo admin, permiso de un día pendiente o aprobado: permite ajustar las horas. */
   ajusteHoras?: AjusteHorasProps;
+  /** Solo admin, permiso aprobado: permite anularlo si no tiene adjuntos. */
+  anulacion?: AnulacionProps;
 }) {
   const tituloId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const saving = (resolucion?.saving ?? false) || (ajusteHoras?.guardando ?? false);
+  const saving = (resolucion?.saving ?? false) || (ajusteHoras?.guardando ?? false) || (anulacion?.guardando ?? false);
   const { codigo, nombre } = partesCategoria(t.categoria);
   const creado = toDate(t.creadoEn);
   const inicio = toDate(t.fechaInicio);
   const fin = toDate(t.fechaFin) ?? inicio;
   const docs = docsDeTramite(t);
-  const resuelto = t.estado === "aprobado" || t.estado === "rechazado";
+  const resuelto = t.estado === "aprobado" || t.estado === "rechazado" || t.estado === "anulado";
   const rechazoPrevio = t.estado === "pendiente" && !!t.revisadoEn;
   // Un turno que amanece cruza la medianoche pero sigue siendo un solo día de permiso.
   const dias = inicio && fin
@@ -551,7 +667,9 @@ export function TramiteDetalleModal({
 
               {(resuelto || rechazoPrevio) && (
                 <Seccion titulo={rechazoPrevio ? "Respuesta anterior" : "Respuesta de administración"} icon={MessageSquareText}>
-                  <RespuestaAdministracion t={t} anterior={rechazoPrevio} />
+                  {t.estado === "anulado" && <AnulacionRegistrada t={t} />}
+                  {(t.estado !== "anulado" || t.comentariosRevision) && <RespuestaAdministracion t={t} anterior={rechazoPrevio} />}
+                  {anulacion && <AnularPermiso t={t} anulacion={anulacion} />}
                 </Seccion>
               )}
             </div>

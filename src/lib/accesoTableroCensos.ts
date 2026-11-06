@@ -8,8 +8,3 @@ export function puedeVerTableroCensos(profile?: UserProfile | null) {
   return profile?.role === "admin"
     || (profile?.role === "medico" && mismoServicio(profile.servicio, "Emergencia"));
 }
-
-/** Cuántas atenciones lleva cada persona: no se muestra a todo el equipo. */
-export function puedeVerDetallePersonal(profile?: UserProfile | null) {
-  return profile?.role === "admin" || profile?.veDetallePersonalCensos === true;
-}

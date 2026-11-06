@@ -23,7 +23,6 @@ export interface UserProfile {
   // completo de /comite-lesiones desde su portal. Se marca POR PERSONA desde
   // /dashboard/usuarios (la API lo escribe; las reglas lo leen del perfil).
   apoyaComiteLesiones?: boolean;
-  veDetallePersonalCensos?: boolean; // ve cuántas atenciones lleva cada persona en el tablero de censos
   jvpm?: string;        // solo médicos — sello/firma
   dui?: string;         // solo médicos — documento único de identidad (########-#)
   codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
@@ -1768,7 +1767,7 @@ export type CategoriaTramitePersonal =
   | "F_tiempo_extra"
   | "G_misiones_oficiales";
 
-export type EstadoTramitePersonal = "subido" | "pendiente" | "aprobado" | "rechazado";
+export type EstadoTramitePersonal = "subido" | "pendiente" | "aprobado" | "rechazado" | "anulado";
 
 // Ajuste de las horas de un permiso ya presentado (solicitud verbal del
 // colaborador el mismo día). Solo el admin lo registra; la justificación es
@@ -1820,6 +1819,12 @@ export interface TramitePersonal {
 
   // Ajustes de horas hechos por el admin (más antiguo primero)
   ajustesHoras?: AjusteHorasTramite[];
+
+  // Anulación: el empleado no tomó un permiso ya aprobado. Solo el admin, y solo sin adjuntos.
+  anuladoPorId?: string;
+  anuladoPorNombre?: string;
+  anuladoEn?: Date;
+  motivoAnulacion?: string;
 }
 
 // Archivero permanente del expediente de cada empleado ESDOMED: evaluaciones
@@ -2114,6 +2119,31 @@ export interface EntradaCatalogoPersonal {
   creadoEn: Date;
   creadoPorId: string;
   creadoPorNombre: string;
+}
+
+// Expediente que ESDOMED crea antes de que el paciente llegue (Código Infarto, Chat
+// Marcapasos). Va aparte de control_ingresos para no salir en la cola de los
+// médicos; al llegar se registra el ingreso normal. Ver lib/esdomed/expedientesProgramados.
+export interface ExpedienteProgramado {
+  id?: string;
+  expediente: string;
+  dui?: string;
+  apellidos: string;
+  nombres: string;
+  edad?: number;
+  genero?: "masculino" | "femenino";
+  solicitud: string;              // SOLICITUDES_PROGRAMADAS
+  fechaPresentacion: string;      // YYYY-MM-DD, día en que se espera al paciente
+  estado: "pendiente" | "presentado";
+  responsableIngresoNombre: string;
+  creadoPor: string;
+  creadoPorNombre: string;
+  creadoEn: Date;
+  // Al llegar el paciente:
+  presentadoEn?: Date;
+  presentadoPorId?: string;
+  presentadoPorNombre?: string;
+  controlIngresoId?: string;      // ingreso que se registró al llegar
 }
 
 export interface CensoDemandaEspontanea {

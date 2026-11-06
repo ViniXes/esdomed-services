@@ -88,7 +88,7 @@ function paresComunes(r: Registro): Par[] {
     ["sexo", genero],
     ["edadSexo", `${grupoEdad(r.edad)}|${genero}`],
     ["evaluadoPor", valorO(r.evaluadoPor)],
-    // Separados porque una persona se puede ocultar y una especialidad no.
+    // Separados porque personas y especialidades van en tarjetas distintas.
     [r.evaluadoPor === "especialidad" ? "evaluaEspecialidad" : "evaluaPersona", staff || SIN_DATO],
     ["reevaluacion", valorO(r.reevaluacion, NO_APLICA)],
     ...lista(r.medicosGenerales).map((m): Par => ["medicosTurno", m]),

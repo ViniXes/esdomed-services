@@ -38,7 +38,7 @@ const PESTANAS = [
 ] as const;
 
 export function TableroCensos({
-  tipo, onTipo, resumenes, desajustes, hoy, cargando, recalculando, error, leidoEn, verPersonal, onActualizar, onRecalcular,
+  tipo, onTipo, resumenes, desajustes, hoy, cargando, recalculando, error, leidoEn, onActualizar, onRecalcular,
 }: {
   tipo: TipoCenso;
   onTipo: (t: TipoCenso) => void;
@@ -49,7 +49,6 @@ export function TableroCensos({
   recalculando: boolean;
   error: string | null;
   leidoEn: Date | null;
-  verPersonal: boolean;
   onActualizar: () => void;
   onRecalcular: () => void;
 }) {
@@ -83,7 +82,6 @@ export function TableroCensos({
     puntos,
     subtituloEvolucion: porDia ? `Por día · ${nombreMes(seleccion)}` : "Por mes, desde noviembre de 2026",
     detalleTotal: textoComparacion(comparacion),
-    verPersonal,
   };
 
   return (

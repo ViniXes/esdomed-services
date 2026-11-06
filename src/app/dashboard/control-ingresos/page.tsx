@@ -4,14 +4,20 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addDoc, collection, Timestamp, query, orderBy, onSnapshot, limit, doc, updateDoc,
-  where, getDocs, QueryConstraint, deleteField,
+  where, getDocs, QueryConstraint, deleteField, writeBatch,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useServicios } from "@/contexts/ServiciosContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
+import { ListaProgramados } from "@/components/esdomed/ListaProgramados";
+import type { ExpedienteProgramado } from "@/types";
 import { claveExpediente, fechaDeRegistro, ingresosRepetidos } from "@/lib/esdomed/duplicadosIngreso";
-import { Ambulance, Download } from "lucide-react";
+import {
+  COLECCION_PROGRAMADOS, SOLICITUDES_PROGRAMADAS, esSolicitudProgramada, fechaPresentacionCorta,
+  hoyLocalISO, porFechaPresentacion, primerDiaFuturo,
+} from "@/lib/esdomed/expedientesProgramados";
+import { Ambulance, CalendarClock, Download, FileInput } from "lucide-react";
 import { Icon } from "@iconify/react";
 import documentAdd from "@iconify-icons/solar/document-add-linear";
 import calendar from "@iconify-icons/solar/calendar-minimalistic-linear";
@@ -55,7 +61,11 @@ type FormState = {
   genero: "" | GeneroIngreso;
   servicio: string;
   ingresoDirectoServicio: boolean;
+  // "YYYY-MM-DD": solo cuando el servicio es una solicitud programada.
+  presentacion: string;
 };
+
+const LIMITE_PROGRAMADOS = 200;
 
 const inputCls =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition focus:border-blue-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-blue-600 dark:focus:bg-slate-800";
@@ -69,6 +79,7 @@ const emptyForm = (): FormState => ({
   genero: "",
   servicio: "",
   ingresoDirectoServicio: false,
+  presentacion: "",
 });
 
 const FILAS_POR_PAGINA = 10;
@@ -99,6 +110,12 @@ export default function ControlIngresosPage() {
   const [exportando, setExportando] = useState(false);
   const [posiblesDuplicados, setPosiblesDuplicados] = useState<ControlIngreso[] | null>(null);
   const [motivoReingreso, setMotivoReingreso] = useState("");
+  const [vistaLista, setVistaLista] = useState<"ingresos" | "programados">("ingresos");
+  const [programados, setProgramados] = useState<ExpedienteProgramado[]>([]);
+  const [errorProgramados, setErrorProgramados] = useState(false);
+  const [editandoProgramadoId, setEditandoProgramadoId] = useState<string | null>(null);
+  // Programado cuyo paciente acaba de llegar: el formulario registra su ingreso real.
+  const [presentandoId, setPresentandoId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -120,6 +137,22 @@ export default function ControlIngresosPage() {
     return onSnapshot(q, s =>
       setIngresos(s.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso)))
     );
+  }, []);
+
+  // Solo los que siguen por llegar: son pocos y no crecen con la historia.
+  useEffect(() => {
+    const q = query(
+      collection(db, COLECCION_PROGRAMADOS),
+      where("estado", "==", "pendiente"),
+      limit(LIMITE_PROGRAMADOS),
+    );
+    return onSnapshot(q, s => {
+      setProgramados(s.docs.map(d => ({ id: d.id, ...d.data() } as ExpedienteProgramado)).sort(porFechaPresentacion));
+      setErrorProgramados(false);
+    }, err => {
+      console.error("No se pudieron cargar los expedientes programados", err);
+      setErrorProgramados(true);
+    });
   }, []);
 
   if (!profile || (profile.role !== "esdomed" && profile.role !== "asistente_esdomed" && profile.role !== "admin")) {
@@ -156,19 +189,47 @@ export default function ControlIngresosPage() {
     if (!/^\d+$/.test(form.edad.trim()) || parseInt(form.edad, 10) > 120) return "La edad debe ser un número entero válido.";
     if (!form.genero) return "Seleccione el género.";
     if (!form.servicio.trim()) return "Seleccione el servicio.";
+    if (esSolicitudProgramada(form.servicio)) {
+      if (!form.presentacion) return "Indique la fecha en que se presentará el paciente.";
+      // Al editar uno ya atrasado se puede corregir otro dato sin cambiarle la fecha.
+      const sinCambio = programadoEnEdicion?.fechaPresentacion === form.presentacion;
+      if (!sinCambio && form.presentacion <= hoyLocalISO()) return "La fecha en que se presentará debe ser futura.";
+    }
     return null;
   };
 
   // Lo que la página ya tiene cargado: vista en vivo (ayer + hoy) y, si se
   // consultaron, los históricos. Contra esto se buscan duplicados.
   const registrosCargados = (): ControlIngreso[] => [...ingresos, ...(resultadosHistoricos ?? [])];
-  const registroEditando = editingId ? registrosCargados().find(i => i.id === editingId) : undefined;
+  const programadoEnEdicion = editandoProgramadoId ? programados.find(p => p.id === editandoProgramadoId) : undefined;
+  const programadoPresentando = presentandoId ? programados.find(p => p.id === presentandoId) : undefined;
+  const registroEditando = editingId ? registrosCargados().find(i => i.id === editingId) : programadoEnEdicion;
+  const modoEdicion = !!(editingId || editandoProgramadoId);
+  const esSolicitud = esSolicitudProgramada(form.servicio);
+  // Un ingreso ya registrado no se convierte en programado, ni al revés: viven en
+  // colecciones distintas. Y quien ya llegó necesita su servicio real.
+  const ofreceSolicitudes = !editingId && !presentandoId;
+  const ofreceServicios = !editandoProgramadoId;
 
   const registrar = async (e: React.FormEvent) => {
     e.preventDefault();
     const err = validar();
     if (err) {
       setModalInfo({ tipo: "error", mensaje: err });
+      return;
+    }
+
+    if (esSolicitud) {
+      const repetido = programados.find(p =>
+        p.id !== editandoProgramadoId && claveExpediente(p.expediente) === claveExpediente(form.expediente));
+      if (repetido) {
+        setModalInfo({
+          tipo: "error",
+          mensaje: `El expediente ${repetido.expediente} ya está programado para el ${fechaPresentacionCorta(repetido.fechaPresentacion)}. Puedes editarlo en la pestaña Programados.`,
+        });
+        return;
+      }
+      await guardarProgramado();
       return;
     }
 
@@ -198,6 +259,45 @@ export default function ControlIngresosPage() {
     const deId = posiblesDuplicados[0].id;
     setPosiblesDuplicados(null);
     await guardar({ motivo, deId });
+  };
+
+  // Va a su propia colección para que no aparezca en la cola de los médicos.
+  const guardarProgramado = async () => {
+    setGuardando(true);
+    try {
+      const data: Record<string, unknown> = {
+        expediente: form.expediente.trim(),
+        apellidos: form.apellidos.trim(),
+        nombres: form.nombres.trim(),
+        edad: parseInt(form.edad, 10),
+        genero: form.genero,
+        solicitud: form.servicio,
+        fechaPresentacion: form.presentacion,
+      };
+      if (form.dui.trim()) data.dui = form.dui.trim();
+
+      if (editandoProgramadoId) {
+        await updateDoc(doc(db, COLECCION_PROGRAMADOS, editandoProgramadoId), data);
+        setEditandoProgramadoId(null);
+        setModalInfo({ tipo: "exito", mensaje: "Expediente programado actualizado." });
+      } else {
+        data.estado = "pendiente";
+        data.responsableIngresoUid = profile.uid;
+        data.responsableIngresoNombre = profile.nombre;
+        data.creadoPor = profile.uid;
+        data.creadoPorNombre = profile.nombre;
+        data.creadoEn = Timestamp.now();
+        await addDoc(collection(db, COLECCION_PROGRAMADOS), data);
+        setModalInfo({ tipo: "exito", mensaje: `Expediente guardado para el ${fechaPresentacionCorta(form.presentacion)}. No saldrá en la cola de los médicos hasta que el paciente llegue.` });
+      }
+
+      setVistaLista("programados");
+      setForm(emptyForm());
+    } catch (err) {
+      setModalInfo({ tipo: "error", mensaje: `Error al guardar: ${err instanceof Error ? err.message : "desconocido"}` });
+    } finally {
+      setGuardando(false);
+    }
   };
 
   // `reingreso`: undefined = no tocar la marca (edición sin cambio de
@@ -236,8 +336,27 @@ export default function ControlIngresosPage() {
         data.creadoPor = profile.uid;
         data.creadoPorNombre = profile.nombre;
         data.creadoEn = Timestamp.now();
-        await addDoc(collection(db, "control_ingresos"), data);
-        setModalInfo({ tipo: "exito", mensaje: "Ingreso registrado correctamente." });
+        if (presentandoId) {
+          // En un lote: el paciente no puede quedar en la cola y seguir como "por llegar".
+          const ingresoRef = doc(collection(db, "control_ingresos"));
+          data.expedienteProgramadoId = presentandoId;
+          const lote = writeBatch(db);
+          lote.set(ingresoRef, data);
+          lote.update(doc(db, COLECCION_PROGRAMADOS, presentandoId), {
+            estado: "presentado",
+            presentadoEn: data.creadoEn,
+            presentadoPorId: profile.uid,
+            presentadoPorNombre: profile.nombre,
+            controlIngresoId: ingresoRef.id,
+          });
+          await lote.commit();
+          setPresentandoId(null);
+          setVistaLista("ingresos");
+          setModalInfo({ tipo: "exito", mensaje: "Ingreso registrado. El paciente ya está en la cola de los médicos." });
+        } else {
+          await addDoc(collection(db, "control_ingresos"), data);
+          setModalInfo({ tipo: "exito", mensaje: "Ingreso registrado correctamente." });
+        }
       }
 
       setForm(emptyForm());
@@ -250,6 +369,8 @@ export default function ControlIngresosPage() {
 
   const handleEdit = (ingreso: ControlIngreso) => {
     setEditingId(ingreso.id!);
+    setEditandoProgramadoId(null);
+    setPresentandoId(null);
     setForm({
       expediente: ingreso.expediente || "",
       dui: ingreso.dui || "",
@@ -259,12 +380,43 @@ export default function ControlIngresosPage() {
       genero: ingreso.genero || "",
       servicio: ingreso.servicio || "",
       ingresoDirectoServicio: ingreso.ingresoDirectoServicio || false,
+      presentacion: "",
     });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const datosDeProgramado = (p: ExpedienteProgramado): FormState => ({
+    ...emptyForm(),
+    expediente: p.expediente,
+    dui: p.dui ?? "",
+    apellidos: p.apellidos,
+    nombres: p.nombres,
+    edad: p.edad != null ? String(p.edad) : "",
+    genero: p.genero ?? "",
+  });
+
+  const editarProgramado = (p: ExpedienteProgramado) => {
+    setEditingId(null);
+    setPresentandoId(null);
+    setEditandoProgramadoId(p.id!);
+    setForm({ ...datosDeProgramado(p), servicio: p.solicitud, presentacion: p.fechaPresentacion });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // El servicio queda vacío a propósito: la solicitud no es un servicio y ESDOMED
+  // debe indicar a dónde ingresa de verdad.
+  const presentarProgramado = (p: ExpedienteProgramado) => {
+    setEditingId(null);
+    setEditandoProgramadoId(null);
+    setPresentandoId(p.id!);
+    setForm(datosDeProgramado(p));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+    setEditandoProgramadoId(null);
+    setPresentandoId(null);
     setForm(emptyForm());
   };
 
@@ -531,7 +683,7 @@ export default function ControlIngresosPage() {
                   disabled={motivoReingreso.trim().length < MIN_MOTIVO_REINGRESO}
                   className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {editingId ? "Guardar como reingreso" : "Sí, es un nuevo ingreso"}
+                  {modoEdicion ? "Guardar como reingreso" : "Sí, es un nuevo ingreso"}
                 </button>
               </div>
             </div>
@@ -602,12 +754,29 @@ export default function ControlIngresosPage() {
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.45fr)]">
       {/* Form card */}
-      <div className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition-shadow dark:bg-slate-900 lg:sticky lg:top-5 ${editingId ? "border-amber-300 ring-4 ring-amber-400/25 dark:border-amber-700 dark:ring-amber-500/20" : "border-slate-200 dark:border-slate-800"}`}>
+      <div className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition-shadow dark:bg-slate-900 lg:sticky lg:top-5 ${modoEdicion ? "border-amber-300 ring-4 ring-amber-400/25 dark:border-amber-700 dark:ring-amber-500/20" : presentandoId ? "border-cyan-300 ring-4 ring-cyan-400/25 dark:border-cyan-800 dark:ring-cyan-500/20" : "border-slate-200 dark:border-slate-800"}`}>
 
         {/* Card header — en edición se vuelve una franja ámbar imposible de
             pasar por alto: sin ella, alguien que abrió "editar" y se distrajo
             digitaba al siguiente paciente ENCIMA del registro anterior. */}
-        {editingId ? (
+        {presentandoId ? (
+          <div className="flex items-start gap-3 border-b border-cyan-200 bg-cyan-50 px-5 py-4 dark:border-cyan-900/60 dark:bg-cyan-950/40">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-600 text-white"><FileInput size={19} /></div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">Llegó el paciente</p>
+              <p className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100">Exp. {programadoPresentando?.expediente ?? form.expediente}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">Elige el servicio al que ingresa. Al registrar pasa a la cola de los médicos.</p>
+            </div>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={guardando}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-cyan-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-cyan-800 transition-colors hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-800 dark:bg-slate-900 dark:text-cyan-300 dark:hover:bg-cyan-950"
+            >
+              <Icon icon={closeCircle} width={15} /> Cancelar
+            </button>
+          </div>
+        ) : modoEdicion ? (
           <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900/60 dark:bg-amber-950/40">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-white"><Icon icon={pen} width={19} /></div>
             <div className="min-w-0 flex-1">
@@ -645,7 +814,7 @@ export default function ControlIngresosPage() {
 
         <form
           onSubmit={registrar}
-          onKeyDown={e => { if (e.key === "Escape" && editingId && !guardando) cancelEdit(); }}
+          onKeyDown={e => { if (e.key === "Escape" && (modoEdicion || presentandoId) && !guardando) cancelEdit(); }}
           className="space-y-4 p-5"
         >
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -746,40 +915,76 @@ export default function ControlIngresosPage() {
                 className={`${inputCls} appearance-none`}
               >
                 <option value="">Seleccione el servicio...</option>
-                {servicios.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                {ofreceSolicitudes && (
+                  <optgroup label="Paciente por llegar">
+                    {SOLICITUDES_PROGRAMADAS.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {ofreceServicios && (
+                  <optgroup label="Servicios">
+                    {servicios.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
+
+            {esSolicitud && (
+              <div className="sm:col-span-2">
+                <p className="mb-1.5 block text-xs font-medium text-slate-500">
+                  Se presentará en: <span className="text-red-500">*</span>
+                </p>
+                <DateField
+                  value={form.presentacion}
+                  onChange={value => setForm(prev => ({ ...prev, presentacion: value }))}
+                  minDate={primerDiaFuturo()}
+                  placeholder="Elige una fecha futura"
+                  ariaLabel="Se presentará en"
+                />
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  No saldrá en la cola de los médicos hasta que marques que el paciente llegó.
+                </p>
+              </div>
+            )}
           </div>
 
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition-colors hover:border-blue-200 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-800/70 dark:hover:border-blue-900 dark:hover:bg-blue-950/20">
-            <input
-              type="checkbox"
-              checked={form.ingresoDirectoServicio}
-              onChange={e => setForm(prev => ({ ...prev, ingresoDirectoServicio: e.target.checked }))}
-              className="h-4 w-4 mt-0.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-            />
-            <span className="text-sm text-slate-700 dark:text-slate-300">
-              El paciente ingresó directamente a un servicio hospitalario
-            </span>
-          </label>
+          {!esSolicitud && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 transition-colors hover:border-blue-200 hover:bg-blue-50/50 dark:border-slate-700 dark:bg-slate-800/70 dark:hover:border-blue-900 dark:hover:bg-blue-950/20">
+              <input
+                type="checkbox"
+                checked={form.ingresoDirectoServicio}
+                onChange={e => setForm(prev => ({ ...prev, ingresoDirectoServicio: e.target.checked }))}
+                className="h-4 w-4 mt-0.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                El paciente ingresó directamente a un servicio hospitalario
+              </span>
+            </label>
+          )}
 
           <div className="flex gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button
               type="button"
-              onClick={editingId ? cancelEdit : () => setForm(emptyForm())}
+              onClick={modoEdicion || presentandoId ? cancelEdit : () => setForm(emptyForm())}
               disabled={guardando}
               className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
             >
-              {editingId ? "Cancelar" : "Limpiar"}
+              {modoEdicion || presentandoId ? "Cancelar" : "Limpiar"}
             </button>
             <button
               type="submit"
               disabled={guardando}
-              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 ${editingId ? "bg-amber-600 hover:bg-amber-500" : "bg-blue-700 hover:bg-blue-600"}`}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold text-white shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 ${modoEdicion ? "bg-amber-600 hover:bg-amber-500" : "bg-blue-700 hover:bg-blue-600"}`}
             >
-              {guardando ? (editingId ? "Guardando cambios..." : "Registrando...") : (editingId ? `Guardar cambios del exp. ${registroEditando?.expediente ?? form.expediente}` : "Registrar ingreso")}
+              {guardando
+                ? (modoEdicion ? "Guardando cambios..." : "Registrando...")
+                : modoEdicion ? `Guardar cambios del exp. ${registroEditando?.expediente ?? form.expediente}`
+                : presentandoId ? "Registrar y enviar a la cola"
+                : esSolicitud ? "Guardar expediente programado"
+                : "Registrar ingreso"}
             </button>
           </div>
         </form>
@@ -787,6 +992,47 @@ export default function ControlIngresosPage() {
 
       {/* Lista de registros */}
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {/* Ingresos | Programados: lo que ya entró y lo que está por llegar. */}
+        <div className="border-b border-slate-100 p-2 dark:border-slate-800">
+          <div className="flex gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/60">
+            {([
+              { id: "ingresos", label: "Ingresos", Icono: FileInput },
+              { id: "programados", label: "Programados", Icono: CalendarClock },
+            ] as const).map(({ id, label, Icono }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setVistaLista(id)}
+                aria-pressed={vistaLista === id}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                  vistaLista === id
+                    ? "bg-white text-blue-700 shadow-sm dark:bg-slate-900 dark:text-cyan-300"
+                    : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                <Icono size={15} />
+                {label}
+                {id === "programados" && programados.length > 0 && (
+                  <span className="min-w-[1.25rem] rounded-full bg-amber-500 px-1.5 text-[11px] font-bold leading-5 text-white tabular-nums">
+                    {programados.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {vistaLista === "programados" ? (
+          <ListaProgramados
+            items={programados}
+            error={errorProgramados}
+            editandoId={editandoProgramadoId}
+            presentandoId={presentandoId}
+            onLlego={presentarProgramado}
+            onEditar={editarProgramado}
+          />
+        ) : (
+        <>
         <div className="px-4 py-3.5">
           <div className="mb-3 flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><Icon icon={calendar} width={18} /></div>
@@ -917,6 +1163,8 @@ export default function ControlIngresosPage() {
             </>
           )}
         </div>
+        </>
+        )}
       </div>
 
       </div>

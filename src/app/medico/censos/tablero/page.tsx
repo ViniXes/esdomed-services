@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ResumenCensoMes, TipoCenso } from "@/types";
-import { puedeVerDetallePersonal, puedeVerTableroCensos } from "@/lib/accesoTableroCensos";
+import { puedeVerTableroCensos } from "@/lib/accesoTableroCensos";
 import { diaDe, mesesDelTablero } from "@/lib/emergencia/resumenCenso";
 import {
   buscarDesajustes, cargarResumenes, reconstruirMes, type DesajusteResumen,
@@ -90,7 +90,6 @@ export default function TableroCensosPage() {
       recalculando={recalculando}
       error={error}
       leidoEn={lectura?.leidoEn ?? null}
-      verPersonal={puedeVerDetallePersonal(profile)}
       onActualizar={() => cargar(tipo)}
       onRecalcular={recalcular}
     />

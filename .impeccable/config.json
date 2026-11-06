@@ -45,6 +45,24 @@
         ],
         "createdAt": "2026-11-06T17:08:29.919Z",
         "reason": "Claude: falso positivo. Boton Quitar: el gris es el estado de reposo sobre fondo transparente; el fondo rojo solo existe en hover y ahi el texto tambien pasa a rojo. Linea preexistente."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/components/esdomed/ListaProgramados.tsx"
+        ],
+        "createdAt": "2026-11-06T20:48:48.208Z",
+        "reason": "model triage: pencil icon is gray only at rest on a transparent background; hover switches background and text to blue together, so gray never sits on color"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/app/dashboard/control-ingresos/page.tsx"
+        ],
+        "createdAt": "2026-11-06T20:48:48.563Z",
+        "reason": "model triage: pencil icon is gray only at rest on a transparent background; hover switches background and text to blue together, so gray never sits on color"
       }
     ]
   }

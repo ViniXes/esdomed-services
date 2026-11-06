@@ -32,14 +32,17 @@ export const ESTADO_TRAMITE_LABEL: Record<EstadoTramitePersonal, string> = {
   pendiente: "Pendiente",
   aprobado: "Aprobado",
   rechazado: "Rechazado",
+  anulado: "Anulado",
 };
 
 // Semánticos del design system: ámbar = pendiente, esmeralda = aprobado, rose = rechazado.
+// Anulado va neutro: no es un error, el permiso simplemente no se tomó.
 export const ESTADO_TRAMITE_PILL: Record<EstadoTramitePersonal, string> = {
   subido: "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700",
   pendiente: "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-900",
   aprobado: "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-900",
   rechazado: "bg-rose-50 text-rose-800 ring-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:ring-rose-900",
+  anulado: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700",
 };
 
 /** "2026-10-12" → "12 de octubre de 2026". */

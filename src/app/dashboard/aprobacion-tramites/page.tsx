@@ -19,6 +19,7 @@ import {
   fechasDelPermiso,
   periodoDeFecha,
   periodosDelPermiso,
+  quitarPermisoDeFilas,
   reaplicarPermisoEnFilas,
 } from "@/lib/esdomed/permisos-plan";
 import { getHorario } from "@/lib/esdomed/horarios";
@@ -90,6 +91,8 @@ export default function AprobacionTramitesPage() {
   const [revisandoCoincidencias, setRevisandoCoincidencias] = useState(false);
   const [ajustando, setAjustando] = useState(false);
   const [errorAjuste, setErrorAjuste] = useState<string | null>(null);
+  const [anulando, setAnulando] = useState(false);
+  const [errorAnulacion, setErrorAnulacion] = useState<string | null>(null);
 
   const leerPendientes = useCallback(async () => {
     const snap = await getDocs(query(collection(db, "tramites_personal"), where("estado", "==", "pendiente"), limit(LIMITE_BUSQUEDA)));
@@ -257,6 +260,7 @@ export default function AprobacionTramitesPage() {
     setConflictosPermiso([]);
     setAdvertenciasPermiso([]);
     setErrorAjuste(null);
+    setErrorAnulacion(null);
     if (tramite.estado !== "pendiente" || !esPermisoPersonal(tramite)) return;
 
     setRevisandoCoincidencias(true);
@@ -472,6 +476,106 @@ export default function AprobacionTramitesPage() {
       return false;
     } finally {
       setAjustando(false);
+    }
+  };
+
+  // El empleado no tomó un permiso ya aprobado (solo admin). Una transacción anula
+  // el trámite y devuelve el turno en el plan: nunca queda uno sin el otro.
+  const anularPermiso = async (motivo: string): Promise<boolean> => {
+    if (!detalle?.id || !user || !profile || profile.role !== "admin") return false;
+    const id = detalle.id;
+    setAnulando(true);
+    setErrorAnulacion(null);
+    try {
+      const ahora = Timestamp.now();
+      const lineas: string[] = [];
+      let hayEditados = false;
+      let nuevo!: TramitePersonal;
+      await runTransaction(db, async (tx) => {
+        lineas.length = 0;
+        hayEditados = false;
+        const refTramite = doc(db, "tramites_personal", id);
+        const snapTramite = await tx.get(refTramite);
+        if (!snapTramite.exists()) throw new Error("El trámite ya no existe.");
+        const actual = { id, ...snapTramite.data() } as TramitePersonal;
+        if (!esPermisoPersonal(actual) || actual.estado !== "aprobado") {
+          throw new Error("Este trámite ya no está aprobado.");
+        }
+        // Se comprueba aquí y no solo en pantalla: el empleado pudo subir el
+        // respaldo mientras la ficha estaba abierta.
+        if (docsDeTramite(actual).length > 0) {
+          throw new Error("El empleado ya subió documentos: el permiso se considera realizado y no se puede anular.");
+        }
+
+        // Lecturas del plan antes de cualquier escritura (requisito de las transacciones).
+        const planes: { periodo: string; snap: Awaited<ReturnType<typeof tx.get>> }[] = [];
+        for (const periodo of periodosDelPermiso(actual)) {
+          planes.push({ periodo, snap: await tx.get(doc(db, "planes_trabajo", periodo)) });
+        }
+
+        const escrituras: { periodo: string; filas: FilaPlanTrabajo[] }[] = [];
+        for (const { periodo, snap } of planes) {
+          // Sin plan no hay nada que devolver, y al crearlo ya no se aplicará: no está aprobado.
+          if (!snap.exists()) continue;
+          const r = quitarPermisoDeFilas((snap.data() as PlanTrabajo).filas ?? [], id);
+          if (!r.cambio) {
+            lineas.push(`${labelPeriodo(periodo)}: el plan no tenía marcas de este permiso.`);
+            continue;
+          }
+          escrituras.push({ periodo, filas: r.filas });
+          const partes: string[] = [];
+          if (r.restaurados > 0) partes.push(`${r.restaurados} día(s) volvieron a su turno`);
+          if (r.parciales > 0) partes.push(`se quitó la fracción de turno de ${r.parciales} día(s)`);
+          if (r.editados > 0) {
+            partes.push(`${r.editados} día(s) ya estaban editados a mano y no se tocaron`);
+            hayEditados = true;
+          }
+          lineas.push(`${labelPeriodo(periodo)}: ${partes.join(" y ")}.`);
+        }
+
+        nuevo = {
+          ...actual,
+          estado: "anulado",
+          anuladoPorId: user.uid,
+          anuladoPorNombre: profile.nombre,
+          anuladoEn: ahora.toDate(),
+          motivoAnulacion: motivo,
+          actualizadoEn: ahora.toDate(),
+        };
+        tx.update(refTramite, {
+          estado: "anulado",
+          anuladoPorId: user.uid,
+          anuladoPorNombre: profile.nombre,
+          anuladoEn: ahora,
+          motivoAnulacion: motivo,
+          actualizadoEn: ahora,
+        });
+        for (const { periodo, filas } of escrituras) {
+          tx.update(doc(db, "planes_trabajo", periodo), {
+            filas,
+            actualizadoEn: ahora,
+            actualizadoPorId: user.uid,
+            actualizadoPorNombre: profile.nombre,
+          });
+        }
+      });
+
+      setDetalle(nuevo);
+      setResultados((prev) => prev?.map((t) => (t.id === id ? nuevo : t)) ?? prev);
+      setResultadoPlan({
+        titulo: "Permiso anulado",
+        lineas: lineas.length > 0 ? lineas : ["El mes del permiso aún no tiene plan de trabajo, así que no había nada que devolver."],
+        tono: hayEditados ? "alerta" : "exito",
+      });
+      return true;
+    } catch (err) {
+      console.error("No se pudo anular el permiso", err);
+      setErrorAnulacion(err instanceof Error && !("code" in err)
+        ? err.message
+        : "No se pudo anular el permiso. Intenta de nuevo.");
+      return false;
+    } finally {
+      setAnulando(false);
     }
   };
 
@@ -694,6 +798,11 @@ export default function AprobacionTramitesPage() {
             && (detalle.estado === "pendiente" || detalle.estado === "aprobado")
             && esPermisoDeUnTurno(detalle)
               ? { guardando: ajustando, error: errorAjuste, onGuardar: ajustarHoras }
+              : undefined
+          }
+          anulacion={
+            profile?.role === "admin" && esPermisoPersonal(detalle) && detalle.estado === "aprobado"
+              ? { guardando: anulando, error: errorAnulacion, onAnular: anularPermiso }
               : undefined
           }
           resolucion={detalle.estado === "pendiente" ? {

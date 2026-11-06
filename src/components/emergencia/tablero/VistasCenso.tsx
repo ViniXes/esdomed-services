@@ -33,7 +33,6 @@ export interface VistaProps {
   puntos: { etiqueta: string; valor: number }[];
   subtituloEvolucion: string;
   detalleTotal?: string;
-  verPersonal: boolean;
 }
 
 const suma = (c: Record<string, number> = {}) => Object.values(c).reduce((s, n) => s + n, 0);
@@ -113,7 +112,7 @@ function QuienEvalua({ conteos, total }: { conteos: ConteosCenso; total: number 
   );
 }
 
-/** Atenciones por persona: solo para quien tiene ese permiso. */
+/** Atenciones por persona: las ve todo el que entra al tablero. */
 function DetallePersonal({ conteos, total }: { conteos: ConteosCenso; total: number }) {
   const reevaluacion = { ...conteos.reevaluacion };
   delete reevaluacion[NO_APLICA];
@@ -139,7 +138,7 @@ const TRIAGE_PARTES = [
   { clave: SIN_DATO, etiqueta: "Sin dato", clase: MARCA_SIN_DATO, textoClase: "text-slate-800 dark:text-slate-100" },
 ];
 
-export function VistaDemanda({ resumen, puntos, subtituloEvolucion, detalleTotal, verPersonal }: VistaProps) {
+export function VistaDemanda({ resumen, puntos, subtituloEvolucion, detalleTotal }: VistaProps) {
   const { total, conteos } = resumen;
   const ingresos = conteos.destino?.ingreso ?? 0;
   const rojos = conteos.triage?.rojo ?? 0;
@@ -219,7 +218,7 @@ export function VistaDemanda({ resumen, puntos, subtituloEvolucion, detalleTotal
           )}
         </Tarjeta>
         </div>
-        {verPersonal && <DetallePersonal conteos={conteos} total={total} />}
+        <DetallePersonal conteos={conteos} total={total} />
       </div>
     </>
   );
@@ -232,7 +231,7 @@ const TRES_ESTADOS = (c: Record<string, number> = {}) => [
   { etiqueta: "Sin dato", valor: c[SIN_DATO] ?? 0, clase: MARCA_SIN_DATO, textoClase: "text-slate-800 dark:text-slate-100" },
 ];
 
-export function VistaReferidos({ resumen, puntos, subtituloEvolucion, detalleTotal, verPersonal }: VistaProps) {
+export function VistaReferidos({ resumen, puntos, subtituloEvolucion, detalleTotal }: VistaProps) {
   const { total, conteos } = resumen;
   const estables = conteos.condicion?.estable ?? 0;
   const inestables = conteos.condicion?.inestable ?? 0;
@@ -318,7 +317,7 @@ export function VistaReferidos({ resumen, puntos, subtituloEvolucion, detalleTot
 
         <Diagnosticos conteos={conteos} total={total} titulo="Diagnóstico" />
         <Procedimientos conteos={conteos} total={total} />
-        {verPersonal && <DetallePersonal conteos={conteos} total={total} />}
+        <DetallePersonal conteos={conteos} total={total} />
       </div>
     </>
   );

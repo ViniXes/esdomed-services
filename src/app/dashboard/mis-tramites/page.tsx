@@ -70,6 +70,7 @@ const ESTADO_BADGE: Record<EstadoTramitePersonal, string> = {
   "pendiente": "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   "aprobado": "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   "rechazado": "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+  "anulado": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
 };
 
 const ESTADO_LABEL: Record<EstadoTramitePersonal, string> = {
@@ -77,6 +78,7 @@ const ESTADO_LABEL: Record<EstadoTramitePersonal, string> = {
   "pendiente": "Pendiente de Aprobación",
   "aprobado": "Aprobado",
   "rechazado": "Rechazado",
+  "anulado": "Anulado",
 };
 
 const inputCls = "w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition";
@@ -617,6 +619,12 @@ function MisTramitesVista() {
                       <p className="text-sm text-blue-950 dark:text-blue-200">{t.comentariosRevision}</p>
                     </div>
                   )}
+                  {t.estado === "anulado" && (
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                      <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Permiso anulado por Administración:</p>
+                      <p className="text-sm text-slate-800 dark:text-slate-100">{t.motivoAnulacion}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="shrink-0 flex flex-col items-stretch md:items-end gap-2 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 pt-3 md:pt-0 md:pl-5 w-full md:w-auto">
@@ -656,7 +664,7 @@ function MisTramitesVista() {
                     >
                       <Paperclip size={14} /> {docs.length > 0 ? "Gestionar documentos" : "Agregar documentos"}
                     </button>
-                  ) : (
+                  ) : t.estado !== "anulado" && (
                     <button
                       onClick={() => abrirEditar(t)}
                       className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl transition-colors w-full md:w-auto"

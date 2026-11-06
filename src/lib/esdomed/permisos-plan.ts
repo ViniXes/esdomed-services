@@ -180,6 +180,44 @@ export function reaplicarPermisoEnFilas(
   return r.cambio ? r : { ...r, filas: limpias, cambio: true };
 }
 
+/** Resultado de retirar un permiso del plan de un mes. */
+export interface ResultadoQuitarPermiso {
+  filas: FilaPlanTrabajo[];
+  cambio: boolean;
+  restaurados: number;  // días PER que volvieron a su turno
+  parciales: number;    // fracciones de turno que dejaron de anotarse
+  editados: number;     // celdas editadas a mano: se respetan, solo se quita el registro
+}
+
+/**
+ * Retira un permiso anulado de las filas de un mes: devuelve el turno a las celdas
+ * que la automatización marcó "PER" y borra su registro en `fila.permisos`. A
+ * diferencia de `reaplicarPermisoEnFilas`, también borra el registro de una celda
+ * editada a mano: el permiso ya no existe y esa celda no debe seguir citándolo.
+ */
+export function quitarPermisoDeFilas(filas: FilaPlanTrabajo[], tramiteId: string): ResultadoQuitarPermiso {
+  let restaurados = 0;
+  let parciales = 0;
+  let editados = 0;
+
+  const filasNuevas = filas.map((fila) => {
+    const propios = (fila.permisos ?? []).filter((p) => p.tramiteId === tramiteId);
+    if (propios.length === 0) return fila;
+
+    const asignaciones = [...fila.asignaciones];
+    for (const p of propios) {
+      if (p.parcial) parciales++;
+      else if ((asignaciones[p.dia - 1] ?? "").trim().toUpperCase() === "PER") {
+        asignaciones[p.dia - 1] = p.codigoTurno;
+        restaurados++;
+      } else editados++;
+    }
+    return { ...fila, asignaciones, permisos: (fila.permisos ?? []).filter((p) => p.tramiteId !== tramiteId) };
+  });
+
+  return { filas: filasNuevas, cambio: restaurados + parciales + editados > 0, restaurados, parciales, editados };
+}
+
 /** Aplica una lista de permisos aprobados sobre las filas de un mes (para el editor). */
 export function aplicarPermisosAprobados(
   filas: FilaPlanTrabajo[],

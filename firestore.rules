@@ -570,6 +570,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Expedientes que ESDOMED crea antes de que llegue el paciente (Código Infarto,
+    // Chat Marcapasos). Van aparte de control_ingresos para no salir en la cola que
+    // ven los médicos; al llegar el paciente se registra el ingreso normal.
+    match /expedientes_programados/{id} {
+      allow read:   if isEsdomed() || isAdmin();
+      allow create: if (isEsdomed() || isAdmin())
+                    && request.resource.data.creadoPor == uid();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── Censos de Emergencia ─────────────────────────────────────────────────
     // Digitan los médicos de emergencia (rol medico); ESDOMED supervisa.
     match /censo_demanda_espontanea/{id} {
