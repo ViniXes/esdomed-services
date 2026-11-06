@@ -588,6 +588,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Contadores mensuales del tablero (id "{demanda|referidos}-YYYY-MM"); no llevan
+    // datos de pacientes. Se escriben en el mismo lote que el censo, por eso quien
+    // digita debe poder escribirlos.
+    match /censo_resumen/{id} {
+      allow read:   if isMedico() || isEsdomed() || isAdmin();
+      allow create, update: if isMedico() || isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // Personal y especialidades que los médicos agregan desde los censos. Solo se
     // agrega (sin update): así nadie puede vaciar ni reescribir la lista
     // compartida. Quitar una entrada equivocada le toca a admin.

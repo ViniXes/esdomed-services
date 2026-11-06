@@ -80,6 +80,7 @@ export const ESPECIALIDADES_EMERGENCIA = [
   "Oncología",
   "Cardiología",
   "Cuidados Paliativos",
+  "Nefrología",
 ] as const;
 
 // ── Servicios a los que se ingresa desde emergencia (nivel macro del censo) ──

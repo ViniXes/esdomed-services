@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
+import { collection, deleteField, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -25,6 +25,7 @@ import {
   tipoEvaluador, turnoSegunHora,
 } from "@/lib/emergencia/censos";
 import { useCatalogoPersonal } from "@/lib/emergencia/catalogoPersonal";
+import { guardarCenso } from "@/lib/emergencia/resumenCensoDatos";
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
   ChipMulti, ChipSelect, DiagnosticosEditor,
@@ -263,22 +264,18 @@ export default function CensoReferidosPage() {
         medicosGenerales: form.medicosGenerales,
       };
 
-      if (editandoId) {
-        await updateDoc(doc(db, "censo_referidos", editandoId), {
-          ...datos,
-          // campos retirados: ya van fundidos en procedimientosUE
-          procedimientosMaxima: deleteField(),
-          otrosProcedimientos: deleteField(),
-          actualizadoEn: Timestamp.now(),
-        });
-      } else {
-        await addDoc(collection(db, "censo_referidos"), {
-          ...datos,
-          creadoEn: Timestamp.now(),
-          creadoPorId: profile.uid,
-          creadoPorNombre: profile.nombre,
-        });
-      }
+      await guardarCenso("referidos", editandoId, datos, editandoId
+        ? {
+            // campos retirados: ya van fundidos en procedimientosUE
+            procedimientosMaxima: deleteField(),
+            otrosProcedimientos: deleteField(),
+            actualizadoEn: Timestamp.now(),
+          }
+        : {
+            creadoEn: Timestamp.now(),
+            creadoPorId: profile.uid,
+            creadoPorNombre: profile.nombre,
+          });
 
       setGuardado({ expediente: form.expediente.trim(), cerrado: faltan.length === 0 });
     } catch (e) {

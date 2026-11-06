@@ -147,6 +147,12 @@ Consecuencias en el resto del sistema (regla para código nuevo: todo listado de
 
 **Eliminar** (`DELETE`) borra Auth + documento y hace desaparecer a la persona de cualquier plan que se vuelva a guardar. Reservarlo para cuentas creadas por error, nunca para personal que trabajó.
 
+### Tablero de censos de emergencia
+
+`/medico/censos/tablero` no lee los censos: lee un documento de contadores por mes (`censo_resumen/{demanda|referidos}-YYYY-MM`), sin datos de pacientes. Arranca en noviembre de 2026 (`MES_INICIO_RESUMEN`); lo anterior fueron pruebas con otros campos y no cuenta. Si el resumen no coincide con los censos, el tablero avisa y ofrece Recalcular. Lo ven los médicos con servicio Emergencia y admin; las atenciones por persona, solo admin y quien tenga `veDetallePersonalCensos` en su perfil.
+
+Reglas para código nuevo: todo guardado de un censo pasa por `guardarCenso()` (`src/lib/emergencia/resumenCensoDatos.ts`), que escribe censo y contadores en el mismo lote. Un campo nuevo del formulario se agrega a `contribucion()` (`src/lib/emergencia/resumenCenso.ts`) y a su panel en `VistasCenso.tsx`. Prueba: `node scripts/test-resumen-censos.mjs`.
+
 ### Navegación (menú lateral) — registro declarativo
 
 Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:

@@ -23,6 +23,7 @@ export interface UserProfile {
   // completo de /comite-lesiones desde su portal. Se marca POR PERSONA desde
   // /dashboard/usuarios (la API lo escribe; las reglas lo leen del perfil).
   apoyaComiteLesiones?: boolean;
+  veDetallePersonalCensos?: boolean; // ve cuántas atenciones lleva cada persona en el tablero de censos
   jvpm?: string;        // solo médicos — sello/firma
   dui?: string;         // solo médicos — documento único de identidad (########-#)
   codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
@@ -2090,6 +2091,20 @@ export type EstadoRegistroCenso = "abierto" | "cerrado";
 // especialidad y no una persona. null = fuera de las listas (registros antiguos
 // de texto libre).
 export type TipoEvaluadorEmergencia = "staff" | "medico_general" | "especialidad";
+
+export type TipoCenso = "demanda" | "referidos";
+
+// dimensión → clave → cantidad de registros.
+export type ConteosCenso = Record<string, Record<string, number>>;
+
+// Contadores de un mes de censo: lo que lee el tablero (colección censo_resumen,
+// id "{tipo}-YYYY-MM"). No lleva datos de pacientes. Ver lib/emergencia/resumenCenso.ts.
+export interface ResumenCensoMes {
+  tipo: TipoCenso;
+  mes: string;                    // YYYY-MM en hora de El Salvador
+  total: number;
+  conteos: ConteosCenso;
+}
 
 // Lo que los médicos agregan al catálogo de personal de los censos de emergencia
 // (colección censo_catalogo_personal, id = claveCatalogo(nombre)).

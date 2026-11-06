@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addDoc, collection, deleteField, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
+import { collection, deleteField, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -24,6 +24,7 @@ import {
   TRIAGES, medicosGeneralesLista, procedimientosUnificados, tipoEvaluador, turnoSegunHora,
 } from "@/lib/emergencia/censos";
 import { useCatalogoPersonal } from "@/lib/emergencia/catalogoPersonal";
+import { guardarCenso } from "@/lib/emergencia/resumenCensoDatos";
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
   ChipMulti, ChipSelect, DiagnosticosEditor,
@@ -278,20 +279,16 @@ export default function CensoDemandaEspontaneaPage() {
         medicosGenerales: form.medicosGenerales,
       };
 
-      if (editandoId) {
-        await updateDoc(doc(db, "censo_demanda_espontanea", editandoId), {
-          ...datos,
-          procedimientosMaxima: deleteField(), // campo retirado: ya va fundido en procedimientosUE
-          actualizadoEn: Timestamp.now(),
-        });
-      } else {
-        await addDoc(collection(db, "censo_demanda_espontanea"), {
-          ...datos,
-          creadoEn: Timestamp.now(),
-          creadoPorId: profile.uid,
-          creadoPorNombre: profile.nombre,
-        });
-      }
+      await guardarCenso("demanda", editandoId, datos, editandoId
+        ? {
+            procedimientosMaxima: deleteField(), // campo retirado: ya va fundido en procedimientosUE
+            actualizadoEn: Timestamp.now(),
+          }
+        : {
+            creadoEn: Timestamp.now(),
+            creadoPorId: profile.uid,
+            creadoPorNombre: profile.nombre,
+          });
 
       setGuardado({ expediente: form.expediente.trim(), cerrado: faltan.length === 0 });
     } catch (e) {
