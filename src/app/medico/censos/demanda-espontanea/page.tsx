@@ -20,17 +20,17 @@ import { toDate } from "@/lib/pacientes/helpers";
 import { ESTABLECIMIENTOS } from "@/lib/establecimientos";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
-  DEPENDENCIAS_HES, DESTINOS, ESPECIALIDADES_EMERGENCIA, HOSPITALES_REFERENCIA,
-  MEDICOS_GENERALES_EMERGENCIA, PROCEDIMIENTOS, STAFF_EMERGENCIA,
+  DEPENDENCIAS_HES, DESTINOS, HOSPITALES_REFERENCIA, PROCEDIMIENTOS,
   TRIAGES, medicosGeneralesLista, procedimientosUnificados, tipoEvaluador, turnoSegunHora,
 } from "@/lib/emergencia/censos";
+import { useCatalogoPersonal } from "@/lib/emergencia/catalogoPersonal";
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
-  ChipMulti, ChipSelect, DiagnosticosEditor, EvaluadorBadge, EvaluadorSelect,
-  FaltantesHint, Field, MedicosGeneralesPicker, SelectCatalogo, SiNoChips, inputCls,
+  ChipMulti, ChipSelect, DiagnosticosEditor,
+  FaltantesHint, Field, SelectCatalogo, SiNoChips, inputCls,
 } from "@/components/emergencia/censoUi";
 import {
-  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, NotaLocal, NotasEditor, Seccion,
+  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, CamposPersonal, NotaLocal, NotasEditor, Seccion,
   guardarMedicosGenerales, leerMedicosGeneralesGuardados, toDtLocal,
 } from "@/components/emergencia/censoSecciones";
 
@@ -88,6 +88,7 @@ function camposFaltantes(f: FormState): string[] {
 export default function CensoDemandaEspontaneaPage() {
   const { profile } = useAuth();
   const router = useRouter();
+  const { catalogo, agregar: agregarAlCatalogo } = useCatalogoPersonal();
 
   const [form, setForm] = useState<FormState>(() => formVacio(leerMedicosGeneralesGuardados()));
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -265,7 +266,7 @@ export default function CensoDemandaEspontaneaPage() {
         servicioIngresar: form.destino === "ingreso" ? form.servicioIngresar : null,
         centroRefiere: form.destino === "referencia" ? form.centroRefiere.trim() : null,
         staffEvalua: form.staffEvalua.trim(),
-        evaluadoPor: tipoEvaluador(form.staffEvalua.trim()),
+        evaluadoPor: tipoEvaluador(form.staffEvalua.trim(), catalogo),
         reevaluacion: form.reevaluacion.trim() || null,
         ventilacionMecanica: form.ventilacionMecanica,
         consulta48h,
@@ -433,7 +434,7 @@ export default function CensoDemandaEspontaneaPage() {
             <ChipSelect options={TRIAGES} value={form.triage} onChange={(v) => set("triage", v)} />
           </Field>
           <Field label="Especialidad que requiere" required>
-            <SelectCatalogo options={ESPECIALIDADES_EMERGENCIA} value={form.especialidad} onChange={(v) => set("especialidad", v)} />
+            <SelectCatalogo options={[...catalogo.especialidad, "Otra"]} value={form.especialidad} onChange={(v) => set("especialidad", v)} />
           </Field>
         </div>
 
@@ -510,35 +511,17 @@ export default function CensoDemandaEspontaneaPage() {
 
       {/* 05 · Personal médico que atiende */}
       <Seccion num="05" titulo="Personal médico que atiende" icon={Users}>
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <Field label="Staff que evalúa" required>
-            <EvaluadorSelect
-              value={form.staffEvalua}
-              onChange={(v) => set("staffEvalua", v)}
-              staff={STAFF_EMERGENCIA}
-              generales={MEDICOS_GENERALES_EMERGENCIA}
-            />
-            {form.staffEvalua && (
-              <div className="mt-1.5"><EvaluadorBadge tipo={tipoEvaluador(form.staffEvalua)} /></div>
-            )}
-          </Field>
-          <Field label="Staff que reevalúa">
-            <EvaluadorSelect
-              value={form.reevaluacion}
-              onChange={(v) => set("reevaluacion", v)}
-              staff={STAFF_EMERGENCIA}
-              generales={MEDICOS_GENERALES_EMERGENCIA}
-              placeholder="— No aplica"
-            />
-          </Field>
-          <Field label="Médicos generales del turno (se recuerdan entre registros)" className="sm:col-span-2 xl:col-span-1">
-            <MedicosGeneralesPicker
-              value={form.medicosGenerales}
-              onChange={(v) => set("medicosGenerales", v)}
-              catalogo={MEDICOS_GENERALES_EMERGENCIA}
-            />
-          </Field>
-        </div>
+        <CamposPersonal
+          staffEvalua={form.staffEvalua}
+          reevaluacion={form.reevaluacion}
+          medicosGenerales={form.medicosGenerales}
+          onStaffEvalua={(v) => set("staffEvalua", v)}
+          onReevaluacion={(v) => set("reevaluacion", v)}
+          onMedicosGenerales={(v) => set("medicosGenerales", v)}
+          catalogo={catalogo}
+          onAgregar={agregarAlCatalogo}
+          etiquetaReevaluacion="Staff que reevalúa"
+        />
       </Seccion>
 
       {/* 06 · Plan y observaciones */}

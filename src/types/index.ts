@@ -2084,11 +2084,22 @@ export type DestinoEmergencia =
 // automáticamente cuando todo está digitado.
 export type EstadoRegistroCenso = "abierto" | "cerrado";
 
-// Quién hizo la atención: DERIVADO al guardar según a qué lista oficial
-// (STAFF_EMERGENCIA / MEDICOS_GENERALES_EMERGENCIA) pertenece el nombre en
-// staffEvalua. Separa las atenciones del staff de las de médicos generales.
-// null = nombre fuera de las listas (registros antiguos de texto libre).
-export type TipoEvaluadorEmergencia = "staff" | "medico_general";
+// Quién hizo la atención: DERIVADO al guardar según a qué lista del catálogo vivo
+// pertenece lo anotado en staffEvalua (tipoEvaluador). Separa las atenciones del
+// staff de las de médicos generales; "especialidad" es cuando se anota la
+// especialidad y no una persona. null = fuera de las listas (registros antiguos
+// de texto libre).
+export type TipoEvaluadorEmergencia = "staff" | "medico_general" | "especialidad";
+
+// Lo que los médicos agregan al catálogo de personal de los censos de emergencia
+// (colección censo_catalogo_personal, id = claveCatalogo(nombre)).
+export interface EntradaCatalogoPersonal {
+  tipo: TipoEvaluadorEmergencia;
+  nombre: string;
+  creadoEn: Date;
+  creadoPorId: string;
+  creadoPorNombre: string;
+}
 
 export interface CensoDemandaEspontanea {
   id?: string;
@@ -2117,7 +2128,7 @@ export interface CensoDemandaEspontanea {
   triage: TriageEmergencia | null;
   condicion: "vivo" | "fallecido";
   diagnosticos: DiagnosticoCIE[]; // impresión diagnóstica, restringida a CIE-10
-  especialidad: string;           // catálogo ESPECIALIDADES_EMERGENCIA
+  especialidad: string;           // catálogo vivo de especialidades, o "Otra"
 
   // ── Referencia de entrada ──
   traeReferencia: boolean;
@@ -2129,7 +2140,7 @@ export interface CensoDemandaEspontanea {
   centroRefiere?: string;         // solo si destino == "referencia"
 
   // ── Médicos ──
-  staffEvalua: string;            // nombre del médico que evalúa (staff o general)
+  staffEvalua: string;            // quien evalúa: staff, médico general o una especialidad
   evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
   reevaluacion?: string;          // vacío/undefined = no aplica
   medicosGenerales?: string[] | string; // los del turno, del catálogo (string = registros viejos en texto libre; normalizar con medicosGeneralesLista)
@@ -2201,7 +2212,7 @@ export interface CensoReferido {
   servicioIngreso: string;        // SERVICIOS_HOSPITALARIOS o DESENLACES_SIN_INGRESO
 
   // ── Médicos ──
-  staffEvalua: string;            // nombre del médico que evalúa (staff o general)
+  staffEvalua: string;            // quien evalúa: staff, médico general o una especialidad
   evaluadoPor: TipoEvaluadorEmergencia | null; // derivado de staffEvalua
   reevaluacion?: string;          // vacío/undefined = no aplica
   medicosGenerales?: string[] | string; // ver CensoDemandaEspontanea.medicosGenerales

@@ -9,8 +9,11 @@
 import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import type { Genero, TurnoEmergencia } from "@/types";
 import { DateTimeField } from "@/components/ui/DateTimeField";
-import { TURNOS, medicosGeneralesLista } from "@/lib/emergencia/censos";
-import { ChipSelect, Field, inputCls } from "@/components/emergencia/censoUi";
+import { TURNOS, medicosGeneralesLista, tipoEvaluador, type CatalogoPersonal } from "@/lib/emergencia/censos";
+import type { AgregarAlCatalogo } from "@/lib/emergencia/catalogoPersonal";
+import {
+  BuscadorPersonal, ChipSelect, EvaluadorBadge, Field, MedicosGeneralesPicker, TIPOS_EVALUADOR, inputCls,
+} from "@/components/emergencia/censoUi";
 
 export const pad = (n: number) => String(n).padStart(2, "0");
 export const toDtLocal = (d: Date) =>
@@ -149,6 +152,63 @@ export function CamposMomento({ fechaHora, turno, onFechaHora, onTurno }: {
       </Field>
       <Field label="Turno" required>
         <ChipSelect options={TURNOS} value={turno} onChange={onTurno} />
+      </Field>
+    </div>
+  );
+}
+
+// ── Personal médico que atiende ──────────────────────────────────────────────
+// En cualquiera de los tres campos se puede anotar una especialidad en lugar de
+// una persona.
+
+export function CamposPersonal({
+  staffEvalua, reevaluacion, medicosGenerales,
+  onStaffEvalua, onReevaluacion, onMedicosGenerales,
+  catalogo, onAgregar, etiquetaReevaluacion,
+}: {
+  staffEvalua: string;
+  reevaluacion: string;
+  medicosGenerales: string[];
+  onStaffEvalua: (v: string) => void;
+  onReevaluacion: (v: string) => void;
+  onMedicosGenerales: (v: string[]) => void;
+  catalogo: CatalogoPersonal;
+  onAgregar: AgregarAlCatalogo;
+  etiquetaReevaluacion: string;
+}) {
+  return (
+    <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <Field label="Staff que evalúa" required>
+        <BuscadorPersonal
+          value={staffEvalua}
+          onChange={onStaffEvalua}
+          catalogo={catalogo}
+          tipos={TIPOS_EVALUADOR}
+          onAgregar={onAgregar}
+          ariaLabel="Staff que evalúa"
+        />
+        {staffEvalua && (
+          <div className="mt-1.5"><EvaluadorBadge tipo={tipoEvaluador(staffEvalua, catalogo)} /></div>
+        )}
+      </Field>
+      <Field label={etiquetaReevaluacion}>
+        <BuscadorPersonal
+          value={reevaluacion}
+          onChange={onReevaluacion}
+          catalogo={catalogo}
+          tipos={TIPOS_EVALUADOR}
+          onAgregar={onAgregar}
+          placeholder="Buscar… (vacío = no aplica)"
+          ariaLabel={etiquetaReevaluacion}
+        />
+      </Field>
+      <Field label="Médicos generales del turno (se recuerdan entre registros)" className="sm:col-span-2 xl:col-span-1">
+        <MedicosGeneralesPicker
+          value={medicosGenerales}
+          onChange={onMedicosGenerales}
+          catalogo={catalogo}
+          onAgregar={onAgregar}
+        />
       </Field>
     </div>
   );

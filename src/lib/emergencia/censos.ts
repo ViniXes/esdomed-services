@@ -4,12 +4,15 @@
 // Todos los catálogos salen de los valores REALES de los libros de Excel 2026
 // (hojas de junio), normalizados: donde el libro tenía 26 variantes de texto
 // libre aquí hay una lista cerrada. Si emergencia pide un valor nuevo, se
-// agrega aquí (una línea) y queda disponible para todos.
+// agrega aquí (una línea) y queda disponible para todos. La excepción es el
+// personal médico y las especialidades: los médicos agregan los suyos desde el
+// propio formulario (ver "Catálogo vivo de personal" más abajo).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type {
   ClasificacionSisReferido,
   DestinoEmergencia,
+  EntradaCatalogoPersonal,
   TipoEvaluadorEmergencia,
   TriageEmergencia,
   TurnoEmergencia,
@@ -64,15 +67,19 @@ export const DESTINO_LABEL: Record<DestinoEmergencia, string> = Object.fromEntri
 ) as Record<DestinoEmergencia, string>;
 
 // ── Especialidades que evalúan en emergencia ─────────────────────────────────
+// Sirven para "Especialidad que requiere" y, en mayúsculas, para el personal que
+// atiende cuando en vez de una persona se anota la especialidad.
 
 export const ESPECIALIDADES_EMERGENCIA = [
   "Medicina Interna",
   "Cirugía",
+  "Pediatría",
   "Medicina General",
-  "Oncología",
   "Ginecología",
+  "Hematología",
+  "Oncología",
   "Cardiología",
-  "Otra",
+  "Cuidados Paliativos",
 ] as const;
 
 // ── Servicios a los que se ingresa desde emergencia (nivel macro del censo) ──
@@ -306,11 +313,69 @@ export const MEDICOS_GENERALES_EMERGENCIA = [
   "GUSTAVO ALEJANDRO GOMEZ CORNEJO",
 ] as const;
 
+// ── Catálogo vivo de personal ────────────────────────────────────────────────
+// Las listas oficiales de arriba más lo que los médicos agregan desde el
+// formulario (colección censo_catalogo_personal, ver useCatalogoPersonal).
+
+export type CatalogoPersonal = Record<TipoEvaluadorEmergencia, readonly string[]>;
+
+// Llave de comparación: ignora mayúsculas, tildes y signos, así "Cirugia" no
+// entra como duplicado de "CIRUGÍA". También es el id del documento.
+export function claveCatalogo(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+const PALABRAS_MENORES = new Set(["de", "del", "la", "las", "los", "y", "e", "en"]);
+
+// Forma en que se guarda lo agregado: nombres en mayúsculas como las listas
+// oficiales; especialidades como "Medicina Interna", porque también se ofrecen
+// en el select de "Especialidad que requiere".
+export function nombreParaCatalogo(tipo: TipoEvaluadorEmergencia, texto: string): string {
+  const limpio = texto.trim().replace(/\s+/g, " ");
+  if (tipo !== "especialidad") return limpio.toUpperCase();
+  return limpio
+    .toLowerCase()
+    .split(" ")
+    .map((p, i) => (i > 0 && PALABRAS_MENORES.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)))
+    .join(" ");
+}
+
+const alfabetico = (a: string, b: string) => a.localeCompare(b, "es");
+
+// Personas en orden alfabético para ubicarlas a simple vista; las especialidades
+// conservan el orden oficial y las agregadas van al final.
+export function combinarCatalogo(extras: EntradaCatalogoPersonal[]): CatalogoPersonal {
+  const vistos = new Set(
+    [...STAFF_EMERGENCIA, ...MEDICOS_GENERALES_EMERGENCIA, ...ESPECIALIDADES_EMERGENCIA].map(claveCatalogo),
+  );
+  const nuevos = extras.filter((e) => {
+    const clave = claveCatalogo(e.nombre);
+    if (vistos.has(clave)) return false;
+    vistos.add(clave);
+    return true;
+  });
+  const de = (tipo: TipoEvaluadorEmergencia) => nuevos.filter((e) => e.tipo === tipo).map((e) => e.nombre);
+  return {
+    staff: [...STAFF_EMERGENCIA, ...de("staff")].sort(alfabetico),
+    medico_general: [...MEDICOS_GENERALES_EMERGENCIA, ...de("medico_general")].sort(alfabetico),
+    especialidad: [...ESPECIALIDADES_EMERGENCIA, ...de("especialidad").sort(alfabetico)],
+  };
+}
+
 // Deriva quién evalúa según a qué lista pertenece el nombre; null para
 // nombres fuera de catálogo (registros antiguos digitados como texto libre).
-export function tipoEvaluador(nombre: string): TipoEvaluadorEmergencia | null {
-  if ((STAFF_EMERGENCIA as readonly string[]).includes(nombre)) return "staff";
-  if ((MEDICOS_GENERALES_EMERGENCIA as readonly string[]).includes(nombre)) return "medico_general";
+export function tipoEvaluador(nombre: string, catalogo: CatalogoPersonal): TipoEvaluadorEmergencia | null {
+  const clave = claveCatalogo(nombre);
+  if (!clave) return null;
+  const esta = (lista: readonly string[]) => lista.some((x) => claveCatalogo(x) === clave);
+  if (esta(catalogo.staff)) return "staff";
+  if (esta(catalogo.medico_general)) return "medico_general";
+  if (esta(catalogo.especialidad)) return "especialidad";
   return null;
 }
 
@@ -341,4 +406,5 @@ export function medicosGeneralesLista(v: unknown): string[] {
 export const TIPO_EVALUADOR_LABEL: Record<TipoEvaluadorEmergencia, string> = {
   staff: "Staff",
   medico_general: "Médico general",
+  especialidad: "Especialidad",
 };

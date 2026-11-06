@@ -27,6 +27,24 @@
         ],
         "createdAt": "2026-10-07T21:05:46.830Z",
         "reason": "Claude: L175 is the pre-existing edit-censo pencil link; gray text sits on a transparent background and only gets bg-blue-50 together with text-blue-600 on hover"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/components/emergencia/censoUi.tsx"
+        ],
+        "createdAt": "2026-11-06T17:08:29.594Z",
+        "reason": "Claude: falso positivo. Boton Quitar: el gris es el estado de reposo sobre fondo transparente; el fondo rojo solo existe en hover y ahi el texto tambien pasa a rojo. Linea preexistente."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/components/emergencia/censoSecciones.tsx"
+        ],
+        "createdAt": "2026-11-06T17:08:29.919Z",
+        "reason": "Claude: falso positivo. Boton Quitar: el gris es el estado de reposo sobre fondo transparente; el fondo rojo solo existe en hover y ahi el texto tambien pasa a rojo. Linea preexistente."
       }
     ]
   }

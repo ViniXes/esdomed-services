@@ -588,6 +588,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Personal y especialidades que los médicos agregan desde los censos. Solo se
+    // agrega (sin update): así nadie puede vaciar ni reescribir la lista
+    // compartida. Quitar una entrada equivocada le toca a admin.
+    match /censo_catalogo_personal/{id} {
+      allow read:   if isMedico() || isEsdomed() || isAdmin();
+      allow create: if (isMedico() || isEsdomed() || isAdmin())
+                    && request.resource.data.creadoPorId == uid()
+                    && request.resource.data.tipo in ['staff', 'medico_general', 'especialidad']
+                    && request.resource.data.nombre is string
+                    && request.resource.data.nombre.size() >= 3;
+      allow delete: if isAdmin();
+    }
+
     // ─── Incapacidades ────────────────────────────────────────────────────────
     match /incapacidades/{id} {
       // Lectura pública para el cuerpo médico: cualquier médico (o staff) puede ver
