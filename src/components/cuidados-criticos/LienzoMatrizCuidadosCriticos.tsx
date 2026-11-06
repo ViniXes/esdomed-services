@@ -7,6 +7,7 @@ import { collection, doc, serverTimestamp, updateDoc, writeBatch } from "@/lib/f
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { fechaCuidadosCriticos } from "@/lib/fechasCuidadosCriticos";
+import { detectarGruposPosibleDuplicado, ponerGruposPosiblesDuplicadosJuntos, type GrupoPosibleDuplicado } from "@/lib/duplicadosCuidadosCriticos";
 import { aplicarCalculosBasicos, camposMatrizPorTipo, fichaPendienteCierreCuidadosCriticos, normalizarValorSiNo, VALOR_NO_REGISTRADO, valorComoTexto, valorNumericoEnteroComoTexto, type CampoMatrizCuidadosCriticos, type DatosMatrizCuidadosCriticos } from "@/lib/matrizCuidadosCriticos";
 import type { FichaCuidadosCriticos, TipoMedicoCuidadosCriticos } from "@/types";
 
@@ -28,6 +29,11 @@ interface Props {
 const PAGE_SIZE_OPTIONS = [100, 200, 300] as const;
 const DEFAULT_PAGE_SIZE = 200;
 
+function claveAvisoDuplicado(grupo: GrupoPosibleDuplicado) {
+  const ids = grupo.fichas.map(ficha => ficha.id).filter((id): id is string => Boolean(id)).sort();
+  return `${grupo.clave}|${ids.join(",")}`;
+}
+
 export function LienzoMatrizCuidadosCriticos({
   tipo = "ucin",
   datos,
@@ -45,6 +51,8 @@ export function LienzoMatrizCuidadosCriticos({
   const mostrarAcciones = puedeGestionarAcciones && modoAcciones;
   const [exportando, setExportando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [avisosDuplicadoDescartados, setAvisosDuplicadoDescartados] = useState<Set<string>>(() => new Set());
+  const [soloPosiblesDuplicados, setSoloPosiblesDuplicados] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const campos = useMemo(() => camposMatrizPorTipo(tipo), [tipo]);
@@ -56,17 +64,86 @@ export function LienzoMatrizCuidadosCriticos({
     ...ficha,
     datos: aplicarCalculosBasicos(ficha.datos ?? {}),
   })), [fichasOriginales]);
+  const gruposPosiblesDuplicados = useMemo(() => detectarGruposPosibleDuplicado(filas), [filas]);
+  const gruposPorFicha = useMemo(() => {
+    const resultado = new Map<string, (typeof gruposPosiblesDuplicados)[number]>();
+    gruposPosiblesDuplicados.forEach(grupo => grupo.fichas.forEach(ficha => {
+      if (ficha.id) resultado.set(ficha.id, grupo);
+    }));
+    return resultado;
+  }, [gruposPosiblesDuplicados]);
+  const filasOrdenadas = useMemo(
+    () => ponerGruposPosiblesDuplicadosJuntos(filas, gruposPosiblesDuplicados),
+    [filas, gruposPosiblesDuplicados],
+  );
   const mostrarCreador = Boolean(fichas);
   const busquedaNormalizada = normalizarBusqueda(busqueda);
   const filasFiltradas = useMemo(() => {
-    if (!busquedaNormalizada) return filas;
-    return filas.filter(fila => textoBusquedaFila(fila, campos).includes(busquedaNormalizada));
-  }, [busquedaNormalizada, campos, filas]);
-  const totalPaginas = Math.max(1, Math.ceil(filasFiltradas.length / pageSize));
+    if (!busquedaNormalizada) return filasOrdenadas;
+    return filasOrdenadas.filter(fila => textoBusquedaFila(fila, campos).includes(busquedaNormalizada));
+  }, [busquedaNormalizada, campos, filasOrdenadas]);
+  const idsCoincidenBusqueda = useMemo(
+    () => new Set(filasFiltradas.map(fila => fila.id).filter((id): id is string => Boolean(id))),
+    [filasFiltradas],
+  );
+  const gruposDuplicadosVisibles = useMemo(
+    () => gruposPosiblesDuplicados.filter(grupo =>
+      !avisosDuplicadoDescartados.has(claveAvisoDuplicado(grupo))
+      && grupo.fichas.some(ficha => ficha.id && idsCoincidenBusqueda.has(ficha.id)),
+    ),
+    [avisosDuplicadoDescartados, gruposPosiblesDuplicados, idsCoincidenBusqueda],
+  );
+  const idsDuplicadosVisibles = useMemo(
+    () => new Set(gruposDuplicadosVisibles.flatMap(grupo => grupo.fichas.map(ficha => ficha.id).filter((id): id is string => Boolean(id)))),
+    [gruposDuplicadosVisibles],
+  );
+  const filasDuplicadas = useMemo(
+    () => filasFiltradas.filter(fila => fila.id && idsDuplicadosVisibles.has(fila.id)),
+    [filasFiltradas, idsDuplicadosVisibles],
+  );
+  const filasVisibles = soloPosiblesDuplicados ? filasDuplicadas : filasFiltradas;
+  const totalFilasSinBusqueda = soloPosiblesDuplicados ? filasDuplicadas.length : filas.length;
+  const totalPaginas = Math.max(1, Math.ceil(filasVisibles.length / pageSize));
   const paginaActual = Math.min(pagina, totalPaginas);
   const inicio = (paginaActual - 1) * pageSize;
-  const fin = Math.min(inicio + pageSize, filasFiltradas.length);
-  const filasPagina = filasFiltradas.slice(inicio, fin);
+  const fin = Math.min(inicio + pageSize, filasVisibles.length);
+  const filasPagina = filasVisibles.slice(inicio, fin);
+
+  useEffect(() => {
+    let vigente = true;
+    queueMicrotask(() => {
+      if (!vigente) return;
+      if (!user?.uid || typeof window === "undefined") {
+        setAvisosDuplicadoDescartados(new Set());
+        return;
+      }
+      try {
+        const guardados = JSON.parse(window.localStorage.getItem(`cuidados-criticos:duplicados-revisados:v1:${user.uid}`) ?? "[]");
+        setAvisosDuplicadoDescartados(new Set(Array.isArray(guardados) ? guardados.filter((value): value is string => typeof value === "string") : []));
+      } catch {
+        setAvisosDuplicadoDescartados(new Set());
+      }
+    });
+    return () => { vigente = false; };
+  }, [user?.uid]);
+
+  const confirmarNoDuplicado = (grupo: GrupoPosibleDuplicado) => {
+    const claveAviso = claveAvisoDuplicado(grupo);
+    const expedientes = grupo.fichas.map(ficha => ficha.pacienteExpediente).join(", ");
+    const continuar = window.confirm(
+      `Coincidencia: expediente ${expedientes}; mismo servicio, cama, fecha y hora de ingreso.\n\n¿Confirmas que revisaste las fichas y que son estancias reales distintas? El aviso se ocultará solo en este navegador. No se modificará ni eliminará ningún registro.`,
+    );
+    if (!continuar) return;
+    const siguientes = new Set(avisosDuplicadoDescartados).add(claveAviso);
+    setAvisosDuplicadoDescartados(siguientes);
+    if (user?.uid) {
+      try {
+        window.localStorage.setItem(`cuidados-criticos:duplicados-revisados:v1:${user.uid}`, JSON.stringify([...siguientes]));
+      } catch {
+        // La confirmacion sigue vigente durante esta sesion aunque el navegador no permita almacenamiento local.
+      }
+    }
+  };
 
   useEffect(() => {
     setPagina(1);
@@ -77,12 +154,12 @@ export function LienzoMatrizCuidadosCriticos({
   }, [pagina, totalPaginas]);
 
   const exportarExcel = async () => {
-    if (filasFiltradas.length === 0 || exportando) return;
+    if (filasVisibles.length === 0 || exportando) return;
 
     try {
       setExportando(true);
       const XLSX = await import("xlsx");
-      const registros = filasFiltradas.map(fila => {
+      const registros = filasVisibles.map(fila => {
         const registro: Record<string, string> = {};
         campos.forEach(campo => {
           registro[campo.label] = valorCampo(fila, campo);
@@ -142,8 +219,27 @@ export function LienzoMatrizCuidadosCriticos({
 
           <button
             type="button"
+            onClick={() => {
+              setSoloPosiblesDuplicados(actual => !actual);
+              setPagina(1);
+            }}
+            disabled={gruposDuplicadosVisibles.length === 0 && !soloPosiblesDuplicados}
+            aria-pressed={soloPosiblesDuplicados}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              soloPosiblesDuplicados
+                ? "border-amber-500 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+                : "border-amber-300 text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950/50"
+            }`}
+          >
+            <AlertTriangle size={14} />
+            Posibles duplicados
+            <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] dark:bg-amber-900">{gruposDuplicadosVisibles.length}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={exportarExcel}
-            disabled={filasFiltradas.length === 0 || exportando}
+            disabled={filasVisibles.length === 0 || exportando}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <Download size={14} />
@@ -168,6 +264,42 @@ export function LienzoMatrizCuidadosCriticos({
           )}
         </div>
       </div>
+
+      {soloPosiblesDuplicados && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900 dark:bg-amber-950/20" aria-label="Revisión de posibles duplicados">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Posibles duplicados en los resultados filtrados</h3>
+              <p className="text-xs text-amber-800/80 dark:text-amber-200/80">Coinciden en expediente, servicio, cama, fecha y hora de ingreso. Revísalos antes de concluir que son duplicados.</p>
+            </div>
+            <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">{gruposDuplicadosVisibles.length} coincidencias</span>
+          </div>
+          {gruposDuplicadosVisibles.length > 0 ? (
+            <div className="space-y-2">
+              {gruposDuplicadosVisibles.map(grupo => (
+                <div key={grupo.clave} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white/80 px-3 py-2 dark:border-amber-900 dark:bg-slate-900/70">
+                  <div className="min-w-0 text-xs text-slate-700 dark:text-slate-200">
+                    <p className="font-semibold">Exp. {grupo.fichas[0].pacienteExpediente} · {valorComoTexto(grupo.fichas[0].datos?.nombres)} {valorComoTexto(grupo.fichas[0].datos?.apellidos)}</p>
+                    <p className="mt-0.5 text-slate-600 dark:text-slate-300">
+                      {grupo.fichas.length} fichas · {grupo.fichas[0].servicio} · Cama {grupo.fichas[0].cama || "No registrada"} · Ingreso {valorComoTexto(grupo.fichas[0].datos?.fecha_ingreso_al_servicio)} {valorComoTexto(grupo.fichas[0].datos?.hora_ingreso_al_servicio)}
+                    </p>
+                    <p className="mt-0.5 text-slate-500 dark:text-slate-400">Creado por: {grupo.fichas.map(ficha => valorCreadorFicha(ficha)).join(" / ")}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => confirmarNoDuplicado(grupo)}
+                    className="shrink-0 rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-950"
+                  >
+                    Confirmar que no es duplicado
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg bg-white/80 px-3 py-4 text-center text-xs text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">No se detectan coincidencias con los filtros actuales.</p>
+          )}
+        </section>
+      )}
 
       <div className="scrollbar-matriz-cuidados overflow-x-auto">
         <table className="min-w-max border-collapse text-xs">
@@ -203,6 +335,9 @@ export function LienzoMatrizCuidadosCriticos({
           <tbody>
             {filasPagina.map((fila, index) => {
               const esUltimaFila = index === filasPagina.length - 1;
+              const grupoDuplicado = fila.id ? gruposPorFicha.get(fila.id) : undefined;
+              const claveAviso = grupoDuplicado ? claveAvisoDuplicado(grupoDuplicado) : "";
+              const alertaDuplicadoVisible = Boolean(grupoDuplicado && !avisosDuplicadoDescartados.has(claveAviso));
               return (
               <tr key={fila.id ?? `fila-${inicio + index}`}>
                 {mostrarAcciones && (
@@ -223,7 +358,7 @@ export function LienzoMatrizCuidadosCriticos({
                   return (
                     <Fragment key={campo.key}>
                       <td
-                        className={`max-w-56 border-r border-t border-slate-200 bg-white px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 ${
+                        className={`max-w-56 border-r border-t border-slate-200 px-3 py-2 align-top text-slate-700 dark:border-slate-700 dark:text-slate-300 ${alertaDuplicadoVisible ? "bg-amber-50/80 dark:bg-amber-950/30" : "bg-white dark:bg-slate-900"} ${
                           esPrimera ? `border-l${esUltimaFila ? " rounded-bl-xl" : ""}` : ""
                         } ${esUltima && esUltimaFila ? "rounded-br-xl" : ""}`}
                       >
@@ -253,10 +388,10 @@ export function LienzoMatrizCuidadosCriticos({
               </tr>
               );
             })}
-            {filasFiltradas.length === 0 && (
+            {filasVisibles.length === 0 && (
               <tr>
                 <td colSpan={campos.length + (mostrarCreador ? 1 : 0) + (mostrarAcciones ? 1 : 0)} className="rounded-b-xl border-x border-b border-t border-slate-200 bg-white px-4 py-8 text-center text-slate-400 dark:border-slate-700 dark:bg-slate-900">
-                  {filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
+                  {soloPosiblesDuplicados ? "No se detectan posibles duplicados con los filtros actuales." : filas.length === 0 ? "Aun no hay fichas registradas." : "No hay filas que coincidan con la busqueda."}
                 </td>
               </tr>
             )}
@@ -279,10 +414,10 @@ export function LienzoMatrizCuidadosCriticos({
         <Paginacion
           pagina={paginaActual}
           totalPaginas={totalPaginas}
-          inicio={filasFiltradas.length === 0 ? 0 : inicio + 1}
+          inicio={filasVisibles.length === 0 ? 0 : inicio + 1}
           fin={fin}
-          total={filasFiltradas.length}
-          totalOriginal={filas.length}
+          total={filasVisibles.length}
+          totalOriginal={totalFilasSinBusqueda}
           onAnterior={() => setPagina(actual => Math.max(1, actual - 1))}
           onSiguiente={() => setPagina(actual => Math.min(totalPaginas, actual + 1))}
         />
