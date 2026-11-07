@@ -6,15 +6,15 @@
 // válido (queda "Falta por cerrar").
 // Diseño institucional HNES: hero con el degradado único y secciones numeradas.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { collection, deleteField, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
+import { collection, deleteField, doc, getDoc, getDocs, query, Timestamp, where, type DocumentData } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertTriangle, ArrowLeft, Building2, CheckCircle2, Clock, IdCard, Loader2,
-  NotebookPen, Plus, Stethoscope, Syringe, Timer, Users,
+  NotebookPen, Pencil, Plus, Stethoscope, Syringe, Timer, Users,
 } from "lucide-react";
 import type { Genero, TurnoEmergencia } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
@@ -22,18 +22,21 @@ import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
   DESENLACES_SIN_INGRESO, DISPOSITIVOS_O2, HOSPITALES_REFERENCIA, PROCEDIMIENTOS, RAZONES_DEMORA,
   TIEMPOS_PERMANENCIA, clasificacionSis, medicosGeneralesLista, procedimientosUnificados,
-  tipoEvaluador, turnoSegunHora,
+  tipoEvaluador, turnoSegunHora, unirFormularios,
 } from "@/lib/emergencia/censos";
 import { useCatalogoPersonal } from "@/lib/emergencia/catalogoPersonal";
-import { guardarCenso } from "@/lib/emergencia/resumenCensoDatos";
+import {
+  CensoYaRegistrado, buscarCensoDeAtencion, guardarCenso, versionCenso, type CensoGuardado,
+} from "@/lib/emergencia/resumenCensoDatos";
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
   ChipMulti, ChipSelect, DiagnosticosEditor,
   FaltantesHint, Field, SelectCatalogo, SiNoChips, inputCls,
 } from "@/components/emergencia/censoUi";
 import {
-  BOTON_PRIMARIO, CamposIdentidad, CamposMomento, CamposPersonal, NotaLocal, NotasEditor, Seccion,
-  guardarMedicosGenerales, leerMedicosGeneralesGuardados, toDtLocal,
+  AvisoCenso, AvisoCensoExistente, BOTON_PRIMARIO, BOTON_SECUNDARIO, CamposIdentidad, CamposMomento,
+  CamposPersonal, NotaLocal, NotasEditor, Seccion, guardarMedicosGenerales,
+  leerMedicosGeneralesGuardados, mensajeErrorCenso, toDtLocal,
 } from "@/components/emergencia/censoSecciones";
 
 const TRES_ESTADOS = [
@@ -88,6 +91,36 @@ function camposFaltantes(f: FormState): string[] {
   return faltan;
 }
 
+// Un censo guardado, con la forma del formulario, para seguir editándolo.
+function formDesdeRegistro(r: DocumentData, f: FormState): FormState {
+  const generales = medicosGeneralesLista(r.medicosGenerales);
+  return {
+    ...f,
+    fechaHora: toDtLocal(toDate(r.fecha) ?? new Date()),
+    turno: r.turno ?? f.turno,
+    expediente: r.expediente ?? "",
+    nombre: r.pacienteNombre ?? "",
+    edad: r.edad !== undefined && r.edad !== null ? String(r.edad) : "",
+    genero: r.genero ?? null,
+    hospitalReferencia: r.hospitalReferencia ?? "",
+    referenciaSis: r.referenciaSis !== false,
+    condicion: r.condicion ?? null,
+    dispositivoO2: r.dispositivoO2 ?? "No",
+    diagnosticos: r.diagnosticos ?? [],
+    discrepanciaDiagnostico: r.discrepanciaDiagnostico ?? "no",
+    modificacionServicio: r.modificacionServicio ?? "no",
+    servicioIngreso: r.servicioIngreso ?? "",
+    staffEvalua: r.staffEvalua ?? "",
+    reevaluacion: r.reevaluacion ?? "",
+    tiempoPermanencia: r.tiempoPermanencia ?? "",
+    razonDemora: r.razonDemora ?? "",
+    procedimientosUE: procedimientosUnificados(r),
+    notas: ((r.notas ?? []) as { texto: string; fecha: unknown }[])
+      .map((n) => ({ texto: n.texto, fecha: (toDate(n.fecha) ?? new Date()).toISOString() })),
+    medicosGenerales: generales.length ? generales : f.medicosGenerales,
+  };
+}
+
 export default function CensoReferidosPage() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -105,7 +138,19 @@ export default function CensoReferidosPage() {
   const [buscandoId, setBuscandoId] = useState(false);
   const [fuentePrellenado, setFuentePrellenado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [guardado, setGuardado] = useState<{ expediente: string; cerrado: boolean } | null>(null);
+  const [guardado, setGuardado] = useState<{ id: string; version: number; expediente: string; cerrado: boolean } | null>(null);
+  // Versión abierta para editar: si otra persona la cambia, guardar no la pisa.
+  const [versionLeida, setVersionLeida] = useState<number>();
+  const [existente, setExistente] = useState<CensoGuardado | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  const abrirRegistro = useCallback((id: string, r: DocumentData) => {
+    setEditandoId(id);
+    setVersionLeida(versionCenso(r));
+    setControlIngresoId(typeof r.controlIngresoId === "string" ? r.controlIngresoId : null);
+    setFuentePrellenado(null);
+    setForm((f) => formDesdeRegistro(r, f));
+  }, []);
 
   // Derivados en vivo
   const clasifSis = form.hospitalReferencia ? clasificacionSis(form.hospitalReferencia, form.referenciaSis) : null;
@@ -121,36 +166,7 @@ export default function CensoReferidosPage() {
         try {
           const snap = await getDoc(doc(db, "censo_referidos", editar));
           if (!snap.exists()) { setError("No se encontró el registro a editar."); return; }
-          const r = snap.data();
-          const fecha = toDate(r.fecha) ?? new Date();
-          const generales = medicosGeneralesLista(r.medicosGenerales);
-          setEditandoId(editar);
-          setControlIngresoId(typeof r.controlIngresoId === "string" ? r.controlIngresoId : null);
-          setForm((f) => ({
-            ...f,
-            fechaHora: toDtLocal(fecha),
-            turno: r.turno ?? f.turno,
-            expediente: r.expediente ?? "",
-            nombre: r.pacienteNombre ?? "",
-            edad: r.edad !== undefined && r.edad !== null ? String(r.edad) : "",
-            genero: r.genero ?? null,
-            hospitalReferencia: r.hospitalReferencia ?? "",
-            referenciaSis: r.referenciaSis !== false,
-            condicion: r.condicion ?? null,
-            dispositivoO2: r.dispositivoO2 ?? "No",
-            diagnosticos: r.diagnosticos ?? [],
-            discrepanciaDiagnostico: r.discrepanciaDiagnostico ?? "no",
-            modificacionServicio: r.modificacionServicio ?? "no",
-            servicioIngreso: r.servicioIngreso ?? "",
-            staffEvalua: r.staffEvalua ?? "",
-            reevaluacion: r.reevaluacion ?? "",
-            tiempoPermanencia: r.tiempoPermanencia ?? "",
-            razonDemora: r.razonDemora ?? "",
-            procedimientosUE: procedimientosUnificados(r),
-            notas: ((r.notas ?? []) as { texto: string; fecha: unknown }[])
-              .map((n) => ({ texto: n.texto, fecha: (toDate(n.fecha) ?? new Date()).toISOString() })),
-            medicosGenerales: generales.length ? generales : f.medicosGenerales,
-          }));
+          abrirRegistro(editar, snap.data());
         } catch (e) {
           setError(`No se pudo cargar el registro: ${e instanceof Error ? e.message : "error"}`);
         }
@@ -174,7 +190,18 @@ export default function CensoReferidosPage() {
         ? "Identidad y fecha/hora cargadas de la cola de expedientes."
         : "Identidad cargada de la cola de expedientes.",
     );
-  }, []);
+    // El enlace pudo reabrirse (recargar, "atrás", otra pestaña) con el censo ya
+    // guardado: se continúa ese registro. Si esto falla, guardar lo comprueba.
+    if (!p.controlIngresoId) return;
+    buscarCensoDeAtencion(p.controlIngresoId).then((c) => {
+      if (c?.tipo === "referidos") {
+        abrirRegistro(c.id, c.registro);
+        setAviso(`Esta atención ya tenía censo, registrado por ${c.registro.creadoPorNombre}. Se abrió para completarlo; no se creará otro.`);
+      } else if (c) {
+        setExistente(c);
+      }
+    }).catch(() => {});
+  }, [abrirRegistro]);
 
   // ── Prellenado de identidad (solo datos personales) ──
   const prellenar = async () => {
@@ -196,6 +223,11 @@ export default function CensoReferidosPage() {
     setBuscandoId(false);
   };
 
+  // Si quedó texto escrito sin "Agregar", se agrega solo para no perderlo.
+  const notasConBorrador = () => nuevaNota.trim()
+    ? [...form.notas, { texto: nuevaNota.trim().toUpperCase(), fecha: new Date().toISOString() }]
+    : form.notas;
+
   const guardar = async () => {
     if (!profile) return;
     const dx = form.diagnosticos.filter((d) => d.codigo.trim() || d.descripcion.trim());
@@ -204,11 +236,10 @@ export default function CensoReferidosPage() {
     if (!form.expediente.trim()) return setError("El expediente es obligatorio.");
     const faltan = camposFaltantes(form);
 
-    // Si quedó texto escrito sin "Agregar", se agrega solo para no perderlo.
-    const notas = [...form.notas];
-    if (nuevaNota.trim()) notas.push({ texto: nuevaNota.trim().toUpperCase(), fecha: new Date().toISOString() });
+    const notas = notasConBorrador();
 
     setError(null);
+    setExistente(null);
     setGuardando(true);
     try {
       const fecha = new Date(form.fechaHora);
@@ -223,14 +254,14 @@ export default function CensoReferidosPage() {
         collection(db, "censo_demanda_espontanea"),
         where("expediente", "==", form.expediente.trim()),
       ));
-      const conflicto = enDemanda.docs.some((d) => {
+      const conflicto = enDemanda.docs.find((d) => {
         const otro = d.data();
         const otroCi = typeof otro.controlIngresoId === "string" && otro.controlIngresoId ? otro.controlIngresoId : null;
         if (controlIngresoId && otroCi) return otroCi === controlIngresoId;
         return mismoDia(toDate(otro.fecha));
       });
       if (conflicto) {
-        setError("Esta atención ya está registrada en el censo de DEMANDA ESPONTÁNEA; un paciente no puede estar en ambos censos por la misma atención.");
+        setExistente({ tipo: "demanda", id: conflicto.id, registro: conflicto.data() });
         setGuardando(false);
         return;
       }
@@ -264,7 +295,7 @@ export default function CensoReferidosPage() {
         medicosGenerales: form.medicosGenerales,
       };
 
-      await guardarCenso("referidos", editandoId, datos, editandoId
+      const { id, version } = await guardarCenso("referidos", editandoId, datos, editandoId
         ? {
             // campos retirados: ya van fundidos en procedimientosUE
             procedimientosMaxima: deleteField(),
@@ -275,11 +306,15 @@ export default function CensoReferidosPage() {
             creadoEn: Timestamp.now(),
             creadoPorId: profile.uid,
             creadoPorNombre: profile.nombre,
-          });
+          }, versionLeida);
 
-      setGuardado({ expediente: form.expediente.trim(), cerrado: faltan.length === 0 });
+      setForm((f) => ({ ...f, notas }));
+      setNuevaNota("");
+      setAviso(null);
+      setGuardado({ id, version, expediente: form.expediente.trim(), cerrado: faltan.length === 0 });
     } catch (e) {
-      setError(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);
+      if (e instanceof CensoYaRegistrado) setExistente(e.existente);
+      else setError(mensajeErrorCenso(e));
     } finally {
       setGuardando(false);
     }
@@ -291,8 +326,30 @@ export default function CensoReferidosPage() {
     setNuevaNota("");
     setFuentePrellenado(null);
     setError(null);
+    setAviso(null);
+    setExistente(null);
+    setVersionLeida(undefined);
     setGuardado(null);
     window.scrollTo({ top: 0 });
+  };
+
+  const seguirEditando = () => {
+    if (!guardado) return;
+    setEditandoId(guardado.id);
+    setVersionLeida(guardado.version);
+    setGuardado(null);
+  };
+
+  // Otra persona guardó primero: su registro se abre con lo escrito aquí encima,
+  // para revisarlo y guardarlo sin que nadie pierda nada.
+  const unirConExistente = () => {
+    if (!existente) return;
+    const escrito = { ...form, notas: notasConBorrador() };
+    abrirRegistro(existente.id, existente.registro);
+    setForm((f) => unirFormularios(f, escrito, formVacio([])));
+    setNuevaNota("");
+    setExistente(null);
+    setAviso("Lo escrito se unió con el registro guardado. Revise y presione Guardar cambios.");
   };
 
   // ── Pantalla de éxito ──
@@ -325,10 +382,10 @@ export default function CensoReferidosPage() {
                 <Plus size={15} /> Registrar otro referido
               </button>
             )}
-            <button
-              onClick={() => router.push("/medico/cola-expedientes")}
-              className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
+            <button onClick={seguirEditando} className={BOTON_SECUNDARIO}>
+              <Pencil size={14} /> Seguir editando
+            </button>
+            <button onClick={() => router.push("/medico/cola-expedientes")} className={BOTON_SECUNDARIO}>
               <ArrowLeft size={14} /> Volver a la cola
             </button>
           </div>
@@ -376,6 +433,11 @@ export default function CensoReferidosPage() {
           <span>{error}</span>
         </div>
       )}
+
+      {existente && (
+        <AvisoCensoExistente existente={existente} tipoActual="referidos" editando={!!editandoId} onUnir={unirConExistente} />
+      )}
+      {aviso && <AvisoCenso>{aviso}</AvisoCenso>}
 
       {/* 01 · Momento de la atención */}
       <Seccion num="01" titulo="Momento de la atención" icon={Clock}>

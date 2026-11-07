@@ -404,6 +404,29 @@ export function medicosGeneralesLista(v: unknown): string[] {
   return Array.from(new Set(lista.map((m) => m.trim().toUpperCase()).filter(Boolean)));
 }
 
+// ── Unir lo escrito con un censo ya guardado ─────────────────────────────────
+
+const sumarListas = (guardada: unknown[], escrita: unknown[]) => {
+  const vistos = new Set(guardada.map((x) => JSON.stringify(x)));
+  return [...guardada, ...escrita.filter((x) => !vistos.has(JSON.stringify(x)))];
+};
+
+/**
+ * Junta lo que alguien escribió con el censo que otra persona guardó antes para
+ * la misma atención. Lo guardado manda: de lo escrito solo entra lo que allá
+ * seguía igual que en un formulario vacío (`base`), y las listas se suman.
+ */
+export function unirFormularios<T extends object>(guardado: T, escrito: T, base: T): T {
+  const unido = { ...guardado };
+  for (const clave of Object.keys(base) as (keyof T)[]) {
+    const g = guardado[clave];
+    const e = escrito[clave];
+    if (Array.isArray(g) && Array.isArray(e)) unido[clave] = sumarListas(g, e) as T[keyof T];
+    else if (g === base[clave]) unido[clave] = e;
+  }
+  return unido;
+}
+
 export const TIPO_EVALUADOR_LABEL: Record<TipoEvaluadorEmergencia, string> = {
   staff: "Staff",
   medico_general: "Médico general",

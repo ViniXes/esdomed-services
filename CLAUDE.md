@@ -161,6 +161,14 @@ ESDOMED deja listo el expediente de pacientes que aún no llegan (`Solicitud COD
 
 Reglas para código nuevo: todo guardado de un censo pasa por `guardarCenso()` (`src/lib/emergencia/resumenCensoDatos.ts`), que escribe censo y contadores en el mismo lote. Un campo nuevo del formulario se agrega a `contribucion()` (`src/lib/emergencia/resumenCenso.ts`) y a su panel en `VistasCenso.tsx`. Prueba: `node scripts/test-resumen-censos.mjs`.
 
+### Un censo por atención
+
+Una fila de la cola (`control_ingresos`) tiene un solo censo, entre los dos libros. `guardarCenso()` crea el censo vinculado con el id de la fila como id del documento, en una transacción que exige que no exista en ninguno de los dos libros; los censos anteriores a este candado tienen id automático y se encuentran por `controlIngresoId`. Esto evita los duplicados que salían de dos formularios abiertos (otra pestaña, otra computadora, dos médicos, recargar).
+
+Si la fila ya tiene censo, el formulario abre ese registro. Si dos personas chocan al guardar, `guardarCenso()` lanza `CensoYaRegistrado` y no se escribe nada: el aviso ofrece unir lo escrito (`unirFormularios()`: lo guardado manda y las listas se suman) para revisarlo y guardarlo. Lo mismo ocurre al editar si otra persona cambió el registro (`versionLeida`). Una transacción necesita conexión: sin red el formulario avisa y conserva lo escrito, no queda en cola.
+
+Los censos digitados sin pasar por la cola (`controlIngresoId` nulo) quedan fuera a propósito, porque un paciente puede consultar dos veces el mismo día. Prueba: `node scripts/test-unir-censos.mjs`.
+
 ### Navegación (menú lateral) — registro declarativo
 
 Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:

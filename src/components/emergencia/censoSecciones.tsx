@@ -6,11 +6,15 @@
 // notas médicas con estampa de fecha y las dos secciones idénticas de ambos
 // formularios (Momento de la atención e Identificación del paciente).
 
-import { Loader2, Plus, Search, Trash2 } from "lucide-react";
-import type { Genero, TurnoEmergencia } from "@/types";
+import { useEffect, useRef } from "react";
+import Link from "next/link";
+import { AlertTriangle, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import type { Genero, TipoCenso, TurnoEmergencia } from "@/types";
+import { toDate } from "@/lib/pacientes/helpers";
 import { DateTimeField } from "@/components/ui/DateTimeField";
 import { TURNOS, medicosGeneralesLista, tipoEvaluador, type CatalogoPersonal } from "@/lib/emergencia/censos";
 import type { AgregarAlCatalogo } from "@/lib/emergencia/catalogoPersonal";
+import type { CensoGuardado } from "@/lib/emergencia/resumenCensoDatos";
 import {
   BuscadorPersonal, ChipSelect, EvaluadorBadge, Field, MedicosGeneralesPicker, TIPOS_EVALUADOR, inputCls,
 } from "@/components/emergencia/censoUi";
@@ -64,6 +68,69 @@ export function Seccion({ num, titulo, icon: Icon, children }: {
 }
 
 // ── Notas médicas (varias, con estampa de fecha al agregarlas) ───────────────
+
+export const BOTON_SECUNDARIO =
+  "flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors";
+
+export const mensajeErrorCenso = (e: unknown) =>
+  (e as { code?: string }).code === "unavailable"
+    ? "No hay conexión con el servidor. Lo escrito sigue aquí; intente guardar de nuevo."
+    : `Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`;
+
+const CENSOS: Record<TipoCenso, { nombre: string; ruta: string }> = {
+  demanda: { nombre: "DEMANDA ESPONTÁNEA", ruta: "demanda-espontanea" },
+  referidos: { nombre: "REFERIDOS", ruta: "referidos" },
+};
+
+/** La atención ya tiene censo: nada se guardó y lo escrito sigue en el formulario. */
+export function AvisoCensoExistente({ existente, tipoActual, editando, onUnir }: {
+  existente: CensoGuardado;
+  tipoActual: TipoCenso;
+  editando: boolean;
+  onUnir: () => void;
+}) {
+  // El botón de guardar queda al final del formulario y este aviso arriba.
+  const aviso = useRef<HTMLDivElement>(null);
+  useEffect(() => { aviso.current?.scrollIntoView({ block: "center" }); }, []);
+
+  const { tipo, id, registro } = existente;
+  const otroCenso = tipo !== tipoActual;
+  const hora = toDate(registro.actualizadoEn ?? registro.creadoEn)
+    ?.toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const mensaje = otroCenso
+    ? `Esta atención ya está registrada en el censo de ${CENSOS[tipo].nombre}; un paciente no puede estar en ambos censos por la misma atención.`
+    : editando
+      ? `Este registro cambió mientras lo editaba (última escritura a las ${hora}).`
+      : `Esta atención ya tiene censo: lo registró ${registro.creadoPorNombre} a las ${hora}.`;
+
+  return (
+    <div ref={aviso} role="alert" className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+      <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+      <div className="min-w-0 flex-1 basis-64">
+        <p className="font-medium">{mensaje}</p>
+        <p className="mt-0.5 text-xs">Lo que escribió sigue aquí abajo y todavía no se ha guardado.</p>
+      </div>
+      {otroCenso ? (
+        <Link href={`/medico/censos/${CENSOS[tipo].ruta}?editar=${id}`} className={`${BOTON_PRIMARIO} px-3 py-1.5`}>
+          Abrir ese registro
+        </Link>
+      ) : (
+        <button type="button" onClick={onUnir} className={`${BOTON_PRIMARIO} px-3 py-1.5`}>
+          Unir con ese registro
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Aviso informativo arriba del formulario. */
+export function AvisoCenso({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-300">
+      {children}
+    </p>
+  );
+}
 
 export type NotaLocal = { texto: string; fecha: string }; // fecha en ISO
 

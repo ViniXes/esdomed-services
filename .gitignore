@@ -71,3 +71,4 @@ next-env.d.ts
 
 # Respaldos locales de scripts
 respaldo-configuracion-servicios-*.json
+respaldo-censos-*.json
