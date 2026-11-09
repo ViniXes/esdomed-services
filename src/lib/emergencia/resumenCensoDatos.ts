@@ -61,6 +61,25 @@ export async function buscarCensoDeAtencion(controlIngresoId: string): Promise<C
 }
 
 /**
+ * Los censos de varias filas de la cola a la vez (id de la fila → censo), para
+ * el Histórico, que no entra en la vista en vivo. "in" admite hasta 30 valores.
+ */
+export async function censosDeAtenciones(controlIngresoIds: string[]): Promise<Map<string, CensoGuardado>> {
+  const ids = [...new Set(controlIngresoIds)];
+  const grupos: string[][] = [];
+  for (let i = 0; i < ids.length; i += 30) grupos.push(ids.slice(i, i + 30));
+  const encontrados = new Map<string, CensoGuardado>();
+  await Promise.all(TIPOS_CENSO.flatMap((tipo) => grupos.map(async (grupo) => {
+    const snap = await getDocs(query(collection(db, COLECCION_CENSO[tipo]), where("controlIngresoId", "in", grupo)));
+    snap.docs.forEach((d) => {
+      const ci = d.data().controlIngresoId as string;
+      if (!encontrados.has(ci)) encontrados.set(ci, { tipo, id: d.id, registro: d.data() });
+    });
+  })));
+  return encontrados;
+}
+
+/**
  * Si no se puede escribir el resumen, el censo se guarda igual: un registro
  * clínico nunca se pierde por el tablero, y este avisa del desajuste para recalcular.
  */

@@ -9,6 +9,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
+import { censosDeAtenciones } from "@/lib/emergencia/resumenCensoDatos";
 import { Ambulance, Download } from "lucide-react";
 import { Icon } from "@iconify/react";
 import medicalKit from "@iconify-icons/solar/medical-kit-linear";
@@ -112,7 +113,7 @@ function BadgeCenso({ censo }: { censo: CensoEstado | null }) {
 // un paciente no se registra en los dos censos.
 const MENU_CENSO_W = 288;
 
-function MenuCensoFila({ ingreso, censo, verificado }: { ingreso: ControlIngreso; censo: CensoEstado | null; verificado: boolean }) {
+function MenuCensoFila({ ingreso, censo, verificado, consultando }: { ingreso: ControlIngreso; censo: CensoEstado | null; verificado: boolean; consultando: boolean }) {
   const router = useRouter();
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -164,7 +165,7 @@ function MenuCensoFila({ ingreso, censo, verificado }: { ingreso: ControlIngreso
   // Ya registrado en un censo: se muestra el estado con lápiz para editarlo;
   // no se permite volver a registrarlo (ni en el otro censo).
   if (!verificado) {
-    return <span className="text-xs text-slate-500 dark:text-slate-400">Estado no consultado</span>;
+    return <span className="text-xs text-slate-500 dark:text-slate-400">{consultando ? "Consultando censo…" : "Estado no consultado"}</span>;
   }
   if (censo) {
     return (
@@ -274,6 +275,8 @@ export default function ColaExpedientesPage() {
   const [buscandoHistoricos, setBuscandoHistoricos] = useState(false);
   const [censosDemanda, setCensosDemanda] = useState<CensoLookup>({ verificado: false, porCi: new Map(), porExpSinCi: new Map() });
   const [censosReferido, setCensosReferido] = useState<CensoLookup>({ verificado: false, porCi: new Map(), porExpSinCi: new Map() });
+  // Estado de censo de las filas del Histórico: una lectura junto con la búsqueda.
+  const [censosHistorico, setCensosHistorico] = useState<{ estado: "cargando" | "listo" | "error"; porCi: Map<string, CensoEstado> }>({ estado: "listo", porCi: new Map() });
 
   // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
   // índice compuesto). Fechas anteriores se consultan bajo demanda en la
@@ -347,6 +350,8 @@ export default function ColaExpedientesPage() {
       const c = ingreso.id ? l.porCi.get(ingreso.id) : undefined;
       if (c) return { tipo, estado: c.estado, id: c.id };
     }
+    const delHistorico = ingreso.id ? censosHistorico.porCi.get(ingreso.id) : undefined;
+    if (delHistorico) return delHistorico;
     const dia = tsToDate(ingreso.creadoEn);
     for (const { tipo, l } of fuentes) {
       const c = l.porExpSinCi.get(ingreso.expediente)?.find(x => esMismoDia(x.fecha, dia));
@@ -358,6 +363,28 @@ export default function ColaExpedientesPage() {
   const hoy  = ingresos.filter(i => esFechaHoy(i.creadoEn));
   const ayer = ingresos.filter(i => esFechaAyer(i.creadoEn));
   const ultimo = ingresos[0] ?? null;
+
+  // El Histórico no entra en la vista en vivo: el estado de censo de sus filas
+  // se lee una vez al buscar. Si falla, igual se deja registrar: el formulario
+  // abre el censo que ya exista y la transacción de guardarCenso() impide el duplicado.
+  const cargarCensosHistorico = async (docs: ControlIngreso[], consulta: number) => {
+    const ids = docs.flatMap(i => (i.id ? [i.id] : []));
+    if (ids.length === 0) return setCensosHistorico({ estado: "listo", porCi: new Map() });
+    setCensosHistorico({ estado: "cargando", porCi: new Map() });
+    try {
+      const encontrados = await censosDeAtenciones(ids);
+      const porCi = new Map<string, CensoEstado>();
+      encontrados.forEach((c, ci) => porCi.set(ci, {
+        tipo: c.tipo === "demanda" ? "demanda" : "referido",
+        estado: c.registro.estadoRegistro === "cerrado" ? "cerrado" : "abierto",
+        id: c.id,
+      }));
+      if (consulta === consultaHistorica.current) setCensosHistorico({ estado: "listo", porCi });
+    } catch (err) {
+      console.error("No se pudo consultar el estado de censo del histórico", err);
+      if (consulta === consultaHistorica.current) setCensosHistorico({ estado: "error", porCi: new Map() });
+    }
+  };
 
   // Búsqueda histórica: por expediente exacto (sin orderBy, para no exigir
   // índice compuesto; se ordena en cliente) o por rango de fechas.
@@ -371,6 +398,7 @@ export default function ColaExpedientesPage() {
     const consulta = ++consultaHistorica.current;
     setErrorHistorico("");
     setHistoricos(null);
+    setCensosHistorico({ estado: "listo", porCi: new Map() });
     setBuscandoHistoricos(true);
     try {
       let docs: ControlIngreso[];
@@ -388,7 +416,10 @@ export default function ColaExpedientesPage() {
         const snap = await getDocs(query(collection(db, "control_ingresos"), ...constraints));
         docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ControlIngreso));
       }
-      if (consulta === consultaHistorica.current) setHistoricos(docs);
+      if (consulta === consultaHistorica.current) {
+        setHistoricos(docs);
+        if (!soloConsulta) void cargarCensosHistorico(docs, consulta);
+      }
     } catch {
       if (consulta === consultaHistorica.current) setErrorHistorico("No se pudo consultar el histórico. Intenta buscar de nuevo.");
     } finally {
@@ -402,6 +433,7 @@ export default function ColaExpedientesPage() {
     setErrorHistorico("");
     setExpHistorico(""); setFechaDesde(""); setFechaHasta("");
     setHistoricos(null);
+    setCensosHistorico({ estado: "listo", porCi: new Map() });
   };
 
   const base = soloAyer ? ayer : ingresos;
@@ -416,11 +448,13 @@ export default function ColaExpedientesPage() {
     );
   });
   const lista = vista === "recientes" ? recientesFiltrados : (historicos ?? []);
-  // Las suscripciones solo cubren ayer y hoy. En el histórico no se infiere
-  // que falta un censo ni se habilita un nuevo registro sin consultar su estado.
+  // Ayer y hoy los cubren las suscripciones en vivo; el resto del Histórico, la
+  // lectura que acompaña a la búsqueda (también cuando falla: ver cargarCensosHistorico).
+  const consultandoCenso = vista === "historico" && censosHistorico.estado === "cargando";
   const censoVerificado = (ingreso: ControlIngreso) =>
-    (esFechaHoy(ingreso.creadoEn) || esFechaAyer(ingreso.creadoEn)) &&
-    censosDemanda.verificado && censosReferido.verificado;
+    ((esFechaHoy(ingreso.creadoEn) || esFechaAyer(ingreso.creadoEn)) &&
+      censosDemanda.verificado && censosReferido.verificado) ||
+    (vista === "historico" && !consultandoCenso);
 
   // Exporta lo que está en pantalla: ayer/hoy con la búsqueda y el filtro
   // aplicados, o el resultado del histórico. El archivo lleva el rango real
@@ -661,8 +695,8 @@ export default function ColaExpedientesPage() {
         {vista === "historico" && errorHistorico && (
           <p role="alert" className="border-t border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">{errorHistorico}</p>
         )}
-        {!soloConsulta && vista === "historico" && lista.some(i => !censoVerificado(i)) && (
-          <p className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-700">El estado de censo solo se verifica para ayer y hoy. Para fechas anteriores, consulta el libro de censos.</p>
+        {!soloConsulta && vista === "historico" && censosHistorico.estado === "error" && lista.length > 0 && (
+          <p role="alert" className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">No se pudo consultar el estado de censo de estas atenciones. Si registras una que ya tiene censo, el formulario abrirá el registro existente.</p>
         )}
         {((vista === "recientes" && conexion === "cargando") || (vista === "historico" && buscandoHistoricos)) ? (
           <div role="status" className="flex items-center justify-center gap-3 py-12 text-sm text-slate-500">
@@ -722,7 +756,7 @@ export default function ColaExpedientesPage() {
                       </td>
                       {!soloConsulta && (
                         <td className="px-4 py-3 text-left whitespace-nowrap">
-                          <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} />
+                          <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} consultando={consultandoCenso} />
                         </td>
                       )}
                     </tr>
@@ -768,7 +802,7 @@ export default function ColaExpedientesPage() {
                   </div>
                   {!soloConsulta && (
                     <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} />
+                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} consultando={consultandoCenso} />
                     </div>
                   )}
                 </div>

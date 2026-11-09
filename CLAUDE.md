@@ -169,6 +169,8 @@ Si la fila ya tiene censo, el formulario abre ese registro. Si dos personas choc
 
 Los censos digitados sin pasar por la cola (`controlIngresoId` nulo) quedan fuera a propósito, porque un paciente puede consultar dos veces el mismo día. Prueba: `node scripts/test-unir-censos.mjs`.
 
+La cola de expedientes vigila en vivo solo los censos de ayer y hoy; en la pestaña Histórico el estado de censo de las filas se lee una vez al buscar con `censosDeAtenciones()` (`controlIngresoId` "in" de a 30). Así se puede registrar el censo de una atención de hace días. Si esa lectura falla, el botón se muestra igual, porque el formulario abre el censo que ya exista y `guardarCenso()` impide el duplicado.
+
 ### Navegación (menú lateral) — registro declarativo
 
 Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:
