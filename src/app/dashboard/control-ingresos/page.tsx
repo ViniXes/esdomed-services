@@ -15,7 +15,7 @@ import type { ExpedienteProgramado } from "@/types";
 import { claveExpediente, fechaDeRegistro, ingresosRepetidos } from "@/lib/esdomed/duplicadosIngreso";
 import {
   COLECCION_PROGRAMADOS, SOLICITUDES_PROGRAMADAS, esSolicitudProgramada, fechaPresentacionCorta,
-  hoyLocalISO, porFechaPresentacion, primerDiaFuturo,
+  hoyLocalISO, porFechaPresentacion, primerDiaPresentacion,
 } from "@/lib/esdomed/expedientesProgramados";
 import { Ambulance, CalendarClock, Download, FileInput } from "lucide-react";
 import { Icon } from "@iconify/react";
@@ -193,7 +193,7 @@ export default function ControlIngresosPage() {
       if (!form.presentacion) return "Indique la fecha en que se presentará el paciente.";
       // Al editar uno ya atrasado se puede corregir otro dato sin cambiarle la fecha.
       const sinCambio = programadoEnEdicion?.fechaPresentacion === form.presentacion;
-      if (!sinCambio && form.presentacion <= hoyLocalISO()) return "La fecha en que se presentará debe ser futura.";
+      if (!sinCambio && form.presentacion < hoyLocalISO()) return "La fecha en que se presentará no puede ser anterior a hoy.";
     }
     return null;
   };
@@ -940,8 +940,8 @@ export default function ControlIngresosPage() {
                 <DateField
                   value={form.presentacion}
                   onChange={value => setForm(prev => ({ ...prev, presentacion: value }))}
-                  minDate={primerDiaFuturo()}
-                  placeholder="Elige una fecha futura"
+                  minDate={primerDiaPresentacion()}
+                  placeholder="Hoy o una fecha próxima"
                   ariaLabel="Se presentará en"
                 />
                 <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">

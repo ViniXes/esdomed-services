@@ -24,11 +24,13 @@ export function hoyLocalISO(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/** Primer día que se puede elegir: "se presentará" siempre es a futuro. */
-export function primerDiaFuturo(): Date {
+/**
+ * Primer día que se puede elegir: hoy. Un Código Infarto suele llegar el mismo
+ * día, a pocas horas del aviso; solo se rechazan fechas pasadas.
+ */
+export function primerDiaPresentacion(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 1);
   return d;
 }
 

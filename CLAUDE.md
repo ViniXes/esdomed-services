@@ -153,7 +153,7 @@ Consecuencias en el resto del sistema (regla para código nuevo: todo listado de
 
 ### Expedientes programados (paciente por llegar)
 
-ESDOMED deja listo el expediente de pacientes que aún no llegan (`Solicitud CODIGO DE INFARTO HNES`, `Solicitud CHAT MARCAPASOS HNES`). Esas dos opciones salen en el campo Servicio de `/dashboard/control-ingresos`, piden "Se presentará en" (fecha futura) y guardan en `expedientes_programados`, **no** en `control_ingresos`: de ahí sale la cola de los médicos. No son servicios, así que no van en el catálogo (define camas y ocupación). La pestaña Programados los lista; "Llegó" abre el formulario con los datos, se elige el servicio real y un lote crea el ingreso y marca el programado como `presentado`. Regla para código nuevo: nada de esta colección se muestra a médicos ni cuenta como ingreso hasta que exista su `control_ingresos`.
+ESDOMED deja listo el expediente de pacientes que aún no llegan (`Solicitud CODIGO DE INFARTO HNES`, `Solicitud CHAT MARCAPASOS HNES`). Esas dos opciones salen en el campo Servicio de `/dashboard/control-ingresos`, piden "Se presentará en" (hoy o después: un Código Infarto suele llegar el mismo día) y guardan en `expedientes_programados`, **no** en `control_ingresos`: de ahí sale la cola de los médicos. No son servicios, así que no van en el catálogo (define camas y ocupación). La pestaña Programados los lista; "Llegó" abre el formulario con los datos, se elige el servicio real y un lote crea el ingreso y marca el programado como `presentado`. Regla para código nuevo: nada de esta colección se muestra a médicos ni cuenta como ingreso hasta que exista su `control_ingresos`.
 
 ### Tablero de censos de emergencia
 
