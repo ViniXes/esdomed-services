@@ -35,7 +35,7 @@ export const CRITERIOS = {
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
-  { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas)", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5" },
+  { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas) y nota del examen del archivero", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5. Examen reprobado (menos de 7): máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
@@ -75,17 +75,29 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   const n = (x: number, uno: string, varios: string) => `${x} ${x === 1 ? uno : varios}`;
   const tiposAmon = (r.archivero ?? []).filter((e) => esAmonestacion(e.tipo)).map((e) => e.tipo);
   const amonestaciones = tiposAmon.length;
-  const conNota = (r.archivero ?? []).filter((e) => typeof e.nota === "number");
+  // Examen del archivero: cuenta solo el más reciente de cada tipo (la reevaluación
+  // reemplaza a la anterior). Reprobado (< 7) deja el factor 1 en máx. B.
+  const ultimoPorTipo = new Map<string, NonNullable<ResumenRespaldo["archivero"]>[number]>();
+  for (const e of r.archivero ?? []) {
+    if (typeof e.nota !== "number") continue;
+    const previo = ultimoPorTipo.get(e.tipo);
+    if (!previo || e.fecha > previo.fecha) ultimoPorTipo.set(e.tipo, e);
+  }
+  const conNota = [...ultimoPorTipo.values()];
+  const reprobado = conNota.some((e) => (e.nota as number) < NOTA_MINIMA_EVALUACION);
   const notas = conNota.length
-    ? ` · Nota ${conNota.map((e) => `${e.nota}${(e.nota as number) < NOTA_MINIMA_EVALUACION ? " (reprobada)" : ""}`).join(", ")}`
+    ? ` · Nota ${conNota.map((e) => `${e.nota}${(e.nota as number) < NOTA_MINIMA_EVALUACION ? " (reprobada, máx. B)" : ""}`).join(", ")}`
     : "";
   const out: Record<number, Sugerencia> = {};
   const m = r.marcaciones;
   const plan = r.plan;
 
-  // 1. Calidad
-  if (esAdministrativo) out[1] = sin(`Administrativo: sin datos en Services${notas}`);
-  else out[1] = { letra: menorEsMejor(r.altasRevertidas.length, CRITERIOS.errores), motivo: `${n(r.altasRevertidas.length, "alta revertida", "altas revertidas")}${notas}` };
+  // 1. Calidad: altas revertidas; examen reprobado pone tope B (manda la peor letra).
+  if (esAdministrativo) out[1] = reprobado ? { letra: "B", motivo: `Administrativo${notas}` } : sin(`Administrativo: sin datos en Services${notas}`);
+  else {
+    const porAltas = menorEsMejor(r.altasRevertidas.length, CRITERIOS.errores);
+    out[1] = { letra: reprobado ? peor(porAltas, "B") : porAltas, motivo: `${n(r.altasRevertidas.length, "alta revertida", "altas revertidas")}${notas}` };
+  }
 
   // 2. Responsabilidad: llegadas tarde. Solo en JUL - DIC 2026 (regla puntual de la
   // jefatura, ver SGAS_PERIODO): sin diploma SGAS queda en A.
