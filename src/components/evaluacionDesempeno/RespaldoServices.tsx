@@ -295,25 +295,34 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                 {archivero.map((e) => {
                   const amonestacion = /amonest/i.test(e.tipo);
                   return (
-                    <li key={e.id} className="flex items-start gap-2 text-xs">
-                      <span
-                        className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-px text-[10px] font-semibold ${
-                          amonestacion
-                            ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
-                            : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                        }`}
-                      >
-                        {e.tipo}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="flex flex-wrap items-center gap-1.5 tabular-nums text-slate-500">
-                          {e.fecha}
-                          {typeof e.nota === "number" && <ChipNota nota={e.nota} />}
-                          {e.notaPorRevisar && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">nota por revisar en su ficha</span>}
-                        </p>
-                        {e.notas && <p className="text-slate-700 dark:text-slate-200">{e.notas}</p>}
+                    <li key={e.id} className="text-xs">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`rounded-full border px-1.5 py-px text-[10px] font-semibold ${
+                            amonestacion
+                              ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+                              : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                          }`}
+                        >
+                          {e.tipo}
+                        </span>
+                        <span className="tabular-nums text-slate-500">{e.fecha}</span>
+                        {typeof e.nota === "number" && <ChipNota nota={e.nota} />}
+                        {e.notaPorRevisar && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">nota por revisar</span>}
+                        <span className="ml-auto">
+                          {botonIncidente(`arch-${e.id}`, {
+                            fecha: e.fecha,
+                            factor: amonestacion ? 5 : 1,
+                            tipo: amonestacion || (typeof e.nota === "number" && !aproboEvaluacion(e.nota)) ? "D" : "F",
+                            descripcion:
+                              typeof e.nota === "number"
+                                ? `${e.tipo}: nota ${e.nota} (${aproboEvaluacion(e.nota) ? "aprobada" : `reprobada, mínimo ${NOTA_MINIMA_EVALUACION}`})`
+                                : `${e.tipo}${e.notas ? `: ${e.notas}` : ""}`,
+                          })}
+                        </span>
                       </div>
-                      {botonIncidente(`arch-${e.id}`, { fecha: e.fecha, factor: amonestacion ? 5 : 1, tipo: amonestacion || (typeof e.nota === "number" && !aproboEvaluacion(e.nota)) ? "D" : "F", descripcion: `${e.tipo}${typeof e.nota === "number" ? ` (nota ${e.nota}, mínimo ${NOTA_MINIMA_EVALUACION})` : ""}${e.notas ? `: ${e.notas}` : ""}` })}
+                      {/* Con nota basta la etiqueta; la descripción solo se muestra si no hay nota (p. ej. amonestaciones). */}
+                      {typeof e.nota !== "number" && e.notas && <p className="mt-0.5 text-slate-700 dark:text-slate-200">{e.notas}</p>}
                     </li>
                   );
                 })}
