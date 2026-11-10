@@ -52,14 +52,14 @@ const esAmonestacion = (tipo: string) => /amonest/i.test(tipo);
 /**
  * Tope que dejan las amonestaciones del semestre en el factor 5 (regla de la
  * jefatura): una oral → máx. C; una escrita (la más grave, lleva copia a RRHH)
- * → máx. B; más de una → A. Escrita = el tipo dice "escrita"; lo demás (oral,
- * verbal, interna) cuenta como oral.
+ * → máx. B; más de una → A. Escrita = el tipo dice "escrita"; lo demás (interna,
+ * oral, verbal) pesa como oral.
  */
 function topeAmonestaciones(tipos: string[]): { tope: Opcion | null; texto: string } {
   if (!tipos.length) return { tope: null, texto: "" };
   if (tipos.length > 1) return { tope: "A", texto: `${tipos.length} amonestaciones` };
-  const escrita = /escrit/i.test(tipos[0]);
-  return escrita ? { tope: "B", texto: "1 amonestación escrita" } : { tope: "C", texto: "1 amonestación oral" };
+  if (/escrit/i.test(tipos[0])) return { tope: "B", texto: "1 amonestación escrita" };
+  return { tope: "C", texto: /intern/i.test(tipos[0]) ? "1 amonestación interna" : "1 amonestación oral" };
 }
 
 /** La peor de dos letras (A es la peor). */
