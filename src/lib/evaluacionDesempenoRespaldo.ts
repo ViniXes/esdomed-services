@@ -14,7 +14,7 @@ import { db } from "@/lib/firebase";
 import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
 import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
 import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
-import { tipoIncidencia } from "@/lib/inconsistenciasMarcacion/analisis";
+import { desgloseMinutos, tipoIncidencia } from "@/lib/inconsistenciasMarcacion/analisis";
 import { buscarFila, estadoFilaEnDia } from "@/lib/esdomed/turnos-dia";
 
 const MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
@@ -56,7 +56,7 @@ export interface ResumenRespaldo {
   marcaciones: {
     meses: number;          // meses del periodo con reporte del reloj cargado
     diasConIncidencia: number;
-    tardanzas: number;      // días con minutos descontados
+    tardanzas: number;      // días que llegó tarde (según el horario del reloj)
     minutos: number;
     omisiones: number;      // olvidó marcar entrada o salida
     ausencias: number;      // días sin ninguna marca
@@ -83,7 +83,7 @@ export interface MesRespaldo {
   incapacidades: number;
   permisos: number;       // PER + licencias
   marcacionPublicada: boolean; // hay reporte del reloj cargado para ese mes
-  tarde: number;          // días con minutos descontados (llegó tarde / salió antes)
+  tarde: number;          // días que llegó tarde (no cuenta las salidas antes de hora)
   olvidoMarca: number;    // olvidó marcar entrada o salida
   sinMarca: number;       // día de turno sin ninguna marca (no vino)
 }
@@ -103,6 +103,9 @@ export interface EntradaArchivero {
 }
 
 type Registro = { n: string; t: Date };
+
+/** Día en que llegó tarde: minutos descontados a la entrada (estimado con el horario). */
+const llegoTarde = (d: Parameters<typeof desgloseMinutos>[0]) => desgloseMinutos(d).tarde > 0;
 
 function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown): Registro[] {
   const out: Registro[] = [];
@@ -217,7 +220,7 @@ export async function cargarRespaldo(params: {
   const marcaciones = {
     meses: meses.length,
     diasConIncidencia: dias.length,
-    tardanzas: dias.filter((d) => tipoIncidencia(d) === "minutos").length,
+    tardanzas: dias.filter(llegoTarde).length,
     minutos: dias.reduce((a, d) => a + (d.minutos || 0), 0),
     omisiones: dias.filter((d) => {
       const t = tipoIncidencia(d);
@@ -249,7 +252,7 @@ export async function cargarRespaldo(params: {
       return [
         m.periodo,
         {
-          tarde: ds.filter((d) => tipoIncidencia(d) === "minutos").length,
+          tarde: ds.filter(llegoTarde).length,
           olvidoMarca: ds.filter((d) => ["omision_entrada", "omision_salida"].includes(tipoIncidencia(d))).length,
           sinMarca: ds.filter((d) => tipoIncidencia(d) === "sin_marcacion").length,
         },

@@ -21,6 +21,8 @@ export interface Sugerencia {
 export const CRITERIOS = {
   // Factor 1: errores atribuibles (hoy: altas efectivas revertidas). D ≤ 0, C ≤ 2, B ≤ 5, A > 5.
   errores: { D: 0, C: 2, B: 5 },
+  // Factor 2: llegadas tarde en el semestre (reloj). D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (regla de la jefatura).
+  llegadasTarde: { D: 5, C: 7, B: 9 },
   // Factor 3: actividades por turno, en % del promedio del equipo. D ≥ 110, C ≥ 90, B ≥ 60, A < 60.
   productividadPct: { D: 110, C: 90, B: 60 },
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
@@ -32,7 +34,7 @@ export const CRITERIOS = {
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
   { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas)", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5" },
-  { factor: 2, dato: "Sin dato directo; amonestaciones como alerta", regla: "A criterio del jefe" },
+  { factor: 2, dato: "Llegadas tarde en el semestre (reloj)", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más" },
   { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
   { factor: 5, dato: "Llegadas tarde + olvidos de marca + días sin marca (reloj), y amonestaciones", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
@@ -67,8 +69,14 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
     };
   }
 
-  // 2. Responsabilidad
-  out[2] = sin(`Sin dato directo en Services: a criterio del jefe.${alertaAmon}`);
+  // 2. Responsabilidad: llegadas tarde del semestre
+  const mr = r.marcaciones;
+  if (mr.meses === 0) out[2] = sin(`No hay reporte del reloj cargado para este periodo.${alertaAmon}`);
+  else
+    out[2] = {
+      letra: menorEsMejor(mr.tardanzas, CRITERIOS.llegadasTarde),
+      motivo: `${mr.tardanzas} llegada(s) tarde en ${mr.meses} mes(es) con reporte del reloj.${alertaAmon}`,
+    };
 
   // 3. Cumplimiento de metas
   const plan = r.plan;

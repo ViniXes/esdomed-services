@@ -11,7 +11,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, Lightbulb, Plus, Printer, Save, Search, Trash2, UserRound } from "lucide-react";
+import { ArrowLeft, Eye, Lightbulb, MessageCircleQuestion, Plus, Printer, Save, Search, Trash2, UserRound } from "lucide-react";
 import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,7 +45,7 @@ import { EvaluacionDesempenoPrintLayout } from "@/components/evaluacionDesempeno
 import { RespaldoServices } from "@/components/evaluacionDesempeno/RespaldoServices";
 import type { ResumenRespaldo } from "@/lib/evaluacionDesempenoRespaldo";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
-import { sugerirFactores } from "@/lib/evaluacionDesempenoSugerencias";
+import { CRITERIOS_TEXTO, sugerirFactores, type Sugerencia } from "@/lib/evaluacionDesempenoSugerencias";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "dui" | "puesto" | "codigoMarcacion" | "role" | "activo">;
 
@@ -378,16 +378,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                 {f.numero}. {f.titulo}
               </p>
               <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">{f.definicion}</p>
-              {sugerencias[f.numero] && (
-                <p className="mb-2 flex items-start gap-1.5 text-xs text-cyan-800 dark:text-cyan-200">
-                  <Lightbulb size={13} className="mt-0.5 shrink-0" />
-                  <span>
-                    <strong>{sugerencias[f.numero].letra ? `Sugerida: ${sugerencias[f.numero].letra}. ` : "Sin sugerencia. "}</strong>
-                    {sugerencias[f.numero].motivo}
-                  </span>
-                </p>
-              )}
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex items-start gap-2">
+              <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {OPCIONES.map((o) => {
                   const activa = borrador.respuestas[f.numero] === o;
                   const sugerida = sugerencias[f.numero]?.letra === o;
@@ -416,6 +408,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                     </button>
                   );
                 })}
+              </div>
+              <GloboPorque factor={f.numero} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} />
               </div>
             </div>
           ))}
@@ -744,6 +738,64 @@ function SelectorSemestre({ value, onChange }: { value: string; onChange: (v: st
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/**
+ * Globito junto a las casillas de cada factor: por qué se sugiere esa letra
+ * (dato de Services + regla). Se abre al pasar el mouse o al tocarlo.
+ */
+function GloboPorque({ factor, sugerencia, cargado }: { factor: number; sugerencia?: Sugerencia; cargado: boolean }) {
+  const [abierto, setAbierto] = useState(false);
+  const regla = CRITERIOS_TEXTO.find((c) => c.factor === factor);
+  const letra = sugerencia?.letra ?? null;
+  return (
+    <div className="group relative shrink-0" onMouseLeave={() => setAbierto(false)}>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        onBlur={() => setAbierto(false)}
+        onKeyDown={(e) => e.key === "Escape" && setAbierto(false)}
+        aria-expanded={abierto}
+        aria-label={`Por qué se sugiere esta evaluación en el factor ${factor}`}
+        className={`relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+          letra
+            ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300"
+            : "border-slate-200 bg-white text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:bg-slate-900"
+        }`}
+      >
+        <MessageCircleQuestion size={17} />
+        {letra && (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-700 px-1 text-[9px] font-bold text-white">
+            {letra}
+          </span>
+        )}
+      </button>
+      <div
+        role="tooltip"
+        className={`absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900 ${
+          abierto ? "block" : "hidden group-hover:block"
+        }`}
+      >
+        <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+          {!cargado ? "¿Por qué esta evaluación?" : letra ? `¿Por qué se sugiere ${letra}?` : "Sin sugerencia automática"}
+        </p>
+        <p className="mt-1 text-xs leading-snug text-slate-600 dark:text-slate-300">
+          {!cargado ? "Carga el respaldo de Services (arriba) para ver el dato que sustenta este factor." : sugerencia?.motivo ?? "Sin datos para este factor."}
+        </p>
+        {regla && (
+          <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+            <p>
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Dato:</span> {regla.dato}
+            </p>
+            <p>
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Regla:</span> {regla.regla}
+            </p>
+          </div>
+        )}
+        <p className="mt-2 text-[10px] text-slate-400">Es una sugerencia: la letra la decide el evaluador.</p>
+      </div>
     </div>
   );
 }
