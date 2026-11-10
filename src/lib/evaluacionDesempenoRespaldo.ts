@@ -99,6 +99,7 @@ export interface EntradaArchivero {
   tipo: string;
   fecha: string; // "YYYY-MM-DD"
   notas: string;
+  nota?: number; // 0–10, mínimo 7 para aprobar
 }
 
 type Registro = { n: string; t: Date };
@@ -276,8 +277,8 @@ export async function cargarArchivero(empleadoId: string, periodo: string): Prom
   const snap = await getDocs(query(collection(db, "evaluaciones_personal"), where("empleadoId", "==", empleadoId)));
   return snap.docs
     .map((d) => {
-      const x = d.data() as { tipo?: string; fecha?: unknown; notas?: string };
-      return { id: d.id, tipo: x.tipo ?? "", fecha: aIso(x.fecha), notas: x.notas ?? "" };
+      const x = d.data() as { tipo?: string; fecha?: unknown; notas?: string; nota?: number };
+      return { id: d.id, tipo: x.tipo ?? "", fecha: aIso(x.fecha), notas: x.notas ?? "", ...(typeof x.nota === "number" ? { nota: x.nota } : {}) };
     })
     .filter((e) => {
       if (!rango || !e.fecha) return true;

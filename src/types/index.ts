@@ -1837,6 +1837,7 @@ export interface EvaluacionPersonal {
   empleadoNombre: string;
   tipo: string; // catálogo abierto, ver TIPOS_EVALUACION_PERSONAL en src/lib/evaluacionesPersonal.ts
   notas?: string;
+  nota?: number; // calificación 0–10 (mínimo para aprobar: NOTA_MINIMA_EVALUACION = 7)
   archivos?: AdjuntoBitacora[];
   fecha: Date; // fecha de la evaluación/amonestación (no necesariamente hoy)
   registradaPorId: string;

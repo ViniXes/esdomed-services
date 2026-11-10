@@ -10,6 +10,8 @@ import {
   type ResumenRespaldo,
 } from "@/lib/evaluacionDesempenoRespaldo";
 import { CRITERIOS_TEXTO } from "@/lib/evaluacionDesempenoSugerencias";
+import { NOTA_MINIMA_EVALUACION, aproboEvaluacion } from "@/lib/evaluacionesPersonal";
+import { ChipNota } from "@/components/personal/EvaluacionesPersonal";
 import type { IncidenteCritico } from "@/lib/evaluacionDesempeno";
 
 interface Props {
@@ -265,10 +267,13 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                         {e.tipo}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="tabular-nums text-slate-500">{e.fecha}</p>
+                        <p className="flex flex-wrap items-center gap-1.5 tabular-nums text-slate-500">
+                          {e.fecha}
+                          {typeof e.nota === "number" && <ChipNota nota={e.nota} />}
+                        </p>
                         {e.notas && <p className="text-slate-700 dark:text-slate-200">{e.notas}</p>}
                       </div>
-                      {botonIncidente(`arch-${e.id}`, { fecha: e.fecha, factor: amonestacion ? 5 : 1, tipo: amonestacion ? "D" : "F", descripcion: `${e.tipo}${e.notas ? `: ${e.notas}` : ""}` })}
+                      {botonIncidente(`arch-${e.id}`, { fecha: e.fecha, factor: amonestacion ? 5 : 1, tipo: amonestacion || (typeof e.nota === "number" && !aproboEvaluacion(e.nota)) ? "D" : "F", descripcion: `${e.tipo}${typeof e.nota === "number" ? ` (nota ${e.nota}, mínimo ${NOTA_MINIMA_EVALUACION})` : ""}${e.notas ? `: ${e.notas}` : ""}` })}
                     </li>
                   );
                 })}

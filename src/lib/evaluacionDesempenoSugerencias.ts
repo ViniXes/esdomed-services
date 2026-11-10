@@ -10,6 +10,7 @@
 
 import type { Opcion } from "@/lib/evaluacionDesempeno";
 import type { ResumenRespaldo } from "@/lib/evaluacionDesempenoRespaldo";
+import { NOTA_MINIMA_EVALUACION } from "@/lib/evaluacionesPersonal";
 
 export interface Sugerencia {
   letra: Opcion | null; // null = sin datos suficientes / a criterio del jefe
@@ -49,15 +50,20 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   if (!r) return {};
   const amonestaciones = (r.archivero ?? []).filter((e) => esAmonestacion(e.tipo)).length;
   const alertaAmon = amonestaciones ? ` Hay ${amonestaciones} amonestación(es) en el archivero.` : "";
+  const conNota = (r.archivero ?? []).filter((e) => typeof e.nota === "number");
+  const reprobadas = conNota.filter((e) => (e.nota as number) < NOTA_MINIMA_EVALUACION);
+  const textoNotas = conNota.length
+    ? ` Evaluaciones del archivero: ${conNota.map((e) => `${e.tipo} ${e.nota}`).join(", ")}${reprobadas.length ? ` (${reprobadas.length} bajo ${NOTA_MINIMA_EVALUACION})` : " (todas aprobadas)"}.`
+    : "";
   const out: Record<number, Sugerencia> = {};
 
   // 1. Calidad
-  if (esAdministrativo) out[1] = sin("Administrativo: su trabajo no se registra en Services.");
+  if (esAdministrativo) out[1] = sin(`Administrativo: su trabajo no se registra en Services.${textoNotas}`);
   else {
     const n = r.altasRevertidas.length;
     out[1] = {
       letra: menorEsMejor(n, CRITERIOS.errores),
-      motivo: `${n} alta(s) efectiva(s) revertida(s) en el periodo. Única fuente de errores trazable por ahora.`,
+      motivo: `${n} alta(s) efectiva(s) revertida(s) en el periodo.${textoNotas}`,
     };
   }
 
