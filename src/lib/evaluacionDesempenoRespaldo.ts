@@ -65,6 +65,12 @@ export interface ResumenRespaldo {
   altasRevertidas: { fecha: string; paciente: string; nota: string }[];
   /** Entradas del archivero (evaluaciones/amonestaciones) dentro del periodo. */
   archivero?: EntradaArchivero[];
+  /**
+   * Diploma del curso SGAS (Sistema de Gestión Antisoborno). Subirlo era
+   * responsabilidad de cada trabajador: si el requisito aplica al periodo y no
+   * está en la pestaña Diplomas de su ficha, el factor 2 se sugiere en A.
+   */
+  sgas?: { aplica: boolean; diploma: { fecha: string; detalle: string } | null };
   /** Plan de trabajo, solo días ya transcurridos del periodo. */
   plan?: {
     turnosProgramados: number;
@@ -280,11 +286,34 @@ export async function cargarRespaldo(params: {
   };
 }
 
-/** Entradas del archivero (evaluaciones / amonestaciones) de la persona dentro del periodo. */
-export async function cargarArchivero(empleadoId: string, periodo: string): Promise<EntradaArchivero[]> {
+/** El curso SGAS fue en octubre de 2026: el requisito aplica a los periodos que terminan desde entonces. */
+export const SGAS_EXIGIBLE_DESDE = new Date(2026, 9, 1);
+
+/** Diploma del curso SGAS: se reconoce por "SGAS" o "Antisoborno" en el tipo, la descripción o el archivo. */
+export const esDiplomaSgas = (x: { tipo?: string; notas?: string; archivos?: { nombre?: string }[] }) =>
+  /\bsgas\b|antisoborno/i.test([x.tipo, x.notas, ...(x.archivos ?? []).map((a) => a.nombre)].filter(Boolean).join(" "));
+
+/**
+ * Archivero de la persona en una sola lectura: evaluaciones y amonestaciones
+ * del periodo (sin diplomas) y si tiene subido el diploma SGAS.
+ */
+export async function cargarArchivero(
+  empleadoId: string,
+  periodo: string,
+): Promise<{ entradas: EntradaArchivero[]; sgas: NonNullable<ResumenRespaldo["sgas"]> }> {
   const rango = rangoDePeriodo(periodo);
   const snap = await getDocs(query(collection(db, "evaluaciones_personal"), where("empleadoId", "==", empleadoId)));
-  return snap.docs
+  const diplomas = snap.docs
+    .map((d) => d.data() as { categoria?: string; tipo?: string; notas?: string; fecha?: unknown; archivos?: { nombre?: string }[] })
+    .filter((x) => x.categoria === "diploma" && esDiplomaSgas(x))
+    // Cuenta si lo subió hasta el fin del periodo evaluado.
+    .filter((x) => !rango || !aIso(x.fecha) || new Date(`${aIso(x.fecha)}T12:00:00`) <= rango.fin)
+    .sort((a, b) => aIso(a.fecha).localeCompare(aIso(b.fecha)));
+  const sgas = {
+    aplica: !!rango && rango.fin >= SGAS_EXIGIBLE_DESDE,
+    diploma: diplomas.length ? { fecha: aIso(diplomas[0].fecha), detalle: diplomas[0].notas || diplomas[0].tipo || "Diploma SGAS" } : null,
+  };
+  const entradas = snap.docs
     // Los diplomas/certificados viven en la misma colección pero no son parte de este respaldo.
     .filter((d) => d.data().categoria !== "diploma")
     .map((d) => {
@@ -297,6 +326,7 @@ export async function cargarArchivero(empleadoId: string, periodo: string): Prom
       return f >= rango.inicio && f <= rango.fin;
     })
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  return { entradas, sgas };
 }
 
 /**

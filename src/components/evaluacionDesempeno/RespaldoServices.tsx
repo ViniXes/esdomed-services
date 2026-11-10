@@ -47,7 +47,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
         cargarRespaldo({ empleadoId, uid: empleadoId, nombre, codigoMarcacion, periodo, equipo }),
         cargarArchivero(empleadoId, periodo),
       ]);
-      onRespaldo({ ...r, archivero: a });
+      onRespaldo({ ...r, archivero: a.entradas, sgas: a.sgas });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el respaldo.");
     } finally {
@@ -268,7 +268,26 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
           </Bloque>
 
           {/* Archivero */}
-          <Bloque icon={FileWarning} titulo="Archivero: evaluaciones y amonestaciones" factor="Factores 5 y 7">
+          <Bloque icon={FileWarning} titulo="Archivero: evaluaciones y amonestaciones" factor="Factores 2, 5 y 7">
+            {respaldo.sgas?.aplica && (
+              <div
+                className={`mb-2 rounded-lg border px-2.5 py-1.5 text-xs ${
+                  respaldo.sgas.diploma
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
+                    : "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
+                }`}
+              >
+                {respaldo.sgas.diploma ? (
+                  <>
+                    <strong>Diploma SGAS subido</strong> ({respaldo.sgas.diploma.fecha}).
+                  </>
+                ) : (
+                  <>
+                    <strong>Sin diploma SGAS</strong> en la pestaña Diplomas de su ficha: el factor 2 (Responsabilidad) se sugiere en A.
+                  </>
+                )}
+              </div>
+            )}
             {!archivero || archivero.length === 0 ? (
               <p className="text-xs text-slate-500">Sin registros en el archivero de esta persona dentro del periodo.</p>
             ) : (

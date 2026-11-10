@@ -35,7 +35,7 @@ export const CRITERIOS = {
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
   { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas)", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5" },
-  { factor: 2, dato: "Llegadas tarde en el semestre (reloj)", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más" },
+  { factor: 2, dato: "Llegadas tarde en el semestre (reloj) y diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más, o sin diploma SGAS" },
   { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
   { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
@@ -70,13 +70,26 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
     };
   }
 
-  // 2. Responsabilidad: llegadas tarde del semestre
+  // 2. Responsabilidad: llegadas tarde del semestre + diploma SGAS (regla de la jefatura:
+  // quien no hizo o no subió el diploma del curso SGAS queda en A).
   const mr = r.marcaciones;
-  if (mr.meses === 0) out[2] = sin(`No hay reporte del reloj cargado para este periodo.${alertaAmon}`);
+  const sinSgas = !!r.sgas?.aplica && !r.sgas.diploma;
+  const textoTarde = mr.meses ? `${mr.tardanzas} llegada(s) tarde en ${mr.meses} mes(es) con reporte del reloj.` : "No hay reporte del reloj cargado para este periodo.";
+  const textoSgas = !r.sgas?.aplica
+    ? ""
+    : r.sgas.diploma
+      ? ` Diploma del curso SGAS subido (${r.sgas.diploma.fecha}).`
+      : "";
+  if (sinSgas) {
+    out[2] = {
+      letra: "A",
+      motivo: `No hizo o no tiene subido el diploma del curso SGAS (Sistema de Gestión Antisoborno), que era su responsabilidad: queda en A. Además: ${textoTarde}${alertaAmon}`,
+    };
+  } else if (mr.meses === 0) out[2] = sin(`${textoTarde}${textoSgas}${alertaAmon}`);
   else
     out[2] = {
       letra: menorEsMejor(mr.tardanzas, CRITERIOS.llegadasTarde),
-      motivo: `${mr.tardanzas} llegada(s) tarde en ${mr.meses} mes(es) con reporte del reloj.${alertaAmon}`,
+      motivo: `${textoTarde}${textoSgas}${alertaAmon}`,
     };
 
   // 3. Cumplimiento de metas
