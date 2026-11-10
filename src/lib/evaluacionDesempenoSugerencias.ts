@@ -23,7 +23,7 @@ export const CRITERIOS = {
   errores: { D: 4, C: 6, B: 8 },
   // Factor 2: llegadas tarde en el semestre (reloj). D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (regla de la jefatura).
   llegadasTarde: { D: 5, C: 7, B: 9 },
-  // Factor 3: actividades por turno, en % del que más registró en su grupo (= 100%).
+  // Factor 3: total del semestre, en % del total mayor de su grupo (= 100%).
   // D ≥ 80, C ≥ 60, B ≥ 40, A < 40.
   productividadPct: { D: 80, C: 60, B: 40 },
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
@@ -38,7 +38,7 @@ export const CRITERIOS = {
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
   { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas) y nota del examen del archivero", regla: "D: 0–4 · C: 5–6 · B: 7–8 · A: 9 o más. Examen reprobado (menos de 7): máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
-  { factor: 3, dato: "Actividades registradas en Services por turno (sin traslados), como % del que más registró en su grupo", regla: "D: 80% o más del mejor · C: 60–79% · B: 40–59% · A: menos de 40%" },
+  { factor: 3, dato: "Total registrado en Services en el semestre (sin traslados), como % del total mayor de su grupo", regla: "D: 80% o más del mayor · C: 60–79% · B: 40–59% · A: menos de 40%" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
   { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
@@ -111,16 +111,16 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   if (esAdministrativo) out[3] = sin("Administrativo: sin datos en Services");
   else if (!plan?.turnosProgramados) out[3] = sin("Sin turnos en el plan");
   else {
-    // El 100% es quien más registró por turno en su grupo; si no hay compañeros en él, en todo el equipo.
-    const conGrupo = !!plan.companerosGrupo && !!plan.maximoGrupoPorTurno;
-    const base = conGrupo ? (plan.maximoGrupoPorTurno as number) : (plan.maximoEquipoPorTurno ?? 0);
+    // El 100% es el total mayor de su grupo; si no hay compañeros en él, el de todo el equipo.
+    const conGrupo = !!plan.companerosGrupo && !!plan.maximoGrupoTotal;
+    const base = conGrupo ? (plan.maximoGrupoTotal as number) : (plan.maximoEquipoTotal ?? 0);
     const quien = conGrupo ? plan.grupo : "el equipo";
     if (!base) out[3] = sin("Vuelve a cargar el respaldo");
     else {
-      const pct = Math.round((plan.actividadesPorTurno / base) * 100);
+      const pct = Math.round((r.totalPersona / base) * 100);
       out[3] = {
         letra: mayorEsMejor(pct, CRITERIOS.productividadPct),
-        motivo: `${pct}% del mejor de ${quien} (${plan.actividadesPorTurno} vs ${base} por turno)`,
+        motivo: `${r.totalPersona} de ${base} (total mayor de ${quien}) = ${pct}%`,
       };
     }
   }

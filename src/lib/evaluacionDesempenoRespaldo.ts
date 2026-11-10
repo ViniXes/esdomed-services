@@ -86,6 +86,10 @@ export interface ResumenRespaldo {
     maximoGrupoPorTurno?: number;
     /** El que más registró por turno en todo el equipo (respaldo si no hay grupo). */
     maximoEquipoPorTurno?: number;
+    /** Total mayor del semestre en su grupo (incluida la persona): es el 100% del factor 3. */
+    maximoGrupoTotal?: number;
+    /** Total mayor del semestre en todo el equipo (respaldo si no hay compañeros en su grupo). */
+    maximoEquipoTotal?: number;
     porMes: MesRespaldo[];
   };
 }
@@ -463,12 +467,14 @@ async function resumenPlan(p: {
     actividadesPorTurno: r1(porTurno(yoN)),
     promedioEquipoPorTurno: r1(promedio(tasasEquipo)),
     maximoEquipoPorTurno: r1(maximo(tasasEquipo)),
+    maximoEquipoTotal: maximo([...p.totales.values()]),
     ...(miGrupo
       ? {
           grupo: miGrupo,
           companerosGrupo: tasasGrupo.length,
           promedioGrupoPorTurno: r1(promedio(tasasGrupo)),
           maximoGrupoPorTurno: r1(maximo([...tasasGrupo, porTurno(yoN)])),
+          maximoGrupoTotal: maximo([...turnosDe.keys()].filter((n) => principal(n) === miGrupo).map((n) => p.totales.get(n) ?? 0)),
         }
       : {}),
     porMes,

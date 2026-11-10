@@ -133,28 +133,41 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {/* Productividad */}
           <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 3 · metas" atenuado={esAdministrativo} ancho>
-            <ProductividadPorTurno plan={respaldo.plan} nombre={primerNombre(nombre)} />
+            <ProductividadTotal plan={respaldo.plan} total={respaldo.totalPersona} nombre={primerNombre(nombre)} />
             <table className="mt-3 w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
-                  <th className="pb-1 font-semibold">Lo que registró en Services en el semestre</th>
-                  <th className="pb-1 text-right font-semibold">Total</th>
+                  <th className="pb-1 font-semibold">Actividad (total del semestre)</th>
+                  <th className="pb-1 text-right font-semibold">{primerNombre(nombre)}</th>
+                  <th className="pb-1 text-right font-semibold">Promedio equipo</th>
+                  <th className="pb-1 text-right font-semibold" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {METRICAS_PRODUCTIVIDAD.map((m) => (
                   <tr key={m.id}>
                     <td className="py-1 text-slate-600 dark:text-slate-300">{m.label}</td>
-                    <td className="py-1 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.productividad[m.id]}</td>
+                    <td className="py-1 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.productividad[m.id] ?? 0}</td>
+                    <td className="py-1 text-right tabular-nums text-slate-500">{Math.round(respaldo.promedioEquipo[m.id] ?? 0)}</td>
+                    <td className="py-1 pl-2 text-right">
+                      <Comparacion persona={respaldo.productividad[m.id] ?? 0} equipo={respaldo.promedioEquipo[m.id] ?? 0} />
+                    </td>
                   </tr>
                 ))}
                 <tr>
                   <td className="pt-1.5 font-semibold text-slate-700 dark:text-slate-200">Total</td>
                   <td className="pt-1.5 text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.totalPersona}</td>
+                  <td className="pt-1.5 text-right tabular-nums text-slate-500">{respaldo.promedioTotalEquipo}</td>
+                  <td className="pt-1.5 pl-2 text-right">
+                    <Comparacion persona={respaldo.totalPersona} equipo={respaldo.promedioTotalEquipo} />
+                  </td>
                 </tr>
               </tbody>
             </table>
-            <p className="mt-2 text-[11px] text-slate-400">No incluye las hojas de Drive (carpetas, actualizaciones, consentimientos).</p>
+            <p className="mt-2 text-[11px] text-slate-400">
+              &quot;Promedio equipo&quot; = lo que hizo en promedio cada compañero operativo en el semestre. Arriba o abajo cuenta a partir de 10% de
+              diferencia. Sin traslados (son de coordinadores) ni hojas de Drive.
+            </p>
           </Bloque>
 
           {/* Asistencia mes por mes */}
@@ -401,41 +414,33 @@ function Celda({ n, alerta }: { n: number; alerta?: boolean }) {
 }
 
 const ESCALA_PRODUCTIVIDAD: { letra: string; texto: string; desde: number }[] = [
-  { letra: "D", texto: "80% o más del mejor", desde: 80 },
+  { letra: "D", texto: "80% o más del mayor", desde: 80 },
   { letra: "C", texto: "60–79%", desde: 60 },
   { letra: "B", texto: "40–59%", desde: 40 },
   { letra: "A", texto: "menos de 40%", desde: -Infinity },
 ];
 
 /**
- * Factor 3 explicado en simple: actividades por turno de la persona como % del
- * que más registró en su grupo (= 100%), y la escala con su letra resaltada.
+ * Factor 3 en simple: el total del semestre de la persona contra el total mayor
+ * de su grupo (= 100%), el % y la escala con su letra resaltada.
  */
-function ProductividadPorTurno({ plan, nombre }: { plan: ResumenRespaldo["plan"]; nombre: string }) {
-  if (!plan?.turnosProgramados) {
-    return <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la comparación por turno.</p>;
-  }
-  const conGrupo = !!plan.companerosGrupo && !!plan.maximoGrupoPorTurno;
-  const base = conGrupo ? (plan.maximoGrupoPorTurno as number) : (plan.maximoEquipoPorTurno ?? 0);
-  const quien = conGrupo ? (plan.grupo as string) : "todo el equipo";
-  if (!base) return <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la comparación.</p>;
-  const pct = Math.round((plan.actividadesPorTurno / base) * 100);
+function ProductividadTotal({ plan, total, nombre }: { plan: ResumenRespaldo["plan"]; total: number; nombre: string }) {
+  const conGrupo = !!plan?.companerosGrupo && !!plan?.maximoGrupoTotal;
+  const base = conGrupo ? (plan?.maximoGrupoTotal as number) : (plan?.maximoEquipoTotal ?? 0);
+  const quien = conGrupo ? (plan?.grupo as string) : "todo el equipo";
+  if (!base) return <p className="text-xs text-slate-500">Dale Actualizar para ver la comparación con el total mayor.</p>;
+  const pct = Math.round((total / base) * 100);
   const actual = ESCALA_PRODUCTIVIDAD.find((e) => pct >= e.desde)?.letra;
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-slate-800/60">
-      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-        <strong>Cómo se calcula:</strong> lo que registró en Services en el semestre (sin traslados, que son de coordinadores) ÷ los turnos que tuvo
-        en el plan. El que más registró por turno en <strong>{quien}</strong> es el 100%, y cada quien se mide contra él. Se compara solo dentro de su
-        grupo, así un área de poco volumen no se mide contra una de mucha demanda.
-      </p>
-      <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
         <span>
-          {nombre}: <strong className="tabular-nums">{plan.actividadesPorTurno}</strong> <span className="text-xs text-slate-500">por turno</span>
+          {nombre}: <strong className="tabular-nums">{total}</strong>
         </span>
         <span>
-          El mejor de {quien}: <strong className="tabular-nums">{base}</strong> <span className="text-xs text-slate-500">por turno</span>
+          Total mayor de {quien}: <strong className="tabular-nums">{base}</strong>
         </span>
-        <span className="font-bold tabular-nums">= {pct}% del mejor</span>
+        <span className="font-bold tabular-nums">= {pct}%</span>
       </div>
       <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
         {ESCALA_PRODUCTIVIDAD.map((e) => (
@@ -451,6 +456,22 @@ function ProductividadPorTurno({ plan, nombre }: { plan: ResumenRespaldo["plan"]
           </li>
         ))}
       </ul>
+      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+        Total del semestre en Services. El total mayor de su grupo es el 100%{conGrupo ? " (los Grupos 1 a 4 se comparan juntos)" : ""}.
+      </p>
     </div>
   );
+}
+
+/** Arriba / en el promedio / abajo, con 10% de margen. */
+function Comparacion({ persona, equipo }: { persona: number; equipo: number }) {
+  if (!equipo) return <span className="text-[10px] text-slate-400">—</span>;
+  const dif = Math.round((persona / equipo - 1) * 100);
+  const [texto, cls] =
+    Math.abs(dif) < 10
+      ? ["En el promedio", "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"]
+      : dif > 0
+        ? [`Arriba ${dif}%`, "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"]
+        : [`Abajo ${-dif}%`, "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"];
+  return <span className={`inline-block whitespace-nowrap rounded-full border px-1.5 py-px text-[10px] font-semibold ${cls}`}>{texto}</span>;
 }
