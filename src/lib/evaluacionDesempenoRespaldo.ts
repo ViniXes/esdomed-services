@@ -67,8 +67,8 @@ export interface ResumenRespaldo {
   archivero?: EntradaArchivero[];
   /**
    * Diploma del curso SGAS (Sistema de Gestión Antisoborno). Subirlo era
-   * responsabilidad de cada trabajador: si el requisito aplica al periodo y no
-   * está en la pestaña Diplomas de su ficha, el factor 2 se sugiere en A.
+   * responsabilidad de cada trabajador: en el periodo SGAS_PERIODO, si no está
+   * en la pestaña Diplomas de su ficha, el factor 2 se sugiere en A.
    */
   sgas?: { aplica: boolean; diploma: { fecha: string; detalle: string } | null };
   /** Plan de trabajo, solo días ya transcurridos del periodo. */
@@ -286,8 +286,12 @@ export async function cargarRespaldo(params: {
   };
 }
 
-/** El curso SGAS fue en octubre de 2026: el requisito aplica a los periodos que terminan desde entonces. */
-export const SGAS_EXIGIBLE_DESDE = new Date(2026, 9, 1);
+/**
+ * Regla puntual de la jefatura para la PRIMERA evaluación (curso SGAS de octubre
+ * 2026): solo cuenta en este periodo. Los siguientes semestres tendrán otro
+ * parámetro; no se repite automáticamente.
+ */
+export const SGAS_PERIODO = "JUL - DIC 2026";
 
 /** Diploma del curso SGAS: se reconoce por "SGAS" o "Antisoborno" en el tipo, la descripción o el archivo. */
 export const esDiplomaSgas = (x: { tipo?: string; notas?: string; archivos?: { nombre?: string }[] }) =>
@@ -310,7 +314,7 @@ export async function cargarArchivero(
     .filter((x) => !rango || !aIso(x.fecha) || new Date(`${aIso(x.fecha)}T12:00:00`) <= rango.fin)
     .sort((a, b) => aIso(a.fecha).localeCompare(aIso(b.fecha)));
   const sgas = {
-    aplica: !!rango && rango.fin >= SGAS_EXIGIBLE_DESDE,
+    aplica: periodo.trim().toUpperCase() === SGAS_PERIODO,
     diploma: diplomas.length ? { fecha: aIso(diplomas[0].fecha), detalle: diplomas[0].notas || diplomas[0].tipo || "Diploma SGAS" } : null,
   };
   const entradas = snap.docs

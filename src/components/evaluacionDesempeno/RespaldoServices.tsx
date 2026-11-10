@@ -283,7 +283,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                   </>
                 ) : (
                   <>
-                    <strong>Sin diploma SGAS</strong> en la pestaña Diplomas de su ficha: el factor 2 (Responsabilidad) se sugiere en A.
+                    <strong>Sin diploma SGAS</strong> en la pestaña Diplomas de su ficha: en este periodo el factor 2 (Responsabilidad) se sugiere en A.
                   </>
                 )}
               </div>
