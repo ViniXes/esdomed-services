@@ -19,8 +19,8 @@ export interface Sugerencia {
 
 /** Umbrales: el valor se compara de la mejor letra (D) a la peor (A). */
 export const CRITERIOS = {
-  // Factor 1: errores atribuibles (hoy: altas efectivas revertidas). D ≤ 0, C ≤ 2, B ≤ 5, A > 5.
-  errores: { D: 0, C: 2, B: 5 },
+  // Factor 1: altas efectivas revertidas. D ≤ 4, C 5–6, B 7–8, A ≥ 9 (con 5 empieza la C).
+  errores: { D: 4, C: 6, B: 8 },
   // Factor 2: llegadas tarde en el semestre (reloj). D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (regla de la jefatura).
   llegadasTarde: { D: 5, C: 7, B: 9 },
   // Factor 3: actividades por turno, en % del que más registró en su grupo (= 100%).
@@ -36,7 +36,7 @@ export const CRITERIOS = {
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
-  { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas) y nota del examen del archivero", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5. Examen reprobado (menos de 7): máx. B" },
+  { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas) y nota del examen del archivero", regla: "D: 0–4 · C: 5–6 · B: 7–8 · A: 9 o más. Examen reprobado (menos de 7): máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "Actividades registradas en Services por turno (sin traslados), como % del que más registró en su grupo", regla: "D: 80% o más del mejor · C: 60–79% · B: 40–59% · A: menos de 40%" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
