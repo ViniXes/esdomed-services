@@ -427,7 +427,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                   );
                 })}
               </div>
-              <GloboPorque factor={f.numero} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} />
+              <GloboPorque factor={f.numero} puntos={f.puntos} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} />
               </div>
             </div>
           ))}
@@ -814,7 +814,17 @@ function SelectorSemestre({ value, onChange }: { value: string; onChange: (v: st
  */
 const ANCHO_GLOBO = 288;
 
-function GloboPorque({ factor, sugerencia, cargado }: { factor: number; sugerencia?: Sugerencia; cargado: boolean }) {
+function GloboPorque({
+  factor,
+  puntos,
+  sugerencia,
+  cargado,
+}: {
+  factor: number;
+  puntos: Record<Opcion, number>;
+  sugerencia?: Sugerencia;
+  cargado: boolean;
+}) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [fijo, setFijo] = useState(false); // abierto con clic/toque (no solo hover)
@@ -886,23 +896,11 @@ function GloboPorque({ factor, sugerencia, cargado }: { factor: number; sugerenc
           style={{ position: "fixed", left: pos.left, top: pos.top, width: ANCHO_GLOBO }}
           className="z-50 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
-          <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
-            {!cargado ? "¿Por qué esta evaluación?" : letra ? `¿Por qué se sugiere ${letra}?` : "Sin sugerencia automática"}
+          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            {!cargado ? "Carga el respaldo de Services" : letra ? `Sugerida: ${letra} · ${puntos[letra]} pts` : "Sin sugerencia"}
           </p>
-          <p className="mt-1 text-xs leading-snug text-slate-600 dark:text-slate-300">
-            {!cargado ? "Carga el respaldo de Services (arriba) para ver el dato que sustenta este factor." : sugerencia?.motivo ?? "Sin datos para este factor."}
-          </p>
-          {regla && (
-            <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-              <p>
-                <span className="font-semibold text-slate-600 dark:text-slate-300">Dato:</span> {regla.dato}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-600 dark:text-slate-300">Regla:</span> {regla.regla}
-              </p>
-            </div>
-          )}
-          <p className="mt-2 text-[10px] text-slate-400">Es una sugerencia: la letra la decide el evaluador.</p>
+          {cargado && <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">{sugerencia?.motivo ?? "Sin datos"}</p>}
+          {regla && <p className="mt-2 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">{regla.regla}</p>}
         </div>
       )}
     </div>

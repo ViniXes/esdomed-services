@@ -48,98 +48,72 @@ const mayorEsMejor = (v: number, u: { D: number; C: number; B: number }): Opcion
 
 const esAmonestacion = (tipo: string) => /amonest/i.test(tipo);
 
+/**
+ * Motivos en una línea, solo el dato y su cifra: la regla ya se ve en el globito
+ * y en "Ver criterios", así que aquí no se repite la explicación.
+ */
 export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boolean): Record<number, Sugerencia> {
   const sin = (motivo: string): Sugerencia => ({ letra: null, motivo });
   if (!r) return {};
+  const n = (x: number, uno: string, varios: string) => `${x} ${x === 1 ? uno : varios}`;
   const amonestaciones = (r.archivero ?? []).filter((e) => esAmonestacion(e.tipo)).length;
-  const alertaAmon = amonestaciones ? ` Hay ${amonestaciones} amonestación(es) en el archivero.` : "";
   const conNota = (r.archivero ?? []).filter((e) => typeof e.nota === "number");
-  const reprobadas = conNota.filter((e) => (e.nota as number) < NOTA_MINIMA_EVALUACION);
-  const textoNotas = conNota.length
-    ? ` Evaluaciones del archivero: ${conNota.map((e) => `${e.tipo} ${e.nota}`).join(", ")}${reprobadas.length ? ` (${reprobadas.length} bajo ${NOTA_MINIMA_EVALUACION})` : " (todas aprobadas)"}.`
+  const notas = conNota.length
+    ? ` · Nota ${conNota.map((e) => `${e.nota}${(e.nota as number) < NOTA_MINIMA_EVALUACION ? " (reprobada)" : ""}`).join(", ")}`
     : "";
   const out: Record<number, Sugerencia> = {};
+  const m = r.marcaciones;
+  const plan = r.plan;
 
   // 1. Calidad
-  if (esAdministrativo) out[1] = sin(`Administrativo: su trabajo no se registra en Services.${textoNotas}`);
-  else {
-    const n = r.altasRevertidas.length;
-    out[1] = {
-      letra: menorEsMejor(n, CRITERIOS.errores),
-      motivo: `${n} alta(s) efectiva(s) revertida(s) en el periodo.${textoNotas}`,
-    };
-  }
+  if (esAdministrativo) out[1] = sin(`Administrativo: sin datos en Services${notas}`);
+  else out[1] = { letra: menorEsMejor(r.altasRevertidas.length, CRITERIOS.errores), motivo: `${n(r.altasRevertidas.length, "alta revertida", "altas revertidas")}${notas}` };
 
-  // 2. Responsabilidad: llegadas tarde del semestre. Solo en JUL - DIC 2026 (regla puntual
-  // de la jefatura, ver SGAS_PERIODO): quien no hizo o no subió el diploma SGAS queda en A.
-  const mr = r.marcaciones;
-  const sinSgas = !!r.sgas?.aplica && !r.sgas.diploma;
-  const textoTarde = mr.meses ? `${mr.tardanzas} llegada(s) tarde en ${mr.meses} mes(es) con reporte del reloj.` : "No hay reporte del reloj cargado para este periodo.";
-  const textoSgas = !r.sgas?.aplica
-    ? ""
-    : r.sgas.diploma
-      ? ` Diploma del curso SGAS subido (${r.sgas.diploma.fecha}).`
-      : "";
-  if (sinSgas) {
-    out[2] = {
-      letra: "A",
-      motivo: `No hizo o no tiene subido el diploma del curso SGAS (Sistema de Gestión Antisoborno), que era su responsabilidad: queda en A. Además: ${textoTarde}${alertaAmon}`,
-    };
-  } else if (mr.meses === 0) out[2] = sin(`${textoTarde}${textoSgas}${alertaAmon}`);
-  else
-    out[2] = {
-      letra: menorEsMejor(mr.tardanzas, CRITERIOS.llegadasTarde),
-      motivo: `${textoTarde}${textoSgas}${alertaAmon}`,
-    };
+  // 2. Responsabilidad: llegadas tarde. Solo en JUL - DIC 2026 (regla puntual de la
+  // jefatura, ver SGAS_PERIODO): sin diploma SGAS queda en A.
+  const tarde = m.meses ? n(m.tardanzas, "llegada tarde", "llegadas tarde") : "Sin reporte del reloj";
+  if (r.sgas?.aplica && !r.sgas.diploma) out[2] = { letra: "A", motivo: `Sin diploma SGAS · ${tarde}` };
+  else if (!m.meses) out[2] = sin(tarde);
+  else out[2] = { letra: menorEsMejor(m.tardanzas, CRITERIOS.llegadasTarde), motivo: `${tarde}${r.sgas?.aplica ? " · Diploma SGAS subido" : ""}` };
 
   // 3. Cumplimiento de metas
-  const plan = r.plan;
-  if (esAdministrativo) out[3] = sin("Administrativo: su trabajo no se registra como productividad.");
-  else if (!plan || !plan.turnosProgramados) out[3] = sin("No tiene turnos en el plan de trabajo de este periodo para comparar.");
-  else if (!plan.promedioEquipoPorTurno) out[3] = sin("El equipo no tiene actividad registrada para comparar.");
+  if (esAdministrativo) out[3] = sin("Administrativo: sin datos en Services");
+  else if (!plan?.turnosProgramados) out[3] = sin("Sin turnos en el plan");
+  else if (!plan.promedioEquipoPorTurno) out[3] = sin("El equipo no tiene actividad para comparar");
   else {
     const pct = Math.round((plan.actividadesPorTurno / plan.promedioEquipoPorTurno) * 100);
     const dif = pct - 100;
-    const comparado = Math.abs(dif) < 10 ? "en el promedio del equipo" : dif > 0 ? `${dif}% arriba del promedio del equipo` : `${-dif}% abajo del promedio del equipo`;
     out[3] = {
       letra: mayorEsMejor(pct, CRITERIOS.productividadPct),
-      motivo: `Hace ${plan.actividadesPorTurno} actividades por turno; el equipo, ${plan.promedioEquipoPorTurno}. Está ${comparado}.`,
+      motivo: `${plan.actividadesPorTurno} por turno vs ${plan.promedioEquipoPorTurno} del equipo (${dif >= 0 ? "+" : ""}${dif}%)`,
     };
   }
 
   // 4. Organización
-  if (esAdministrativo) out[4] = sin("Administrativo: su trabajo no se registra en Services.");
-  else if (!plan || !plan.turnosProgramados) out[4] = sin("No tiene turnos en el plan de trabajo de este periodo.");
+  if (esAdministrativo) out[4] = sin("Administrativo: sin datos en Services");
+  else if (!plan?.turnosProgramados) out[4] = sin("Sin turnos en el plan");
   else {
     const pct = Math.round((plan.turnosSinActividad / plan.turnosProgramados) * 100);
-    out[4] = {
-      letra: menorEsMejor(pct, CRITERIOS.turnosVaciosPct),
-      motivo: `En ${plan.turnosSinActividad} de sus ${plan.turnosProgramados} turnos (${pct}%) no registró nada en Services.`,
-    };
+    out[4] = { letra: menorEsMejor(pct, CRITERIOS.turnosVaciosPct), motivo: `${plan.turnosSinActividad} de ${plan.turnosProgramados} turnos sin registro (${pct}%)` };
   }
 
-  // 5. Normas e instrucciones
-  const m = r.marcaciones;
-  if (m.meses === 0 && !amonestaciones) out[5] = sin("No hay reporte del reloj cargado para este periodo.");
+  // 5. Normas (disciplina): olvidos + sin marca + salidas antes; amonestación → A.
+  const faltas = m.omisiones + m.ausencias + (m.salidasAntes ?? 0);
+  const textoAmon = amonestaciones ? n(amonestaciones, "amonestación", "amonestaciones") : "";
+  if (!m.meses && !amonestaciones) out[5] = sin("Sin reporte del reloj");
   else {
-    const faltasDisciplina = m.omisiones + m.ausencias + (m.salidasAntes ?? 0);
-    let letra = m.meses ? menorEsMejor(faltasDisciplina, CRITERIOS.incidenciasMarcacion) : "D";
-    if (amonestaciones) letra = "A";
-    out[5] = {
-      letra,
-      motivo: `${
-        m.meses
-          ? `En ${m.meses} mes(es) con reporte del reloj: ${m.omisiones} olvido(s) de marca, ${m.ausencias} día(s) sin marca y ${m.salidasAntes ?? 0} salida(s) antes de hora (${faltasDisciplina} en total). Las ${m.tardanzas} llegada(s) tarde no cuentan aquí: ya se valoran en Responsabilidad (factor 2).`
-          : "Sin reporte del reloj."
-      }${alertaAmon}`,
-    };
+    const partes = [
+      textoAmon,
+      m.meses ? `${n(faltas, "falta", "faltas")} (${m.omisiones} olvido, ${m.ausencias} sin marca, ${m.salidasAntes ?? 0} salió antes)` : "Sin reporte del reloj",
+    ].filter(Boolean);
+    out[5] = { letra: amonestaciones ? "A" : m.meses ? menorEsMejor(faltas, CRITERIOS.incidenciasMarcacion) : "D", motivo: partes.join(" · ") };
   }
 
   // 6. Discreción
-  out[6] = sin("Sin dato directo en Services: a criterio del jefe.");
+  out[6] = sin("A criterio del jefe");
 
   // 7. Relaciones laborales
-  out[7] = sin(`Sin dato directo en Services: a criterio del jefe.${alertaAmon}`);
+  out[7] = sin(amonestaciones ? `A criterio del jefe · revisar ${textoAmon}` : "A criterio del jefe");
 
   return out;
 }
