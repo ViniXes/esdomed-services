@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Eye, Lightbulb, MessageCircleQuestion, Plus, Printer, Save, Search, Trash2, UserRound } from "lucide-react";
-import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from "@/lib/firestoreMeter";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/types";
@@ -103,6 +103,9 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
   const [vista, setVista] = useState(false);
   const [docId, setDocId] = useState<string | null>(esNueva ? null : id);
   const [duplicada, setDuplicada] = useState<string | null>(null);
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState("");
 
   useEffect(() => {
     if (!authLoading && profile && !esAdmin) router.replace("/dashboard");
@@ -252,6 +255,21 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
       setMensaje("No se pudo guardar. Intenta de nuevo.");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // Borra solo esta evaluación (la ficha con los datos laborales de la persona se conserva).
+  const eliminar = async () => {
+    if (!docId) return;
+    setEliminando(true);
+    setErrorEliminar("");
+    try {
+      await deleteDoc(doc(db, COLECCION_EVALUACIONES_DESEMPENO, docId));
+      router.push("/dashboard/evaluacion-desempeno");
+    } catch (e) {
+      console.error(e);
+      setErrorEliminar("No se pudo eliminar. Intenta de nuevo.");
+      setEliminando(false);
     }
   };
 
@@ -501,6 +519,15 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
           <ResumenPuntaje puntaje={puntaje} calificacion={calificacion} compacto />
           {mensaje && <span className="text-xs text-slate-500 dark:text-slate-400">{mensaje}</span>}
           <div className="ml-auto flex gap-2">
+            {docId && (
+              <button
+                type="button"
+                onClick={() => setConfirmarEliminar(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:border-slate-700 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              >
+                <Trash2 size={15} /> Eliminar
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setVista(true)}
@@ -519,6 +546,43 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       </div>
+
+      {confirmarEliminar && (
+        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="titulo-eliminar">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl dark:bg-slate-900">
+            <h2 id="titulo-eliminar" className="text-base font-bold text-slate-900 dark:text-slate-100">
+              ¿Eliminar esta evaluación?
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Se borrará la evaluación de <strong>{borrador.empleadoNombre}</strong> del periodo <strong>{d.periodo}</strong>: letras, puntaje,
+              incidentes, comentarios y el respaldo guardado. <strong>No se puede deshacer.</strong>
+            </p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Los datos laborales de la persona (DUI, partida, sueldo…) se conservan para la próxima evaluación.
+            </p>
+            {errorEliminar && <p className="mt-2 text-sm text-rose-600 dark:text-rose-400">{errorEliminar}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmarEliminar(false)}
+                disabled={eliminando}
+                autoFocus
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={eliminar}
+                disabled={eliminando}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
+              >
+                <Trash2 size={15} /> {eliminando ? "Eliminando…" : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {vista &&
         createPortal(
