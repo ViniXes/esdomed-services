@@ -11,7 +11,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, Plus, Printer, Save, Search, Trash2, UserRound } from "lucide-react";
+import { ArrowLeft, Eye, Lightbulb, Plus, Printer, Save, Search, Trash2, UserRound } from "lucide-react";
 import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +45,7 @@ import { EvaluacionDesempenoPrintLayout } from "@/components/evaluacionDesempeno
 import { RespaldoServices } from "@/components/evaluacionDesempeno/RespaldoServices";
 import type { ResumenRespaldo } from "@/lib/evaluacionDesempenoRespaldo";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
+import { sugerirFactores } from "@/lib/evaluacionDesempenoSugerencias";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "dui" | "puesto" | "codigoMarcacion" | "role" | "activo">;
 
@@ -176,14 +177,17 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
   }, [esAdmin, empleadoId]);
   const evaluado = equipo.find((p) => p.uid === empleadoId);
   const evaluadoAdministrativo = evaluado ? esAdministrativoPlan({ codigoMarcacion: evaluado.codigoMarcacion ?? "" }) : false;
-  const nombresOperativos = useMemo(
+  const equipoOperativo = useMemo(
     () =>
       equipo
         .filter((p) => p.activo !== false && (p.role !== "admin" || Boolean(p.codigoMarcacion?.trim())))
         .filter((p) => !esAdministrativoPlan({ codigoMarcacion: p.codigoMarcacion ?? "" }))
-        .map((p) => p.nombre),
+        .map((p) => ({ uid: p.uid, nombre: p.nombre, codigoMarcacion: p.codigoMarcacion })),
     [equipo],
   );
+  const respaldoVigente = borrador?.respaldo?.periodo === borrador?.datos.periodo ? (borrador?.respaldo ?? null) : null;
+  const sugerencias = useMemo(() => sugerirFactores(respaldoVigente, evaluadoAdministrativo), [respaldoVigente, evaluadoAdministrativo]);
+  const sugeridasPendientes = FACTORES.filter((f) => sugerencias[f.numero]?.letra && !borrador?.respuestas[f.numero]);
 
   const puntaje = useMemo(() => puntajeDe(borrador?.respuestas ?? {}), [borrador?.respuestas]);
   const completos = factoresCompletos(borrador?.respuestas ?? {});
@@ -328,9 +332,10 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         empleadoId={borrador.empleadoId}
         nombre={borrador.empleadoNombre}
         periodo={d.periodo}
+        codigoMarcacion={evaluado?.codigoMarcacion}
         esAdministrativo={evaluadoAdministrativo}
-        nombresEquipo={nombresOperativos}
-        respaldo={borrador.respaldo?.periodo === d.periodo ? borrador.respaldo : null}
+        equipo={equipoOperativo}
+        respaldo={respaldoVigente}
         onRespaldo={(r) => set("respaldo", r)}
         onAgregarIncidente={(inc) =>
           setBorrador((b) => (b && b.incidentes.length < FILAS_INCIDENTES ? { ...b, incidentes: [...b.incidentes, inc] } : b))
@@ -338,7 +343,34 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
       />
 
       {/* II. Factores */}
-      <Tarjeta titulo="II. Evaluación general por parte del jefe inmediato" nota="Elige una opción por factor; el puntaje sale de la Tabla de Valoración oficial.">
+      <Tarjeta
+        titulo="II. Evaluación general por parte del jefe inmediato"
+        nota={
+          respaldoVigente
+            ? "Elige una opción por factor. La letra con borde punteado es la sugerida por los datos de Services; tú decides."
+            : "Elige una opción por factor; el puntaje sale de la Tabla de Valoración oficial. Carga el respaldo de Services para ver letras sugeridas."
+        }
+      >
+        {sugeridasPendientes.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/60 px-3 py-2 dark:border-cyan-900 dark:bg-cyan-950/30">
+            <Lightbulb size={15} className="text-cyan-700 dark:text-cyan-300" />
+            <span className="text-xs text-slate-700 dark:text-slate-200">
+              Hay {sugeridasPendientes.length} factor(es) sin marcar con letra sugerida.
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                set("respuestas", {
+                  ...borrador.respuestas,
+                  ...Object.fromEntries(sugeridasPendientes.map((f) => [f.numero, sugerencias[f.numero].letra as Opcion])),
+                })
+              }
+              className="ml-auto rounded-lg bg-cyan-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-600"
+            >
+              Usar sugeridas en los vacíos
+            </button>
+          </div>
+        )}
         <div className="space-y-5">
           {FACTORES.map((f) => (
             <div key={f.numero}>
@@ -346,9 +378,19 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                 {f.numero}. {f.titulo}
               </p>
               <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">{f.definicion}</p>
+              {sugerencias[f.numero] && (
+                <p className="mb-2 flex items-start gap-1.5 text-xs text-cyan-800 dark:text-cyan-200">
+                  <Lightbulb size={13} className="mt-0.5 shrink-0" />
+                  <span>
+                    <strong>{sugerencias[f.numero].letra ? `Sugerida: ${sugerencias[f.numero].letra}. ` : "Sin sugerencia. "}</strong>
+                    {sugerencias[f.numero].motivo}
+                  </span>
+                </p>
+              )}
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {OPCIONES.map((o) => {
                   const activa = borrador.respuestas[f.numero] === o;
+                  const sugerida = sugerencias[f.numero]?.letra === o;
                   return (
                     <button
                       key={o}
@@ -358,12 +400,17 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                       className={`rounded-xl border p-3 text-left transition-colors ${
                         activa
                           ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:border-blue-400 dark:bg-blue-950/50"
-                          : "border-slate-200 bg-white hover:border-blue-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-blue-700"
+                          : sugerida
+                            ? "border-2 border-dashed border-cyan-500 bg-white hover:border-blue-300 dark:border-cyan-600 dark:bg-slate-950"
+                            : "border-slate-200 bg-white hover:border-blue-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-blue-700"
                       }`}
                     >
                       <div className="mb-1 flex items-center justify-between">
                         <span className={`text-sm font-bold ${activa ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-200"}`}>{o}</span>
-                        <span className="text-[11px] font-semibold tabular-nums text-slate-400">{f.puntos[o]} pts</span>
+                        <span className="flex items-center gap-1.5">
+                          {sugerida && <span className="rounded-full bg-cyan-100 px-1.5 py-px text-[10px] font-semibold text-cyan-800 dark:bg-cyan-900/60 dark:text-cyan-200">Sugerida</span>}
+                          <span className="text-[11px] font-semibold tabular-nums text-slate-400">{f.puntos[o]} pts</span>
+                        </span>
                       </div>
                       <p className="whitespace-pre-line text-xs leading-snug text-slate-600 dark:text-slate-300">{f.descriptores[o]}</p>
                     </button>

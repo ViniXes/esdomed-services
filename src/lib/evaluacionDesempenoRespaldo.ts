@@ -9,11 +9,12 @@
 // lo sigue llenando el jefe. Se carga bajo demanda (consultas por rango del
 // semestre) y al guardar la evaluación queda una foto del resumen.
 
-import { collection, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
+import { collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import type { InconsistenciasMarcacionPersonal, NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, SolicitudTraslado } from "@/types";
+import type { InconsistenciasMarcacionPersonal, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
 import { COLECCION_INCONSISTENCIAS_PERSONAL } from "@/lib/inconsistenciasMarcacion/personal";
 import { tipoIncidencia } from "@/lib/inconsistenciasMarcacion/analisis";
+import { buscarFila, estadoFilaEnDia } from "@/lib/esdomed/turnos-dia";
 
 const MESES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
 
@@ -60,6 +61,23 @@ export interface ResumenRespaldo {
     ausencias: number;      // días sin ninguna marca
   };
   altasRevertidas: { fecha: string; paciente: string; nota: string }[];
+  /** Entradas del archivero (evaluaciones/amonestaciones) dentro del periodo. */
+  archivero?: EntradaArchivero[];
+  /** Plan de trabajo, solo días ya transcurridos del periodo. */
+  plan?: {
+    meses: number;              // meses del periodo con fila de la persona en el plan
+    horasProgramadas: number;
+    turnosProgramados: number;
+    turnosSinActividad: number; // turnos en cuya ventana no registró nada en Services
+    tasaPor100h: number;        // actividades por cada 100 h programadas
+    tasaEquipoPor100h: number;  // promedio del equipo operativo con actividad
+  };
+}
+
+export interface RefPersonaEquipo {
+  uid: string;
+  nombre: string;
+  codigoMarcacion?: string;
 }
 
 export interface EntradaArchivero {
@@ -67,6 +85,19 @@ export interface EntradaArchivero {
   tipo: string;
   fecha: string; // "YYYY-MM-DD"
   notas: string;
+}
+
+type Registro = { n: string; t: Date };
+
+function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown): Registro[] {
+  const out: Registro[] = [];
+  for (const it of items) {
+    const n = normalizar(nombre(it));
+    const v = fecha(it) as { toDate?: () => Date } | undefined;
+    const t = v?.toDate?.() ?? null;
+    if (n && t) out.push({ n, t });
+  }
+  return out;
 }
 
 function contarPor<T>(items: T[], nombre: (i: T) => string | undefined | null): Map<string, number> {
@@ -86,13 +117,15 @@ const aIso = (v: unknown) => {
 /**
  * Productividad (mismas fuentes y criterios que /dashboard/productividad/esdomed,
  * sin las hojas de Drive), marcaciones publicadas y altas revertidas del periodo.
- * `nombresEquipo` = personal operativo para el promedio de comparación.
+ * `equipo` = personal operativo para el promedio de comparación.
  */
 export async function cargarRespaldo(params: {
   empleadoId: string;
   nombre: string;
   periodo: string;
-  nombresEquipo: string[];
+  uid: string;
+  codigoMarcacion?: string;
+  equipo: RefPersonaEquipo[];
 }): Promise<ResumenRespaldo> {
   const rango = rangoDePeriodo(params.periodo);
   if (!rango) throw new Error("El periodo no tiene el formato «JUL - DIC 2026».");
@@ -130,7 +163,7 @@ export async function cargarRespaldo(params: {
   };
 
   const yo = normalizar(params.nombre);
-  const equipo = new Set(params.nombresEquipo.map(normalizar));
+  const equipo = new Set(params.equipo.map((p) => normalizar(p.nombre)));
   equipo.add(yo);
   const productividad = {} as Record<MetricaId, number>;
   const promedioEquipo = {} as Record<MetricaId, number>;
@@ -168,9 +201,23 @@ export async function cargarRespaldo(params: {
     .filter((a) => normalizar(a.procesadoPorNombre) === yo)
     .map((a) => ({ fecha: aIso(a.revertidoEn), paciente: a.pacienteNombre ?? "", nota: a.revertidoNota ?? "" }));
 
+  // Registros con fecha (para turnos sin actividad).
+  const todos: Registro[] = [
+    ...registros(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre, (i) => (i as { creadoEn?: unknown }).creadoEn),
+    ...registros(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre, (a) => a.procesadoEn),
+    ...registros(datos<NotificacionFallecido>(confirmados), (x) => x.confirmadoPorNombre, (x) => x.confirmadoEn),
+    ...registros(datos<NotificacionFallecido>(certificados), (x) => x.entregaCertificado, (x) => x.entregaCertificadoEn),
+    ...registros(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow, (a) => a.digitaSimmowEn),
+    ...registros(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
+    ...registros(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
+    ...registros(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
+  ];
+  const plan = await resumenPlan({ rango, yo: { uid: params.uid, nombre: params.nombre, codigoMarcacion: params.codigoMarcacion }, equipo: params.equipo, totales: totalesEquipo, registrosYo: todos.filter((r) => r.n === yo).map((r) => r.t.getTime()) });
+
   return {
     periodo: params.periodo,
     cargadoEn: new Date().toISOString(),
+    plan,
     productividad,
     promedioEquipo,
     totalPersona,
@@ -195,4 +242,91 @@ export async function cargarArchivero(empleadoId: string, periodo: string): Prom
       return f >= rango.inicio && f <= rango.fin;
     })
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+/**
+ * Horas y turnos programados en el plan de trabajo (solo días ya transcurridos)
+ * y, con eso, la productividad por cada 100 h y los turnos sin ningún registro.
+ * Así quien tuvo vacaciones, permisos o incapacidad no sale castigado.
+ */
+async function resumenPlan(p: {
+  rango: { inicio: Date; fin: Date };
+  yo: RefPersonaEquipo;
+  equipo: RefPersonaEquipo[];
+  totales: Map<string, number>;
+  registrosYo: number[];
+}): Promise<NonNullable<ResumenRespaldo["plan"]>> {
+  const hoy = new Date();
+  const limite = p.rango.fin < hoy ? p.rango.fin : hoy;
+  const periodos: string[] = [];
+  for (let d = new Date(p.rango.inicio.getFullYear(), p.rango.inicio.getMonth(), 1); d <= limite; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    periodos.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const planes = await Promise.all(
+    periodos.map((id) =>
+      getDoc(doc(db, "planes_trabajo", id))
+        .then((s) => (s.exists() ? (s.data() as PlanTrabajo) : null))
+        .catch(() => null),
+    ),
+  );
+
+  const personas = [p.yo, ...p.equipo.filter((e) => e.uid !== p.yo.uid)];
+  const horas = new Map<string, number>();
+  let meses = 0;
+  let turnos = 0;
+  let sinActividad = 0;
+  const regs = [...p.registrosYo].sort((a, b) => a - b);
+  const hayEntre = (a: number, b: number) => {
+    let lo = 0;
+    let hi = regs.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (regs[m] < a) lo = m + 1;
+      else hi = m;
+    }
+    return lo < regs.length && regs[lo] <= b;
+  };
+
+  planes.forEach((plan, i) => {
+    if (!plan) return;
+    const [anio, mes] = periodos[i].split("-").map(Number);
+    const diasMes = new Date(anio, mes, 0).getDate();
+    for (const persona of personas) {
+      const fila = buscarFila(plan, persona);
+      if (!fila) continue;
+      const esYo = persona.uid === p.yo.uid;
+      if (esYo) meses++;
+      for (let dia = 1; dia <= diasMes; dia++) {
+        const fecha = new Date(anio, mes - 1, dia);
+        if (fecha > limite || fecha < p.rango.inicio) continue;
+        const est = estadoFilaEnDia(fila, dia);
+        if (est.tipo !== "turno" || !est.horario) continue;
+        const clave = normalizar(persona.nombre);
+        horas.set(clave, (horas.get(clave) ?? 0) + est.horario.horas);
+        if (esYo) {
+          turnos++;
+          const ini = fecha.getTime() + (est.inicio ?? 0) * 60000;
+          const fin = fecha.getTime() + (est.fin ?? 24 * 60) * 60000;
+          if (fin <= hoy.getTime() && !hayEntre(ini, fin)) sinActividad++;
+        }
+      }
+    }
+  });
+
+  const yoN = normalizar(p.yo.nombre);
+  const horasYo = horas.get(yoN) ?? 0;
+  const tasa = (n: string) => {
+    const h = horas.get(n) ?? 0;
+    return h > 0 ? ((p.totales.get(n) ?? 0) / h) * 100 : 0;
+  };
+  const tasasEquipo = [...horas.keys()].map(tasa).filter((t) => t > 0);
+  const r1 = (x: number) => Math.round(x * 10) / 10;
+  return {
+    meses,
+    horasProgramadas: horasYo,
+    turnosProgramados: turnos,
+    turnosSinActividad: sinActividad,
+    tasaPor100h: r1(tasa(yoN)),
+    tasaEquipoPor100h: r1(tasasEquipo.length ? tasasEquipo.reduce((a, b) => a + b, 0) / tasasEquipo.length : 0),
+  };
 }

@@ -1,22 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Database, FileWarning, Fingerprint, Plus, RefreshCw, TrendingUp, Undo2 } from "lucide-react";
+import { CalendarClock, Database, FileWarning, Fingerprint, ListChecks, Plus, RefreshCw, TrendingUp, Undo2 } from "lucide-react";
 import {
   METRICAS_PRODUCTIVIDAD,
   cargarArchivero,
   cargarRespaldo,
-  type EntradaArchivero,
+  type RefPersonaEquipo,
   type ResumenRespaldo,
 } from "@/lib/evaluacionDesempenoRespaldo";
+import { CRITERIOS_TEXTO } from "@/lib/evaluacionDesempenoSugerencias";
 import type { IncidenteCritico } from "@/lib/evaluacionDesempeno";
 
 interface Props {
   empleadoId: string;
   nombre: string;
+  codigoMarcacion?: string;
   periodo: string;
   esAdministrativo: boolean;
-  nombresEquipo: string[];
+  equipo: RefPersonaEquipo[];
   respaldo: ResumenRespaldo | null;
   onRespaldo: (r: ResumenRespaldo) => void;
   onAgregarIncidente: (i: IncidenteCritico) => void;
@@ -28,19 +30,22 @@ interface Props {
  * amonestaciones, marcaciones publicadas y altas revertidas. Cada hallazgo puede
  * pasarse al Registro de Incidentes Críticos (página 3) con un clic.
  */
-export function RespaldoServices({ empleadoId, nombre, periodo, esAdministrativo, nombresEquipo, respaldo, onRespaldo, onAgregarIncidente }: Props) {
+export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo, esAdministrativo, equipo, respaldo, onRespaldo, onAgregarIncidente }: Props) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-  const [archivero, setArchivero] = useState<EntradaArchivero[] | null>(null);
+  const [verCriterios, setVerCriterios] = useState(false);
+  const archivero = respaldo?.archivero ?? null;
   const [agregados, setAgregados] = useState<Set<string>>(new Set());
 
   const cargar = async () => {
     setCargando(true);
     setError("");
     try {
-      const [r, a] = await Promise.all([cargarRespaldo({ empleadoId, nombre, periodo, nombresEquipo }), cargarArchivero(empleadoId, periodo)]);
-      onRespaldo(r);
-      setArchivero(a);
+      const [r, a] = await Promise.all([
+        cargarRespaldo({ empleadoId, uid: empleadoId, nombre, codigoMarcacion, periodo, equipo }),
+        cargarArchivero(empleadoId, periodo),
+      ]);
+      onRespaldo({ ...r, archivero: a });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el respaldo.");
     } finally {
@@ -67,8 +72,15 @@ export function RespaldoServices({ empleadoId, nombre, periodo, esAdministrativo
             <Database size={15} /> Respaldo desde ESDOMED Services
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Trazabilidad del periodo {periodo} para sustentar la evaluación. Es apoyo para el evaluador: no marca factores por sí solo.
+            Trazabilidad del periodo {periodo} para sustentar la evaluación. Con esto se sugiere una letra por factor; la decisión siempre es del evaluador.
           </p>
+          <button
+            type="button"
+            onClick={() => setVerCriterios((v) => !v)}
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline dark:text-blue-300"
+          >
+            <ListChecks size={13} /> {verCriterios ? "Ocultar criterios" : "Ver criterios de sugerencia"}
+          </button>
         </div>
         <button
           type="button"
@@ -80,6 +92,32 @@ export function RespaldoServices({ empleadoId, nombre, periodo, esAdministrativo
           {cargando ? "Cargando…" : respaldo ? "Actualizar" : "Cargar respaldo"}
         </button>
       </div>
+
+      {verCriterios && (
+        <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
+                <th className="px-3 py-2 font-semibold">Factor</th>
+                <th className="px-3 py-2 font-semibold">Dato de Services</th>
+                <th className="px-3 py-2 font-semibold">Sugerencia</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {CRITERIOS_TEXTO.map((c) => (
+                <tr key={c.factor}>
+                  <td className="px-3 py-1.5 font-semibold text-slate-700 dark:text-slate-200">{c.factor}</td>
+                  <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">{c.dato}</td>
+                  <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">{c.regla}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400 dark:border-slate-800">
+            Solo cuentan los días ya transcurridos del periodo. La productividad se compara por horas programadas en el plan, así vacaciones, permisos e incapacidades no castigan.
+          </p>
+        </div>
+      )}
 
       {esAdministrativo && (
         <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
@@ -119,6 +157,24 @@ export function RespaldoServices({ empleadoId, nombre, periodo, esAdministrativo
             <p className="mt-2 text-[11px] text-slate-400">
               Promedio entre el personal operativo con actividad. No incluye las hojas de Drive (carpetas, actualizaciones, consentimientos).
             </p>
+          </Bloque>
+
+          {/* Plan de trabajo */}
+          <Bloque icon={CalendarClock} titulo="Turnos del plan de trabajo" factor="Factores 3 y 4" atenuado={esAdministrativo}>
+            {!respaldo.plan ? (
+              <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver los turnos del plan.</p>
+            ) : respaldo.plan.turnosProgramados === 0 ? (
+              <p className="text-xs text-slate-500">No aparece con turnos en el plan de trabajo de este periodo (hasta hoy).</p>
+            ) : (
+              <ul className="grid grid-cols-2 gap-2 text-xs">
+                <Dato label="Turnos programados" valor={respaldo.plan.turnosProgramados} />
+                <Dato label="Horas programadas" valor={respaldo.plan.horasProgramadas} />
+                <Dato label="Actividades por 100 h" valor={respaldo.plan.tasaPor100h} />
+                <Dato label="Promedio del equipo por 100 h" valor={respaldo.plan.tasaEquipoPor100h} />
+                <Dato label="Turnos sin ningún registro" valor={respaldo.plan.turnosSinActividad} />
+                <Dato label="Meses con plan" valor={respaldo.plan.meses} />
+              </ul>
+            )}
           </Bloque>
 
           {/* Marcaciones */}
