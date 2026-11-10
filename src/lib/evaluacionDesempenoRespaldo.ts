@@ -108,6 +108,7 @@ export interface EntradaArchivero {
   fecha: string; // "YYYY-MM-DD"
   notas: string;
   nota?: number; // 0–10, mínimo 7 para aprobar
+  notaPorRevisar?: boolean; // cambiaron el archivo después de poner la nota
 }
 
 type Registro = { n: string; t: Date };
@@ -321,8 +322,15 @@ export async function cargarArchivero(
     // Los diplomas/certificados viven en la misma colección pero no son parte de este respaldo.
     .filter((d) => d.data().categoria !== "diploma")
     .map((d) => {
-      const x = d.data() as { tipo?: string; fecha?: unknown; notas?: string; nota?: number };
-      return { id: d.id, tipo: x.tipo ?? "", fecha: aIso(x.fecha), notas: x.notas ?? "", ...(typeof x.nota === "number" ? { nota: x.nota } : {}) };
+      const x = d.data() as { tipo?: string; fecha?: unknown; notas?: string; nota?: number; notaPorRevisar?: boolean };
+      return {
+        id: d.id,
+        tipo: x.tipo ?? "",
+        fecha: aIso(x.fecha),
+        notas: x.notas ?? "",
+        ...(typeof x.nota === "number" ? { nota: x.nota } : {}),
+        ...(x.notaPorRevisar ? { notaPorRevisar: true } : {}),
+      };
     })
     .filter((e) => {
       if (!rango || !e.fecha) return true;

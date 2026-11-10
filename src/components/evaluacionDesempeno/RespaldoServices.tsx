@@ -309,6 +309,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                         <p className="flex flex-wrap items-center gap-1.5 tabular-nums text-slate-500">
                           {e.fecha}
                           {typeof e.nota === "number" && <ChipNota nota={e.nota} />}
+                          {e.notaPorRevisar && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">nota por revisar en su ficha</span>}
                         </p>
                         {e.notas && <p className="text-slate-700 dark:text-slate-200">{e.notas}</p>}
                       </div>

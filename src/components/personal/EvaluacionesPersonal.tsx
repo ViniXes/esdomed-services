@@ -237,7 +237,13 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
     try {
       if (nuevo) subido = await subirAdjunto(empleadoId, nuevo, () => {});
       const archivosNuevos = entrada.archivos.flatMap((a, i) => (i !== idx ? [a] : subido ? [subido] : []));
-      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { archivos: archivosNuevos });
+      // Si ya tenía nota y se sube otro archivo (p. ej. la reevaluación), la nota
+      // puede haber cambiado: queda marcada para que el admin la confirme o corrija.
+      const marcarNota = !!subido && cfg.conNota && typeof entrada.nota === "number";
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), {
+        archivos: archivosNuevos,
+        ...(marcarNota ? { notaPorRevisar: true } : {}),
+      });
       if (viejo?.storagePath) await deleteObject(storageRef(storage, viejo.storagePath)).catch(() => {});
     } catch (err) {
       if (subido) await deleteObject(storageRef(storage, subido.storagePath)).catch(() => {});
@@ -563,7 +569,7 @@ function NotaEvaluacion({ entrada, puedeGestionar }: { entrada: EvaluacionPerson
     setGuardando(true);
     setError(null);
     try {
-      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { nota: n === null ? deleteField() : n });
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { nota: n === null ? deleteField() : n, notaPorRevisar: deleteField() });
       setEditando(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la nota.");
@@ -601,9 +607,32 @@ function NotaEvaluacion({ entrada, puedeGestionar }: { entrada: EvaluacionPerson
     );
   }
 
+  const confirmarNota = async () => {
+    if (!entrada.id) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { notaPorRevisar: deleteField() });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo confirmar la nota.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1">
       {tieneNota && <ChipNota nota={entrada.nota as number} />}
+      {puedeGestionar && entrada.notaPorRevisar && tieneNota && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-[11px] font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          Cambió el archivo: revisa la nota
+          <button type="button" onClick={confirmarNota} disabled={guardando}
+            className="rounded px-1 font-semibold underline-offset-2 hover:underline disabled:opacity-50">
+            {guardando ? "…" : "Sigue igual"}
+          </button>
+        </span>
+      )}
+      {error && <span className="text-[11px] text-rose-600 dark:text-rose-400">{error}</span>}
       {puedeGestionar && entrada.id && (
         <button type="button" onClick={() => { setValor(tieneNota ? String(entrada.nota) : ""); setEditando(true); }}
           className="inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950">

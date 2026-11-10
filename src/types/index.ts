@@ -1843,6 +1843,7 @@ export interface EvaluacionPersonal {
   tipo: string; // catálogo abierto, ver CATEGORIAS_ARCHIVO_PERSONAL en src/lib/evaluacionesPersonal.ts
   notas?: string;
   nota?: number; // calificación 0–10, solo evaluaciones (mínimo para aprobar: NOTA_MINIMA_EVALUACION = 7)
+  notaPorRevisar?: boolean; // se reemplazó el archivo después de poner la nota: el admin debe confirmarla o corregirla
   archivos?: AdjuntoBitacora[];
   fecha: Date; // fecha de la evaluación/amonestación (no necesariamente hoy)
   registradaPorId: string;
