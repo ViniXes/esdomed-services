@@ -11,8 +11,9 @@
 
 import { collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import type { InconsistenciasMarcacionPersonal, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
-import { COLECCION_INCONSISTENCIAS_PERSONAL } from "@/lib/inconsistenciasMarcacion/personal";
+import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
+import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
+import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
 import { tipoIncidencia } from "@/lib/inconsistenciasMarcacion/analisis";
 import { buscarFila, estadoFilaEnDia } from "@/lib/esdomed/turnos-dia";
 
@@ -53,7 +54,7 @@ export interface ResumenRespaldo {
   totalPersona: number;
   promedioTotalEquipo: number;
   marcaciones: {
-    meses: number;          // meses publicados del periodo
+    meses: number;          // meses del periodo con reporte del reloj cargado
     diasConIncidencia: number;
     tardanzas: number;      // días con minutos descontados
     minutos: number;
@@ -81,7 +82,7 @@ export interface MesRespaldo {
   vacaciones: number;
   incapacidades: number;
   permisos: number;       // PER + licencias
-  marcacionPublicada: boolean;
+  marcacionPublicada: boolean; // hay reporte del reloj cargado para ese mes
   tarde: number;          // días con minutos descontados (llegó tarde / salió antes)
   olvidoMarca: number;    // olvidó marcar entrada o salida
   sinMarca: number;       // día de turno sin ninguna marca (no vino)
@@ -129,7 +130,7 @@ const aIso = (v: unknown) => {
 
 /**
  * Productividad (mismas fuentes y criterios que /dashboard/productividad/esdomed,
- * sin las hojas de Drive), marcaciones publicadas y altas revertidas del periodo.
+ * sin las hojas de Drive), reporte mensual del reloj y altas revertidas del periodo.
  * `equipo` = personal operativo para el promedio de comparación.
  */
 export async function cargarRespaldo(params: {
@@ -146,7 +147,7 @@ export async function cargarRespaldo(params: {
   const fin = Timestamp.fromDate(rango.fin);
   const entre = (campo: string, col: string) => getDocs(query(collection(db, col), where(campo, ">=", ini), where(campo, "<=", fin)));
 
-  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, traslados, revertidas, marc] = await Promise.all([
+  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, traslados, revertidas] = await Promise.all([
     entre("creadoEn", "control_ingresos"),
     entre("confirmadoEn", "notificaciones_fallecidos"),
     entre("entregaCertificadoEn", "notificaciones_fallecidos"),
@@ -156,7 +157,6 @@ export async function cargarRespaldo(params: {
     entre("impresoEn", "solicitudes_impresion"),
     entre("actualizadoEn", "traslados"),
     entre("revertidoEn", "notificaciones_altas"),
-    getDocs(query(collection(db, COLECCION_INCONSISTENCIAS_PERSONAL), where("empleadoId", "==", params.empleadoId))),
   ]);
 
   const datos = <T>(s: { docs: { data: () => unknown }[] }) => s.docs.map((d) => d.data() as T);
@@ -191,11 +191,28 @@ export async function cargarRespaldo(params: {
   const conActividad = [...totalesEquipo.values()].filter((v) => v > 0);
   const promedioTotalEquipo = conActividad.length ? Math.round(conActividad.reduce((a, b) => a + b, 0) / conActividad.length) : 0;
 
-  // Marcaciones publicadas por el admin, solo meses del periodo.
-  const desde = `${rango.inicio.getFullYear()}-${String(rango.inicio.getMonth() + 1).padStart(2, "0")}`;
-  const hasta = `${rango.fin.getFullYear()}-${String(rango.fin.getMonth() + 1).padStart(2, "0")}`;
-  const meses = datos<InconsistenciasMarcacionPersonal>(marc).filter((m) => m.periodo >= desde && m.periodo <= hasta);
-  const dias = meses.flatMap((m) => m.dias ?? []);
+  // Reloj: el reporte mensual de RRHH que el admin carga en Inconsistencias de
+  // marcación (doc por mes, publicado o no). Solo trae a quien tuvo descuentos:
+  // si el mes está cargado y la persona no aparece, ese mes no tuvo incidencias.
+  const periodosRango: string[] = [];
+  for (let d = new Date(rango.inicio); d <= rango.fin; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    periodosRango.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const reportes = await Promise.all(
+    periodosRango.map((p) =>
+      getDoc(doc(db, COLECCION_INCONSISTENCIAS, p))
+        .then((snap) => (snap.exists() ? { periodo: p, empleados: ((snap.data().empleados ?? []) as EmpleadoInconsistenciasMarcacion[]) } : null))
+        .catch(() => null),
+    ),
+  );
+  const miCodigo = normalizarCodigoMarcacion(params.codigoMarcacion);
+  const meses = reportes
+    .filter((x): x is { periodo: string; empleados: EmpleadoInconsistenciasMarcacion[] } => !!x)
+    .map((x) => {
+      const yo = x.empleados.find((e) => (miCodigo && normalizarCodigoMarcacion(e.codigoMarcacion) === miCodigo) || normalizar(e.nombre) === normalizar(params.nombre));
+      return { periodo: x.periodo, dias: yo?.dias ?? [] };
+    });
+  const dias = meses.flatMap((m) => m.dias);
   const marcaciones = {
     meses: meses.length,
     diasConIncidencia: dias.length,

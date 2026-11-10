@@ -92,7 +92,7 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
 
   // 5. Normas e instrucciones
   const m = r.marcaciones;
-  if (m.meses === 0 && !amonestaciones) out[5] = sin("No hay meses de marcación publicados en este periodo.");
+  if (m.meses === 0 && !amonestaciones) out[5] = sin("No hay reporte del reloj cargado para este periodo.");
   else {
     let letra = m.meses ? menorEsMejor(m.diasConIncidencia, CRITERIOS.incidenciasMarcacion) : "D";
     if (amonestaciones) letra = "A";
@@ -100,8 +100,8 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
       letra,
       motivo: `${
         m.meses
-          ? `En ${m.meses} mes(es) con marcación publicada: ${m.tardanzas} llegada(s) tarde, ${m.omisiones} olvido(s) de marca y ${m.ausencias} día(s) sin marca (${m.diasConIncidencia} en total).`
-          : "Sin marcaciones publicadas."
+          ? `En ${m.meses} mes(es) con reporte del reloj: ${m.tardanzas} llegada(s) tarde, ${m.omisiones} olvido(s) de marca y ${m.ausencias} día(s) sin marca (${m.diasConIncidencia} en total).`
+          : "Sin reporte del reloj."
       }${alertaAmon}`,
     };
   }

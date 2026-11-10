@@ -27,7 +27,7 @@ interface Props {
 /**
  * Trazabilidad de ESDOMED Services para respaldar la evaluación: productividad
  * del semestre contra el promedio del equipo operativo, archivero de
- * amonestaciones, marcaciones publicadas y altas revertidas. Cada hallazgo puede
+ * amonestaciones, reporte del reloj y altas revertidas. Cada hallazgo puede
  * pasarse al Registro de Incidentes Críticos (página 3) con un clic.
  */
 export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo, esAdministrativo, equipo, respaldo, onRespaldo, onAgregarIncidente }: Props) {
@@ -204,7 +204,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                             </>
                           ) : (
                             <td colSpan={3} className="py-1 text-center text-[11px] text-slate-400">
-                              reloj no publicado
+                              sin reporte del reloj
                             </td>
                           )}
                           <Celda n={m.incapacidades} />
@@ -231,7 +231,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[11px] text-slate-400">
                     Turnos, incapacidad y permisos salen del plan de trabajo (solo días ya pasados). Llegadas tarde, olvidos y días sin marca salen
-                    del reloj, de los meses publicados en Inconsistencias de marcación.
+                    del reloj: el reporte mensual de RRHH cargado en Administración → Inconsistencias de marcación.
                   </p>
                   {respaldo.marcaciones.diasConIncidencia > 0 &&
                     botonIncidente("marcaciones", {
