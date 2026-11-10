@@ -27,7 +27,8 @@ export const CRITERIOS = {
   productividadPct: { D: 110, C: 90, B: 60 },
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
   turnosVaciosPct: { D: 5, C: 15, B: 30 },
-  // Factor 5: días con incidencia en el reloj. D ≤ 0, C ≤ 3, B ≤ 8, A > 8 (o con amonestación).
+  // Factor 5 (disciplina): olvidos de marca + días sin marca + salidas antes de hora. Las llegadas
+  // tarde NO cuentan aquí: ya se valoran en el factor 2. D ≤ 0, C ≤ 3, B ≤ 8, A > 8 (o con amonestación).
   incidenciasMarcacion: { D: 0, C: 3, B: 8 },
 } as const;
 
@@ -37,7 +38,7 @@ export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] 
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj)", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más" },
   { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
-  { factor: 5, dato: "Llegadas tarde + olvidos de marca + días sin marca (reloj), y amonestaciones", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
+  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
   { factor: 7, dato: "Quejas o amonestaciones en el archivero, como alerta", regla: "A criterio del jefe" },
 ];
@@ -108,13 +109,14 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   const m = r.marcaciones;
   if (m.meses === 0 && !amonestaciones) out[5] = sin("No hay reporte del reloj cargado para este periodo.");
   else {
-    let letra = m.meses ? menorEsMejor(m.diasConIncidencia, CRITERIOS.incidenciasMarcacion) : "D";
+    const faltasDisciplina = m.omisiones + m.ausencias + (m.salidasAntes ?? 0);
+    let letra = m.meses ? menorEsMejor(faltasDisciplina, CRITERIOS.incidenciasMarcacion) : "D";
     if (amonestaciones) letra = "A";
     out[5] = {
       letra,
       motivo: `${
         m.meses
-          ? `En ${m.meses} mes(es) con reporte del reloj: ${m.tardanzas} llegada(s) tarde, ${m.omisiones} olvido(s) de marca y ${m.ausencias} día(s) sin marca (${m.diasConIncidencia} en total).`
+          ? `En ${m.meses} mes(es) con reporte del reloj: ${m.omisiones} olvido(s) de marca, ${m.ausencias} día(s) sin marca y ${m.salidasAntes ?? 0} salida(s) antes de hora (${faltasDisciplina} en total). Las ${m.tardanzas} llegada(s) tarde no cuentan aquí: ya se valoran en Responsabilidad (factor 2).`
           : "Sin reporte del reloj."
       }${alertaAmon}`,
     };

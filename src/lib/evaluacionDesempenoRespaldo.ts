@@ -57,6 +57,7 @@ export interface ResumenRespaldo {
     meses: number;          // meses del periodo con reporte del reloj cargado
     diasConIncidencia: number;
     tardanzas: number;      // días que llegó tarde (según el horario del reloj)
+    salidasAntes?: number;  // días que salió antes de hora (permanencia; no es puntualidad)
     minutos: number;
     omisiones: number;      // olvidó marcar entrada o salida
     ausencias: number;      // días sin ninguna marca
@@ -84,6 +85,7 @@ export interface MesRespaldo {
   permisos: number;       // PER + licencias
   marcacionPublicada: boolean; // hay reporte del reloj cargado para ese mes
   tarde: number;          // días que llegó tarde (no cuenta las salidas antes de hora)
+  salioAntes?: number;    // días que salió antes de hora
   olvidoMarca: number;    // olvidó marcar entrada o salida
   sinMarca: number;       // día de turno sin ninguna marca (no vino)
 }
@@ -106,6 +108,8 @@ type Registro = { n: string; t: Date };
 
 /** Día en que llegó tarde: minutos descontados a la entrada (estimado con el horario). */
 const llegoTarde = (d: Parameters<typeof desgloseMinutos>[0]) => desgloseMinutos(d).tarde > 0;
+/** Día en que salió antes de hora (estimado con el horario). */
+const salioAntes = (d: Parameters<typeof desgloseMinutos>[0]) => desgloseMinutos(d).temprano > 0;
 
 function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown): Registro[] {
   const out: Registro[] = [];
@@ -221,6 +225,7 @@ export async function cargarRespaldo(params: {
     meses: meses.length,
     diasConIncidencia: dias.length,
     tardanzas: dias.filter(llegoTarde).length,
+    salidasAntes: dias.filter(salioAntes).length,
     minutos: dias.reduce((a, d) => a + (d.minutos || 0), 0),
     omisiones: dias.filter((d) => {
       const t = tipoIncidencia(d);
@@ -253,6 +258,7 @@ export async function cargarRespaldo(params: {
         m.periodo,
         {
           tarde: ds.filter(llegoTarde).length,
+          salioAntes: ds.filter(salioAntes).length,
           olvidoMarca: ds.filter((d) => ["omision_entrada", "omision_salida"].includes(tipoIncidencia(d))).length,
           sinMarca: ds.filter((d) => tipoIncidencia(d) === "sin_marcacion").length,
         },
@@ -297,7 +303,7 @@ export async function cargarArchivero(empleadoId: string, periodo: string): Prom
  * sin castigar vacaciones, permisos ni incapacidades.
  */
 async function resumenPlan(p: {
-  marcPorMes: Map<string, { tarde: number; olvidoMarca: number; sinMarca: number }>;
+  marcPorMes: Map<string, { tarde: number; salioAntes: number; olvidoMarca: number; sinMarca: number }>;
   rango: { inicio: Date; fin: Date };
   yo: RefPersonaEquipo;
   equipo: RefPersonaEquipo[];
@@ -345,6 +351,7 @@ async function resumenPlan(p: {
       permisos: 0,
       marcacionPublicada: !!marc,
       tarde: marc?.tarde ?? 0,
+      salioAntes: marc?.salioAntes ?? 0,
       olvidoMarca: marc?.olvidoMarca ?? 0,
       sinMarca: marc?.sinMarca ?? 0,
     };

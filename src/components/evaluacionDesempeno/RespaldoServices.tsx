@@ -173,7 +173,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
           </Bloque>
 
           {/* Asistencia mes por mes */}
-          <Bloque icon={CalendarClock} titulo="Asistencia mes por mes" factor="Factores 4 y 5" ancho>
+          <Bloque icon={CalendarClock} titulo="Asistencia mes por mes" factor="Factores 2, 4 y 5" ancho>
             {!respaldo.plan?.porMes ? (
               <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la asistencia por mes.</p>
             ) : (
@@ -185,6 +185,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                         <th className="pb-1 text-left font-semibold">Mes</th>
                         <th className="pb-1 text-right font-semibold">Turnos</th>
                         <th className="pb-1 text-right font-semibold">Llegadas tarde</th>
+                        <th className="pb-1 text-right font-semibold">Salió antes</th>
                         <th className="pb-1 text-right font-semibold">Olvidó marcar</th>
                         <th className="pb-1 text-right font-semibold">No vino (sin marca)</th>
                         <th className="pb-1 text-right font-semibold">Incapacidad</th>
@@ -201,11 +202,12 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                           {m.marcacionPublicada ? (
                             <>
                               <Celda n={m.tarde} alerta />
+                              <Celda n={m.salioAntes ?? 0} alerta />
                               <Celda n={m.olvidoMarca} alerta />
                               <Celda n={m.sinMarca} alerta />
                             </>
                           ) : (
-                            <td colSpan={3} className="py-1 text-center text-[11px] text-slate-400">
+                            <td colSpan={4} className="py-1 text-center text-[11px] text-slate-400">
                               sin reporte del reloj
                             </td>
                           )}
@@ -217,6 +219,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                         <td className="pt-1.5 text-slate-700 dark:text-slate-200">Total</td>
                         <td className="pt-1.5 text-right tabular-nums text-slate-700 dark:text-slate-200">{respaldo.plan.turnosProgramados}</td>
                         <Celda n={respaldo.marcaciones.tardanzas} alerta />
+                        <Celda n={respaldo.marcaciones.salidasAntes ?? 0} alerta />
                         <Celda n={respaldo.marcaciones.omisiones} alerta />
                         <Celda n={respaldo.marcaciones.ausencias} alerta />
                         <Celda n={respaldo.plan.porMes.reduce((t, m) => t + m.incapacidades, 0)} />
@@ -232,16 +235,33 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                 )}
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[11px] text-slate-400">
-                    Turnos, incapacidad y permisos salen del plan de trabajo (solo días ya pasados). Llegadas tarde, olvidos y días sin marca salen
+                    Turnos, incapacidad y permisos salen del plan de trabajo (solo días ya pasados). Llegadas tarde, salidas antes, olvidos y días sin marca salen
                     del reloj: el reporte mensual de RRHH cargado en Administración → Inconsistencias de marcación.
                   </p>
-                  {respaldo.marcaciones.diasConIncidencia > 0 &&
-                    botonIncidente("marcaciones", {
-                      fecha: hoy,
-                      factor: 5,
-                      tipo: "D",
-                      descripcion: `Marcaciones ${periodo}: ${respaldo.marcaciones.tardanzas} llegadas tarde, ${respaldo.marcaciones.omisiones} olvidos de marca y ${respaldo.marcaciones.ausencias} días sin marca.`,
-                    })}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {respaldo.marcaciones.tardanzas > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                        Llegadas tarde (factor 2):
+                        {botonIncidente("tardanzas", {
+                          fecha: hoy,
+                          factor: 2,
+                          tipo: "D",
+                          descripcion: `Llegadas tarde ${periodo}: ${respaldo.marcaciones.tardanzas}.`,
+                        })}
+                      </span>
+                    )}
+                    {respaldo.marcaciones.omisiones + respaldo.marcaciones.ausencias + (respaldo.marcaciones.salidasAntes ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                        Disciplina (factor 5):
+                        {botonIncidente("disciplina", {
+                          fecha: hoy,
+                          factor: 5,
+                          tipo: "D",
+                          descripcion: `Disciplina ${periodo}: ${respaldo.marcaciones.omisiones} olvidos de marca, ${respaldo.marcaciones.ausencias} días sin marca y ${respaldo.marcaciones.salidasAntes ?? 0} salidas antes de hora.`,
+                        })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </>
             )}
