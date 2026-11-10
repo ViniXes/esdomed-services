@@ -65,8 +65,11 @@ function Pie({ n }: { n: number }) {
 /** Líneas de renglón con el texto encima (comentarios, acciones, observaciones). */
 function Renglones({ texto, lineas }: { texto: string; lineas: number }) {
   return (
-    <div className="renglones" style={{ minHeight: `${lineas * 0.3}in` }}>
-      {texto}
+    <div className="renglones">
+      {Array.from({ length: lineas }, (_, i) => (
+        <div key={i} className="renglon" />
+      ))}
+      <div className="renglones-texto">{texto}</div>
     </div>
   );
 }
@@ -397,7 +400,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
             ACCIONES ACORDADAS CON EL EMPLEADO PARA MEJORAR SU DESEMPEÑO EN EL PROXIMO PERIODO A EVALUAR, U OTRAS OBSERVACIONES.
           </p>
           <div className="acciones">
-            <Renglones texto={ev.acciones} lineas={6} />
+            <Renglones texto={ev.acciones} lineas={7} />
             <div className="firma-fila normal">
               <div className="firma-linea">Firma del Evaluado</div>
               <div className="sello">SELLO</div>
@@ -416,8 +419,8 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           color: #000;
           font-family: "Myriad Pro Cond", "Myriad Pro", "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           font-stretch: condensed;
-          font-size: 10pt;
-          line-height: 1.2;
+          font-size: 9pt;
+          line-height: 1.15;
         }
         .eval-desempeno p {
           margin: 0;
@@ -427,7 +430,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           box-sizing: border-box;
           width: 8.5in;
           height: 11in;
-          padding: 0.35in 0.45in 0.45in;
+          padding: 0.3in 0.4in 0.5in;
           margin: 0 auto 0.3in;
           background: #fff;
           box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
@@ -436,14 +439,15 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         .eval-desempeno .val {
           font-family: Arial, Helvetica, sans-serif;
           font-stretch: normal;
-          font-size: 11pt;
+          font-size: 10pt;
         }
         .eval-desempeno .val.grande {
-          font-size: 13pt;
+          font-size: 12pt;
         }
         .eval-desempeno .et {
-          font-size: 10pt;
+          font-size: 8.5pt;
           text-transform: uppercase;
+          white-space: nowrap;
         }
         .eval-desempeno .subrayado {
           font-weight: 700;
@@ -457,7 +461,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           gap: 0.3in;
         }
         .eval-desempeno .logo {
-          width: 1.6in;
+          width: 1.3in;
           flex-shrink: 0;
         }
         .eval-desempeno .logo img {
@@ -470,38 +474,43 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           text-align: center;
           font-family: Arial, Helvetica, sans-serif;
           font-stretch: normal;
-          font-size: 22pt;
+          font-size: 20pt;
           line-height: 1.1;
-          padding-right: 1.2in;
+          padding-right: 1in;
         }
         .eval-desempeno .regla {
           border-top: 1.5px solid #000;
-          margin: 0.06in 0 0.06in;
+          margin: 0.05in 0 0.05in;
         }
         .eval-desempeno .subtitulo {
           text-align: center;
-          font-size: 14pt;
+          font-size: 12.5pt;
         }
         .eval-desempeno .titulo-fila {
-          position: relative;
-          text-align: center;
+          display: flex;
+          align-items: flex-end;
+          gap: 0.1in;
+          margin-bottom: 0.03in;
         }
         .eval-desempeno .titulo {
           text-align: center;
-          font-size: 22pt;
+          font-size: 19pt;
           font-weight: 800;
           line-height: 1.1;
         }
+        .eval-desempeno .titulo-fila .titulo {
+          flex: 1;
+          padding-right: 0.35in;
+        }
         .eval-desempeno .seccion {
           font-weight: 700;
-          font-size: 10.5pt;
-          margin: 0.06in 0 0.02in;
+          font-size: 9.5pt;
+          margin: 0.05in 0 0.02in;
         }
         .eval-desempeno .seccion-i {
-          position: absolute;
-          left: 0;
-          bottom: 0;
+          flex-shrink: 0;
           margin: 0;
+          white-space: nowrap;
         }
 
         /* Datos generales */
@@ -517,13 +526,12 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         }
         .eval-desempeno .celda {
           box-sizing: border-box;
-          padding: 0.03in 0.08in;
-          min-height: 0.3in;
+          padding: 0.02in 0.07in;
+          min-height: 0.26in;
           display: flex;
           align-items: center;
           gap: 0.06in;
           border-right: 1px solid #000;
-          white-space: nowrap;
           overflow: hidden;
         }
         .eval-desempeno .celda:last-child {
@@ -547,13 +555,13 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           text-align: center;
         }
         .eval-desempeno .unidad {
-          min-height: 0.75in;
+          min-height: 0.6in;
           padding: 0.06in 0.08in;
           gap: 0.15in;
         }
         .eval-desempeno .unidad-caja {
           width: 1.4in;
-          height: 0.55in;
+          height: 0.45in;
           border: 1px solid #000;
           flex-shrink: 0;
           align-self: flex-end;
@@ -571,24 +579,24 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           border-top: 1.5px solid #000;
         }
         .eval-desempeno .factor-enc {
-          padding: 0.03in 0.08in 0.04in;
+          padding: 0.02in 0.07in 0.03in;
           border-bottom: 1px solid #000;
         }
         .eval-desempeno .factor-titulo {
           font-weight: 700;
-          font-size: 12.5pt;
+          font-size: 11pt;
           letter-spacing: 0.14em;
         }
         .eval-desempeno .factor-def {
           font-weight: 700;
-          font-size: 10.5pt;
+          font-size: 10pt;
         }
         .eval-desempeno .factor-opciones {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
         }
         .eval-desempeno .opcion {
-          padding: 0.03in 0.06in 0.06in;
+          padding: 0.02in 0.05in 0.04in;
           border-right: 1px solid #000;
         }
         .eval-desempeno .opcion:last-child {
@@ -596,12 +604,12 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         }
         .eval-desempeno .opcion-enc {
           position: relative;
-          height: 0.3in;
+          height: 0.25in;
           text-align: center;
         }
         .eval-desempeno .opcion-letra {
           font-weight: 700;
-          font-size: 12pt;
+          font-size: 11pt;
         }
         .eval-desempeno .opcion-enc .casilla {
           position: absolute;
@@ -609,19 +617,20 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           top: 0.02in;
         }
         .eval-desempeno .opcion-texto {
-          font-size: 9.6pt;
+          font-size: 9.4pt;
+          line-height: 1.18;
           white-space: pre-line;
         }
         .eval-desempeno .casilla {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          width: 0.42in;
-          height: 0.26in;
+          width: 0.38in;
+          height: 0.22in;
           border: 1px solid #000;
           font-family: Arial, Helvetica, sans-serif;
           font-weight: 700;
-          font-size: 13pt;
+          font-size: 12pt;
           vertical-align: middle;
         }
 
@@ -801,10 +810,22 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           font-family: Arial, Helvetica, sans-serif;
           font-stretch: normal;
           font-size: 10pt;
-          line-height: 0.3in;
+          position: relative;
+        }
+        .eval-desempeno .renglon {
+          height: 0.27in;
+          border-bottom: 1px solid #999;
+        }
+        .eval-desempeno .renglon:nth-last-child(2) {
+          border-bottom: 0;
+        }
+        .eval-desempeno .renglones-texto {
+          position: absolute;
+          inset: 0;
+          padding: 0.03in 0.08in 0;
+          line-height: 0.27in;
           white-space: pre-wrap;
-          background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(0.3in - 1px), #888 calc(0.3in - 1px), #888 0.3in);
-          padding: 0 0.06in;
+          overflow: hidden;
         }
 
         /* Página 4 */
@@ -834,13 +855,13 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           font-size: 11pt;
         }
         .eval-desempeno .res-bloque {
-          padding: 0.1in 0.12in 0.18in;
+          padding: 0.08in 0.12in 0.12in;
           border-bottom: 1px solid #000;
         }
         .eval-desempeno .calificaciones {
           display: flex;
           justify-content: space-around;
-          margin-top: 0.2in;
+          margin-top: 0.12in;
         }
         .eval-desempeno .calif {
           display: inline-flex;
@@ -853,14 +874,14 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         }
         .eval-desempeno .firmas {
           border: 1px solid #000;
-          margin-top: 0.12in;
-          padding: 0.1in 0.3in;
+          margin-top: 0.08in;
+          padding: 0.04in 0.3in;
         }
         .eval-desempeno .firma-fila {
           display: flex;
           align-items: flex-end;
           gap: 0.15in;
-          padding: 0.08in 0;
+          padding: 0.04in 0;
         }
         .eval-desempeno .firma-linea {
           flex: 1;
@@ -869,7 +890,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           font-weight: 700;
           font-size: 10.5pt;
           padding-top: 0.02in;
-          margin-bottom: 0.3in;
+          margin-bottom: 0.28in;
           position: relative;
         }
         .eval-desempeno .firma-fila.normal .firma-linea {
@@ -889,8 +910,8 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           padding-bottom: 0.03in;
         }
         .eval-desempeno .sello {
-          width: 1.1in;
-          height: 0.8in;
+          width: 1.05in;
+          height: 0.7in;
           border: 1px solid #888;
           border-radius: 0.1in;
           display: flex;
@@ -908,13 +929,13 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         .eval-desempeno .renglon-texto {
           font-family: Calibri, Carlito, Arial, sans-serif;
           font-stretch: normal;
-          font-size: 12pt;
-          padding: 0.04in 0.12in;
+          font-size: 11pt;
+          padding: 0.03in 0.12in;
           border-bottom: 1px solid #000;
         }
         .eval-desempeno .comunicacion .firma-fila,
         .eval-desempeno .acciones .firma-fila {
-          padding: 0.15in 0.6in 0;
+          padding: 0.08in 0.6in 0;
           border-top: 1px solid #000;
         }
         .eval-desempeno .acciones-titulo {
@@ -929,7 +950,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           position: absolute;
           left: 0;
           right: 0;
-          bottom: 0.2in;
+          bottom: 0.22in;
           text-align: center;
           font-weight: 700;
           font-size: 10pt;
