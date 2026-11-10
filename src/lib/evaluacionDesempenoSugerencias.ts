@@ -20,7 +20,7 @@ export interface Sugerencia {
 export const CRITERIOS = {
   // Factor 1: errores atribuibles (hoy: altas efectivas revertidas). D ≤ 0, C ≤ 2, B ≤ 5, A > 5.
   errores: { D: 0, C: 2, B: 5 },
-  // Factor 3: productividad por 100 h programadas, en % del promedio del equipo. D ≥ 110, C ≥ 90, B ≥ 60, A < 60.
+  // Factor 3: actividades por turno, en % del promedio del equipo. D ≥ 110, C ≥ 90, B ≥ 60, A < 60.
   productividadPct: { D: 110, C: 90, B: 60 },
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
   turnosVaciosPct: { D: 5, C: 15, B: 30 },
@@ -32,9 +32,9 @@ export const CRITERIOS = {
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
   { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas)", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5" },
   { factor: 2, dato: "Sin dato directo; amonestaciones como alerta", regla: "A criterio del jefe" },
-  { factor: 3, dato: "Productividad por cada 100 h programadas vs. promedio del equipo", regla: "D: ≥110% · C: 90–110% · B: 60–90% · A: <60%" },
-  { factor: 4, dato: "Turnos programados sin ningún registro en Services", regla: "D: ≤5% · C: ≤15% · B: ≤30% · A: >30%" },
-  { factor: 5, dato: "Días con incidencia en el reloj + amonestaciones", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
+  { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
+  { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
+  { factor: 5, dato: "Llegadas tarde + olvidos de marca + días sin marca (reloj), y amonestaciones", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
   { factor: 7, dato: "Quejas o amonestaciones en el archivero, como alerta", regla: "A criterio del jefe" },
 ];
@@ -67,24 +67,26 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   // 3. Cumplimiento de metas
   const plan = r.plan;
   if (esAdministrativo) out[3] = sin("Administrativo: su trabajo no se registra como productividad.");
-  else if (!plan || plan.horasProgramadas === 0) out[3] = sin("No hay turnos del plan de trabajo en este periodo para comparar.");
-  else if (plan.tasaEquipoPor100h === 0) out[3] = sin("El equipo no tiene actividad registrada para comparar.");
+  else if (!plan || !plan.turnosProgramados) out[3] = sin("No tiene turnos en el plan de trabajo de este periodo para comparar.");
+  else if (!plan.promedioEquipoPorTurno) out[3] = sin("El equipo no tiene actividad registrada para comparar.");
   else {
-    const pct = Math.round((plan.tasaPor100h / plan.tasaEquipoPor100h) * 100);
+    const pct = Math.round((plan.actividadesPorTurno / plan.promedioEquipoPorTurno) * 100);
+    const dif = pct - 100;
+    const comparado = Math.abs(dif) < 10 ? "en el promedio del equipo" : dif > 0 ? `${dif}% arriba del promedio del equipo` : `${-dif}% abajo del promedio del equipo`;
     out[3] = {
       letra: mayorEsMejor(pct, CRITERIOS.productividadPct),
-      motivo: `${plan.tasaPor100h} actividades por cada 100 h programadas = ${pct}% del promedio del equipo (${plan.tasaEquipoPor100h}).`,
+      motivo: `Hace ${plan.actividadesPorTurno} actividades por turno; el equipo, ${plan.promedioEquipoPorTurno}. Está ${comparado}.`,
     };
   }
 
   // 4. Organización
   if (esAdministrativo) out[4] = sin("Administrativo: su trabajo no se registra en Services.");
-  else if (!plan || plan.turnosProgramados === 0) out[4] = sin("No hay turnos del plan de trabajo en este periodo.");
+  else if (!plan || !plan.turnosProgramados) out[4] = sin("No tiene turnos en el plan de trabajo de este periodo.");
   else {
     const pct = Math.round((plan.turnosSinActividad / plan.turnosProgramados) * 100);
     out[4] = {
       letra: menorEsMejor(pct, CRITERIOS.turnosVaciosPct),
-      motivo: `${plan.turnosSinActividad} de ${plan.turnosProgramados} turnos (${pct}%) sin ningún registro en Services.`,
+      motivo: `En ${plan.turnosSinActividad} de sus ${plan.turnosProgramados} turnos (${pct}%) no registró nada en Services.`,
     };
   }
 
@@ -96,7 +98,11 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
     if (amonestaciones) letra = "A";
     out[5] = {
       letra,
-      motivo: `${m.meses ? `${m.diasConIncidencia} día(s) con incidencia en ${m.meses} mes(es) publicados.` : "Sin marcaciones publicadas."}${alertaAmon}`,
+      motivo: `${
+        m.meses
+          ? `En ${m.meses} mes(es) con marcación publicada: ${m.tardanzas} llegada(s) tarde, ${m.omisiones} olvido(s) de marca y ${m.ausencias} día(s) sin marca (${m.diasConIncidencia} en total).`
+          : "Sin marcaciones publicadas."
+      }${alertaAmon}`,
     };
   }
 

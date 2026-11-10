@@ -65,13 +65,26 @@ export interface ResumenRespaldo {
   archivero?: EntradaArchivero[];
   /** Plan de trabajo, solo días ya transcurridos del periodo. */
   plan?: {
-    meses: number;              // meses del periodo con fila de la persona en el plan
-    horasProgramadas: number;
     turnosProgramados: number;
-    turnosSinActividad: number; // turnos en cuya ventana no registró nada en Services
-    tasaPor100h: number;        // actividades por cada 100 h programadas
-    tasaEquipoPor100h: number;  // promedio del equipo operativo con actividad
+    turnosSinActividad: number;   // turnos en los que no registró nada en Services
+    actividadesPorTurno: number;  // total del semestre ÷ turnos programados
+    promedioEquipoPorTurno: number;
+    porMes: MesRespaldo[];
   };
+}
+
+/** Resumen sencillo de un mes: lo que decía el plan y lo que marcó el reloj. */
+export interface MesRespaldo {
+  periodo: string;        // "2026-07"
+  enPlan: boolean;        // aparece en el plan de ese mes
+  turnos: number;         // turnos programados (días ya transcurridos)
+  vacaciones: number;
+  incapacidades: number;
+  permisos: number;       // PER + licencias
+  marcacionPublicada: boolean;
+  tarde: number;          // días con minutos descontados (llegó tarde / salió antes)
+  olvidoMarca: number;    // olvidó marcar entrada o salida
+  sinMarca: number;       // día de turno sin ninguna marca (no vino)
 }
 
 export interface RefPersonaEquipo {
@@ -212,7 +225,20 @@ export async function cargarRespaldo(params: {
     ...registros(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
     ...registros(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
   ];
-  const plan = await resumenPlan({ rango, yo: { uid: params.uid, nombre: params.nombre, codigoMarcacion: params.codigoMarcacion }, equipo: params.equipo, totales: totalesEquipo, registrosYo: todos.filter((r) => r.n === yo).map((r) => r.t.getTime()) });
+  const marcPorMes = new Map(
+    meses.map((m) => {
+      const ds = m.dias ?? [];
+      return [
+        m.periodo,
+        {
+          tarde: ds.filter((d) => tipoIncidencia(d) === "minutos").length,
+          olvidoMarca: ds.filter((d) => ["omision_entrada", "omision_salida"].includes(tipoIncidencia(d))).length,
+          sinMarca: ds.filter((d) => tipoIncidencia(d) === "sin_marcacion").length,
+        },
+      ] as const;
+    }),
+  );
+  const plan = await resumenPlan({ marcPorMes, rango, yo: { uid: params.uid, nombre: params.nombre, codigoMarcacion: params.codigoMarcacion }, equipo: params.equipo, totales: totalesEquipo, registrosYo: todos.filter((r) => r.n === yo).map((r) => r.t.getTime()) });
 
   return {
     periodo: params.periodo,
@@ -245,11 +271,12 @@ export async function cargarArchivero(empleadoId: string, periodo: string): Prom
 }
 
 /**
- * Horas y turnos programados en el plan de trabajo (solo días ya transcurridos)
- * y, con eso, la productividad por cada 100 h y los turnos sin ningún registro.
- * Así quien tuvo vacaciones, permisos o incapacidad no sale castigado.
+ * Turnos del plan de trabajo (solo días ya transcurridos) mes por mes, junto con
+ * lo que marcó el reloj; y actividades por turno para comparar con el equipo
+ * sin castigar vacaciones, permisos ni incapacidades.
  */
 async function resumenPlan(p: {
+  marcPorMes: Map<string, { tarde: number; olvidoMarca: number; sinMarca: number }>;
   rango: { inicio: Date; fin: Date };
   yo: RefPersonaEquipo;
   equipo: RefPersonaEquipo[];
@@ -271,9 +298,7 @@ async function resumenPlan(p: {
   );
 
   const personas = [p.yo, ...p.equipo.filter((e) => e.uid !== p.yo.uid)];
-  const horas = new Map<string, number>();
-  let meses = 0;
-  let turnos = 0;
+  const turnosDe = new Map<string, number>();
   let sinActividad = 0;
   const regs = [...p.registrosYo].sort((a, b) => a - b);
   const hayEntre = (a: number, b: number) => {
@@ -287,46 +312,64 @@ async function resumenPlan(p: {
     return lo < regs.length && regs[lo] <= b;
   };
 
-  planes.forEach((plan, i) => {
-    if (!plan) return;
-    const [anio, mes] = periodos[i].split("-").map(Number);
-    const diasMes = new Date(anio, mes, 0).getDate();
+  const porMes: MesRespaldo[] = periodos.map((periodo, i) => {
+    const plan = planes[i];
+    const marc = p.marcPorMes.get(periodo);
+    const mes: MesRespaldo = {
+      periodo,
+      enPlan: false,
+      turnos: 0,
+      vacaciones: 0,
+      incapacidades: 0,
+      permisos: 0,
+      marcacionPublicada: !!marc,
+      tarde: marc?.tarde ?? 0,
+      olvidoMarca: marc?.olvidoMarca ?? 0,
+      sinMarca: marc?.sinMarca ?? 0,
+    };
+    if (!plan) return mes;
+    const [anio, m] = periodo.split("-").map(Number);
+    const diasMes = new Date(anio, m, 0).getDate();
     for (const persona of personas) {
       const fila = buscarFila(plan, persona);
       if (!fila) continue;
       const esYo = persona.uid === p.yo.uid;
-      if (esYo) meses++;
+      if (esYo) mes.enPlan = true;
+      const clave = normalizar(persona.nombre);
       for (let dia = 1; dia <= diasMes; dia++) {
-        const fecha = new Date(anio, mes - 1, dia);
+        const fecha = new Date(anio, m - 1, dia);
         if (fecha > limite || fecha < p.rango.inicio) continue;
         const est = estadoFilaEnDia(fila, dia);
-        if (est.tipo !== "turno" || !est.horario) continue;
-        const clave = normalizar(persona.nombre);
-        horas.set(clave, (horas.get(clave) ?? 0) + est.horario.horas);
-        if (esYo) {
-          turnos++;
-          const ini = fecha.getTime() + (est.inicio ?? 0) * 60000;
-          const fin = fecha.getTime() + (est.fin ?? 24 * 60) * 60000;
-          if (fin <= hoy.getTime() && !hayEntre(ini, fin)) sinActividad++;
+        if (est.tipo === "turno") {
+          turnosDe.set(clave, (turnosDe.get(clave) ?? 0) + 1);
+          if (esYo) {
+            mes.turnos++;
+            const ini = fecha.getTime() + (est.inicio ?? 0) * 60000;
+            const fin = fecha.getTime() + (est.fin ?? 24 * 60) * 60000;
+            if (fin <= hoy.getTime() && !hayEntre(ini, fin)) sinActividad++;
+          }
+        } else if (esYo && est.tipo === "ausencia") {
+          if (est.codigo === "VAC") mes.vacaciones++;
+          else if (est.codigo === "INC") mes.incapacidades++;
+          else mes.permisos++;
         }
       }
     }
+    return mes;
   });
 
   const yoN = normalizar(p.yo.nombre);
-  const horasYo = horas.get(yoN) ?? 0;
-  const tasa = (n: string) => {
-    const h = horas.get(n) ?? 0;
-    return h > 0 ? ((p.totales.get(n) ?? 0) / h) * 100 : 0;
+  const porTurno = (n: string) => {
+    const t = turnosDe.get(n) ?? 0;
+    return t > 0 ? (p.totales.get(n) ?? 0) / t : 0;
   };
-  const tasasEquipo = [...horas.keys()].map(tasa).filter((t) => t > 0);
+  const tasasEquipo = [...turnosDe.keys()].map(porTurno).filter((t) => t > 0);
   const r1 = (x: number) => Math.round(x * 10) / 10;
   return {
-    meses,
-    horasProgramadas: horasYo,
-    turnosProgramados: turnos,
+    turnosProgramados: turnosDe.get(yoN) ?? 0,
     turnosSinActividad: sinActividad,
-    tasaPor100h: r1(tasa(yoN)),
-    tasaEquipoPor100h: r1(tasasEquipo.length ? tasasEquipo.reduce((a, b) => a + b, 0) / tasasEquipo.length : 0),
+    actividadesPorTurno: r1(porTurno(yoN)),
+    promedioEquipoPorTurno: r1(tasasEquipo.length ? tasasEquipo.reduce((a, b) => a + b, 0) / tasasEquipo.length : 0),
+    porMes,
   };
 }

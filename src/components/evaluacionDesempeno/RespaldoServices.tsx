@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Database, FileWarning, Fingerprint, ListChecks, Plus, RefreshCw, TrendingUp, Undo2 } from "lucide-react";
+import { CalendarClock, Database, FileWarning, ListChecks, Plus, RefreshCw, TrendingUp, Undo2 } from "lucide-react";
 import {
   METRICAS_PRODUCTIVIDAD,
   cargarArchivero,
@@ -114,7 +114,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
             </tbody>
           </table>
           <p className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400 dark:border-slate-800">
-            Solo cuentan los días ya transcurridos del periodo. La productividad se compara por horas programadas en el plan, así vacaciones, permisos e incapacidades no castigan.
+            Solo cuentan los días ya transcurridos del periodo. La productividad se compara por turno trabajado según el plan, así vacaciones, permisos e incapacidades no castigan.
           </p>
         </div>
       )}
@@ -130,13 +130,25 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
       {respaldo && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {/* Productividad */}
-          <Bloque icon={TrendingUp} titulo="Productividad del periodo" factor="Factores 1 y 3" atenuado={esAdministrativo}>
+          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factores 1 y 3" atenuado={esAdministrativo} ancho>
+            {respaldo.plan && respaldo.plan.turnosProgramados > 0 && respaldo.plan.promedioEquipoPorTurno > 0 && (
+              <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  Por cada turno hace <strong className="text-slate-900 dark:text-slate-100">{respaldo.plan.actividadesPorTurno}</strong> actividades; el
+                  promedio del equipo es <strong className="text-slate-900 dark:text-slate-100">{respaldo.plan.promedioEquipoPorTurno}</strong>.
+                </p>
+                <div className="mt-1.5">
+                  <Comparacion persona={respaldo.plan.actividadesPorTurno} equipo={respaldo.plan.promedioEquipoPorTurno} grande />
+                </div>
+              </div>
+            )}
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
-                  <th className="pb-1 font-semibold">Actividad</th>
-                  <th className="pb-1 text-right font-semibold">Persona</th>
-                  <th className="pb-1 text-right font-semibold">Prom. equipo</th>
+                  <th className="pb-1 font-semibold">Actividad (total del semestre)</th>
+                  <th className="pb-1 text-right font-semibold">{primerNombre(nombre)}</th>
+                  <th className="pb-1 text-right font-semibold">Promedio equipo</th>
+                  <th className="pb-1 text-right font-semibold" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -144,63 +156,91 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                   <tr key={m.id}>
                     <td className="py-1 text-slate-600 dark:text-slate-300">{m.label}</td>
                     <td className="py-1 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.productividad[m.id]}</td>
-                    <td className="py-1 text-right tabular-nums text-slate-500">{respaldo.promedioEquipo[m.id]}</td>
+                    <td className="py-1 text-right tabular-nums text-slate-500">{Math.round(respaldo.promedioEquipo[m.id])}</td>
+                    <td className="py-1 pl-2 text-right">
+                      <Comparacion persona={respaldo.productividad[m.id]} equipo={respaldo.promedioEquipo[m.id]} />
+                    </td>
                   </tr>
                 ))}
-                <tr>
-                  <td className="pt-1.5 font-semibold text-slate-700 dark:text-slate-200">Total</td>
-                  <td className="pt-1.5 text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.totalPersona}</td>
-                  <td className="pt-1.5 text-right tabular-nums text-slate-500">{respaldo.promedioTotalEquipo}</td>
-                </tr>
               </tbody>
             </table>
             <p className="mt-2 text-[11px] text-slate-400">
-              Promedio entre el personal operativo con actividad. No incluye las hojas de Drive (carpetas, actualizaciones, consentimientos).
+              &quot;Promedio equipo&quot; = lo que hizo en promedio cada compañero operativo en el semestre. Arriba o abajo cuenta a partir de 10% de
+              diferencia. No incluye las hojas de Drive.
             </p>
           </Bloque>
 
-          {/* Plan de trabajo */}
-          <Bloque icon={CalendarClock} titulo="Turnos del plan de trabajo" factor="Factores 3 y 4" atenuado={esAdministrativo}>
-            {!respaldo.plan ? (
-              <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver los turnos del plan.</p>
-            ) : respaldo.plan.turnosProgramados === 0 ? (
-              <p className="text-xs text-slate-500">No aparece con turnos en el plan de trabajo de este periodo (hasta hoy).</p>
-            ) : (
-              <ul className="grid grid-cols-2 gap-2 text-xs">
-                <Dato label="Turnos programados" valor={respaldo.plan.turnosProgramados} />
-                <Dato label="Horas programadas" valor={respaldo.plan.horasProgramadas} />
-                <Dato label="Actividades por 100 h" valor={respaldo.plan.tasaPor100h} />
-                <Dato label="Promedio del equipo por 100 h" valor={respaldo.plan.tasaEquipoPor100h} />
-                <Dato label="Turnos sin ningún registro" valor={respaldo.plan.turnosSinActividad} />
-                <Dato label="Meses con plan" valor={respaldo.plan.meses} />
-              </ul>
-            )}
-          </Bloque>
-
-          {/* Marcaciones */}
-          <Bloque icon={Fingerprint} titulo="Marcaciones (reloj)" factor="Factor 5 · puntualidad">
-            {respaldo.marcaciones.meses === 0 ? (
-              <p className="text-xs text-slate-500">No hay meses publicados de este periodo en Inconsistencias de marcación.</p>
+          {/* Asistencia mes por mes */}
+          <Bloque icon={CalendarClock} titulo="Asistencia mes por mes" factor="Factores 4 y 5" ancho>
+            {!respaldo.plan?.porMes ? (
+              <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la asistencia por mes.</p>
             ) : (
               <>
-                <ul className="grid grid-cols-2 gap-2 text-xs">
-                  <Dato label="Meses publicados" valor={respaldo.marcaciones.meses} />
-                  <Dato label="Días con incidencia" valor={respaldo.marcaciones.diasConIncidencia} />
-                  <Dato label="Días con minutos descontados" valor={respaldo.marcaciones.tardanzas} />
-                  <Dato label="Minutos descontados" valor={respaldo.marcaciones.minutos} />
-                  <Dato label="Olvidó marcar" valor={respaldo.marcaciones.omisiones} />
-                  <Dato label="Días sin ninguna marca" valor={respaldo.marcaciones.ausencias} />
-                </ul>
-                {respaldo.marcaciones.diasConIncidencia > 0 && (
-                  <div className="mt-2 flex justify-end">
-                    {botonIncidente("marcaciones", {
-                        fecha: hoy,
-                        factor: 5,
-                        tipo: "D",
-                        descripcion: `Marcaciones ${periodo}: ${respaldo.marcaciones.diasConIncidencia} días con incidencia (${respaldo.marcaciones.minutos} min descontados, ${respaldo.marcaciones.omisiones} omisiones, ${respaldo.marcaciones.ausencias} sin marca).`,
-                      })}
-                  </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[34rem] text-xs">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-wider text-slate-400">
+                        <th className="pb-1 text-left font-semibold">Mes</th>
+                        <th className="pb-1 text-right font-semibold">Turnos</th>
+                        <th className="pb-1 text-right font-semibold">Llegadas tarde</th>
+                        <th className="pb-1 text-right font-semibold">Olvidó marcar</th>
+                        <th className="pb-1 text-right font-semibold">No vino (sin marca)</th>
+                        <th className="pb-1 text-right font-semibold">Incapacidad</th>
+                        <th className="pb-1 text-right font-semibold">Permisos</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {respaldo.plan.porMes.map((m) => (
+                        <tr key={m.periodo}>
+                          <td className="py-1 font-medium capitalize text-slate-700 dark:text-slate-200">{nombreMes(m.periodo)}</td>
+                          <td className="py-1 text-right tabular-nums text-slate-700 dark:text-slate-200">
+                            {m.enPlan ? m.turnos : <span className="text-slate-400">sin plan</span>}
+                          </td>
+                          {m.marcacionPublicada ? (
+                            <>
+                              <Celda n={m.tarde} alerta />
+                              <Celda n={m.olvidoMarca} alerta />
+                              <Celda n={m.sinMarca} alerta />
+                            </>
+                          ) : (
+                            <td colSpan={3} className="py-1 text-center text-[11px] text-slate-400">
+                              reloj no publicado
+                            </td>
+                          )}
+                          <Celda n={m.incapacidades} />
+                          <Celda n={m.permisos} />
+                        </tr>
+                      ))}
+                      <tr className="font-semibold">
+                        <td className="pt-1.5 text-slate-700 dark:text-slate-200">Total</td>
+                        <td className="pt-1.5 text-right tabular-nums text-slate-700 dark:text-slate-200">{respaldo.plan.turnosProgramados}</td>
+                        <Celda n={respaldo.marcaciones.tardanzas} alerta />
+                        <Celda n={respaldo.marcaciones.omisiones} alerta />
+                        <Celda n={respaldo.marcaciones.ausencias} alerta />
+                        <Celda n={respaldo.plan.porMes.reduce((t, m) => t + m.incapacidades, 0)} />
+                        <Celda n={respaldo.plan.porMes.reduce((t, m) => t + m.permisos, 0)} />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {!esAdministrativo && respaldo.plan.turnosProgramados > 0 && (
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    En <strong>{respaldo.plan.turnosSinActividad}</strong> de sus {respaldo.plan.turnosProgramados} turnos no registró nada en Services.
+                  </p>
                 )}
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-slate-400">
+                    Turnos, incapacidad y permisos salen del plan de trabajo (solo días ya pasados). Llegadas tarde, olvidos y días sin marca salen
+                    del reloj, de los meses publicados en Inconsistencias de marcación.
+                  </p>
+                  {respaldo.marcaciones.diasConIncidencia > 0 &&
+                    botonIncidente("marcaciones", {
+                      fecha: hoy,
+                      factor: 5,
+                      tipo: "D",
+                      descripcion: `Marcaciones ${periodo}: ${respaldo.marcaciones.tardanzas} llegadas tarde, ${respaldo.marcaciones.omisiones} olvidos de marca y ${respaldo.marcaciones.ausencias} días sin marca.`,
+                    })}
+                </div>
               </>
             )}
           </Bloque>
@@ -268,16 +308,18 @@ function Bloque({
   titulo,
   factor,
   atenuado,
+  ancho,
   children,
 }: {
   icon: typeof Database;
   titulo: string;
   factor: string;
   atenuado?: boolean;
+  ancho?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 ${atenuado ? "opacity-60" : ""}`}>
+    <div className={`rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 ${atenuado ? "opacity-60" : ""} ${ancho ? "lg:col-span-2" : ""}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-100">
           <Icon size={14} className="text-blue-600 dark:text-blue-400" /> {titulo}
@@ -286,15 +328,6 @@ function Bloque({
       </div>
       {children}
     </div>
-  );
-}
-
-function Dato({ label, valor }: { label: string; valor: number }) {
-  return (
-    <li className="rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-slate-800/60">
-      <p className="text-[10px] text-slate-500 dark:text-slate-400">{label}</p>
-      <p className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{valor}</p>
-    </li>
   );
 }
 
@@ -309,5 +342,38 @@ function BotonAgregar({ hecho, onClick }: { hecho: boolean; onClick: () => void 
     >
       <Plus size={12} /> Incidente
     </button>
+  );
+}
+
+const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const nombreMes = (periodo: string) => MESES_LARGOS[Number(periodo.slice(5, 7)) - 1] ?? periodo;
+const primerNombre = (n: string) => n.trim().split(/\s+/)[0] || "Persona";
+
+function Celda({ n, alerta }: { n: number; alerta?: boolean }) {
+  return (
+    <td
+      className={`py-1 text-right tabular-nums ${
+        n === 0 ? "text-slate-400" : alerta ? "font-semibold text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-200"
+      }`}
+    >
+      {n}
+    </td>
+  );
+}
+
+/** Arriba / en el promedio / abajo, con 10% de margen. */
+function Comparacion({ persona, equipo, grande }: { persona: number; equipo: number; grande?: boolean }) {
+  if (!equipo) return <span className="text-[10px] text-slate-400">—</span>;
+  const dif = Math.round((persona / equipo - 1) * 100);
+  const [texto, cls] =
+    Math.abs(dif) < 10
+      ? ["En el promedio", "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"]
+      : dif > 0
+        ? [`Arriba ${dif}%`, "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"]
+        : [`Abajo ${-dif}%`, "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"];
+  return (
+    <span className={`inline-block whitespace-nowrap rounded-full border font-semibold ${grande ? "px-2.5 py-0.5 text-xs" : "px-1.5 py-px text-[10px]"} ${cls}`}>
+      {texto}
+    </span>
   );
 }
