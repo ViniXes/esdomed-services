@@ -1831,13 +1831,18 @@ export interface TramitePersonal {
 // (ej. Norma Técnica de Hechos Vitales) y amonestaciones por algún
 // procedimiento. Solo el admin registra/elimina; cada empleado consulta
 // únicamente las suyas (ver firestore.rules, colección evaluaciones_personal).
+export type CategoriaArchivoPersonal = "evaluacion" | "amonestacion" | "diploma";
+
 export interface EvaluacionPersonal {
   id?: string;
   empleadoId: string;
   empleadoNombre: string;
-  tipo: string; // catálogo abierto, ver TIPOS_EVALUACION_PERSONAL en src/lib/evaluacionesPersonal.ts
+  // Pestaña de la ficha donde se muestra (evaluacion | amonestacion | diploma). Las entradas anteriores no lo traen:
+  // se deduce con categoriaDeEntrada() en src/lib/evaluacionesPersonal.ts.
+  categoria?: CategoriaArchivoPersonal;
+  tipo: string; // catálogo abierto, ver CATEGORIAS_ARCHIVO_PERSONAL en src/lib/evaluacionesPersonal.ts
   notas?: string;
-  nota?: number; // calificación 0–10 (mínimo para aprobar: NOTA_MINIMA_EVALUACION = 7)
+  nota?: number; // calificación 0–10, solo evaluaciones (mínimo para aprobar: NOTA_MINIMA_EVALUACION = 7)
   archivos?: AdjuntoBitacora[];
   fecha: Date; // fecha de la evaluación/amonestación (no necesariamente hoy)
   registradaPorId: string;

@@ -7,8 +7,8 @@ import {
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { AdjuntoBitacora, EvaluacionPersonal } from "@/types";
-import { NOTA_MINIMA_EVALUACION, TIPOS_EVALUACION_PERSONAL, aproboEvaluacion, leerNota } from "@/lib/evaluacionesPersonal";
+import type { AdjuntoBitacora, CategoriaArchivoPersonal, EvaluacionPersonal } from "@/types";
+import { CATEGORIAS_ARCHIVO_PERSONAL, NOTA_MINIMA_EVALUACION, aproboEvaluacion, categoriaDeEntrada, leerNota } from "@/lib/evaluacionesPersonal";
 import {
   Paperclip, FilePlus2, Trash2, FileText, Loader2, X, ExternalLink, ImageOff, ClipboardCheck, Download, RefreshCw, Pencil, Check,
 } from "lucide-react";
@@ -80,10 +80,13 @@ interface Props {
   empleadoNombre: string;
   /** Solo el admin registra y elimina entradas. */
   puedeGestionar: boolean;
+  /** Pestaña de la ficha: evaluaciones, amonestaciones o diplomas/certificados. */
+  categoria: CategoriaArchivoPersonal;
 }
 
-export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestionar }: Props) {
+export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestionar, categoria }: Props) {
   const { user, profile } = useAuth();
+  const cfg = CATEGORIAS_ARCHIVO_PERSONAL[categoria];
 
   const [entradas, setEntradas] = useState<EvaluacionPersonal[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -114,6 +117,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       q,
       (snap) => {
         setErrorCarga(null);
+        // Una sola consulta por empleado; cada pestaña se queda con lo suyo.
         setEntradas(snap.docs.map((d) => {
           const data = d.data();
           return {
@@ -122,7 +126,8 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
             fecha: toDate(data.fecha),
             creadoEn: toDate(data.creadoEn),
           } as EvaluacionPersonal;
-        }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime()));
+        }).filter((e) => categoriaDeEntrada(e) === categoria)
+          .sort((a, b) => b.fecha.getTime() - a.fecha.getTime()));
       },
       (err) => {
         console.error("evaluaciones_personal:", err);
@@ -130,7 +135,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       },
     );
     return unsub;
-  }, [empleadoId]);
+  }, [empleadoId, categoria]);
 
   const agregarArchivos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nuevos = Array.from(e.target.files ?? []);
@@ -152,7 +157,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
 
   const quitarArchivo = (idx: number) => setArchivos((prev) => prev.filter((_, i) => i !== idx));
 
-  const notaInvalida = nota.trim() !== "" && leerNota(nota) === null;
+  const notaInvalida = cfg.conNota && nota.trim() !== "" && leerNota(nota) === null;
   const puedeRegistrar = !subiendo && tipo.trim().length > 0 && fecha.length > 0 && !notaInvalida;
 
   const registrar = async () => {
@@ -174,6 +179,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       const entrada: Record<string, unknown> = {
         empleadoId,
         empleadoNombre,
+        categoria,
         tipo: tipo.trim(),
         fecha: Timestamp.fromDate(new Date(`${fecha}T00:00:00`)),
         registradaPorId: user.uid,
@@ -181,7 +187,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
         creadoEn: serverTimestamp(),
       };
       if (notas.trim()) entrada.notas = notas.trim();
-      const notaNum = leerNota(nota);
+      const notaNum = cfg.conNota ? leerNota(nota) : null;
       if (notaNum !== null) entrada.nota = notaNum;
       if (subidos.length) entrada.archivos = subidos;
 
@@ -243,19 +249,19 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
     <div className="space-y-4">
       {puedeGestionar && (
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 p-3 space-y-2.5">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_10rem_7rem] gap-2.5">
+          <div className={`grid grid-cols-1 gap-2.5 ${cfg.conNota ? "sm:grid-cols-[1fr_10rem_7rem]" : "sm:grid-cols-[1fr_10rem]"}`}>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Tipo</label>
               <input
-                list="tipos-evaluacion-personal"
+                list={`tipos-archivo-${categoria}`}
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
                 disabled={subiendo}
-                placeholder="Ej. Norma Técnica de Hechos Vitales"
+                placeholder={cfg.ejemploTipo}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
-              <datalist id="tipos-evaluacion-personal">
-                {TIPOS_EVALUACION_PERSONAL.map((t) => <option key={t} value={t} />)}
+              <datalist id={`tipos-archivo-${categoria}`}>
+                {cfg.tipos.map((t) => <option key={t} value={t} />)}
               </datalist>
             </div>
             <div>
@@ -268,7 +274,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
             </div>
-            <div>
+            {cfg.conNota && <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Nota (0–10)</label>
               <input
                 inputMode="decimal"
@@ -278,9 +284,9 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
                 placeholder="Opcional"
                 className={`w-full bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${notaInvalida ? "border-rose-400" : "border-slate-200 dark:border-slate-700"}`}
               />
-            </div>
+            </div>}
           </div>
-          <p className="text-[11px] text-slate-400">Nota mínima para aprobar: {NOTA_MINIMA_EVALUACION}. Déjala vacía en amonestaciones.</p>
+          {cfg.conNota && <p className="text-[11px] text-slate-400">Nota mínima para aprobar: {NOTA_MINIMA_EVALUACION}.</p>}
 
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Notas (opcional)</label>
@@ -348,11 +354,9 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       ) : entradas.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
           <ClipboardCheck size={28} className="text-slate-300 dark:text-slate-600" />
-          <p className="text-sm font-medium text-slate-500">Sin evaluaciones registradas</p>
+          <p className="text-sm font-medium text-slate-500">{cfg.vacio}</p>
           <p className="text-xs text-slate-400 max-w-xs">
-            {puedeGestionar
-              ? "Las evaluaciones y amonestaciones que registres aquí quedan permanentes en el expediente."
-              : "Aquí verás las evaluaciones y amonestaciones que ESDOMED registre en tu expediente."}
+            {puedeGestionar ? cfg.vacioAdmin : cfg.vacioEmpleado}
           </p>
         </div>
       ) : (
@@ -366,7 +370,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
                       {e.tipo}
                     </span>
                     <span className="text-xs text-slate-400">{formatFecha(e.fecha)}</span>
-                    <NotaEvaluacion entrada={e} puedeGestionar={puedeGestionar} />
+                    {cfg.conNota && <NotaEvaluacion entrada={e} puedeGestionar={puedeGestionar} />}
                   </div>
                   {e.notas && (
                     <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{e.notas}</p>

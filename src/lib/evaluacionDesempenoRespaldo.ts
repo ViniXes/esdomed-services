@@ -285,6 +285,8 @@ export async function cargarArchivero(empleadoId: string, periodo: string): Prom
   const rango = rangoDePeriodo(periodo);
   const snap = await getDocs(query(collection(db, "evaluaciones_personal"), where("empleadoId", "==", empleadoId)));
   return snap.docs
+    // Los diplomas/certificados viven en la misma colección pero no son parte de este respaldo.
+    .filter((d) => d.data().categoria !== "diploma")
     .map((d) => {
       const x = d.data() as { tipo?: string; fecha?: unknown; notas?: string; nota?: number };
       return { id: d.id, tipo: x.tipo ?? "", fecha: aIso(x.fecha), notas: x.notas ?? "", ...(typeof x.nota === "number" ? { nota: x.nota } : {}) };
