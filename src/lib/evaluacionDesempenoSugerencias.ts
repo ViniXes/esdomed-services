@@ -28,7 +28,8 @@ export const CRITERIOS = {
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
   turnosVaciosPct: { D: 5, C: 15, B: 30 },
   // Factor 5 (disciplina): olvidos de marca + días sin marca + salidas antes de hora. Las llegadas
-  // tarde NO cuentan aquí: ya se valoran en el factor 2. D ≤ 0, C ≤ 3, B ≤ 8, A > 8 (o con amonestación).
+  // tarde NO cuentan aquí: ya se valoran en el factor 2. D ≤ 0, C ≤ 3, B ≤ 8, A > 8. Las
+  // amonestaciones ponen tope: ver topeAmonestaciones().
   incidenciasMarcacion: { D: 0, C: 3, B: 8 },
 } as const;
 
@@ -38,7 +39,7 @@ export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] 
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
-  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "D: 0 · C: 1–3 · B: 4–8 · A: más de 8 o con amonestación" },
+  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0 · C: 1–3 · B: 4–8 · A: más de 8. Amonestación oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
   { factor: 7, dato: "Quejas o amonestaciones en el archivero, como alerta", regla: "A criterio del jefe" },
 ];
@@ -49,6 +50,22 @@ const mayorEsMejor = (v: number, u: { D: number; C: number; B: number }): Opcion
 const esAmonestacion = (tipo: string) => /amonest/i.test(tipo);
 
 /**
+ * Tope que dejan las amonestaciones del semestre en el factor 5 (regla de la
+ * jefatura): una oral → máx. C; una escrita (la más grave, lleva copia a RRHH)
+ * → máx. B; más de una → A. Escrita = el tipo dice "escrita"; lo demás (oral,
+ * verbal, interna) cuenta como oral.
+ */
+function topeAmonestaciones(tipos: string[]): { tope: Opcion | null; texto: string } {
+  if (!tipos.length) return { tope: null, texto: "" };
+  if (tipos.length > 1) return { tope: "A", texto: `${tipos.length} amonestaciones` };
+  const escrita = /escrit/i.test(tipos[0]);
+  return escrita ? { tope: "B", texto: "1 amonestación escrita" } : { tope: "C", texto: "1 amonestación oral" };
+}
+
+/** La peor de dos letras (A es la peor). */
+const peor = (a: Opcion, b: Opcion): Opcion => (a < b ? a : b);
+
+/**
  * Motivos en una línea, solo el dato y su cifra: la regla ya se ve en el globito
  * y en "Ver criterios", así que aquí no se repite la explicación.
  */
@@ -56,7 +73,8 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   const sin = (motivo: string): Sugerencia => ({ letra: null, motivo });
   if (!r) return {};
   const n = (x: number, uno: string, varios: string) => `${x} ${x === 1 ? uno : varios}`;
-  const amonestaciones = (r.archivero ?? []).filter((e) => esAmonestacion(e.tipo)).length;
+  const tiposAmon = (r.archivero ?? []).filter((e) => esAmonestacion(e.tipo)).map((e) => e.tipo);
+  const amonestaciones = tiposAmon.length;
   const conNota = (r.archivero ?? []).filter((e) => typeof e.nota === "number");
   const notas = conNota.length
     ? ` · Nota ${conNota.map((e) => `${e.nota}${(e.nota as number) < NOTA_MINIMA_EVALUACION ? " (reprobada)" : ""}`).join(", ")}`
@@ -97,16 +115,20 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
     out[4] = { letra: menorEsMejor(pct, CRITERIOS.turnosVaciosPct), motivo: `${plan.turnosSinActividad} de ${plan.turnosProgramados} turnos sin registro (${pct}%)` };
   }
 
-  // 5. Normas (disciplina): olvidos + sin marca + salidas antes; amonestación → A.
+  // 5. Normas (disciplina): olvidos + sin marca + salidas antes; las amonestaciones
+  // ponen un tope (oral máx. C, escrita máx. B, más de una A) y manda la peor letra.
   const faltas = m.omisiones + m.ausencias + (m.salidasAntes ?? 0);
+  const amon = topeAmonestaciones(tiposAmon);
   const textoAmon = amonestaciones ? n(amonestaciones, "amonestación", "amonestaciones") : "";
-  if (!m.meses && !amonestaciones) out[5] = sin("Sin reporte del reloj");
+  if (!m.meses && !amon.tope) out[5] = sin("Sin reporte del reloj");
   else {
+    const porReloj: Opcion | null = m.meses ? menorEsMejor(faltas, CRITERIOS.incidenciasMarcacion) : null;
+    const letra = porReloj && amon.tope ? peor(porReloj, amon.tope) : (porReloj ?? amon.tope ?? "D");
     const partes = [
-      textoAmon,
+      amon.tope ? `${amon.texto} (máx. ${amon.tope})` : "",
       m.meses ? `${n(faltas, "falta", "faltas")} (${m.omisiones} olvido, ${m.ausencias} sin marca, ${m.salidasAntes ?? 0} salió antes)` : "Sin reporte del reloj",
     ].filter(Boolean);
-    out[5] = { letra: amonestaciones ? "A" : m.meses ? menorEsMejor(faltas, CRITERIOS.incidenciasMarcacion) : "D", motivo: partes.join(" · ") };
+    out[5] = { letra, motivo: partes.join(" · ") };
   }
 
   // 6. Discreción
