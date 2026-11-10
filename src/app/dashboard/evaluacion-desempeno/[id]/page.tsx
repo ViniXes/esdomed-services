@@ -7,7 +7,7 @@
 // Guardar escribe la evaluación y actualiza la ficha. "Vista de impresión"
 // muestra el formulario MINSAL de 4 hojas para imprimir y firmar.
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -378,7 +378,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                 {f.numero}. {f.titulo}
               </p>
               <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">{f.definicion}</p>
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2" data-fila-factor>
               <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {OPCIONES.map((o) => {
                   const activa = borrador.respuestas[f.numero] === o;
@@ -744,20 +744,64 @@ function SelectorSemestre({ value, onChange }: { value: string; onChange: (v: st
 
 /**
  * Globito junto a las casillas de cada factor: por qué se sugiere esa letra
- * (dato de Services + regla). Se abre al pasar el mouse o al tocarlo.
+ * (dato de Services + regla). Se abre al pasar el mouse o al tocarlo y NUNCA
+ * tapa los literales: sale a la derecha si hay espacio; si no, debajo de la
+ * fila completa de casillas.
  */
+const ANCHO_GLOBO = 288;
+
 function GloboPorque({ factor, sugerencia, cargado }: { factor: number; sugerencia?: Sugerencia; cargado: boolean }) {
-  const [abierto, setAbierto] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [fijo, setFijo] = useState(false); // abierto con clic/toque (no solo hover)
   const regla = CRITERIOS_TEXTO.find((c) => c.factor === factor);
   const letra = sugerencia?.letra ?? null;
+
+  const abrir = () => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const b = btn.getBoundingClientRect();
+    if (window.innerWidth - b.right >= ANCHO_GLOBO + 16) {
+      setPos({ left: b.right + 8, top: b.top });
+    } else {
+      const fila = (btn.closest("[data-fila-factor]") as HTMLElement | null)?.getBoundingClientRect() ?? b;
+      setPos({ left: Math.max(8, fila.right - ANCHO_GLOBO), top: fila.bottom + 8 });
+    }
+  };
+  const cerrar = () => {
+    setPos(null);
+    setFijo(false);
+  };
+
+  // Posición fija en pantalla: al desplazarse o cambiar el tamaño se cierra.
+  useEffect(() => {
+    if (!pos) return;
+    const fuera = () => cerrar();
+    window.addEventListener("scroll", fuera, true);
+    window.addEventListener("resize", fuera);
+    return () => {
+      window.removeEventListener("scroll", fuera, true);
+      window.removeEventListener("resize", fuera);
+    };
+  }, [pos]);
+
   return (
-    <div className="group relative shrink-0" onMouseLeave={() => setAbierto(false)}>
+    <div className="relative shrink-0">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setAbierto((v) => !v)}
-        onBlur={() => setAbierto(false)}
-        onKeyDown={(e) => e.key === "Escape" && setAbierto(false)}
-        aria-expanded={abierto}
+        onMouseEnter={abrir}
+        onMouseLeave={() => !fijo && setPos(null)}
+        onClick={() => {
+          if (fijo) cerrar();
+          else {
+            abrir();
+            setFijo(true);
+          }
+        }}
+        onBlur={cerrar}
+        onKeyDown={(e) => e.key === "Escape" && cerrar()}
+        aria-expanded={!!pos}
         aria-label={`Por qué se sugiere esta evaluación en el factor ${factor}`}
         className={`relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
           letra
@@ -772,30 +816,31 @@ function GloboPorque({ factor, sugerencia, cargado }: { factor: number; sugerenc
           </span>
         )}
       </button>
-      <div
-        role="tooltip"
-        className={`absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900 ${
-          abierto ? "block" : "hidden group-hover:block"
-        }`}
-      >
-        <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
-          {!cargado ? "¿Por qué esta evaluación?" : letra ? `¿Por qué se sugiere ${letra}?` : "Sin sugerencia automática"}
-        </p>
-        <p className="mt-1 text-xs leading-snug text-slate-600 dark:text-slate-300">
-          {!cargado ? "Carga el respaldo de Services (arriba) para ver el dato que sustenta este factor." : sugerencia?.motivo ?? "Sin datos para este factor."}
-        </p>
-        {regla && (
-          <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-            <p>
-              <span className="font-semibold text-slate-600 dark:text-slate-300">Dato:</span> {regla.dato}
-            </p>
-            <p>
-              <span className="font-semibold text-slate-600 dark:text-slate-300">Regla:</span> {regla.regla}
-            </p>
-          </div>
-        )}
-        <p className="mt-2 text-[10px] text-slate-400">Es una sugerencia: la letra la decide el evaluador.</p>
-      </div>
+      {pos && (
+        <div
+          role="tooltip"
+          style={{ position: "fixed", left: pos.left, top: pos.top, width: ANCHO_GLOBO }}
+          className="z-50 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900"
+        >
+          <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+            {!cargado ? "¿Por qué esta evaluación?" : letra ? `¿Por qué se sugiere ${letra}?` : "Sin sugerencia automática"}
+          </p>
+          <p className="mt-1 text-xs leading-snug text-slate-600 dark:text-slate-300">
+            {!cargado ? "Carga el respaldo de Services (arriba) para ver el dato que sustenta este factor." : sugerencia?.motivo ?? "Sin datos para este factor."}
+          </p>
+          {regla && (
+            <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+              <p>
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Dato:</span> {regla.dato}
+              </p>
+              <p>
+                <span className="font-semibold text-slate-600 dark:text-slate-300">Regla:</span> {regla.regla}
+              </p>
+            </div>
+          )}
+          <p className="mt-2 text-[10px] text-slate-400">Es una sugerencia: la letra la decide el evaluador.</p>
+        </div>
+      )}
     </div>
   );
 }
