@@ -1,0 +1,257 @@
+"use client";
+
+import { useState } from "react";
+import { Database, FileWarning, Fingerprint, Plus, RefreshCw, TrendingUp, Undo2 } from "lucide-react";
+import {
+  METRICAS_PRODUCTIVIDAD,
+  cargarArchivero,
+  cargarRespaldo,
+  type EntradaArchivero,
+  type ResumenRespaldo,
+} from "@/lib/evaluacionDesempenoRespaldo";
+import type { IncidenteCritico } from "@/lib/evaluacionDesempeno";
+
+interface Props {
+  empleadoId: string;
+  nombre: string;
+  periodo: string;
+  esAdministrativo: boolean;
+  nombresEquipo: string[];
+  respaldo: ResumenRespaldo | null;
+  onRespaldo: (r: ResumenRespaldo) => void;
+  onAgregarIncidente: (i: IncidenteCritico) => void;
+}
+
+/**
+ * Trazabilidad de ESDOMED Services para respaldar la evaluación: productividad
+ * del semestre contra el promedio del equipo operativo, archivero de
+ * amonestaciones, marcaciones publicadas y altas revertidas. Cada hallazgo puede
+ * pasarse al Registro de Incidentes Críticos (página 3) con un clic.
+ */
+export function RespaldoServices({ empleadoId, nombre, periodo, esAdministrativo, nombresEquipo, respaldo, onRespaldo, onAgregarIncidente }: Props) {
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState("");
+  const [archivero, setArchivero] = useState<EntradaArchivero[] | null>(null);
+  const [agregados, setAgregados] = useState<Set<string>>(new Set());
+
+  const cargar = async () => {
+    setCargando(true);
+    setError("");
+    try {
+      const [r, a] = await Promise.all([cargarRespaldo({ empleadoId, nombre, periodo, nombresEquipo }), cargarArchivero(empleadoId, periodo)]);
+      onRespaldo(r);
+      setArchivero(a);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cargar el respaldo.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const agregar = (clave: string, inc: IncidenteCritico) => {
+    onAgregarIncidente(inc);
+    setAgregados((s) => new Set(s).add(clave));
+  };
+
+  const botonIncidente = (clave: string, inc: IncidenteCritico) => (
+    <BotonAgregar hecho={agregados.has(clave)} onClick={() => agregar(clave, inc)} />
+  );
+
+  const hoy = new Date().toISOString().slice(0, 10);
+
+  return (
+    <section className="rounded-2xl border border-cyan-200 bg-cyan-50/40 p-4 md:p-5 dark:border-cyan-900 dark:bg-cyan-950/20">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">
+            <Database size={15} /> Respaldo desde ESDOMED Services
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Trazabilidad del periodo {periodo} para sustentar la evaluación. Es apoyo para el evaluador: no marca factores por sí solo.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={cargar}
+          disabled={cargando}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+        >
+          <RefreshCw size={14} className={cargando ? "animate-spin" : ""} />
+          {cargando ? "Cargando…" : respaldo ? "Actualizar" : "Cargar respaldo"}
+        </button>
+      </div>
+
+      {esAdministrativo && (
+        <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          Personal administrativo: su trabajo (sistema, calidad, coordinación) no se registra como productividad en Services, así que esas cifras no
+          sirven para evaluarlo. Sí aplican el archivero y las marcaciones.
+        </p>
+      )}
+      {error && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+
+      {respaldo && (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {/* Productividad */}
+          <Bloque icon={TrendingUp} titulo="Productividad del periodo" factor="Factores 1 y 3" atenuado={esAdministrativo}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
+                  <th className="pb-1 font-semibold">Actividad</th>
+                  <th className="pb-1 text-right font-semibold">Persona</th>
+                  <th className="pb-1 text-right font-semibold">Prom. equipo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {METRICAS_PRODUCTIVIDAD.map((m) => (
+                  <tr key={m.id}>
+                    <td className="py-1 text-slate-600 dark:text-slate-300">{m.label}</td>
+                    <td className="py-1 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.productividad[m.id]}</td>
+                    <td className="py-1 text-right tabular-nums text-slate-500">{respaldo.promedioEquipo[m.id]}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td className="pt-1.5 font-semibold text-slate-700 dark:text-slate-200">Total</td>
+                  <td className="pt-1.5 text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.totalPersona}</td>
+                  <td className="pt-1.5 text-right tabular-nums text-slate-500">{respaldo.promedioTotalEquipo}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-2 text-[11px] text-slate-400">
+              Promedio entre el personal operativo con actividad. No incluye las hojas de Drive (carpetas, actualizaciones, consentimientos).
+            </p>
+          </Bloque>
+
+          {/* Marcaciones */}
+          <Bloque icon={Fingerprint} titulo="Marcaciones (reloj)" factor="Factor 5 · puntualidad">
+            {respaldo.marcaciones.meses === 0 ? (
+              <p className="text-xs text-slate-500">No hay meses publicados de este periodo en Inconsistencias de marcación.</p>
+            ) : (
+              <>
+                <ul className="grid grid-cols-2 gap-2 text-xs">
+                  <Dato label="Meses publicados" valor={respaldo.marcaciones.meses} />
+                  <Dato label="Días con incidencia" valor={respaldo.marcaciones.diasConIncidencia} />
+                  <Dato label="Días con minutos descontados" valor={respaldo.marcaciones.tardanzas} />
+                  <Dato label="Minutos descontados" valor={respaldo.marcaciones.minutos} />
+                  <Dato label="Olvidó marcar" valor={respaldo.marcaciones.omisiones} />
+                  <Dato label="Días sin ninguna marca" valor={respaldo.marcaciones.ausencias} />
+                </ul>
+                {respaldo.marcaciones.diasConIncidencia > 0 && (
+                  <div className="mt-2 flex justify-end">
+                    {botonIncidente("marcaciones", {
+                        fecha: hoy,
+                        factor: 5,
+                        tipo: "D",
+                        descripcion: `Marcaciones ${periodo}: ${respaldo.marcaciones.diasConIncidencia} días con incidencia (${respaldo.marcaciones.minutos} min descontados, ${respaldo.marcaciones.omisiones} omisiones, ${respaldo.marcaciones.ausencias} sin marca).`,
+                      })}
+                  </div>
+                )}
+              </>
+            )}
+          </Bloque>
+
+          {/* Archivero */}
+          <Bloque icon={FileWarning} titulo="Archivero: evaluaciones y amonestaciones" factor="Factores 5 y 7">
+            {!archivero || archivero.length === 0 ? (
+              <p className="text-xs text-slate-500">Sin registros en el archivero de esta persona dentro del periodo.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {archivero.map((e) => {
+                  const amonestacion = /amonest/i.test(e.tipo);
+                  return (
+                    <li key={e.id} className="flex items-start gap-2 text-xs">
+                      <span
+                        className={`mt-0.5 shrink-0 rounded-full border px-1.5 py-px text-[10px] font-semibold ${
+                          amonestacion
+                            ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+                            : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        }`}
+                      >
+                        {e.tipo}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="tabular-nums text-slate-500">{e.fecha}</p>
+                        {e.notas && <p className="text-slate-700 dark:text-slate-200">{e.notas}</p>}
+                      </div>
+                      {botonIncidente(`arch-${e.id}`, { fecha: e.fecha, factor: amonestacion ? 5 : 1, tipo: amonestacion ? "D" : "F", descripcion: `${e.tipo}${e.notas ? `: ${e.notas}` : ""}` })}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Bloque>
+
+          {/* Altas revertidas */}
+          <Bloque icon={Undo2} titulo="Altas efectivas revertidas" factor="Factor 1 · calidad" atenuado={esAdministrativo}>
+            {respaldo.altasRevertidas.length === 0 ? (
+              <p className="text-xs text-slate-500">Ninguna alta procesada por esta persona se revirtió en el periodo.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {respaldo.altasRevertidas.map((a, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-slate-700 dark:text-slate-200">
+                        <span className="tabular-nums text-slate-500">{a.fecha}</span> · {a.paciente}
+                      </p>
+                      {a.nota && <p className="text-slate-500">{a.nota}</p>}
+                    </div>
+                    {botonIncidente(`rev-${i}`, { fecha: a.fecha, factor: 1, tipo: "D", descripcion: `Alta efectiva revertida: ${a.paciente}${a.nota ? ` (${a.nota})` : ""}` })}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-[11px] text-slate-400">Indicio para revisar: la reversión puede deberse a causas ajenas a quien procesó.</p>
+          </Bloque>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Bloque({
+  icon: Icon,
+  titulo,
+  factor,
+  atenuado,
+  children,
+}: {
+  icon: typeof Database;
+  titulo: string;
+  factor: string;
+  atenuado?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 ${atenuado ? "opacity-60" : ""}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-100">
+          <Icon size={14} className="text-blue-600 dark:text-blue-400" /> {titulo}
+        </p>
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{factor}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Dato({ label, valor }: { label: string; valor: number }) {
+  return (
+    <li className="rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-slate-800/60">
+      <p className="text-[10px] text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{valor}</p>
+    </li>
+  );
+}
+
+function BotonAgregar({ hecho, onClick }: { hecho: boolean; onClick: () => void }) {
+  return hecho ? (
+    <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">Agregado</span>
+  ) : (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/50"
+    >
+      <Plus size={12} /> Incidente
+    </button>
+  );
+}

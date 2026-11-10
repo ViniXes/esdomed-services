@@ -894,6 +894,17 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ─── Evaluación del desempeño (formulario MINSAL) ─────────────────────────
+    // Solo el admin (superusuario) evalúa, consulta y guarda. La ficha guarda
+    // los datos laborales usados (DUI, partida, sueldo…) para precargar la
+    // siguiente evaluación de esa persona; por el sueldo, tampoco la ve nadie más.
+    match /evaluaciones_desempeno/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /evaluaciones_desempeno_fichas/{uid} {
+      allow read, write: if isAdmin();
+    }
+
     // ─── Inconsistencias de marcación (estadísticas) ──────────────────────────
     // Espejo mensual del "Reporte Descuentos" de RRHH (doc id = "YYYY-MM").
     // Trae descuentos por persona: por ahora SOLO el admin lo ve y lo carga.
