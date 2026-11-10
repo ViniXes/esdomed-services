@@ -1,7 +1,7 @@
 // Respaldo de la evaluación del desempeño con la trazabilidad que ya existe en
 // ESDOMED Services. Pensado para el personal OPERATIVO: su trabajo queda
 // registrado aquí (expedientes, altas, defunciones, SIMMOW, impresiones,
-// traslados). El administrativo hace trabajo que no se mide como productividad
+// …; los traslados no, porque los procesan los coordinadores). El administrativo hace trabajo que no se mide como productividad
 // en el sistema (desarrollo, calidad, coordinación): para él solo aplican el
 // archivero de amonestaciones y las marcaciones.
 //
@@ -11,7 +11,7 @@
 
 import { collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
+import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion } from "@/types";
 import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
 import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
 import { desgloseMinutos, tipoIncidencia } from "@/lib/inconsistenciasMarcacion/analisis";
@@ -40,7 +40,6 @@ export const METRICAS_PRODUCTIVIDAD = [
   { id: "certificados", label: "Certificados entregados" },
   { id: "simmow", label: "Egresos digitados SIMMOW" },
   { id: "documentos", label: "Documentos impresos/entregados" },
-  { id: "traslados", label: "Traslados procesados" },
 ] as const;
 
 export type MetricaId = (typeof METRICAS_PRODUCTIVIDAD)[number]["id"];
@@ -77,6 +76,16 @@ export interface ResumenRespaldo {
     turnosSinActividad: number;   // turnos en los que no registró nada en Services
     actividadesPorTurno: number;  // total del semestre ÷ turnos programados
     promedioEquipoPorTurno: number;
+    /** Grupo de trabajo con el que se compara (Grupos 1 a 4, Equipo de emergencia…). */
+    grupo?: string;
+    /** Compañeros de ese grupo con actividad registrada (sin contar a la persona). */
+    companerosGrupo?: number;
+    /** Promedio de actividades por turno de esos compañeros. */
+    promedioGrupoPorTurno?: number;
+    /** El que más registró por turno en su grupo (incluida la persona): es el 100% del factor 3. */
+    maximoGrupoPorTurno?: number;
+    /** El que más registró por turno en todo el equipo (respaldo si no hay grupo). */
+    maximoEquipoPorTurno?: number;
     porMes: MesRespaldo[];
   };
 }
@@ -162,7 +171,7 @@ export async function cargarRespaldo(params: {
   const fin = Timestamp.fromDate(rango.fin);
   const entre = (campo: string, col: string) => getDocs(query(collection(db, col), where(campo, ">=", ini), where(campo, "<=", fin)));
 
-  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, traslados, revertidas] = await Promise.all([
+  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, revertidas] = await Promise.all([
     entre("creadoEn", "control_ingresos"),
     entre("confirmadoEn", "notificaciones_fallecidos"),
     entre("entregaCertificadoEn", "notificaciones_fallecidos"),
@@ -170,7 +179,6 @@ export async function cargarRespaldo(params: {
     entre("procesadoEn", "notificaciones_altas"),
     entre("digitaSimmowEn", "notificaciones_altas"),
     entre("impresoEn", "solicitudes_impresion"),
-    entre("actualizadoEn", "traslados"),
     entre("revertidoEn", "notificaciones_altas"),
   ]);
 
@@ -187,7 +195,6 @@ export async function cargarRespaldo(params: {
       return m;
     })(),
     documentos: contarPor(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre),
-    traslados: contarPor(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre),
   };
 
   const yo = normalizar(params.nombre);
@@ -256,7 +263,6 @@ export async function cargarRespaldo(params: {
     ...registros(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow, (a) => a.digitaSimmowEn),
     ...registros(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
     ...registros(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
-    ...registros(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
   ];
   const marcPorMes = new Map(
     meses.map((m) => {
@@ -370,6 +376,8 @@ async function resumenPlan(p: {
 
   const personas = [p.yo, ...p.equipo.filter((e) => e.uid !== p.yo.uid)];
   const turnosDe = new Map<string, number>();
+  // Turnos de cada persona por grupo de comparación, para saber su grupo principal.
+  const turnosPorGrupo = new Map<string, Map<string, number>>();
   let sinActividad = 0;
   const regs = [...p.registrosYo].sort((a, b) => a - b);
   const hayEntre = (a: number, b: number) => {
@@ -408,12 +416,16 @@ async function resumenPlan(p: {
       const esYo = persona.uid === p.yo.uid;
       if (esYo) mes.enPlan = true;
       const clave = normalizar(persona.nombre);
+      const grupo = grupoComparacion(fila.grupo);
       for (let dia = 1; dia <= diasMes; dia++) {
         const fecha = new Date(anio, m - 1, dia);
         if (fecha > limite || fecha < p.rango.inicio) continue;
         const est = estadoFilaEnDia(fila, dia);
         if (est.tipo === "turno") {
           turnosDe.set(clave, (turnosDe.get(clave) ?? 0) + 1);
+          const g = turnosPorGrupo.get(clave) ?? new Map<string, number>();
+          g.set(grupo, (g.get(grupo) ?? 0) + 1);
+          turnosPorGrupo.set(clave, g);
           if (esYo) {
             mes.turnos++;
             const ini = fecha.getTime() + (est.inicio ?? 0) * 60000;
@@ -437,11 +449,41 @@ async function resumenPlan(p: {
   };
   const tasasEquipo = [...turnosDe.keys()].map(porTurno).filter((t) => t > 0);
   const r1 = (x: number) => Math.round(x * 10) / 10;
+  const promedio = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  // Grupo principal = donde tuvo más turnos en el semestre.
+  const principal = (n: string) => [...(turnosPorGrupo.get(n) ?? new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const miGrupo = principal(yoN);
+  const tasasGrupo = miGrupo
+    ? [...turnosDe.keys()].filter((n) => n !== yoN && principal(n) === miGrupo).map(porTurno).filter((t) => t > 0)
+    : [];
+  const maximo = (xs: number[]) => (xs.length ? Math.max(...xs) : 0);
   return {
     turnosProgramados: turnosDe.get(yoN) ?? 0,
     turnosSinActividad: sinActividad,
     actividadesPorTurno: r1(porTurno(yoN)),
-    promedioEquipoPorTurno: r1(tasasEquipo.length ? tasasEquipo.reduce((a, b) => a + b, 0) / tasasEquipo.length : 0),
+    promedioEquipoPorTurno: r1(promedio(tasasEquipo)),
+    maximoEquipoPorTurno: r1(maximo(tasasEquipo)),
+    ...(miGrupo
+      ? {
+          grupo: miGrupo,
+          companerosGrupo: tasasGrupo.length,
+          promedioGrupoPorTurno: r1(promedio(tasasGrupo)),
+          maximoGrupoPorTurno: r1(maximo([...tasasGrupo, porTurno(yoN)])),
+        }
+      : {}),
     porMes,
   };
+}
+
+/**
+ * Grupo con el que se compara la productividad. Los Grupos 1 a 4 hacen el mismo
+ * trabajo en distinto turno (3 personas cada uno): se comparan juntos. Apoyo
+ * diurno / emergencia se compara con el Equipo de emergencia.
+ */
+function grupoComparacion(grupo?: string): string {
+  const g = (grupo ?? "").trim();
+  if (/^grupo\s*\d/i.test(g)) return "Grupos 1 a 4";
+  if (/emergencia/i.test(g)) return "Equipo de emergencia";
+  if (/consulta/i.test(g)) return "Consulta Externa";
+  return g || "Sin grupo";
 }

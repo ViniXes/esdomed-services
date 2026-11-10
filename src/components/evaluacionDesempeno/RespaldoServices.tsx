@@ -132,25 +132,13 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
       {respaldo && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {/* Productividad */}
-          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factores 1 y 3" atenuado={esAdministrativo} ancho>
-            {respaldo.plan && respaldo.plan.turnosProgramados > 0 && respaldo.plan.promedioEquipoPorTurno > 0 && (
-              <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
-                <p className="text-xs text-slate-600 dark:text-slate-300">
-                  Por cada turno hace <strong className="text-slate-900 dark:text-slate-100">{respaldo.plan.actividadesPorTurno}</strong> actividades; el
-                  promedio del equipo es <strong className="text-slate-900 dark:text-slate-100">{respaldo.plan.promedioEquipoPorTurno}</strong>.
-                </p>
-                <div className="mt-1.5">
-                  <Comparacion persona={respaldo.plan.actividadesPorTurno} equipo={respaldo.plan.promedioEquipoPorTurno} grande />
-                </div>
-              </div>
-            )}
-            <table className="w-full text-xs">
+          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 3 · metas" atenuado={esAdministrativo} ancho>
+            <ProductividadPorTurno plan={respaldo.plan} nombre={primerNombre(nombre)} />
+            <table className="mt-3 w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
-                  <th className="pb-1 font-semibold">Actividad (total del semestre)</th>
-                  <th className="pb-1 text-right font-semibold">{primerNombre(nombre)}</th>
-                  <th className="pb-1 text-right font-semibold">Promedio equipo</th>
-                  <th className="pb-1 text-right font-semibold" />
+                  <th className="pb-1 font-semibold">Lo que registró en Services en el semestre</th>
+                  <th className="pb-1 text-right font-semibold">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -158,18 +146,15 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                   <tr key={m.id}>
                     <td className="py-1 text-slate-600 dark:text-slate-300">{m.label}</td>
                     <td className="py-1 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.productividad[m.id]}</td>
-                    <td className="py-1 text-right tabular-nums text-slate-500">{Math.round(respaldo.promedioEquipo[m.id])}</td>
-                    <td className="py-1 pl-2 text-right">
-                      <Comparacion persona={respaldo.productividad[m.id]} equipo={respaldo.promedioEquipo[m.id]} />
-                    </td>
                   </tr>
                 ))}
+                <tr>
+                  <td className="pt-1.5 font-semibold text-slate-700 dark:text-slate-200">Total</td>
+                  <td className="pt-1.5 text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">{respaldo.totalPersona}</td>
+                </tr>
               </tbody>
             </table>
-            <p className="mt-2 text-[11px] text-slate-400">
-              &quot;Promedio equipo&quot; = lo que hizo en promedio cada compañero operativo en el semestre. Arriba o abajo cuenta a partir de 10% de
-              diferencia. No incluye las hojas de Drive.
-            </p>
+            <p className="mt-2 text-[11px] text-slate-400">No incluye las hojas de Drive (carpetas, actualizaciones, consentimientos).</p>
           </Bloque>
 
           {/* Asistencia mes por mes */}
@@ -415,19 +400,57 @@ function Celda({ n, alerta }: { n: number; alerta?: boolean }) {
   );
 }
 
-/** Arriba / en el promedio / abajo, con 10% de margen. */
-function Comparacion({ persona, equipo, grande }: { persona: number; equipo: number; grande?: boolean }) {
-  if (!equipo) return <span className="text-[10px] text-slate-400">—</span>;
-  const dif = Math.round((persona / equipo - 1) * 100);
-  const [texto, cls] =
-    Math.abs(dif) < 10
-      ? ["En el promedio", "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"]
-      : dif > 0
-        ? [`Arriba ${dif}%`, "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"]
-        : [`Abajo ${-dif}%`, "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"];
+const ESCALA_PRODUCTIVIDAD: { letra: string; texto: string; desde: number }[] = [
+  { letra: "D", texto: "80% o más del mejor", desde: 80 },
+  { letra: "C", texto: "60–79%", desde: 60 },
+  { letra: "B", texto: "40–59%", desde: 40 },
+  { letra: "A", texto: "menos de 40%", desde: -Infinity },
+];
+
+/**
+ * Factor 3 explicado en simple: actividades por turno de la persona como % del
+ * que más registró en su grupo (= 100%), y la escala con su letra resaltada.
+ */
+function ProductividadPorTurno({ plan, nombre }: { plan: ResumenRespaldo["plan"]; nombre: string }) {
+  if (!plan?.turnosProgramados) {
+    return <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la comparación por turno.</p>;
+  }
+  const conGrupo = !!plan.companerosGrupo && !!plan.maximoGrupoPorTurno;
+  const base = conGrupo ? (plan.maximoGrupoPorTurno as number) : (plan.maximoEquipoPorTurno ?? 0);
+  const quien = conGrupo ? (plan.grupo as string) : "todo el equipo";
+  if (!base) return <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la comparación.</p>;
+  const pct = Math.round((plan.actividadesPorTurno / base) * 100);
+  const actual = ESCALA_PRODUCTIVIDAD.find((e) => pct >= e.desde)?.letra;
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full border font-semibold ${grande ? "px-2.5 py-0.5 text-xs" : "px-1.5 py-px text-[10px]"} ${cls}`}>
-      {texto}
-    </span>
+    <div className="rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-slate-800/60">
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+        <strong>Cómo se calcula:</strong> lo que registró en Services en el semestre (sin traslados, que son de coordinadores) ÷ los turnos que tuvo
+        en el plan. El que más registró por turno en <strong>{quien}</strong> es el 100%, y cada quien se mide contra él. Se compara solo dentro de su
+        grupo, así un área de poco volumen no se mide contra una de mucha demanda.
+      </p>
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+        <span>
+          {nombre}: <strong className="tabular-nums">{plan.actividadesPorTurno}</strong> <span className="text-xs text-slate-500">por turno</span>
+        </span>
+        <span>
+          El mejor de {quien}: <strong className="tabular-nums">{base}</strong> <span className="text-xs text-slate-500">por turno</span>
+        </span>
+        <span className="font-bold tabular-nums">= {pct}% del mejor</span>
+      </div>
+      <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+        {ESCALA_PRODUCTIVIDAD.map((e) => (
+          <li
+            key={e.letra}
+            className={`rounded-full border px-2 py-0.5 ${
+              e.letra === actual
+                ? "border-blue-500 bg-blue-50 font-semibold text-blue-800 dark:border-blue-400 dark:bg-blue-950/50 dark:text-blue-200"
+                : "border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400"
+            }`}
+          >
+            {e.letra}: {e.texto}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

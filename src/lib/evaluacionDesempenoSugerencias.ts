@@ -23,23 +23,24 @@ export const CRITERIOS = {
   errores: { D: 0, C: 2, B: 5 },
   // Factor 2: llegadas tarde en el semestre (reloj). D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (regla de la jefatura).
   llegadasTarde: { D: 5, C: 7, B: 9 },
-  // Factor 3: actividades por turno, en % del promedio del equipo. D ≥ 110, C ≥ 90, B ≥ 60, A < 60.
-  productividadPct: { D: 110, C: 90, B: 60 },
+  // Factor 3: actividades por turno, en % del que más registró en su grupo (= 100%).
+  // D ≥ 80, C ≥ 60, B ≥ 40, A < 40.
+  productividadPct: { D: 80, C: 60, B: 40 },
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
   turnosVaciosPct: { D: 5, C: 15, B: 30 },
   // Factor 5 (disciplina): olvidos de marca + días sin marca + salidas antes de hora. Las llegadas
-  // tarde NO cuentan aquí: ya se valoran en el factor 2. D ≤ 0, C ≤ 3, B ≤ 8, A > 8. Las
+  // tarde NO cuentan aquí: ya se valoran en el factor 2. D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (igual que las llegadas tarde). Las
   // amonestaciones ponen tope: ver topeAmonestaciones().
-  incidenciasMarcacion: { D: 0, C: 3, B: 8 },
+  incidenciasMarcacion: { D: 5, C: 7, B: 9 },
 } as const;
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
   { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas) y nota del examen del archivero", regla: "D: 0 · C: 1–2 · B: 3–5 · A: más de 5. Examen reprobado (menos de 7): máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
-  { factor: 3, dato: "Actividades por turno trabajado comparadas con el promedio del equipo", regla: "D: 10% o más arriba · C: en el promedio · B: hasta 40% abajo · A: más de 40% abajo" },
+  { factor: 3, dato: "Actividades registradas en Services por turno (sin traslados), como % del que más registró en su grupo", regla: "D: 80% o más del mejor · C: 60–79% · B: 40–59% · A: menos de 40%" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
-  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0 · C: 1–3 · B: 4–8 · A: más de 8. Amonestación oral: máx. C · escrita: máx. B · más de una: A" },
+  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
   { factor: 7, dato: "Quejas o amonestaciones en el archivero, como alerta", regla: "A criterio del jefe" },
 ];
@@ -109,14 +110,19 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   // 3. Cumplimiento de metas
   if (esAdministrativo) out[3] = sin("Administrativo: sin datos en Services");
   else if (!plan?.turnosProgramados) out[3] = sin("Sin turnos en el plan");
-  else if (!plan.promedioEquipoPorTurno) out[3] = sin("El equipo no tiene actividad para comparar");
   else {
-    const pct = Math.round((plan.actividadesPorTurno / plan.promedioEquipoPorTurno) * 100);
-    const dif = pct - 100;
-    out[3] = {
-      letra: mayorEsMejor(pct, CRITERIOS.productividadPct),
-      motivo: `${plan.actividadesPorTurno} por turno vs ${plan.promedioEquipoPorTurno} del equipo (${dif >= 0 ? "+" : ""}${dif}%)`,
-    };
+    // El 100% es quien más registró por turno en su grupo; si no hay compañeros en él, en todo el equipo.
+    const conGrupo = !!plan.companerosGrupo && !!plan.maximoGrupoPorTurno;
+    const base = conGrupo ? (plan.maximoGrupoPorTurno as number) : (plan.maximoEquipoPorTurno ?? 0);
+    const quien = conGrupo ? plan.grupo : "el equipo";
+    if (!base) out[3] = sin("Vuelve a cargar el respaldo");
+    else {
+      const pct = Math.round((plan.actividadesPorTurno / base) * 100);
+      out[3] = {
+        letra: mayorEsMejor(pct, CRITERIOS.productividadPct),
+        motivo: `${pct}% del mejor de ${quien} (${plan.actividadesPorTurno} vs ${base} por turno)`,
+      };
+    }
   }
 
   // 4. Organización
