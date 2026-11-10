@@ -629,21 +629,32 @@ function SelectorPersona({ onElegir }: { onElegir: (p: Persona, periodo: string)
   const [personal, setPersonal] = useState<Persona[] | null>(null);
   const [error, setError] = useState("");
   const [busqueda, setBusqueda] = useState("");
-  const [periodo, setPeriodo] = useState(periodoSemestral());
+  // Desde el archivo (?periodo=…&empleado=…): llega con el semestre y, si
+  // viene de "Faltan por evaluar", con la persona ya elegida.
+  const [periodo, setPeriodo] = useState(() => {
+    if (typeof window === "undefined") return periodoSemestral();
+    const p = new URLSearchParams(window.location.search).get("periodo");
+    return p ? armarPeriodo(partirPeriodo(p).semestre, partirPeriodo(p).anio) : periodoSemestral();
+  });
 
   useEffect(() => {
     let cancelado = false;
     getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])))
       .then((snap) => {
         if (cancelado) return;
-        setPersonal(
-          snap.docs
-            .map((d) => ({ uid: d.id, ...d.data() }) as Persona)
-            // Mismo criterio que Personal de trabajo: admin solo si tiene código; solo vigentes.
-            .filter((u) => u.role !== "admin" || Boolean(u.codigoMarcacion?.trim()))
-            .filter((u) => u.activo !== false)
-            .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
-        );
+        const lista = snap.docs
+          .map((d) => ({ uid: d.id, ...d.data() }) as Persona)
+          // Mismo criterio que Personal de trabajo: admin solo si tiene código; solo vigentes.
+          .filter((u) => u.role !== "admin" || Boolean(u.codigoMarcacion?.trim()))
+          .filter((u) => u.activo !== false)
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+        setPersonal(lista);
+        const params = new URLSearchParams(window.location.search);
+        const elegido = lista.find((p) => p.uid === params.get("empleado"));
+        if (elegido) {
+          const p = params.get("periodo");
+          onElegir(elegido, p ? armarPeriodo(partirPeriodo(p).semestre, partirPeriodo(p).anio) : periodoSemestral());
+        }
       })
       .catch(() => {
         if (!cancelado) setError("No se pudo cargar el personal.");
@@ -651,6 +662,8 @@ function SelectorPersona({ onElegir }: { onElegir: (p: Persona, periodo: string)
     return () => {
       cancelado = true;
     };
+    // Solo al montar: la preselección de la URL se aplica una vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const palabras = normalizar(busqueda).split(/\s+/).filter(Boolean);
