@@ -116,6 +116,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
   const [mensaje, setMensaje] = useState("");
   const [vista, setVista] = useState(false);
   const [docId, setDocId] = useState<string | null>(esNueva ? null : id);
+  // Día en que se hizo la evaluación (para las fechas de las firmas impresas).
+  const [creadoEn, setCreadoEn] = useState<Date | null>(null);
   const [duplicada, setDuplicada] = useState<string | null>(null);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
@@ -137,6 +139,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
           return;
         }
         const e = snap.data() as EvaluacionDesempeno;
+        const creado = (e.creadoEn as unknown as { toDate?: () => Date } | undefined)?.toDate?.();
+        if (creado) setCreadoEn(creado);
         setBorrador({ ...VACIO, ...e, respuestas: e.respuestas ?? {}, incidentes: e.incidentes ?? [] });
       })
       .catch(() => {
@@ -313,7 +317,12 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
   if (!borrador) return <SelectorPersona onElegir={elegirPersona} />;
 
   const d = borrador.datos;
-  const evImprimible = { ...borrador, puntaje, calificacion };
+  const fechaEvaluacion = (() => {
+    const f = creadoEn ?? new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${f.getFullYear()}-${pad(f.getMonth() + 1)}-${pad(f.getDate())}`;
+  })();
+  const evImprimible = { ...borrador, puntaje, calificacion, fechaEvaluacion };
 
   return (
     <div className="p-4 md:p-6 pb-28 max-w-4xl mx-auto space-y-5">

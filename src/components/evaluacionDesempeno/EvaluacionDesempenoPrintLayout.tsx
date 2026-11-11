@@ -28,7 +28,15 @@ type Datos = Pick<
   | "fechaEvaluado"
   | "acciones"
   | "fechaAcciones"
-> & { formato?: EvaluacionDesempeno["formato"] };
+> & {
+  formato?: EvaluacionDesempeno["formato"];
+  /** "YYYY-MM-DD": día en que se hizo la evaluación; va en las fechas de las firmas si no se llenaron a mano. */
+  fechaEvaluacion?: string;
+};
+
+// Sin firma digital: el nombre de quien firma va sobre la línea.
+const FIRMA_EVALUADOR = "Heber Benjamín Cardoza Guevara";
+const FIRMA_JEFE_SUPERIOR = "Roberto Centeno Zambrano";
 
 function Casilla({ marcada }: { marcada: boolean }) {
   return <span className="casilla">{marcada ? "X" : ""}</span>;
@@ -365,18 +373,24 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
 
           <div className="firmas">
             <div className="firma-fila">
-              <div className="firma-linea">Firma del Evaluador</div>
+              <div className="firma-linea">
+                <span className="fecha-val firma-nombre">{FIRMA_EVALUADOR}</span>
+                Firma del Evaluador
+              </div>
               <div className="sello">SELLO</div>
               <div className="firma-linea fecha">
-                <span className="fecha-val">{fechaCorta(ev.fechaEvaluador)}</span>
+                <span className="fecha-val">{fechaCorta(ev.fechaEvaluador || ev.fechaEvaluacion || "")}</span>
                 Fecha
               </div>
             </div>
             <div className="firma-fila">
-              <div className="firma-linea">Firma Jefe Inmediato Superior</div>
+              <div className="firma-linea">
+                <span className="fecha-val firma-nombre">{FIRMA_JEFE_SUPERIOR}</span>
+                Firma Jefe Inmediato Superior
+              </div>
               <div className="sello">SELLO</div>
               <div className="firma-linea fecha">
-                <span className="fecha-val">{fechaCorta(ev.fechaJefeSuperior)}</span>
+                <span className="fecha-val">{fechaCorta(ev.fechaJefeSuperior || ev.fechaEvaluacion || "")}</span>
                 Fecha
               </div>
             </div>
@@ -910,6 +924,10 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           font-weight: 400;
           font-size: 12pt;
           padding-bottom: 0.03in;
+        }
+        .eval-desempeno .firma-nombre {
+          font-size: 11pt;
+          white-space: nowrap;
         }
         .eval-desempeno .sello {
           width: 1.05in;
