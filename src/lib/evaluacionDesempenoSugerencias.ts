@@ -38,7 +38,7 @@ export const CRITERIOS = {
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
-  { factor: 1, dato: "Errores que le observaron en la revisión de digitación SIMMOW (Denys), por cada 100 egresos que digitó; y nota del examen", regla: "Errores: D hasta 10% · C 10–15% · B 15–20% · A más de 20% (con 30+ digitados). Examen reprobado: máx. B" },
+  { factor: 1, dato: "Errores que le observaron en la revisión de digitación SIMMOW (Denys), por cada 100 egresos que digitó; y nota del examen", regla: "Errores: D hasta 10% · C 10–15% · B 15–20% · A más de 20% (con 30+ digitados). Examen reprobado: máx. B. Coordinadores de equipo: un punto arriba" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "% que hizo del total de actividades del servicio en el semestre", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%" },
   { factor: 4, dato: "De los turnos que tuvo en el plan, en cuántos no registró ni una sola actividad en Services (ningún expediente, alta, impresión, SIMMOW… en todo el turno)", regla: "Turnos vacíos: D hasta 5% de sus turnos · C 6–15% · B 16–30% · A más de 30%" },
@@ -54,6 +54,22 @@ const esAmonestacion = (tipo: string) => /amonest/i.test(tipo);
 
 /** Mínimo de egresos digitados en SIMMOW para que la tasa de errores sea confiable. */
 export const MIN_DIGITADOS = 30;
+
+/**
+ * Coordinadores de equipo (decisión de la jefatura): además de su trabajo hacen
+ * reportes, resuelven conflictos y problemas y reportan a los jefes, así que en
+ * Calidad del trabajo se les sube un punto sobre lo que les salga. Por uid; si
+ * cambian los coordinadores, se actualiza esta lista.
+ */
+export const COORDINADORES_EQUIPO: Record<string, string> = {
+  gZwWfKaYDmTZavHW6vMmATorhMN2: "Violeta Sarai Castro Orellana",
+  "8WACn4ixi7TwPabAD6m8JlZceMI3": "Gabriela Alejandra Calpaño Rodriguez",
+  yiPrJKlgL4SR58Xw9ic4q3OXdcz2: "Alejandro Gabriel Hernández Herrera",
+  "3Fr9fO3pRkYQAKiXWcHHWIzlSiU2": "Bartimeo Oliverio Lopez Pichinte",
+};
+
+/** Una letra más arriba (A→B, B→C, C→D; D se queda en D). */
+const subir = (l: Opcion): Opcion => (l === "A" ? "B" : l === "B" ? "C" : "D");
 
 /**
  * Tope que dejan las amonestaciones del semestre en el factor 5 (regla de la
@@ -75,7 +91,11 @@ const peor = (a: Opcion, b: Opcion): Opcion => (a < b ? a : b);
  * Motivos en una línea, solo el dato y su cifra: la regla ya se ve en el globito
  * y en "Ver criterios", así que aquí no se repite la explicación.
  */
-export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boolean): Record<number, Sugerencia> {
+export function sugerirFactores(
+  r: ResumenRespaldo | null,
+  esAdministrativo: boolean,
+  opciones: { esCoordinador?: boolean } = {},
+): Record<number, Sugerencia> {
   const sin = (motivo: string): Sugerencia => ({ letra: null, motivo });
   if (!r) return {};
   const n = (x: number, uno: string, varios: string) => `${x} ${x === 1 ? uno : varios}`;
@@ -114,6 +134,14 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
       letra: reprobado ? peor(porErrores, "B") : porErrores,
       motivo: `${pct}% de errores (${er.total} de ${er.digitados} egresos digitados en SIMMOW)${notas}`,
     };
+  }
+
+  // Coordinador de equipo: un punto arriba en Calidad sobre lo que le salga.
+  if (opciones.esCoordinador && out[1]) {
+    const base = out[1];
+    out[1] = base.letra
+      ? { letra: subir(base.letra), motivo: `${base.motivo} · Coordinador de equipo: ${base.letra === "D" ? "ya está en D, la más alta" : `un punto arriba (${base.letra} → ${subir(base.letra)})`}` }
+      : { letra: null, motivo: `${base.motivo} · Coordinador de equipo: súbele un punto a la letra que elijas` };
   }
 
   // 2. Responsabilidad: llegadas tarde. Solo en JUL - DIC 2026 (regla puntual de la

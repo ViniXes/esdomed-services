@@ -54,7 +54,7 @@ const esAdministrativoEval = (p: { nombre?: string; codigoMarcacion?: string }) 
   if (nombre.includes("BORIS") && nombre.includes("ANDREE")) return false;
   return esAdministrativoPlan({ codigoMarcacion: p.codigoMarcacion ?? "" });
 };
-import { CRITERIOS_TEXTO, sugerirFactores, type Sugerencia } from "@/lib/evaluacionDesempenoSugerencias";
+import { COORDINADORES_EQUIPO, CRITERIOS_TEXTO, sugerirFactores, type Sugerencia } from "@/lib/evaluacionDesempenoSugerencias";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "dui" | "puesto" | "codigoMarcacion" | "role" | "activo">;
 
@@ -198,7 +198,11 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
     [equipo],
   );
   const respaldoVigente = borrador?.respaldo?.periodo === borrador?.datos.periodo ? (borrador?.respaldo ?? null) : null;
-  const sugerencias = useMemo(() => sugerirFactores(respaldoVigente, evaluadoAdministrativo), [respaldoVigente, evaluadoAdministrativo]);
+  const esCoordinador = !!empleadoId && empleadoId in COORDINADORES_EQUIPO;
+  const sugerencias = useMemo(
+    () => sugerirFactores(respaldoVigente, evaluadoAdministrativo, { esCoordinador }),
+    [respaldoVigente, evaluadoAdministrativo, esCoordinador],
+  );
   const sugeridasPendientes = FACTORES.filter((f) => sugerencias[f.numero]?.letra && !borrador?.respuestas[f.numero]);
 
   const puntaje = useMemo(() => puntajeDe(borrador?.respuestas ?? {}), [borrador?.respuestas]);
