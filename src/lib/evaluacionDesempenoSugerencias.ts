@@ -20,8 +20,9 @@ export interface Sugerencia {
 /** Umbrales: el valor se compara de la mejor letra (D) a la peor (A). */
 export const CRITERIOS = {
   // Factor 1: errores de la revisión de Denys por cada 100 egresos digitados en SIMMOW.
-  // D ≤ 3%, C ≤ 8%, B ≤ 15%, A > 15%. Solo con al menos MIN_DIGITADOS digitados.
-  tasaErrores: { D: 3, C: 8, B: 15 },
+  // D ≤ 10%, C ≤ 15%, B ≤ 20%, A > 20% (la revisión cuenta el egreso entero aunque falle un solo
+  // campo, por eso el tope es más amplio que el 5% habitual). Solo con al menos MIN_DIGITADOS digitados.
+  tasaErrores: { D: 10, C: 15, B: 20 },
   // Factor 3: % que hizo la persona del total de actividades del servicio en el semestre.
   // D ≥ 8%, C ≥ 4%, B ≥ 2%, A < 2% (con unas 20 personas, la parte pareja es ~5%).
   porcentajeServicio: { D: 8, C: 4, B: 2 },
@@ -37,7 +38,7 @@ export const CRITERIOS = {
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
-  { factor: 1, dato: "Errores que le observaron en la revisión de digitación SIMMOW (Denys), por cada 100 egresos que digitó; y nota del examen", regla: "Errores: D hasta 3% · C 3–8% · B 8–15% · A más de 15% (con 30+ digitados). Examen reprobado: máx. B" },
+  { factor: 1, dato: "Errores que le observaron en la revisión de digitación SIMMOW (Denys), por cada 100 egresos que digitó; y nota del examen", regla: "Errores: D hasta 10% · C 10–15% · B 15–20% · A más de 20% (con 30+ digitados). Examen reprobado: máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "% que hizo del total de actividades del servicio en el semestre", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%" },
   { factor: 4, dato: "De los turnos que tuvo en el plan, en cuántos no registró ni una sola actividad en Services (ningún expediente, alta, impresión, SIMMOW… en todo el turno)", regla: "Turnos vacíos: D hasta 5% de sus turnos · C 6–15% · B 16–30% · A más de 30%" },

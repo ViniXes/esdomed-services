@@ -445,10 +445,10 @@ function ParteDelServicio({ total, servicio, nombre }: { total: number; servicio
 }
 
 const ESCALA_ERRORES: { letra: string; texto: string; hasta: number }[] = [
-  { letra: "D", texto: "hasta 3%", hasta: 3 },
-  { letra: "C", texto: "3–8%", hasta: 8 },
-  { letra: "B", texto: "8–15%", hasta: 15 },
-  { letra: "A", texto: "más de 15%", hasta: Infinity },
+  { letra: "D", texto: "hasta 10%", hasta: 10 },
+  { letra: "C", texto: "10–15%", hasta: 15 },
+  { letra: "B", texto: "15–20%", hasta: 20 },
+  { letra: "A", texto: "más de 20%", hasta: Infinity },
 ];
 
 /**
