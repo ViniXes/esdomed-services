@@ -228,7 +228,9 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                 </div>
                 {!esAdministrativo && respaldo.plan.turnosProgramados > 0 && (
                   <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                    En <strong>{respaldo.plan.turnosSinActividad}</strong> de sus {respaldo.plan.turnosProgramados} turnos no registró nada en Services.
+                    <strong>Turnos vacíos (factor 4):</strong> en <strong>{respaldo.plan.turnosSinActividad}</strong> de sus {respaldo.plan.turnosProgramados} turnos
+                    {" "}(<strong>{Math.round((respaldo.plan.turnosSinActividad / respaldo.plan.turnosProgramados) * 100)}%</strong>) no registró ni una sola
+                    actividad en Services durante todo el turno. Mientras más bajo, mejor.
                   </p>
                 )}
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

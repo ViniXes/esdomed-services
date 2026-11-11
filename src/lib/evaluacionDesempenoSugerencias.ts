@@ -37,7 +37,7 @@ export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] 
   { factor: 1, dato: "% que hizo del total de actividades del servicio en el semestre, y nota del examen del archivero", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%. Examen reprobado (menos de 7): máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "Sin parámetro automático", regla: "A criterio del jefe" },
-  { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
+  { factor: 4, dato: "De los turnos que tuvo en el plan, en cuántos no registró ni una sola actividad en Services (ningún expediente, alta, impresión, SIMMOW… en todo el turno)", regla: "Turnos vacíos: D hasta 5% de sus turnos · C 6–15% · B 16–30% · A más de 30%" },
   { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
   { factor: 7, dato: "Quejas o amonestaciones en el archivero, como alerta", regla: "A criterio del jefe" },
@@ -119,7 +119,7 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   else if (!plan?.turnosProgramados) out[4] = sin("Sin turnos en el plan");
   else {
     const pct = Math.round((plan.turnosSinActividad / plan.turnosProgramados) * 100);
-    out[4] = { letra: menorEsMejor(pct, CRITERIOS.turnosVaciosPct), motivo: `${plan.turnosSinActividad} de ${plan.turnosProgramados} turnos sin registro (${pct}%)` };
+    out[4] = { letra: menorEsMejor(pct, CRITERIOS.turnosVaciosPct), motivo: `En ${plan.turnosSinActividad} de sus ${plan.turnosProgramados} turnos (${pct}%) no registró ni una sola actividad en Services` };
   }
 
   // 5. Normas (disciplina): olvidos + sin marca + salidas antes; las amonestaciones
