@@ -23,8 +23,9 @@ function fechaCorta(valor: unknown): string {
 
 export function TramitesInicio() {
   const { user, profile } = useAuth();
-  // Gestión de Trámites es solo del admin (el asistente administrativo ya no la ve).
-  const revisa = profile?.role === "admin";
+  // Gestión de Trámites: admin y asistente administrativo (los permisos
+  // personales solo los resuelve el admin, ver aprobacion-tramites).
+  const revisa = profile?.role === "admin" || profile?.role === "asistente_esdomed";
   const [tramites, setTramites] = useState<TramitePersonal[] | null>(null);
   const [porRevisar, setPorRevisar] = useState<number | null>(null);
 
