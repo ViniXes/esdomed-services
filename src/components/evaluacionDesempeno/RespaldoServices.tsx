@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Database, FileWarning, ListChecks, Plus, RefreshCw, TrendingUp, Undo2 } from "lucide-react";
+import { CalendarClock, Database, FileWarning, ListChecks, Plus, RefreshCw, TrendingUp } from "lucide-react";
 import {
   METRICAS_PRODUCTIVIDAD,
   cargarArchivero,
@@ -132,8 +132,8 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
       {respaldo && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {/* Productividad */}
-          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 3 · metas" atenuado={esAdministrativo} ancho>
-            <ProductividadTotal plan={respaldo.plan} total={respaldo.totalPersona} nombre={primerNombre(nombre)} />
+          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 1 · calidad" atenuado={esAdministrativo} ancho>
+            <ParteDelServicio total={respaldo.totalPersona} servicio={respaldo.totalServicio ?? 0} nombre={primerNombre(nombre)} />
             <table className="mt-3 w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
@@ -166,7 +166,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
             </table>
             <p className="mt-2 text-[11px] text-slate-400">
               &quot;Promedio equipo&quot; = lo que hizo en promedio cada compañero operativo en el semestre. Arriba o abajo cuenta a partir de 10% de
-              diferencia. Sin traslados (son de coordinadores) ni hojas de Drive.
+              diferencia. No incluye las hojas de Drive.
             </p>
           </Bloque>
 
@@ -328,27 +328,6 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
             )}
           </Bloque>
 
-          {/* Altas revertidas */}
-          <Bloque icon={Undo2} titulo="Altas efectivas revertidas" factor="Factor 1 · calidad" atenuado={esAdministrativo}>
-            {respaldo.altasRevertidas.length === 0 ? (
-              <p className="text-xs text-slate-500">Ninguna alta procesada por esta persona se revirtió en el periodo.</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {respaldo.altasRevertidas.map((a, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-slate-700 dark:text-slate-200">
-                        <span className="tabular-nums text-slate-500">{a.fecha}</span> · {a.paciente}
-                      </p>
-                      {a.nota && <p className="text-slate-500">{a.nota}</p>}
-                    </div>
-                    {botonIncidente(`rev-${i}`, { fecha: a.fecha, factor: 1, tipo: "D", descripcion: `Alta efectiva revertida: ${a.paciente}${a.nota ? ` (${a.nota})` : ""}` })}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-2 text-[11px] text-slate-400">Indicio para revisar: la reversión puede deberse a causas ajenas a quien procesó.</p>
-          </Bloque>
         </div>
       )}
     </section>
@@ -413,37 +392,30 @@ function Celda({ n, alerta }: { n: number; alerta?: boolean }) {
   );
 }
 
-const ESCALA_PRODUCTIVIDAD: { letra: string; texto: string; desde: number }[] = [
-  { letra: "D", texto: "80% o más del mayor", desde: 80 },
-  { letra: "C", texto: "60–79%", desde: 60 },
-  { letra: "B", texto: "40–59%", desde: 40 },
-  { letra: "A", texto: "menos de 40%", desde: -Infinity },
+const ESCALA_SERVICIO: { letra: string; texto: string; desde: number }[] = [
+  { letra: "D", texto: "8% o más", desde: 8 },
+  { letra: "C", texto: "4–7.9%", desde: 4 },
+  { letra: "B", texto: "2–3.9%", desde: 2 },
+  { letra: "A", texto: "menos de 2%", desde: -Infinity },
 ];
 
 /**
- * Factor 3 en simple: el total del semestre de la persona contra el total mayor
- * de su grupo (= 100%), el % y la escala con su letra resaltada.
+ * Factor 1 en simple: de todas las actividades del servicio en el semestre,
+ * qué porcentaje hizo la persona, y la escala con su letra resaltada.
  */
-function ProductividadTotal({ plan, total, nombre }: { plan: ResumenRespaldo["plan"]; total: number; nombre: string }) {
-  const conGrupo = !!plan?.companerosGrupo && !!plan?.maximoGrupoTotal;
-  const base = conGrupo ? (plan?.maximoGrupoTotal as number) : (plan?.maximoEquipoTotal ?? 0);
-  const quien = conGrupo ? (plan?.grupo as string) : "todo el equipo";
-  if (!base) return <p className="text-xs text-slate-500">Dale Actualizar para ver la comparación con el total mayor.</p>;
-  const pct = Math.round((total / base) * 100);
-  const actual = ESCALA_PRODUCTIVIDAD.find((e) => pct >= e.desde)?.letra;
+function ParteDelServicio({ total, servicio, nombre }: { total: number; servicio: number; nombre: string }) {
+  if (!servicio) return <p className="text-xs text-slate-500">Dale Actualizar para ver su parte del total del servicio.</p>;
+  const pct = Math.round((total / servicio) * 1000) / 10;
+  const actual = ESCALA_SERVICIO.find((e) => pct >= e.desde)?.letra;
+  const fmt = (x: number) => x.toLocaleString("es-SV");
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-slate-800/60">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-        <span>
-          {nombre}: <strong className="tabular-nums">{total}</strong>
-        </span>
-        <span>
-          Total mayor de {quien}: <strong className="tabular-nums">{base}</strong>
-        </span>
-        <span className="font-bold tabular-nums">= {pct}%</span>
-      </div>
+      <p className="text-sm">
+        {nombre} hizo <strong className="tabular-nums">{fmt(total)}</strong> de <strong className="tabular-nums">{fmt(servicio)}</strong> actividades del
+        servicio en el semestre = <strong className="tabular-nums">{pct}%</strong>
+      </p>
       <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-        {ESCALA_PRODUCTIVIDAD.map((e) => (
+        {ESCALA_SERVICIO.map((e) => (
           <li
             key={e.letra}
             className={`rounded-full border px-2 py-0.5 ${
@@ -456,9 +428,6 @@ function ProductividadTotal({ plan, total, nombre }: { plan: ResumenRespaldo["pl
           </li>
         ))}
       </ul>
-      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-        Total del semestre en Services. El total mayor de su grupo es el 100%{conGrupo ? " (los Grupos 1 a 4 se comparan juntos)" : ""}.
-      </p>
     </div>
   );
 }

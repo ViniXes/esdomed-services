@@ -1,7 +1,7 @@
 // Respaldo de la evaluación del desempeño con la trazabilidad que ya existe en
 // ESDOMED Services. Pensado para el personal OPERATIVO: su trabajo queda
 // registrado aquí (expedientes, altas, defunciones, SIMMOW, impresiones,
-// …; los traslados no, porque los procesan los coordinadores). El administrativo hace trabajo que no se mide como productividad
+// traslados). El administrativo hace trabajo que no se mide como productividad
 // en el sistema (desarrollo, calidad, coordinación): para él solo aplican el
 // archivero de amonestaciones y las marcaciones.
 //
@@ -11,7 +11,7 @@
 
 import { collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
-import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion } from "@/types";
+import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
 import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
 import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
 import { desgloseMinutos, tipoIncidencia } from "@/lib/inconsistenciasMarcacion/analisis";
@@ -40,6 +40,7 @@ export const METRICAS_PRODUCTIVIDAD = [
   { id: "certificados", label: "Certificados entregados" },
   { id: "simmow", label: "Egresos digitados SIMMOW" },
   { id: "documentos", label: "Documentos impresos/entregados" },
+  { id: "traslados", label: "Traslados procesados" },
 ] as const;
 
 export type MetricaId = (typeof METRICAS_PRODUCTIVIDAD)[number]["id"];
@@ -52,6 +53,8 @@ export interface ResumenRespaldo {
   promedioEquipo: Record<MetricaId, number>;
   totalPersona: number;
   promedioTotalEquipo: number;
+  /** Todas las actividades del servicio en el periodo (de cualquier responsable). */
+  totalServicio?: number;
   marcaciones: {
     meses: number;          // meses del periodo con reporte del reloj cargado
     diasConIncidencia: number;
@@ -175,7 +178,7 @@ export async function cargarRespaldo(params: {
   const fin = Timestamp.fromDate(rango.fin);
   const entre = (campo: string, col: string) => getDocs(query(collection(db, col), where(campo, ">=", ini), where(campo, "<=", fin)));
 
-  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, revertidas] = await Promise.all([
+  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, traslados, revertidas] = await Promise.all([
     entre("creadoEn", "control_ingresos"),
     entre("confirmadoEn", "notificaciones_fallecidos"),
     entre("entregaCertificadoEn", "notificaciones_fallecidos"),
@@ -183,6 +186,7 @@ export async function cargarRespaldo(params: {
     entre("procesadoEn", "notificaciones_altas"),
     entre("digitaSimmowEn", "notificaciones_altas"),
     entre("impresoEn", "solicitudes_impresion"),
+    entre("actualizadoEn", "traslados"),
     entre("revertidoEn", "notificaciones_altas"),
   ]);
 
@@ -199,7 +203,10 @@ export async function cargarRespaldo(params: {
       return m;
     })(),
     documentos: contarPor(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre),
+    traslados: contarPor(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre),
   };
+  // Producción total del servicio: todas las actividades con responsable, de cualquier persona.
+  const totalServicio = Object.values(mapas).reduce((acc, m) => acc + [...m.values()].reduce((a, b) => a + b, 0), 0);
 
   const yo = normalizar(params.nombre);
   const equipo = new Set(params.equipo.map((p) => normalizar(p.nombre)));
@@ -267,6 +274,7 @@ export async function cargarRespaldo(params: {
     ...registros(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow, (a) => a.digitaSimmowEn),
     ...registros(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
     ...registros(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
+    ...registros(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
   ];
   const marcPorMes = new Map(
     meses.map((m) => {
@@ -292,6 +300,7 @@ export async function cargarRespaldo(params: {
     promedioEquipo,
     totalPersona,
     promedioTotalEquipo,
+    totalServicio,
     marcaciones,
     altasRevertidas,
   };

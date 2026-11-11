@@ -19,13 +19,11 @@ export interface Sugerencia {
 
 /** Umbrales: el valor se compara de la mejor letra (D) a la peor (A). */
 export const CRITERIOS = {
-  // Factor 1: altas efectivas revertidas. D ≤ 4, C 5–6, B 7–8, A ≥ 9 (con 5 empieza la C).
-  errores: { D: 4, C: 6, B: 8 },
+  // Factor 1: % que hizo la persona del total de actividades del servicio en el semestre.
+  // D ≥ 8%, C ≥ 4%, B ≥ 2%, A < 2% (con unas 20 personas, la parte pareja es ~5%).
+  porcentajeServicio: { D: 8, C: 4, B: 2 },
   // Factor 2: llegadas tarde en el semestre (reloj). D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (regla de la jefatura).
   llegadasTarde: { D: 5, C: 7, B: 9 },
-  // Factor 3: total del semestre, en % del total mayor de su grupo (= 100%).
-  // D ≥ 80, C ≥ 60, B ≥ 40, A < 40.
-  productividadPct: { D: 80, C: 60, B: 40 },
   // Factor 4: % de turnos sin ningún registro en Services. D ≤ 5, C ≤ 15, B ≤ 30, A > 30.
   turnosVaciosPct: { D: 5, C: 15, B: 30 },
   // Factor 5 (disciplina): olvidos de marca + días sin marca + salidas antes de hora. Las llegadas
@@ -36,9 +34,9 @@ export const CRITERIOS = {
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
-  { factor: 1, dato: "Errores atribuibles (altas efectivas revertidas) y nota del examen del archivero", regla: "D: 0–4 · C: 5–6 · B: 7–8 · A: 9 o más. Examen reprobado (menos de 7): máx. B" },
+  { factor: 1, dato: "% que hizo del total de actividades del servicio en el semestre, y nota del examen del archivero", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%. Examen reprobado (menos de 7): máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
-  { factor: 3, dato: "Total registrado en Services en el semestre (sin traslados), como % del total mayor de su grupo", regla: "D: 80% o más del mayor · C: 60–79% · B: 40–59% · A: menos de 40%" },
+  { factor: 3, dato: "Sin parámetro automático", regla: "A criterio del jefe" },
   { factor: 4, dato: "Turnos en los que no registró nada en Services", regla: "D: hasta 5% · C: hasta 15% · B: hasta 30% · A: más de 30%" },
   { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
@@ -93,11 +91,16 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   const m = r.marcaciones;
   const plan = r.plan;
 
-  // 1. Calidad: altas revertidas; examen reprobado pone tope B (manda la peor letra).
+  // 1. Calidad: % que hizo del total del servicio; examen reprobado pone tope B (manda la peor letra).
   if (esAdministrativo) out[1] = reprobado ? { letra: "B", motivo: `Administrativo${notas}` } : sin(`Administrativo: sin datos en Services${notas}`);
+  else if (!r.totalServicio) out[1] = sin(`Dale Actualizar al respaldo${notas}`);
   else {
-    const porAltas = menorEsMejor(r.altasRevertidas.length, CRITERIOS.errores);
-    out[1] = { letra: reprobado ? peor(porAltas, "B") : porAltas, motivo: `${n(r.altasRevertidas.length, "alta revertida", "altas revertidas")}${notas}` };
+    const pct = Math.round((r.totalPersona / r.totalServicio) * 1000) / 10;
+    const porServicio = mayorEsMejor(pct, CRITERIOS.porcentajeServicio);
+    out[1] = {
+      letra: reprobado ? peor(porServicio, "B") : porServicio,
+      motivo: `${pct}% del servicio (${r.totalPersona.toLocaleString("es-SV")} de ${r.totalServicio.toLocaleString("es-SV")})${notas}`,
+    };
   }
 
   // 2. Responsabilidad: llegadas tarde. Solo en JUL - DIC 2026 (regla puntual de la
@@ -107,23 +110,9 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   else if (!m.meses) out[2] = sin(tarde);
   else out[2] = { letra: menorEsMejor(m.tardanzas, CRITERIOS.llegadasTarde), motivo: `${tarde}${r.sgas?.aplica ? " · Diploma SGAS subido" : ""}` };
 
-  // 3. Cumplimiento de metas
-  if (esAdministrativo) out[3] = sin("Administrativo: sin datos en Services");
-  else if (!plan?.turnosProgramados) out[3] = sin("Sin turnos en el plan");
-  else {
-    // El 100% es el total mayor de su grupo; si no hay compañeros en él, el de todo el equipo.
-    const conGrupo = !!plan.companerosGrupo && !!plan.maximoGrupoTotal;
-    const base = conGrupo ? (plan.maximoGrupoTotal as number) : (plan.maximoEquipoTotal ?? 0);
-    const quien = conGrupo ? plan.grupo : "el equipo";
-    if (!base) out[3] = sin("Vuelve a cargar el respaldo");
-    else {
-      const pct = Math.round((r.totalPersona / base) * 100);
-      out[3] = {
-        letra: mayorEsMejor(pct, CRITERIOS.productividadPct),
-        motivo: `${r.totalPersona} de ${base} (total mayor de ${quien}) = ${pct}%`,
-      };
-    }
-  }
+  // 3. Cumplimiento de metas: sin parámetro automático (decisión de la jefatura: no se
+  // entendía ni se podía explicar al personal).
+  out[3] = sin("A criterio del jefe");
 
   // 4. Organización
   if (esAdministrativo) out[4] = sin("Administrativo: sin datos en Services");
