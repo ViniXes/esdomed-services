@@ -53,7 +53,7 @@ export interface ResumenRespaldo {
   promedioEquipo: Record<MetricaId, number>;
   totalPersona: number;
   promedioTotalEquipo: number;
-  /** Todas las actividades del servicio en el periodo (de cualquier responsable). */
+  /** Actividades del personal operativo ESDOMED evaluado en el periodo: la suma de todas sus partes da 100%. */
   totalServicio?: number;
   marcaciones: {
     meses: number;          // meses del periodo con reporte del reloj cargado
@@ -134,10 +134,39 @@ const llegoTarde = (d: Parameters<typeof desgloseMinutos>[0]) => desgloseMinutos
 /** Día en que salió antes de hora (estimado con el horario). */
 const salioAntes = (d: Parameters<typeof desgloseMinutos>[0]) => desgloseMinutos(d).temprano > 0;
 
-function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown): Registro[] {
+type Canon = (nombre?: string | null) => string;
+
+/**
+ * Une las formas distintas de escribir a la misma persona. El nombre guardado en
+ * cada actividad es texto libre: "Oscar Alexander Guardado" y "Oscar Alexander
+ * Guardado Guevara" son la misma persona. Si todas las palabras (3 o más) del
+ * nombre registrado están en el nombre de UNA sola persona del personal, se le
+ * acredita a ella; si coincide con varias o con ninguna, queda tal cual.
+ */
+export function canonDeNombres(nombresPersonal: string[]): Canon {
+  const personal = [...new Set(nombresPersonal.map(normalizar).filter(Boolean))].map((n) => ({ n, palabras: new Set(n.split(" ")) }));
+  const exactos = new Set(personal.map((p) => p.n));
+  const cache = new Map<string, string>();
+  return (nombre) => {
+    const n = normalizar(nombre);
+    if (!n || exactos.has(n)) return n;
+    const previo = cache.get(n);
+    if (previo !== undefined) return previo;
+    const palabras = n.split(" ");
+    let destino = n;
+    if (palabras.length >= 3) {
+      const candidatos = personal.filter((p) => palabras.every((w) => p.palabras.has(w)));
+      if (candidatos.length === 1) destino = candidatos[0].n;
+    }
+    cache.set(n, destino);
+    return destino;
+  };
+}
+
+function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown, canon: Canon = normalizar): Registro[] {
   const out: Registro[] = [];
   for (const it of items) {
-    const n = normalizar(nombre(it));
+    const n = canon(nombre(it));
     const v = fecha(it) as { toDate?: () => Date } | undefined;
     const t = v?.toDate?.() ?? null;
     if (n && t) out.push({ n, t });
@@ -145,10 +174,10 @@ function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, f
   return out;
 }
 
-function contarPor<T>(items: T[], nombre: (i: T) => string | undefined | null): Map<string, number> {
+function contarPor<T>(items: T[], nombre: (i: T) => string | undefined | null, canon: Canon = normalizar): Map<string, number> {
   const m = new Map<string, number>();
   for (const it of items) {
-    const n = normalizar(nombre(it));
+    const n = canon(nombre(it));
     if (n) m.set(n, (m.get(n) ?? 0) + 1);
   }
   return m;
@@ -192,21 +221,23 @@ export async function cargarRespaldo(params: {
 
   const datos = <T>(s: { docs: { data: () => unknown }[] }) => s.docs.map((d) => d.data() as T);
   const ing = datos<{ responsableIngresoNombre?: string; creadoPorNombre?: string }>(ingresos);
+  // Nombres del personal evaluado: une las variantes de escritura de cada persona.
+  const canon = canonDeNombres([params.nombre, ...params.equipo.map((p) => p.nombre)]);
+  const cuenta = <T>(items: T[], nombre: (i: T) => string | undefined | null) => contarPor(items, nombre, canon);
+  const reg = <T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown) => registros(items, nombre, fecha, canon);
   const mapas: Record<MetricaId, Map<string, number>> = {
-    expedientes: contarPor(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre),
-    altas: contarPor(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre),
-    defunciones: contarPor(datos<NotificacionFallecido>(confirmados), (f) => f.confirmadoPorNombre),
-    certificados: contarPor(datos<NotificacionFallecido>(certificados), (f) => f.entregaCertificado),
+    expedientes: cuenta(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre),
+    altas: cuenta(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre),
+    defunciones: cuenta(datos<NotificacionFallecido>(confirmados), (f) => f.confirmadoPorNombre),
+    certificados: cuenta(datos<NotificacionFallecido>(certificados), (f) => f.entregaCertificado),
     simmow: (() => {
-      const m = contarPor(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow);
-      for (const [k, v] of contarPor(datos<NotificacionFallecido>(simmowF), (f) => f.digitaSimmow)) m.set(k, (m.get(k) ?? 0) + v);
+      const m = cuenta(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow);
+      for (const [k, v] of cuenta(datos<NotificacionFallecido>(simmowF), (f) => f.digitaSimmow)) m.set(k, (m.get(k) ?? 0) + v);
       return m;
     })(),
-    documentos: contarPor(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre),
-    traslados: contarPor(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre),
+    documentos: cuenta(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre),
+    traslados: cuenta(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre),
   };
-  // Producción total del servicio: todas las actividades con responsable, de cualquier persona.
-  const totalServicio = Object.values(mapas).reduce((acc, m) => acc + [...m.values()].reduce((a, b) => a + b, 0), 0);
 
   const yo = normalizar(params.nombre);
   const equipo = new Set(params.equipo.map((p) => normalizar(p.nombre)));
@@ -221,6 +252,9 @@ export async function cargarRespaldo(params: {
     for (const n of equipo) totalesEquipo.set(n, (totalesEquipo.get(n) ?? 0) + (mapas[id].get(n) ?? 0));
   }
   const totalPersona = Object.values(productividad).reduce((a, b) => a + b, 0);
+  // Total del servicio = lo que hizo el personal operativo de ESDOMED que se evalúa
+  // (vigente). Así las partes de todos suman exactamente 100%.
+  const totalServicio = [...totalesEquipo.values()].reduce((a, b) => a + b, 0);
   const conActividad = [...totalesEquipo.values()].filter((v) => v > 0);
   const promedioTotalEquipo = conActividad.length ? Math.round(conActividad.reduce((a, b) => a + b, 0) / conActividad.length) : 0;
 
@@ -267,14 +301,14 @@ export async function cargarRespaldo(params: {
 
   // Registros con fecha (para turnos sin actividad).
   const todos: Registro[] = [
-    ...registros(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre, (i) => (i as { creadoEn?: unknown }).creadoEn),
-    ...registros(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre, (a) => a.procesadoEn),
-    ...registros(datos<NotificacionFallecido>(confirmados), (x) => x.confirmadoPorNombre, (x) => x.confirmadoEn),
-    ...registros(datos<NotificacionFallecido>(certificados), (x) => x.entregaCertificado, (x) => x.entregaCertificadoEn),
-    ...registros(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow, (a) => a.digitaSimmowEn),
-    ...registros(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
-    ...registros(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
-    ...registros(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
+    ...reg(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre, (i) => (i as { creadoEn?: unknown }).creadoEn),
+    ...reg(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre, (a) => a.procesadoEn),
+    ...reg(datos<NotificacionFallecido>(confirmados), (x) => x.confirmadoPorNombre, (x) => x.confirmadoEn),
+    ...reg(datos<NotificacionFallecido>(certificados), (x) => x.entregaCertificado, (x) => x.entregaCertificadoEn),
+    ...reg(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow, (a) => a.digitaSimmowEn),
+    ...reg(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
+    ...reg(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
+    ...reg(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
   ];
   const marcPorMes = new Map(
     meses.map((m) => {

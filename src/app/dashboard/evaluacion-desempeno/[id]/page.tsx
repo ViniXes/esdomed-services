@@ -45,6 +45,15 @@ import { EvaluacionDesempenoPrintLayout } from "@/components/evaluacionDesempeno
 import { RespaldoServices } from "@/components/evaluacionDesempeno/RespaldoServices";
 import type { ResumenRespaldo } from "@/lib/evaluacionDesempenoRespaldo";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
+
+// Administrativo según el catálogo del plan, con la misma excepción que la página de
+// Productividad: Boris es de jornada operativa aunque su código esté en el catálogo
+// administrativo por razones históricas.
+const esAdministrativoEval = (p: { nombre?: string; codigoMarcacion?: string }) => {
+  const nombre = (p.nombre ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  if (nombre.includes("BORIS") && nombre.includes("ANDREE")) return false;
+  return esAdministrativoPlan({ codigoMarcacion: p.codigoMarcacion ?? "" });
+};
 import { CRITERIOS_TEXTO, sugerirFactores, type Sugerencia } from "@/lib/evaluacionDesempenoSugerencias";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "dui" | "puesto" | "codigoMarcacion" | "role" | "activo">;
@@ -179,12 +188,12 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
     };
   }, [esAdmin, empleadoId]);
   const evaluado = equipo.find((p) => p.uid === empleadoId);
-  const evaluadoAdministrativo = evaluado ? esAdministrativoPlan({ codigoMarcacion: evaluado.codigoMarcacion ?? "" }) : false;
+  const evaluadoAdministrativo = evaluado ? esAdministrativoEval(evaluado) : false;
   const equipoOperativo = useMemo(
     () =>
       equipo
         .filter((p) => p.activo !== false && (p.role !== "admin" || Boolean(p.codigoMarcacion?.trim())))
-        .filter((p) => !esAdministrativoPlan({ codigoMarcacion: p.codigoMarcacion ?? "" }))
+        .filter((p) => !esAdministrativoEval(p))
         .map((p) => ({ uid: p.uid, nombre: p.nombre, codigoMarcacion: p.codigoMarcacion })),
     [equipo],
   );
