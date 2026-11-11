@@ -921,10 +921,11 @@ service cloud.firestore {
     }
 
     // ─── Configuración global ────────────────────────────────────────────────
-    // Servicios y camas: lectura pública (no es dato sensible), escritura solo admin.
+    // Servicios y camas: lectura pública (no es dato sensible). Escribe el admin;
+    // el asistente administrativo solo el catálogo de servicios y camas.
     match /configuracion/{docId} {
       allow read:  if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (isAsistenteEsdomed() && docId == 'servicios');
     }
   }
 }

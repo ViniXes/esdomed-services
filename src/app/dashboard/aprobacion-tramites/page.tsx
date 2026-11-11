@@ -65,6 +65,9 @@ const SELECT_CLS =
 
 export default function AprobacionTramitesPage() {
   const { user, profile } = useAuth();
+  // Los permisos personales (A1/A2) los aprueba o rechaza solo el admin; el
+  // asistente administrativo resuelve los demás trámites (firestore.rules valida lo mismo).
+  const puedeResolver = (t: Pick<TramitePersonal, "categoria">) => profile?.role === "admin" || !esPermisoPersonal(t);
   const [vista, setVista] = useState<"pendientes" | "buscar">("pendientes");
 
   // ── Pendientes: consulta pequeña (solo estado == pendiente) al entrar ──
@@ -581,7 +584,7 @@ export default function AprobacionTramitesPage() {
 
   const handleResolver = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!detalle?.id || !user || !profile) return;
+    if (!detalle?.id || !user || !profile || !puedeResolver(detalle)) return;
     setSaving(true);
     try {
       if (accionAdmin === "aprobado" && esPermisoPersonal(detalle)) {
@@ -695,7 +698,7 @@ export default function AprobacionTramitesPage() {
           ) : pendientes.length === 0 ? (
             <Vacio icono={CheckCircle2} titulo="Sin trámites pendientes" tono="verde" />
           ) : (
-            <TablaTramites items={pendientes} onAbrir={abrirDetalle} />
+            <TablaTramites items={pendientes} onAbrir={abrirDetalle} puedeResolver={puedeResolver} />
           )}
         </div>
       ) : (
@@ -781,7 +784,7 @@ export default function AprobacionTramitesPage() {
               ) : resultados.length === 0 ? (
                 <Vacio icono={Search} titulo="Sin coincidencias" tono="neutro" />
               ) : (
-                <TablaTramites items={resultados} onAbrir={abrirDetalle} />
+                <TablaTramites items={resultados} onAbrir={abrirDetalle} puedeResolver={puedeResolver} />
               )}
             </div>
           )}
@@ -805,7 +808,12 @@ export default function AprobacionTramitesPage() {
               ? { guardando: anulando, error: errorAnulacion, onAnular: anularPermiso }
               : undefined
           }
-          resolucion={detalle.estado === "pendiente" ? {
+          avisoSinResolucion={
+            detalle.estado === "pendiente" && !puedeResolver(detalle)
+              ? "Los permisos personales los aprueba o rechaza solo el administrador."
+              : undefined
+          }
+          resolucion={detalle.estado === "pendiente" && puedeResolver(detalle) ? {
             accion: accionAdmin,
             onAccion: setAccionAdmin,
             comentario: comentarioAdmin,
@@ -909,7 +917,11 @@ function Vacio({ icono: Icono, titulo, tono }: { icono: typeof Search; titulo: s
 }
 
 /** Tabla de trámites: toda la fila abre la ficha; el botón da el acceso por teclado. */
-function TablaTramites({ items, onAbrir }: { items: TramitePersonal[]; onAbrir: (t: TramitePersonal) => void }) {
+function TablaTramites({ items, onAbrir, puedeResolver }: {
+  items: TramitePersonal[];
+  onAbrir: (t: TramitePersonal) => void;
+  puedeResolver: (t: TramitePersonal) => boolean;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left">
@@ -977,12 +989,12 @@ function TablaTramites({ items, onAbrir }: { items: TramitePersonal[]; onAbrir: 
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onAbrir(t); }}
                       className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        t.estado === "pendiente"
+                        t.estado === "pendiente" && puedeResolver(t)
                           ? "bg-amber-500 text-white hover:bg-amber-600"
                           : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                       }`}
                     >
-                      {t.estado === "pendiente" ? "Resolver" : "Ver"}
+                      {t.estado === "pendiente" && puedeResolver(t) ? "Resolver" : "Ver"}
                       <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                     </button>
                   </div>

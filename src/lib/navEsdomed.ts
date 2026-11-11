@@ -152,7 +152,8 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/inconsistencias-marcacion", label: "Inconsistencias de marcación", icon: FingerprintPattern, visibleSi: esAdmin },
       // Evaluación del desempeño (formulario MINSAL): solo el superusuario.
       { href: "/dashboard/evaluacion-desempeno", label: "Evaluación de personal", icon: ClipboardPen, visibleSi: esAdmin },
-      { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, visibleSi: esAdmin },
+      // Catálogo de servicios y camas: admin y asistente administrativo.
+      { href: "/dashboard/configuracion/servicios", label: "Configuración", icon: Settings, visibleSi: adminOAsistente },
     ],
   },
   {

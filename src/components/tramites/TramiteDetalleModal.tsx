@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AlertTriangle, ArrowRight, Ban, CheckCircle2, ExternalLink, FileImage, FileText, MessageSquareText,
-  CalendarRange, Clock, FingerprintPattern, Paperclip, Pencil, RefreshCw, Route, X, XCircle,
+  CalendarRange, Clock, FingerprintPattern, Lock, Paperclip, Pencil, RefreshCw, Route, X, XCircle,
 } from "lucide-react";
 import type { TramitePersonal } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
@@ -457,12 +457,14 @@ function AvisoPermisos({ tono, titulo, texto, items }: { tono: "ambar" | "rose";
 const esImagen = (nombre: string) => /\.(png|jpe?g|webp|gif|heic)$/i.test(nombre);
 
 export function TramiteDetalleModal({
-  tramite: t, onClose, resolucion, ajusteHoras, anulacion,
+  tramite: t, onClose, resolucion, avisoSinResolucion, ajusteHoras, anulacion,
 }: {
   tramite: TramitePersonal;
   onClose: () => void;
   /** Solo para trámites pendientes: formulario para aprobar o rechazar. */
   resolucion?: ResolucionTramite;
+  /** Pendiente que quien lo ve no puede resolver: explica quién lo resuelve. */
+  avisoSinResolucion?: string;
   /** Solo admin, permiso de un día pendiente o aprobado: permite ajustar las horas. */
   ajusteHoras?: AjusteHorasProps;
   /** Solo admin, permiso aprobado: permite anularlo si no tiene adjuntos. */
@@ -680,6 +682,12 @@ export function TramiteDetalleModal({
               </Seccion>
             </aside>
           </div>
+
+          {!resolucion && avisoSinResolucion && (
+            <p className="flex items-start gap-1.5 border-t border-slate-100 bg-slate-50/60 px-5 py-4 text-xs text-slate-600 sm:px-6 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300">
+              <Lock size={13} className="mt-0.5 shrink-0" aria-hidden="true" /> {avisoSinResolucion}
+            </p>
+          )}
 
           {resolucion && (
             <form id="form-resolucion-tramite" onSubmit={resolucion.onSubmit} className="space-y-4 border-t border-slate-100 bg-slate-50/60 px-5 py-5 sm:px-6 dark:border-slate-800 dark:bg-slate-950/30">
