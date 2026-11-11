@@ -134,6 +134,11 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
           {/* Productividad */}
           <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 1 · calidad" atenuado={esAdministrativo} ancho>
             <ParteDelServicio total={respaldo.totalPersona} servicio={respaldo.totalServicio ?? 0} nombre={primerNombre(nombre)} />
+            {respaldo.driveIncompleto && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                No se pudo leer alguna hoja de Drive: el conteo puede quedar corto. Dale Actualizar en un momento.
+              </p>
+            )}
             <table className="mt-3 w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
@@ -166,7 +171,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
             </table>
             <p className="mt-2 text-[11px] text-slate-400">
               &quot;Promedio equipo&quot; = lo que hizo en promedio cada compañero operativo en el semestre. Arriba o abajo cuenta a partir de 10% de
-              diferencia. No incluye las hojas de Drive.
+              diferencia. Incluye las hojas de Drive (carpetas, actualizaciones, consentimientos, emergencias SIMMOW).
             </p>
           </Bloque>
 

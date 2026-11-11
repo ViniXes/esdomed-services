@@ -10,7 +10,7 @@
 // semestre) y al guardar la evaluación queda una foto del resumen.
 
 import { collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
 import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
 import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
@@ -41,7 +41,14 @@ export const METRICAS_PRODUCTIVIDAD = [
   { id: "simmow", label: "Egresos digitados SIMMOW" },
   { id: "documentos", label: "Documentos impresos/entregados" },
   { id: "traslados", label: "Traslados procesados" },
+  // Hojas de Google Drive que el personal lleva a mano (mismas que la página de Productividad).
+  { id: "carpetas", label: "Carpetas creadas (Drive)" },
+  { id: "actualizaciones", label: "Actualizaciones (Drive)" },
+  { id: "consentimientos", label: "Consentimientos (Drive)" },
+  { id: "emergenciasSimmow", label: "Emergencias digitadas SIMMOW (Drive)" },
 ] as const;
+
+const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos", "emergenciasSimmow"] as const;
 
 export type MetricaId = (typeof METRICAS_PRODUCTIVIDAD)[number]["id"];
 
@@ -55,6 +62,8 @@ export interface ResumenRespaldo {
   promedioTotalEquipo: number;
   /** Actividades del personal operativo ESDOMED evaluado en el periodo: la suma de todas sus partes da 100%. */
   totalServicio?: number;
+  /** Alguna hoja de Drive no se pudo leer: el conteo puede quedar corto. */
+  driveIncompleto?: boolean;
   marcaciones: {
     meses: number;          // meses del periodo con reporte del reloj cargado
     diasConIncidencia: number;
@@ -138,10 +147,11 @@ type Canon = (nombre?: string | null) => string;
 
 /**
  * Une las formas distintas de escribir a la misma persona. El nombre guardado en
- * cada actividad es texto libre: "Oscar Alexander Guardado" y "Oscar Alexander
- * Guardado Guevara" son la misma persona. Si todas las palabras (3 o más) del
- * nombre registrado están en el nombre de UNA sola persona del personal, se le
- * acredita a ella; si coincide con varias o con ninguna, queda tal cual.
+ * cada actividad es texto libre: "Oscar Alexander Guardado" / "Oscar Alexander
+ * Guardado Guevara", o en Drive "Boris Andree Rodríguez Quintanilla" para la
+ * cuenta "Boris Andree Quintanilla". Si uno de los dos nombres (3 o más palabras)
+ * está completo dentro del otro, y eso pasa con UNA sola persona del personal,
+ * se le acredita a ella; si coincide con varias o con ninguna, queda tal cual.
  */
 export function canonDeNombres(nombresPersonal: string[]): Canon {
   const personal = [...new Set(nombresPersonal.map(normalizar).filter(Boolean))].map((n) => ({ n, palabras: new Set(n.split(" ")) }));
@@ -155,7 +165,10 @@ export function canonDeNombres(nombresPersonal: string[]): Canon {
     const palabras = n.split(" ");
     let destino = n;
     if (palabras.length >= 3) {
-      const candidatos = personal.filter((p) => palabras.every((w) => p.palabras.has(w)));
+      const registrado = new Set(palabras);
+      const candidatos = personal.filter(
+        (p) => palabras.every((w) => p.palabras.has(w)) || (p.palabras.size >= 3 && [...p.palabras].every((w) => registrado.has(w))),
+      );
       if (candidatos.length === 1) destino = candidatos[0].n;
     }
     cache.set(n, destino);
@@ -167,8 +180,8 @@ function registros<T>(items: T[], nombre: (i: T) => string | undefined | null, f
   const out: Registro[] = [];
   for (const it of items) {
     const n = canon(nombre(it));
-    const v = fecha(it) as { toDate?: () => Date } | undefined;
-    const t = v?.toDate?.() ?? null;
+    const v = fecha(it) as Date | { toDate?: () => Date } | undefined;
+    const t = v instanceof Date ? v : (v?.toDate?.() ?? null);
     if (n && t) out.push({ n, t });
   }
   return out;
@@ -219,6 +232,7 @@ export async function cargarRespaldo(params: {
     entre("revertidoEn", "notificaciones_altas"),
   ]);
 
+  const drive = await leerHojasDrive(rango);
   const datos = <T>(s: { docs: { data: () => unknown }[] }) => s.docs.map((d) => d.data() as T);
   const ing = datos<{ responsableIngresoNombre?: string; creadoPorNombre?: string }>(ingresos);
   // Nombres del personal evaluado: une las variantes de escritura de cada persona.
@@ -237,6 +251,10 @@ export async function cargarRespaldo(params: {
     })(),
     documentos: cuenta(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre),
     traslados: cuenta(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre),
+    carpetas: cuenta(drive.hojas.carpetas, (x) => x.nombre),
+    actualizaciones: cuenta(drive.hojas.actualizaciones, (x) => x.nombre),
+    consentimientos: cuenta(drive.hojas.consentimientos, (x) => x.nombre),
+    emergenciasSimmow: cuenta(drive.hojas.emergenciasSimmow, (x) => x.nombre),
   };
 
   const yo = normalizar(params.nombre);
@@ -309,6 +327,7 @@ export async function cargarRespaldo(params: {
     ...reg(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
     ...reg(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
     ...reg(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
+    ...HOJAS_DRIVE.flatMap((h) => reg(drive.hojas[h], (x) => x.nombre, (x) => new Date(x.fecha))),
   ];
   const marcPorMes = new Map(
     meses.map((m) => {
@@ -335,6 +354,7 @@ export async function cargarRespaldo(params: {
     totalPersona,
     promedioTotalEquipo,
     totalServicio,
+    ...(drive.incompleto ? { driveIncompleto: true } : {}),
     marcaciones,
     altasRevertidas,
   };
@@ -535,4 +555,43 @@ function grupoComparacion(grupo?: string): string {
   if (/emergencia/i.test(g)) return "Equipo de emergencia";
   if (/consulta/i.test(g)) return "Consulta Externa";
   return g || "Sin grupo";
+}
+
+/**
+ * Registros (nombre, fecha) de las hojas de Drive del periodo, mes por mes, con la
+ * misma API que usa la página de Productividad. Si una hoja o un mes falla, sigue
+ * con lo demás y avisa que el conteo puede quedar corto.
+ */
+async function leerHojasDrive(rango: { inicio: Date; fin: Date }): Promise<{
+  hojas: Record<(typeof HOJAS_DRIVE)[number], { nombre: string; fecha: string }[]>;
+  incompleto: boolean;
+}> {
+  const hojas = { carpetas: [], actualizaciones: [], consentimientos: [], emergenciasSimmow: [] } as Record<
+    (typeof HOJAS_DRIVE)[number],
+    { nombre: string; fecha: string }[]
+  >;
+  const token = await auth.currentUser?.getIdToken().catch(() => null);
+  if (!token) return { hojas, incompleto: true };
+  const hoy = new Date();
+  const hasta = rango.fin < hoy ? rango.fin : hoy;
+  const meses: string[] = [];
+  for (let d = new Date(rango.inicio.getFullYear(), rango.inicio.getMonth(), 1); d <= hasta; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  let incompleto = false;
+  await Promise.all(
+    HOJAS_DRIVE.flatMap((hoja) =>
+      meses.map(async (mes) => {
+        try {
+          const res = await fetch(`/api/productividad/historial-drive?hoja=${hoja}&mes=${mes}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (!res.ok) throw new Error(String(res.status));
+          const data = (await res.json()) as { registros?: { nombre: string; fecha: string }[] };
+          hojas[hoja].push(...(data.registros ?? []));
+        } catch {
+          incompleto = true;
+        }
+      }),
+    ),
+  );
+  return { hojas, incompleto };
 }
