@@ -64,6 +64,12 @@ export interface ResumenRespaldo {
   totalServicio?: number;
   /** Alguna hoja de Drive no se pudo leer: el conteo puede quedar corto. */
   driveIncompleto?: boolean;
+  /**
+   * Revisión de digitación SIMMOW de Denys (hoja "Historico"): errores que le
+   * observaron a la persona en el periodo, comparados con los egresos que digitó
+   * en SIMMOW. Base del factor 1 (calidad).
+   */
+  errores?: { total: number; digitados: number; porCategoria: { categoria: string; total: number }[]; noLeido?: boolean };
   marcaciones: {
     meses: number;          // meses del periodo con reporte del reloj cargado
     diasConIncidencia: number;
@@ -145,16 +151,43 @@ const salioAntes = (d: Parameters<typeof desgloseMinutos>[0]) => desgloseMinutos
 
 type Canon = (nombre?: string | null) => string;
 
+/** Palabra igual, cortada (una empieza con la otra, 5+ letras) o con una letra distinta (5+ letras). */
+function mismaPalabra(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 5 || b.length < 5) return false;
+  if (a.startsWith(b) || b.startsWith(a)) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let dif = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++dif > 1) return false;
+    if (a.length > b.length) i++;
+    else if (b.length > a.length) j++;
+    else {
+      i++;
+      j++;
+    }
+  }
+  return dif + (a.length - i) + (b.length - j) <= 1;
+}
+
 /**
  * Une las formas distintas de escribir a la misma persona. El nombre guardado en
- * cada actividad es texto libre: "Oscar Alexander Guardado" / "Oscar Alexander
- * Guardado Guevara", o en Drive "Boris Andree Rodríguez Quintanilla" para la
- * cuenta "Boris Andree Quintanilla". Si uno de los dos nombres (3 o más palabras)
- * está completo dentro del otro, y eso pasa con UNA sola persona del personal,
- * se le acredita a ella; si coincide con varias o con ninguna, queda tal cual.
+ * cada actividad (o en las hojas de Drive y la revisión de Denys) es texto libre:
+ * "Oscar Alexander Guardado" / "… Guardado Guevara", "Boris Andree Rodríguez
+ * Quintanill", "Gabriela Alejandra Calpaño de Ruiz", "Fernando Javier Gálvez
+ * Sompson". Se acredita a la persona del personal con la que comparte 3 o más
+ * palabras (tolerando una palabra cortada o con una letra distinta), si es una
+ * sola la que más comparte; si hay empate o ninguna llega a 3, queda tal cual.
  */
 export function canonDeNombres(nombresPersonal: string[]): Canon {
-  const personal = [...new Set(nombresPersonal.map(normalizar).filter(Boolean))].map((n) => ({ n, palabras: new Set(n.split(" ")) }));
+  const personal = [...new Set(nombresPersonal.map(normalizar).filter(Boolean))].map((n) => ({ n, palabras: n.split(" ") }));
   const exactos = new Set(personal.map((p) => p.n));
   const cache = new Map<string, string>();
   return (nombre) => {
@@ -165,11 +198,11 @@ export function canonDeNombres(nombresPersonal: string[]): Canon {
     const palabras = n.split(" ");
     let destino = n;
     if (palabras.length >= 3) {
-      const registrado = new Set(palabras);
-      const candidatos = personal.filter(
-        (p) => palabras.every((w) => p.palabras.has(w)) || (p.palabras.size >= 3 && [...p.palabras].every((w) => registrado.has(w))),
-      );
-      if (candidatos.length === 1) destino = candidatos[0].n;
+      const puntajes = personal
+        .map((p) => ({ p, c: palabras.filter((w) => p.palabras.some((v) => mismaPalabra(w, v))).length }))
+        .filter((x) => x.c >= 3)
+        .sort((x, y) => y.c - x.c);
+      if (puntajes.length && !(puntajes[1] && puntajes[1].c === puntajes[0].c)) destino = puntajes[0].p.n;
     }
     cache.set(n, destino);
     return destino;
@@ -232,7 +265,7 @@ export async function cargarRespaldo(params: {
     entre("revertidoEn", "notificaciones_altas"),
   ]);
 
-  const drive = await leerHojasDrive(rango);
+  const [drive, revision] = await Promise.all([leerHojasDrive(rango), leerRevisionDenys(rango)]);
   const datos = <T>(s: { docs: { data: () => unknown }[] }) => s.docs.map((d) => d.data() as T);
   const ing = datos<{ responsableIngresoNombre?: string; creadoPorNombre?: string }>(ingresos);
   // Nombres del personal evaluado: une las variantes de escritura de cada persona.
@@ -355,6 +388,17 @@ export async function cargarRespaldo(params: {
     promedioTotalEquipo,
     totalServicio,
     ...(drive.incompleto ? { driveIncompleto: true } : {}),
+    errores: (() => {
+      const mias = revision.incidencias.filter((x) => canon(x.usuario) === yo);
+      const cat = new Map<string, number>();
+      for (const x of mias) cat.set(x.categoria, (cat.get(x.categoria) ?? 0) + 1);
+      return {
+        total: mias.length,
+        digitados: productividad.simmow ?? 0,
+        porCategoria: [...cat.entries()].map(([categoria, total]) => ({ categoria, total })).sort((p, q) => q.total - p.total),
+        ...(revision.noLeido ? { noLeido: true } : {}),
+      };
+    })(),
     marcaciones,
     altasRevertidas,
   };
@@ -594,4 +638,21 @@ async function leerHojasDrive(rango: { inicio: Date; fin: Date }): Promise<{
     ),
   );
   return { hojas, incompleto };
+}
+
+/** Observaciones de la revisión de digitación SIMMOW de Denys en el periodo (vía API, sin datos de pacientes). */
+async function leerRevisionDenys(rango: { inicio: Date; fin: Date }): Promise<{ incidencias: { usuario: string; mes: string; categoria: string }[]; noLeido: boolean }> {
+  const mes = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) return { incidencias: [], noLeido: true };
+    const res = await fetch(`/api/evaluacion-desempeno/incidencias?desde=${mes(rango.inicio)}&hasta=${mes(rango.fin)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { incidencias: [], noLeido: true };
+    const data = (await res.json()) as { incidencias?: { usuario: string; mes: string; categoria: string }[] };
+    return { incidencias: data.incidencias ?? [], noLeido: false };
+  } catch {
+    return { incidencias: [], noLeido: true };
+  }
 }

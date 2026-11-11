@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Database, FileWarning, ListChecks, Plus, RefreshCw, TrendingUp } from "lucide-react";
+import { CalendarClock, Database, FileWarning, ListChecks, Plus, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
 import {
   METRICAS_PRODUCTIVIDAD,
   cargarArchivero,
@@ -9,7 +9,7 @@ import {
   type RefPersonaEquipo,
   type ResumenRespaldo,
 } from "@/lib/evaluacionDesempenoRespaldo";
-import { CRITERIOS_TEXTO } from "@/lib/evaluacionDesempenoSugerencias";
+import { CRITERIOS_TEXTO, MIN_DIGITADOS } from "@/lib/evaluacionDesempenoSugerencias";
 import { NOTA_MINIMA_EVALUACION, aproboEvaluacion } from "@/lib/evaluacionesPersonal";
 import { ChipNota } from "@/components/personal/EvaluacionesPersonal";
 import type { IncidenteCritico } from "@/lib/evaluacionDesempeno";
@@ -131,8 +131,13 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
 
       {respaldo && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {/* Errores de digitación (revisión de Denys) */}
+          <Bloque icon={SearchCheck} titulo="Errores en la digitación SIMMOW (revisión de Denys)" factor="Factor 1 · calidad" atenuado={esAdministrativo} ancho>
+            <ErroresRevision errores={respaldo.errores} nombre={primerNombre(nombre)} />
+          </Bloque>
+
           {/* Productividad */}
-          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 1 · calidad" atenuado={esAdministrativo} ancho>
+          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 3 · metas" atenuado={esAdministrativo} ancho>
             <ParteDelServicio total={respaldo.totalPersona} servicio={respaldo.totalServicio ?? 0} nombre={primerNombre(nombre)} />
             {respaldo.driveIncompleto && (
               <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
@@ -435,6 +440,64 @@ function ParteDelServicio({ total, servicio, nombre }: { total: number; servicio
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+const ESCALA_ERRORES: { letra: string; texto: string; hasta: number }[] = [
+  { letra: "D", texto: "hasta 3%", hasta: 3 },
+  { letra: "C", texto: "3–8%", hasta: 8 },
+  { letra: "B", texto: "8–15%", hasta: 15 },
+  { letra: "A", texto: "más de 15%", hasta: Infinity },
+];
+
+/**
+ * Factor 1 en simple: de los egresos que digitó en SIMMOW, a cuántos les
+ * encontró error la revisión de Denys, el % y la escala con su letra resaltada.
+ */
+function ErroresRevision({ errores, nombre }: { errores: ResumenRespaldo["errores"]; nombre: string }) {
+  if (!errores) return <p className="text-xs text-slate-500">Dale Actualizar para ver los errores de la revisión de Denys.</p>;
+  if (errores.noLeido) return <p className="text-xs text-amber-700 dark:text-amber-300">No se pudo leer la hoja de revisión de Denys. Dale Actualizar en un momento.</p>;
+  const pocos = errores.digitados < MIN_DIGITADOS;
+  const pct = errores.digitados ? Math.round((errores.total / errores.digitados) * 1000) / 10 : 0;
+  const actual = pocos ? null : ESCALA_ERRORES.find((e) => pct <= e.hasta)?.letra;
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-slate-800/60">
+      <p className="text-sm">
+        {nombre} digitó <strong className="tabular-nums">{errores.digitados.toLocaleString("es-SV")}</strong> egresos en SIMMOW y la revisión le encontró
+        error en <strong className="tabular-nums">{errores.total}</strong>
+        {errores.digitados ? (
+          <>
+            {" "}
+            = <strong className="tabular-nums">{pct}%</strong>
+          </>
+        ) : null}
+      </p>
+      {pocos ? (
+        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+          Con menos de {MIN_DIGITADOS} egresos digitados el porcentaje no es confiable: queda a criterio del jefe.
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+          {ESCALA_ERRORES.map((e) => (
+            <li
+              key={e.letra}
+              className={`rounded-full border px-2 py-0.5 ${
+                e.letra === actual
+                  ? "border-blue-500 bg-blue-50 font-semibold text-blue-800 dark:border-blue-400 dark:bg-blue-950/50 dark:text-blue-200"
+                  : "border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400"
+              }`}
+            >
+              {e.letra}: {e.texto}
+            </li>
+          ))}
+        </ul>
+      )}
+      {errores.porCategoria.length > 0 && (
+        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          <strong>En qué:</strong> {errores.porCategoria.map((c) => `${c.categoria} (${c.total})`).join(" · ")}
+        </p>
+      )}
     </div>
   );
 }

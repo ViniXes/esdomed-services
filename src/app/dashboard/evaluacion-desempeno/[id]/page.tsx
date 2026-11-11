@@ -821,7 +821,7 @@ function SelectorSemestre({ value, onChange }: { value: string; onChange: (v: st
  * tapa los literales: sale a la derecha si hay espacio; si no, debajo de la
  * fila completa de casillas.
  */
-const ANCHO_GLOBO = 288;
+const ANCHO_GLOBO = 320;
 
 function GloboPorque({
   factor,
@@ -908,8 +908,21 @@ function GloboPorque({
           <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
             {!cargado ? "Carga el respaldo de Services" : letra ? `Sugerida: ${letra} · ${puntos[letra]} pts` : "Sin sugerencia"}
           </p>
-          {cargado && <p className="mt-1 text-xs text-slate-700 dark:text-slate-200">{sugerencia?.motivo ?? "Sin datos"}</p>}
-          {regla && <p className="mt-2 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">{regla.regla}</p>}
+          {regla && (
+            <p className="mt-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Qué se mide:</span> {regla.dato}
+            </p>
+          )}
+          {cargado && (
+            <p className="mt-1.5 text-xs leading-snug text-slate-800 dark:text-slate-100">
+              <span className="font-semibold">Resultado:</span> {sugerencia?.motivo ?? "Sin datos"}
+            </p>
+          )}
+          {regla && (
+            <p className="mt-2 border-t border-slate-100 pt-1.5 text-[11px] leading-snug text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Escala:</span> {regla.regla}
+            </p>
+          )}
         </div>
       )}
     </div>

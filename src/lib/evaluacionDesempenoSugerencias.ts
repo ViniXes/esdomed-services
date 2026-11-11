@@ -19,7 +19,10 @@ export interface Sugerencia {
 
 /** Umbrales: el valor se compara de la mejor letra (D) a la peor (A). */
 export const CRITERIOS = {
-  // Factor 1: % que hizo la persona del total de actividades del servicio en el semestre.
+  // Factor 1: errores de la revisión de Denys por cada 100 egresos digitados en SIMMOW.
+  // D ≤ 3%, C ≤ 8%, B ≤ 15%, A > 15%. Solo con al menos MIN_DIGITADOS digitados.
+  tasaErrores: { D: 3, C: 8, B: 15 },
+  // Factor 3: % que hizo la persona del total de actividades del servicio en el semestre.
   // D ≥ 8%, C ≥ 4%, B ≥ 2%, A < 2% (con unas 20 personas, la parte pareja es ~5%).
   porcentajeServicio: { D: 8, C: 4, B: 2 },
   // Factor 2: llegadas tarde en el semestre (reloj). D ≤ 5, C ≤ 7, B ≤ 9, A ≥ 10 (regla de la jefatura).
@@ -34,9 +37,9 @@ export const CRITERIOS = {
 
 /** Texto de los criterios para mostrarlo al evaluador. */
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
-  { factor: 1, dato: "% que hizo del total de actividades del servicio en el semestre, y nota del examen del archivero", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%. Examen reprobado (menos de 7): máx. B" },
+  { factor: 1, dato: "Errores que le observaron en la revisión de digitación SIMMOW (Denys), por cada 100 egresos que digitó; y nota del examen", regla: "Errores: D hasta 3% · C 3–8% · B 8–15% · A más de 15% (con 30+ digitados). Examen reprobado: máx. B" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
-  { factor: 3, dato: "Sin parámetro automático", regla: "A criterio del jefe" },
+  { factor: 3, dato: "% que hizo del total de actividades del servicio en el semestre", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%" },
   { factor: 4, dato: "De los turnos que tuvo en el plan, en cuántos no registró ni una sola actividad en Services (ningún expediente, alta, impresión, SIMMOW… en todo el turno)", regla: "Turnos vacíos: D hasta 5% de sus turnos · C 6–15% · B 16–30% · A más de 30%" },
   { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
@@ -47,6 +50,9 @@ const menorEsMejor = (v: number, u: { D: number; C: number; B: number }): Opcion
 const mayorEsMejor = (v: number, u: { D: number; C: number; B: number }): Opcion => (v >= u.D ? "D" : v >= u.C ? "C" : v >= u.B ? "B" : "A");
 
 const esAmonestacion = (tipo: string) => /amonest/i.test(tipo);
+
+/** Mínimo de egresos digitados en SIMMOW para que la tasa de errores sea confiable. */
+export const MIN_DIGITADOS = 30;
 
 /**
  * Tope que dejan las amonestaciones del semestre en el factor 5 (regla de la
@@ -91,15 +97,21 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   const m = r.marcaciones;
   const plan = r.plan;
 
-  // 1. Calidad: % que hizo del total del servicio; examen reprobado pone tope B (manda la peor letra).
+  // 1. Calidad: errores de la revisión de Denys por cada 100 egresos digitados en SIMMOW;
+  // examen reprobado pone tope B (manda la peor letra).
+  const er = r.errores;
   if (esAdministrativo) out[1] = reprobado ? { letra: "B", motivo: `Administrativo${notas}` } : sin(`Administrativo: sin datos en Services${notas}`);
-  else if (!r.totalServicio) out[1] = sin(`Dale Actualizar al respaldo${notas}`);
-  else {
-    const pct = Math.round((r.totalPersona / r.totalServicio) * 1000) / 10;
-    const porServicio = mayorEsMejor(pct, CRITERIOS.porcentajeServicio);
+  else if (!er) out[1] = reprobado ? { letra: "B", motivo: `Dale Actualizar al respaldo${notas}` } : sin(`Dale Actualizar al respaldo${notas}`);
+  else if (er.noLeido) out[1] = reprobado ? { letra: "B", motivo: `No se pudo leer la revisión de Denys${notas}` } : sin(`No se pudo leer la revisión de Denys${notas}`);
+  else if (er.digitados < MIN_DIGITADOS) {
+    const txt = `Solo ${n(er.digitados, "egreso digitado", "egresos digitados")} en SIMMOW (${er.total} con error): muy pocos para medir${notas}`;
+    out[1] = reprobado ? { letra: "B", motivo: txt } : sin(txt);
+  } else {
+    const pct = Math.round((er.total / er.digitados) * 1000) / 10;
+    const porErrores = menorEsMejor(pct, CRITERIOS.tasaErrores);
     out[1] = {
-      letra: reprobado ? peor(porServicio, "B") : porServicio,
-      motivo: `${pct}% del servicio (${r.totalPersona.toLocaleString("es-SV")} de ${r.totalServicio.toLocaleString("es-SV")})${notas}`,
+      letra: reprobado ? peor(porErrores, "B") : porErrores,
+      motivo: `${pct}% de errores (${er.total} de ${er.digitados} egresos digitados en SIMMOW)${notas}`,
     };
   }
 
@@ -110,9 +122,16 @@ export function sugerirFactores(r: ResumenRespaldo | null, esAdministrativo: boo
   else if (!m.meses) out[2] = sin(tarde);
   else out[2] = { letra: menorEsMejor(m.tardanzas, CRITERIOS.llegadasTarde), motivo: `${tarde}${r.sgas?.aplica ? " · Diploma SGAS subido" : ""}` };
 
-  // 3. Cumplimiento de metas: sin parámetro automático (decisión de la jefatura: no se
-  // entendía ni se podía explicar al personal).
-  out[3] = sin("A criterio del jefe");
+  // 3. Cumplimiento de metas: % que hizo del total de actividades del servicio.
+  if (esAdministrativo) out[3] = sin("Administrativo: sin datos en Services");
+  else if (!r.totalServicio) out[3] = sin("Dale Actualizar al respaldo");
+  else {
+    const pct = Math.round((r.totalPersona / r.totalServicio) * 1000) / 10;
+    out[3] = {
+      letra: mayorEsMejor(pct, CRITERIOS.porcentajeServicio),
+      motivo: `${pct}% del servicio (${r.totalPersona.toLocaleString("es-SV")} de ${r.totalServicio.toLocaleString("es-SV")} actividades)`,
+    };
+  }
 
   // 4. Organización
   if (esAdministrativo) out[4] = sin("Administrativo: sin datos en Services");
