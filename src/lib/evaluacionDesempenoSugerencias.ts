@@ -40,7 +40,7 @@ export const CRITERIOS = {
 export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] = [
   { factor: 1, dato: "Errores que le observaron en la revisión de digitación SIMMOW (Denys), por cada 100 egresos que digitó; y nota del examen", regla: "Errores: D hasta 10% · C 10–15% · B 15–20% · A más de 20% (con 30+ digitados). Examen reprobado: máx. B. Coordinadores de equipo: un punto arriba" },
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
-  { factor: 3, dato: "% que hizo del total de actividades del servicio en el semestre", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%" },
+  { factor: 3, dato: "% que hizo del total de actividades del servicio en el semestre", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%. Coordinadores de equipo: un punto arriba" },
   { factor: 4, dato: "De los turnos que tuvo en el plan, en cuántos no registró ni una sola actividad en Services (ningún expediente, alta, impresión, SIMMOW… en todo el turno)", regla: "Turnos vacíos: D hasta 5% de sus turnos · C 6–15% · B 16–30% · A más de 30%" },
   { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
@@ -58,7 +58,7 @@ export const MIN_DIGITADOS = 30;
 /**
  * Coordinadores de equipo (decisión de la jefatura): además de su trabajo hacen
  * reportes, resuelven conflictos y problemas y reportan a los jefes, así que en
- * Calidad del trabajo se les sube un punto sobre lo que les salga. Por uid; si
+ * Calidad del trabajo (1) y Cumplimiento de metas (3) se les sube un punto sobre lo que les salga. Por uid; si
  * cambian los coordinadores, se actualiza esta lista.
  */
 export const COORDINADORES_EQUIPO: Record<string, string> = {
@@ -136,13 +136,15 @@ export function sugerirFactores(
     };
   }
 
-  // Coordinador de equipo: un punto arriba en Calidad sobre lo que le salga.
-  if (opciones.esCoordinador && out[1]) {
-    const base = out[1];
-    out[1] = base.letra
-      ? { letra: subir(base.letra), motivo: `${base.motivo} · Coordinador de equipo: ${base.letra === "D" ? "ya está en D, la más alta" : `un punto arriba (${base.letra} → ${subir(base.letra)})`}` }
+  // Coordinador de equipo: un punto arriba en Calidad (1) y en Metas (3) sobre lo que le salga.
+  const coordinadorArriba = (base: Sugerencia): Sugerencia =>
+    base.letra
+      ? {
+          letra: subir(base.letra),
+          motivo: `${base.motivo} · Coordinador de equipo: ${base.letra === "D" ? "ya está en D, la más alta" : `un punto arriba (${base.letra} → ${subir(base.letra)})`}`,
+        }
       : { letra: null, motivo: `${base.motivo} · Coordinador de equipo: súbele un punto a la letra que elijas` };
-  }
+  if (opciones.esCoordinador && out[1]) out[1] = coordinadorArriba(out[1]);
 
   // 2. Responsabilidad: llegadas tarde. Solo en JUL - DIC 2026 (regla puntual de la
   // jefatura, ver SGAS_PERIODO): sin diploma SGAS queda en A.
@@ -161,6 +163,8 @@ export function sugerirFactores(
       motivo: `${pct}% del servicio (${r.totalPersona.toLocaleString("es-SV")} de ${r.totalServicio.toLocaleString("es-SV")} actividades)`,
     };
   }
+
+  if (opciones.esCoordinador && out[3]) out[3] = coordinadorArriba(out[3]);
 
   // 4. Organización
   if (esAdministrativo) out[4] = sin("Administrativo: sin datos en Services");
