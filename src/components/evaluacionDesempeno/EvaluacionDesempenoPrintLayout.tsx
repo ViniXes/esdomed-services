@@ -30,13 +30,22 @@ type Datos = Pick<
   | "fechaAcciones"
 > & {
   formato?: EvaluacionDesempeno["formato"];
-  /** "YYYY-MM-DD": día en que se hizo la evaluación; va en las fechas de las firmas si no se llenaron a mano. */
+  /** "YYYY-MM-DD": día en que se hizo la evaluación; va en las fechas de todas las firmas que no se llenaron a mano. */
   fechaEvaluacion?: string;
 };
 
 // Sin firma digital: el nombre de quien firma va sobre la línea.
 const FIRMA_EVALUADOR = "Heber Benjamín Cardoza Guevara";
 const FIRMA_JEFE_SUPERIOR = "Roberto Centeno Zambrano";
+
+/**
+ * La línea de firma del evaluado es más corta y el nombre va en mayúsculas: hasta
+ * 25 letras cabe a 11pt; uno más largo se achica lo justo para seguir en un renglón.
+ */
+function estiloNombreEvaluado(nombre: string): { fontSize: string } | undefined {
+  const largo = nombre.length;
+  return largo <= 25 ? undefined : { fontSize: `${Math.max(7.5, (11 * 25) / largo).toFixed(1)}pt` };
+}
 
 function Casilla({ marcada }: { marcada: boolean }) {
   return <span className="casilla">{marcada ? "X" : ""}</span>;
@@ -403,10 +412,15 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
             <p className="renglon-texto">Comentarios:</p>
             <Renglones texto={ev.comentariosEvaluado} lineas={1} />
             <div className="firma-fila normal">
-              <div className="firma-linea">Firma del Evaluado</div>
+              <div className="firma-linea">
+                <span className="fecha-val firma-nombre" style={estiloNombreEvaluado(d.nombre)}>
+                  {d.nombre}
+                </span>
+                Firma del Evaluado
+              </div>
               <div className="sello">SELLO</div>
               <div className="firma-linea fecha">
-                <span className="fecha-val">{fechaCorta(ev.fechaEvaluado)}</span>
+                <span className="fecha-val">{fechaCorta(ev.fechaEvaluado || ev.fechaEvaluacion || "")}</span>
                 Fecha
               </div>
             </div>
@@ -418,10 +432,15 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
           <div className="acciones">
             <Renglones texto={ev.acciones} lineas={7} />
             <div className="firma-fila normal">
-              <div className="firma-linea">Firma del Evaluado</div>
+              <div className="firma-linea">
+                <span className="fecha-val firma-nombre" style={estiloNombreEvaluado(d.nombre)}>
+                  {d.nombre}
+                </span>
+                Firma del Evaluado
+              </div>
               <div className="sello">SELLO</div>
               <div className="firma-linea fecha">
-                <span className="fecha-val">{fechaCorta(ev.fechaAcciones)}</span>
+                <span className="fecha-val">{fechaCorta(ev.fechaAcciones || ev.fechaEvaluacion || "")}</span>
                 Fecha
               </div>
             </div>
