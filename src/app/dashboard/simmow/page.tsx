@@ -253,10 +253,10 @@ export default function SimmowPage() {
   const [fechaTemp2Amb, setFechaTemp2Amb] = useState("");
   const [errorFechaAmb, setErrorFechaAmb] = useState<string | null>(null);
 
-  // Mismos roles que pueden ver el enlace en dashboard/layout.tsx (solo
-  // esdomed puntual + admin, NO asistente_esdomed) — el resto de roles no
-  // debe poder abrir la página aunque escriba la URL directamente.
-  const puedeVerSimmow = profile?.role === "esdomed" || profile?.role === "admin";
+  // Mismos roles que ven el enlace en el menú (navEsdomed: esdomed puntual,
+  // asistente administrativo y admin) — el resto de roles no debe poder abrir
+  // la página aunque escriba la URL directamente. Consulta Externa sigue solo admin.
+  const puedeVerSimmow = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   useEffect(() => {
     if (!loading && profile && !puedeVerSimmow) {

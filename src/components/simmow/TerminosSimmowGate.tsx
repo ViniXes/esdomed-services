@@ -13,10 +13,9 @@ import {
   TERMINOS_SIMMOW_SECCIONES,
 } from "@/lib/simmow/terminosSimmow";
 
-// Solo el rol esdomed puntual + admin — NO asistente_esdomed (pedido
-// explícito del usuario, SIMMOW no sigue el agrupamiento esEsdomed habitual
-// del resto de módulos del dashboard).
-const ROLES_SIMMOW = ["esdomed", "admin"];
+// Mismos roles que ven SIMMOW en el menú: esdomed puntual, asistente
+// administrativo (por si genera un alta con la herramienta) y admin.
+const ROLES_SIMMOW = ["esdomed", "asistente_esdomed", "admin"];
 
 /**
  * Pantalla bloqueante adicional a TerminosGate, específica de la herramienta

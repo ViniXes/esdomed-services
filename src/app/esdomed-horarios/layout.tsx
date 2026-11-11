@@ -29,7 +29,7 @@ export default function EsdomedHorariosLayout({ children }: { children: React.Re
     ...(puedePlanificar
       ? [
           { href: "/esdomed-horarios/planes", label: "Planes de trabajo", icon: CalendarDays },
-          // La programación la edita solo el admin; el asistente la consulta.
+          // La programación la editan el admin y el asistente administrativo.
           { href: "/esdomed-horarios/vacaciones", label: "Vacaciones", icon: Plane },
         ]
       : []),

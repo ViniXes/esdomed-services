@@ -20,9 +20,9 @@ type Perfil = UserProfile | null | undefined;
 const esEsdomed = (p: Perfil) => p?.role === "esdomed" || p?.role === "asistente_esdomed";
 const esAdmin = (p: Perfil) => p?.role === "admin";
 const esdomedOAdmin = (p: Perfil) => esEsdomed(p) || esAdmin(p);
-// SIMMOW es solo del rol esdomed puntual + admin — NO asistente_esdomed
-// (pedido explícito del usuario, no sigue el agrupamiento esEsdomed habitual).
-const veSimmow = (p: Perfil) => p?.role === "esdomed" || esAdmin(p);
+// SIMMOW: esdomed puntual, asistente administrativo (por si genera un alta con
+// la herramienta) y admin.
+const veSimmow = (p: Perfil) => p?.role === "esdomed" || p?.role === "asistente_esdomed" || esAdmin(p);
 // Solicitudes SIS y aprobación de trámites: superusuario + auxiliar administrativo.
 const adminOAsistente = (p: Perfil) => esAdmin(p) || p?.role === "asistente_esdomed";
 // Personal con fila en el plan (ESDOMED, auxiliar, o admin con código de marcación).
@@ -156,10 +156,10 @@ const MENU_ESDOMED: SeccionNav[] = [
     ],
   },
   {
-    // Trazabilidad: quién buscó y consultó qué paciente.
+    // Trazabilidad: quién buscó y consultó qué paciente (admin + asistente administrativo).
     titulo: "Auditoría",
     icon: History,
-    visibleSi: esAdmin,
+    visibleSi: adminOAsistente,
     entradas: [
       { href: "/dashboard/historial-busquedas", label: "Historial de búsquedas", icon: SearchCheck },
       { href: "/dashboard/historial-consultas", label: "Historial de consultas", icon: FileSearch },

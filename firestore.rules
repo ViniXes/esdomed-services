@@ -407,12 +407,12 @@ service cloud.firestore {
 
     // ─── Notificaciones de fallecidos ─────────────────────────────────────────
     // Delete: ESDOMED puede eliminar notificaciones duplicadas, pero NO las de
-    // trámite cerrado (esas solo el admin, previa revisión).
+    // trámite cerrado (esas solo el admin o el asistente administrativo, previa revisión).
     match /notificaciones_fallecidos/{id} {
       allow read:   if isAuth() && (isStaff() || isPsicologia() || isTrabajoSocial() || (isMedico() && resource.data.medicoId == uid()));
       allow create: if isMedico();
       allow update: if isStaff() || isPsicologia() || isTrabajoSocial();
-      allow delete: if isAdmin()
+      allow delete: if isAdmin() || isAsistenteEsdomed()
                     || (isEsdomed() && resource.data.tramiteCerrado != true);
 
       // ── Bitácora interna del caso (comentarios + adjuntos de ESDOMED) ──
@@ -443,10 +443,9 @@ service cloud.firestore {
       // el detalle del propio. Sí puede leer SU PROPIO reporte (resource.data.uid
       // == uid()) para consultar si ya se resolvió — una consulta filtrada por
       // "uid == su propio uid" es la única forma de listar bajo esta regla.
-      // create: SIMMOW es solo para el rol esdomed puntual + admin (no
-      // asistente_esdomed), a diferencia de isEsdomed() que sí lo agrupa.
+      // create: quienes usan SIMMOW (esdomed puntual, asistente administrativo y admin).
       allow read:   if isAdmin() || (isAuth() && resource.data.uid == uid());
-      allow create: if (getRole() == 'esdomed' || isAdmin()) && request.resource.data.uid == uid();
+      allow create: if (isEsdomed() || isAdmin()) && request.resource.data.uid == uid();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -467,7 +466,8 @@ service cloud.firestore {
       allow read:   if isStaff() || isMedico() || isEnfermeria() || isIsbm() || isComiteLesiones();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin();
-      allow delete: if isAdmin();
+      // Eliminar paciente: admin y asistente administrativo.
+      allow delete: if isAdmin() || isAsistenteEsdomed();
     }
 
     // ─── Personas ─────────────────────────────────────────────────────────────
@@ -507,7 +507,8 @@ service cloud.firestore {
     // Los médicos tienen acceso de solo lectura para ver la cola.
     // Solo el personal ESDOMED puede registrar ingresos.
     match /busquedas_telefono/{id} {
-      allow read: if isAdmin();
+      // Auditoría (Historial de búsquedas): admin y asistente administrativo.
+      allow read: if isAdmin() || isAsistenteEsdomed();
       allow create: if isMedico()
                     && request.resource.data.keys().hasOnly([
                       'usuarioUid',
@@ -547,10 +548,10 @@ service cloud.firestore {
 
     // ─── Consultas de ficha de paciente (auditoría "Buscar Paciente") ─────────
     // Médicos, trabajo social, psicología y ESDOMED dejan constancia al abrir la
-    // ficha rápida de un paciente. Solo admin puede leer el historial; los
-    // registros son inmutables.
+    // ficha rápida de un paciente. Solo admin y asistente administrativo leen
+    // el historial; los registros son inmutables.
     match /consultas_paciente/{id} {
-      allow read: if isAdmin();
+      allow read: if isAdmin() || isAsistenteEsdomed();
       allow create: if isAuth()
                     && (isMedico() || isTrabajoSocial() || isPsicologia() || isEsdomed() || isAdmin())
                     && request.resource.data.usuarioUid == uid()
@@ -825,11 +826,11 @@ service cloud.firestore {
     }
 
     // Programación anual de vacaciones del personal operativo de ESDOMED
-    // (doc id = año). Solo el admin la arma; el personal la ve en "Mi horario"
-    // y el editor del plan la lee para marcar VAC.
+    // (doc id = año). La arman el admin y el asistente administrativo; el
+    // personal la ve en "Mi horario" y el editor del plan la lee para marcar VAC.
     match /vacaciones_programadas/{anio} {
       allow read:  if isEsdomed() || isAsistenteEsdomed() || isAdmin();
-      allow write: if isAdmin();
+      allow write: if isAsistenteEsdomed() || isAdmin();
     }
 
     // Planes de trabajo de las demás ÁREAS del hospital (Terapia Respiratoria,

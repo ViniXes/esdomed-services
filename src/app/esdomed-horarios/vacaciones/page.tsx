@@ -61,7 +61,8 @@ function nombreCorto(nombre: string): string {
 
 export default function VacacionesPage() {
   const { profile } = useAuth();
-  const esAdmin = profile?.role === "admin";
+  // Arman y modifican la programación: admin y asistente administrativo (mismo criterio que firestore.rules).
+  const puedeEditar = profile?.role === "admin" || profile?.role === "asistente_esdomed";
 
   const [anio, setAnio] = useState(ANIO_INICIAL);
   const [personal, setPersonal] = useState<PersonaVacaciones[] | null>(null);
@@ -303,7 +304,7 @@ export default function VacacionesPage() {
             className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
             {[ANIO_HOY - 1, ANIO_HOY, ANIO_HOY + 1].map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-          {esAdmin && (
+          {puedeEditar && (
             <>
               <button type="button" onClick={() => setImportando(true)} disabled={cargando}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -318,9 +319,9 @@ export default function VacacionesPage() {
         </div>
       </div>
 
-      {!esAdmin && (
+      {!puedeEditar && (
         <p className="mb-4 flex items-start gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-          <Lock size={13} className="mt-0.5 shrink-0" /> Solo el administrador arma y modifica la programación de vacaciones.
+          <Lock size={13} className="mt-0.5 shrink-0" /> Solo el administrador y el asistente administrativo arman y modifican la programación de vacaciones.
         </p>
       )}
 
@@ -417,7 +418,7 @@ export default function VacacionesPage() {
                                         actual={actual}
                                         grupo={persona?.grupo ?? ""}
                                         conAviso={conAviso}
-                                        editable={esAdmin}
+                                        editable={puedeEditar}
                                         deshabilitado={idx === 1 && lista.length === 0}
                                         ariaLabel={`${nombreMes}, ${quincena === 1 ? "primera" : "segunda"} quincena, cupo ${idx + 1}`}
                                         onChange={(uid) => asignarCupo(mes, quincena, idx, uid)}>
