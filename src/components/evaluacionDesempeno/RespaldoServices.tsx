@@ -9,7 +9,8 @@ import {
   type RefPersonaEquipo,
   type ResumenRespaldo,
 } from "@/lib/evaluacionDesempenoRespaldo";
-import { CRITERIOS_TEXTO, MIN_DIGITADOS } from "@/lib/evaluacionDesempenoSugerencias";
+import { MIN_DIGITADOS, criteriosEn, numeroFactor, type ConceptoFactor } from "@/lib/evaluacionDesempenoSugerencias";
+import type { FormatoEvaluacion } from "@/lib/evaluacionDesempeno";
 import { NOTA_MINIMA_EVALUACION, aproboEvaluacion } from "@/lib/evaluacionesPersonal";
 import { ChipNota } from "@/components/personal/EvaluacionesPersonal";
 import type { IncidenteCritico } from "@/lib/evaluacionDesempeno";
@@ -22,6 +23,8 @@ interface Props {
   esAdministrativo: boolean;
   equipo: RefPersonaEquipo[];
   respaldo: ResumenRespaldo | null;
+  /** Formulario de la evaluación: define qué número tiene cada factor. */
+  formato?: FormatoEvaluacion;
   onRespaldo: (r: ResumenRespaldo) => void;
   onAgregarIncidente: (i: IncidenteCritico) => void;
 }
@@ -32,7 +35,14 @@ interface Props {
  * amonestaciones, reporte del reloj y altas revertidas. Cada hallazgo puede
  * pasarse al Registro de Incidentes Críticos (página 3) con un clic.
  */
-export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo, esAdministrativo, equipo, respaldo, onRespaldo, onAgregarIncidente }: Props) {
+export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo, esAdministrativo, equipo, respaldo, formato = "mpe", onRespaldo, onAgregarIncidente }: Props) {
+  // Número de cada factor en el formulario de esta evaluación (cambia entre formatos).
+  const num = (c: ConceptoFactor) => numeroFactor(c, formato);
+  const etiquetaFactores = (...cs: ConceptoFactor[]) => {
+    const ns = cs.map(num).filter((x): x is number => x != null).sort((a, b) => a - b);
+    if (!ns.length) return "Dato de apoyo";
+    return ns.length === 1 ? `Factor ${ns[0]}` : `Factores ${ns.slice(0, -1).join(", ")} y ${ns[ns.length - 1]}`;
+  };
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
   const [verCriterios, setVerCriterios] = useState(false);
@@ -106,7 +116,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {CRITERIOS_TEXTO.map((c) => (
+              {criteriosEn(formato).map((c) => (
                 <tr key={c.factor}>
                   <td className="px-3 py-1.5 font-semibold text-slate-700 dark:text-slate-200">{c.factor}</td>
                   <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300">{c.dato}</td>
@@ -132,12 +142,12 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
       {respaldo && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {/* Errores de digitación (revisión de Denys) */}
-          <Bloque icon={SearchCheck} titulo="Errores en la digitación SIMMOW (revisión de Denys)" factor="Factor 1 · calidad" atenuado={esAdministrativo} ancho>
+          <Bloque icon={SearchCheck} titulo="Errores en la digitación SIMMOW (revisión de Denys)" factor={`${etiquetaFactores("calidad")} · calidad`} atenuado={esAdministrativo} ancho>
             <ErroresRevision errores={respaldo.errores} nombre={primerNombre(nombre)} />
           </Bloque>
 
           {/* Productividad */}
-          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor="Factor 3 · metas" atenuado={esAdministrativo} ancho>
+          <Bloque icon={TrendingUp} titulo="Productividad del semestre" factor={`${etiquetaFactores("metas")} · ${formato === "administrativo" ? "productividad" : "metas"}`} atenuado={esAdministrativo} ancho>
             <ParteDelServicio total={respaldo.totalPersona} servicio={respaldo.totalServicio ?? 0} nombre={primerNombre(nombre)} />
             {respaldo.driveIncompleto && (
               <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
@@ -181,7 +191,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
           </Bloque>
 
           {/* Asistencia mes por mes */}
-          <Bloque icon={CalendarClock} titulo="Asistencia mes por mes" factor="Factores 2, 4 y 5" ancho>
+          <Bloque icon={CalendarClock} titulo="Asistencia mes por mes" factor={etiquetaFactores("responsabilidad", "organizacion", "normas")} ancho>
             {!respaldo.plan?.porMes ? (
               <p className="text-xs text-slate-500">Vuelve a cargar el respaldo para ver la asistencia por mes.</p>
             ) : (
@@ -238,7 +248,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                 </div>
                 {!esAdministrativo && respaldo.plan.turnosProgramados > 0 && (
                   <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                    <strong>Turnos vacíos (factor 4):</strong> en <strong>{respaldo.plan.turnosSinActividad}</strong> de sus {respaldo.plan.turnosProgramados} turnos
+                    <strong>Turnos vacíos ({num("organizacion") ? `factor ${num("organizacion")}` : "dato de apoyo"}):</strong> en <strong>{respaldo.plan.turnosSinActividad}</strong> de sus {respaldo.plan.turnosProgramados} turnos
                     {" "}(<strong>{Math.round((respaldo.plan.turnosSinActividad / respaldo.plan.turnosProgramados) * 100)}%</strong>) no registró ni una sola
                     actividad en Services durante todo el turno. Mientras más bajo, mejor.
                   </p>
@@ -251,10 +261,10 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                   <div className="flex flex-wrap items-center gap-2">
                     {respaldo.marcaciones.tardanzas > 0 && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                        Llegadas tarde (factor 2):
+                        Llegadas tarde (factor {num("responsabilidad")}):
                         {botonIncidente("tardanzas", {
                           fecha: hoy,
-                          factor: 2,
+                          factor: num("responsabilidad") ?? 2,
                           tipo: "D",
                           descripcion: `Llegadas tarde ${periodo}: ${respaldo.marcaciones.tardanzas}.`,
                         })}
@@ -262,10 +272,10 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                     )}
                     {respaldo.marcaciones.omisiones + respaldo.marcaciones.ausencias + (respaldo.marcaciones.salidasAntes ?? 0) > 0 && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                        Disciplina (factor 5):
+                        Disciplina (factor {num("normas")}):
                         {botonIncidente("disciplina", {
                           fecha: hoy,
-                          factor: 5,
+                          factor: num("normas") ?? 5,
                           tipo: "D",
                           descripcion: `Disciplina ${periodo}: ${respaldo.marcaciones.omisiones} olvidos de marca, ${respaldo.marcaciones.ausencias} días sin marca y ${respaldo.marcaciones.salidasAntes ?? 0} salidas antes de hora.`,
                         })}
@@ -278,7 +288,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
           </Bloque>
 
           {/* Archivero */}
-          <Bloque icon={FileWarning} titulo="Archivero: evaluaciones y amonestaciones" factor="Factores 2, 5 y 7">
+          <Bloque icon={FileWarning} titulo="Archivero: evaluaciones y amonestaciones" factor={etiquetaFactores("calidad", "normas", "relaciones")}>
             {respaldo.sgas?.aplica && (
               <div
                 className={`mb-2 rounded-lg border px-2.5 py-1.5 text-xs ${
@@ -322,7 +332,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
                         <span className="ml-auto">
                           {botonIncidente(`arch-${e.id}`, {
                             fecha: e.fecha,
-                            factor: amonestacion ? 5 : 1,
+                            factor: amonestacion ? (num("normas") ?? 5) : (num("calidad") ?? 1),
                             tipo: amonestacion || (typeof e.nota === "number" && !aproboEvaluacion(e.nota)) ? "D" : "F",
                             descripcion:
                               typeof e.nota === "number"

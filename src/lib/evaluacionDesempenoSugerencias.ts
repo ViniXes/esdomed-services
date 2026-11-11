@@ -8,7 +8,7 @@
 // (sistema, calidad, coordinación) no queda registrado como productividad, así
 // que para él solo se sugiere con marcaciones y archivero.
 
-import type { Opcion } from "@/lib/evaluacionDesempeno";
+import type { FormatoEvaluacion, Opcion } from "@/lib/evaluacionDesempeno";
 import type { ResumenRespaldo } from "@/lib/evaluacionDesempenoRespaldo";
 import { NOTA_MINIMA_EVALUACION } from "@/lib/evaluacionesPersonal";
 
@@ -42,7 +42,7 @@ export const CRITERIOS_TEXTO: { factor: number; dato: string; regla: string }[] 
   { factor: 2, dato: "Llegadas tarde en el semestre (reloj). Solo en Jul–Dic 2026: diploma del curso SGAS subido a su ficha", regla: "D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más (en Jul–Dic 2026, también A sin diploma SGAS)" },
   { factor: 3, dato: "% que hizo del total de actividades del servicio en el semestre", regla: "D: 8% o más · C: 4–7.9% · B: 2–3.9% · A: menos de 2%. Coordinadores de equipo: un punto arriba" },
   { factor: 4, dato: "De los turnos que tuvo en el plan, en cuántos no registró ni una sola actividad en Services (ningún expediente, alta, impresión, SIMMOW… en todo el turno)", regla: "Turnos vacíos: D hasta 5% de sus turnos · C 6–15% · B 16–30% · A más de 30%" },
-  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en el factor 2", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
+  { factor: 5, dato: "Disciplina: olvidos de marca + días sin marca + salidas antes de hora (reloj), y amonestaciones. Las llegadas tarde se valoran en Responsabilidad", regla: "Reloj D: 0–5 · C: 6–7 · B: 8–9 · A: 10 o más. Amonestación interna/oral: máx. C · escrita: máx. B · más de una: A" },
   { factor: 6, dato: "Sin dato directo", regla: "A criterio del jefe" },
   { factor: 7, dato: "Quejas o amonestaciones en el archivero, como alerta", regla: "A criterio del jefe" },
 ];
@@ -197,4 +197,55 @@ export function sugerirFactores(
   out[7] = sin(amonestaciones ? `A criterio del jefe · revisar ${textoAmon}` : "A criterio del jefe");
 
   return out;
+}
+
+// ── Formatos ────────────────────────────────────────────────────────────────
+// Las sugerencias se calculan por concepto con la numeración del formulario
+// Médico, paramédico y de enfermería ("mpe"); el formulario Administrativo
+// ordena los factores distinto y cambia Organización por Iniciativa.
+
+export type ConceptoFactor = "calidad" | "responsabilidad" | "metas" | "organizacion" | "normas" | "discrecion" | "relaciones" | "iniciativa";
+
+const CONCEPTO_MPE: Record<number, ConceptoFactor> = {
+  1: "calidad",
+  2: "responsabilidad",
+  3: "metas",
+  4: "organizacion",
+  5: "normas",
+  6: "discrecion",
+  7: "relaciones",
+};
+
+export const NUMERO_FACTOR: Record<FormatoEvaluacion, Partial<Record<ConceptoFactor, number>>> = {
+  mpe: { calidad: 1, responsabilidad: 2, metas: 3, organizacion: 4, normas: 5, discrecion: 6, relaciones: 7 },
+  administrativo: { calidad: 1, metas: 2, responsabilidad: 3, iniciativa: 4, normas: 5, relaciones: 6, discrecion: 7 },
+};
+
+/** Número del factor de ese concepto en el formato, o null si el formato no lo tiene. */
+export const numeroFactor = (concepto: ConceptoFactor, formato: FormatoEvaluacion = "mpe") => NUMERO_FACTOR[formato][concepto] ?? null;
+
+/** Reacomoda las sugerencias (numeradas como "mpe") a los factores del formato. */
+export function sugerenciasEnFormato(s: Record<number, Sugerencia>, formato: FormatoEvaluacion = "mpe"): Record<number, Sugerencia> {
+  if (formato === "mpe") return s;
+  const out: Record<number, Sugerencia> = {};
+  for (const [n, concepto] of Object.entries(CONCEPTO_MPE)) {
+    const destino = NUMERO_FACTOR[formato][concepto];
+    if (destino && s[Number(n)]) out[destino] = s[Number(n)];
+  }
+  const iniciativa = NUMERO_FACTOR[formato].iniciativa;
+  if (iniciativa && Object.keys(s).length && !out[iniciativa]) out[iniciativa] = { letra: null, motivo: "A criterio del jefe" };
+  return out;
+}
+
+/** Criterios (dato + regla) con la numeración del formato. */
+export function criteriosEn(formato: FormatoEvaluacion = "mpe"): { factor: number; dato: string; regla: string }[] {
+  if (formato === "mpe") return CRITERIOS_TEXTO;
+  const filas: { factor: number; dato: string; regla: string }[] = [];
+  for (const c of CRITERIOS_TEXTO) {
+    const destino = NUMERO_FACTOR[formato][CONCEPTO_MPE[c.factor]];
+    if (destino) filas.push({ ...c, factor: destino });
+  }
+  const iniciativa = NUMERO_FACTOR[formato].iniciativa;
+  if (iniciativa) filas.push({ factor: iniciativa, dato: "Sin parámetro automático", regla: "A criterio del jefe" });
+  return filas.sort((a, b) => a.factor - b.factor);
 }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import {
-  FACTORES,
+  FORMATOS,
   FILAS_INCIDENTES,
   OPCIONES,
   RANGOS,
@@ -28,7 +28,7 @@ type Datos = Pick<
   | "fechaEvaluado"
   | "acciones"
   | "fechaAcciones"
->;
+> & { formato?: EvaluacionDesempeno["formato"] };
 
 function Casilla({ marcada }: { marcada: boolean }) {
   return <span className="casilla">{marcada ? "X" : ""}</span>;
@@ -81,6 +81,8 @@ function Renglones({ texto, lineas }: { texto: string; lineas: number }) {
  */
 export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
   const d = ev.datos;
+  const formato = FORMATOS[ev.formato ?? "mpe"];
+  const factores = formato.factores;
   const filas = Array.from({ length: FILAS_INCIDENTES }, (_, i) => ev.incidentes[i]);
 
   return (
@@ -101,7 +103,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         <p className="subtitulo">FORMULARIO DE EVALUACION DEL DESEMPEÑO PARA PERSONAL</p>
         <div className="titulo-fila">
           <p className="seccion seccion-i">I. DATOS GENERALES</p>
-          <p className="titulo">MEDICO, PARAMEDICO Y DE ENFERMERIA</p>
+          <p className="titulo">{formato.titulo}</p>
         </div>
 
         <div className="datos">
@@ -179,7 +181,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
 
         <p className="seccion">II. EVALUACION GENERAL POR PARTE DEL JEFE INMEDIATO</p>
         <div className="factores">
-          {FACTORES.slice(0, 3).map((f) => (
+          {factores.slice(0, 3).map((f) => (
             <Factor key={f.numero} f={f} elegida={ev.respuestas[f.numero]} />
           ))}
         </div>
@@ -189,7 +191,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
       {/* ─────────────── Página 2 ─────────────── */}
       <section className="hoja">
         <div className="factores" style={{ marginTop: "0.25in" }}>
-          {FACTORES.slice(3).map((f) => (
+          {factores.slice(3).map((f) => (
             <Factor key={f.numero} f={f} elegida={ev.respuestas[f.numero]} />
           ))}
         </div>
@@ -207,7 +209,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
                 </tr>
               </thead>
               <tbody>
-                {FACTORES.map((f) => (
+                {factores.map((f) => (
                   <tr key={f.numero}>
                     <td className="col-factor">{f.etiquetaTabla}</td>
                     {OPCIONES.map((o) => (
@@ -242,7 +244,7 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
       <section className="hoja">
         <div className="registro-titulo">
           <p className="subtitulo">REGISTRO INDIVIDUAL DE INCIDENTES CRITICOS DE DESEMPEÑO PARA PERSONAL</p>
-          <p className="titulo">MEDICO, PARAMEDICO Y DE ENFERMERIA</p>
+          <p className="titulo">{formato.titulo}</p>
         </div>
 
         <table className="tabla-personas">
@@ -273,14 +275,14 @@ export function EvaluacionDesempenoPrintLayout({ ev }: { ev: Datos }) {
         <div className="observan">
           <p className="observan-titulo">FACTORES QUE SE OBSERVAN:</p>
           <div className="observan-fila">
-            {FACTORES.slice(0, 4).map((f) => (
+            {factores.slice(0, 4).map((f) => (
               <span key={f.numero} className="observan-caja">
                 {f.etiquetaCorta}
               </span>
             ))}
           </div>
           <div className="observan-fila centrada">
-            {FACTORES.slice(4).map((f) => (
+            {factores.slice(4).map((f) => (
               <span key={f.numero} className="observan-caja alta">
                 {f.etiquetaCorta}
               </span>

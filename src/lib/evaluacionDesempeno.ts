@@ -137,7 +137,141 @@ export const FACTORES: FactorEvaluacion[] = [
   },
 ];
 
-export const PUNTAJE_MAXIMO = FACTORES.reduce((s, f) => s + f.puntos.D, 0); // 84
+/**
+ * Formulario para personal ADMINISTRATIVO (mismo MINSAL: misma estructura,
+ * puntos y rangos; cambian los factores y sus textos). Textos tal cual, con sus
+ * erratas ("maximiznado", "armonia nia", "Normass").
+ */
+export const FACTORES_ADMINISTRATIVO: FactorEvaluacion[] = [
+  {
+    numero: 1,
+    titulo: "CALIDAD DE TRABAJO",
+    etiquetaTabla: "1.- Calidad de Trabajo",
+    etiquetaCorta: "1. Calidad de Trabajo",
+    definicion:
+      "Se refiere al cuidado, nitidez y exactitud con que realiza su trabajo, utilizando adecuadamente los recursos y eliminando el desperdicio en terminos materiales, tiempo y costo.",
+    descriptores: {
+      A: "Casi siempre es necesario que rectifique su trabajo. Necesita mucha supervisión.",
+      B: "Eventualmente comete errores, que son fácilmente corregidos. Necesita poca supervisión.",
+      C: "No comete errores. Trabaja con precisión y oportunidad. No necesita supervisión directa.",
+      D: "Trabajo que excede a la normalidad, realizado con máximo grado de precisión, oportunidad y exactitud.",
+    },
+    puntos: { A: 0, B: 7, C: 14, D: 21 },
+  },
+  {
+    numero: 2,
+    titulo: "PRODUCTIVIDAD",
+    etiquetaTabla: "2.- Productividad",
+    etiquetaCorta: "2. Productividad",
+    definicion:
+      "Se evalua el rendimiento de trabajo efectivo generado por el empleado durante un tiempo estipulado, de conformidad con las asignaciones que recibe, maximiznado el uso de los recursos y eliminando pérdida de tiempo.",
+    descriptores: {
+      A: "Con frecuencia no alcanza a cumplir con la cantidad de trabajo asignado. Siempre está atrasado. En repetidas ocasiones se le proporciona adiestramiento.",
+      B: "Cumple con el trabajo que le es asignado, algunas veces se atrasa. Eventualmente necesita adiestramiento, en alguna etapa de su trabajo.",
+      C: "Cumple con los trabajos asignados. Siempre está al día. Utiliza adecuadamente los recursos; conoce bien su trabajo y no necesita adiestramiento.",
+      D: "Conoce a la perfección su trabajo, lo que le permite realizarlo en menor tiempo del asignado, a la vez que maximiza los recursos. Realiza tareas adicionales a las encomendadas.",
+    },
+    puntos: { A: 0, B: 6, C: 12, D: 18 },
+  },
+  {
+    numero: 3,
+    titulo: "RESPONSABILIDAD",
+    etiquetaTabla: "3.- Responsabilidad",
+    etiquetaCorta: "3. Responsabilidad",
+    definicion: "Es el grado de compromiso, dedicación, interés y preocupación que tiene el empleado en la ejecución de sus funciones y ante la Institución misma.",
+    descriptores: {
+      A: "Generalmente no cumple con las responsabilidades de su puesto de trabajo, muestra apatía y desinteres. Necesita que se le incentive.",
+      B: "Cumple sus funciones, sin embargo a veces no logra concluirlas oportunamente.",
+      C: "Demuestra interés y cumple con las actividades de su puesto de trabajo.",
+      D: "Cumple con las responsabilidades de su puesto y otras que le son encomendadas.",
+    },
+    puntos: { A: 0, B: 5, C: 10, D: 15 },
+  },
+  {
+    numero: 4,
+    titulo: "INICIATIVA Y CREATIVIDAD",
+    etiquetaTabla: "4.- Iniciativa y Creatividad",
+    etiquetaCorta: "4. Iniciativa y Creatividad",
+    definicion:
+      "Evalúa la capacidad del empleado para proponer cambios que mejoren los métodos de trabajo, enfrentar y resolver problemas, aportando soluciones a los mismos. Puede considerarse también, la forma en que actúa para afrontar situaciones no rutinarias.",
+    descriptores: {
+      A: "No aporta nuevas ideas ni demuestra interés por mejorar el trabajo, por lo general se guia por la rutina.",
+      B: "Algunas veces aporta ideas que contribuyen a mejorar el trabajo. Tiene capacidad, pero es necesario su jefe inmediato le presione.",
+      C: "Aporta ideas y sugerencias que contribuyen a mejorar su trabajo y solucionar problemas. No requiere de presiones para desarrollar su potencialidad.",
+      D: "Permanentemente propone cambios, aporta ideas y sugerencias prácticas que permiten la solución de problemas e innovaciones a su trabajo y al de otras áreas.",
+    },
+    puntos: { A: 0, B: 4, C: 8, D: 12 },
+  },
+  {
+    numero: 5,
+    titulo: "CUMPLIMIENTO DE NORMAS E INSTRUCCIONES",
+    etiquetaTabla: "5.- Cumplimiento de Normass e Instrucciones",
+    etiquetaCorta: "5. Cumplimiento de Normas e Instrucciones",
+    definicion:
+      "Es el cumplimiento de normas institucionales e instrucciones emanadas por los jefes. En general de todas las disposiciones reglamentarias y de las aplicacion de las mismas, con especial apego a la puntualidad en el horario de trabajo.",
+    descriptores: {
+      A: "Reincide en incumplir algunas normas y reglamentos especialmente la puntualidad a los horarios de su jornada laboral.",
+      B: "Cumple ordenes e instrucciones. En algunas ocasiones presenta problemas de disciplina y puntualidad en su jornada laboral.",
+      C: "Cumple con las normas y reglamentos vigentes sin dificultad, acata las ordenes e instrucciones que recibe. No presenta problemas de incumplimiento de horarios ni disciplina.",
+      D: "Su acatamiento de las normas e instrucciones es ejemplar, así como la disciplina (asistencia, permanencia y puntualidad en su jornada laboral y conducta), es intachable.",
+    },
+    puntos: { A: 0, B: 3, C: 6, D: 9 },
+  },
+  {
+    numero: 6,
+    titulo: "RELACIONES LABORALES",
+    etiquetaTabla: "6.- Relaciones Laborales",
+    etiquetaCorta: "6. Relaciones Laborales",
+    definicion:
+      "Es la forma de comportarse del empleado con respeto, consideración, buena disposición y prestando ayuda en las relaciones laborales con jefes, compañeros de trabajo y/o visitantes de la Institución.",
+    descriptores: {
+      A: "Presenta dificultades en las relaciones con sus jefes, compañeros y/o visitantes, adopta actitudes negativas. Tiene poca disposición con sus jefes y presta poca ayuda a sus compañeros.",
+      B: "Tiene buenas relaciones con sus jefes, compañeros y/o visitantes, algunas veces presenta dificultades que son fácilmente manejables.",
+      C: "Mantiene muy buenas relaciones con jefes, compañeros y/o visitantes. Tiene muy buena disposición con sus jefes y al solicitarle colaboración la presta con gusto.",
+      D: "Desarrolla su trabajo en total armonia nia con sus jefes, compañeros y/o visitantes. Mantiene total disposición con sus jefes y presta colaboración a sus compañeros sin que sea solicitada",
+    },
+    puntos: { A: 0, B: 2, C: 4, D: 6 },
+  },
+  {
+    numero: 7,
+    titulo: "DISCRECION",
+    etiquetaTabla: "7.- Discreción",
+    etiquetaCorta: "7. Discreción",
+    definicion:
+      "Actitud del empleado para actuar con moderación, sensatez y tacto en el manejo de la información relacionada con su puesto de trabajo y de la institución en general.",
+    descriptores: {
+      A: "Indiscreto con la información relacionada con su trabajo y con información institucional que llega a su puesto.",
+      B: "Mantiene la reserva necesaria en relación a la información de su trabajo y la de la institución, eventualmente comete alguna indiscreción.",
+      C: "Es reservado en el manejo de la información de su trabajo y de la institución, no comete indiscreción.",
+      D: "Totalmente reservado en el manejo de información de su trabajo y de la institución, por lo que siempre se considera digno de confianza.",
+    },
+    puntos: { A: 0, B: 1, C: 2, D: 3 },
+  },
+];
+
+/** "mpe" = Médico, paramédico y de enfermería (el de casi todo el personal); "administrativo". */
+export type FormatoEvaluacion = "mpe" | "administrativo";
+
+export const FORMATOS: Record<FormatoEvaluacion, { nombre: string; titulo: string; factores: FactorEvaluacion[] }> = {
+  mpe: { nombre: "Médico, paramédico y de enfermería", titulo: "MEDICO, PARAMEDICO Y DE ENFERMERIA", factores: FACTORES },
+  administrativo: { nombre: "Administrativo", titulo: "ADMINISTRATIVO", factores: FACTORES_ADMINISTRATIVO },
+};
+
+export const factoresDe = (formato?: FormatoEvaluacion | null) => FORMATOS[formato ?? "mpe"].factores;
+
+/**
+ * Personal que se evalúa con el formulario ADMINISTRATIVO (decisión de la
+ * jefatura). Por uid; el editor permite cambiar el formato de cualquier
+ * evaluación si hace falta.
+ */
+export const FORMATO_ADMINISTRATIVO_UIDS: Record<string, string> = {
+  DdrwgkBxCtSm7bRFNlIOJTQjAr92: "Boris Andree Quintanilla",
+  gZwWfKaYDmTZavHW6vMmATorhMN2: "Violeta Sarai Castro Orellana",
+};
+
+export const formatoPorDefecto = (uid: string): FormatoEvaluacion => (uid in FORMATO_ADMINISTRATIVO_UIDS ? "administrativo" : "mpe");
+
+export const PUNTAJE_MAXIMO = FACTORES.reduce((s, f) => s + f.puntos.D, 0); // 84 (igual en los dos formatos)
 
 export type Calificacion = "Excelente" | "Muy Bueno" | "Bueno" | "Insatisfactorio";
 export const CALIFICACIONES: Calificacion[] = ["Excelente", "Muy Bueno", "Bueno", "Insatisfactorio"];
@@ -218,6 +352,8 @@ export interface EvaluacionDesempeno {
   fechaAcciones: string;
   /** Foto del respaldo de Services al guardar (ver evaluacionDesempenoRespaldo.ts). */
   respaldo?: import("@/lib/evaluacionDesempenoRespaldo").ResumenRespaldo | null;
+  /** Formulario usado; ausente = "mpe" (las evaluaciones anteriores a los formatos). */
+  formato?: FormatoEvaluacion;
   creadoPorId: string;
   creadoPorNombre: string;
   creadoEn: Date;

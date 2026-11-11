@@ -19,8 +19,11 @@ import type { UserProfile } from "@/types";
 import {
   COLECCION_EVALUACIONES_DESEMPENO,
   COLECCION_FICHAS_EVALUACION,
-  FACTORES,
   FILAS_INCIDENTES,
+  FORMATOS,
+  factoresDe,
+  formatoPorDefecto,
+  type FormatoEvaluacion,
   OPCIONES,
   PUNTAJE_MAXIMO,
   calificacionDe,
@@ -54,7 +57,7 @@ const esAdministrativoEval = (p: { nombre?: string; codigoMarcacion?: string }) 
   if (nombre.includes("BORIS") && nombre.includes("ANDREE")) return false;
   return esAdministrativoPlan({ codigoMarcacion: p.codigoMarcacion ?? "" });
 };
-import { COORDINADORES_EQUIPO, CRITERIOS_TEXTO, sugerirFactores, type Sugerencia } from "@/lib/evaluacionDesempenoSugerencias";
+import { COORDINADORES_EQUIPO, criteriosEn, sugerenciasEnFormato, sugerirFactores, type Sugerencia } from "@/lib/evaluacionDesempenoSugerencias";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "dui" | "puesto" | "codigoMarcacion" | "role" | "activo">;
 
@@ -74,6 +77,7 @@ interface Borrador {
   acciones: string;
   fechaAcciones: string;
   respaldo: ResumenRespaldo | null;
+  formato: FormatoEvaluacion;
 }
 
 const VACIO: Omit<Borrador, "empleadoId" | "empleadoNombre" | "datos"> = {
@@ -89,6 +93,7 @@ const VACIO: Omit<Borrador, "empleadoId" | "empleadoNombre" | "datos"> = {
   acciones: "",
   fechaAcciones: "",
   respaldo: null,
+  formato: "mpe",
 };
 
 const normalizar = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("es").trim();
@@ -200,10 +205,11 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
   const respaldoVigente = borrador?.respaldo?.periodo === borrador?.datos.periodo ? (borrador?.respaldo ?? null) : null;
   const esCoordinador = !!empleadoId && empleadoId in COORDINADORES_EQUIPO;
   const sugerencias = useMemo(
-    () => sugerirFactores(respaldoVigente, evaluadoAdministrativo, { esCoordinador }),
-    [respaldoVigente, evaluadoAdministrativo, esCoordinador],
+    () => sugerenciasEnFormato(sugerirFactores(respaldoVigente, evaluadoAdministrativo, { esCoordinador }), borrador?.formato ?? "mpe"),
+    [respaldoVigente, evaluadoAdministrativo, esCoordinador, borrador?.formato],
   );
-  const sugeridasPendientes = FACTORES.filter((f) => sugerencias[f.numero]?.letra && !borrador?.respuestas[f.numero]);
+  const factores = factoresDe(borrador?.formato);
+  const sugeridasPendientes = factores.filter((f) => sugerencias[f.numero]?.letra && !borrador?.respuestas[f.numero]);
 
   const puntaje = useMemo(() => puntajeDe(borrador?.respuestas ?? {}), [borrador?.respuestas]);
   const completos = factoresCompletos(borrador?.respuestas ?? {});
@@ -226,6 +232,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
       empleadoId: p.uid,
       empleadoNombre: p.nombre,
       datos: datosPrecargados(p, ficha, periodoElegido),
+      formato: formatoPorDefecto(p.uid),
     });
     setCargando(false);
   };
@@ -334,6 +341,27 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
       {/* I. Datos generales */}
       <Tarjeta titulo="I. Datos generales" nota="Precargados con lo último usado para esta persona; puedes corregirlos antes de guardar.">
         <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className={etiqueta}>Formulario</label>
+            <select
+              className={input}
+              value={borrador.formato}
+              onChange={(e) => {
+                const formato = e.target.value as FormatoEvaluacion;
+                // Los factores cambian de significado entre formularios: se limpian las letras marcadas.
+                setBorrador((b) => (b ? { ...b, formato, respuestas: {} } : b));
+              }}
+            >
+              {(Object.keys(FORMATOS) as FormatoEvaluacion[]).map((k) => (
+                <option key={k} value={k}>
+                  Personal {FORMATOS[k].nombre}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Boris y Violeta usan el de personal administrativo. Cambiarlo borra las letras ya marcadas, porque los factores son otros.
+            </p>
+          </div>
           <Campo label="Dependencia" value={d.dependencia} onChange={(v) => setDato("dependencia", v)} />
           <div>
             <label className={etiqueta}>Periodo de evaluación</label>
@@ -367,6 +395,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         esAdministrativo={evaluadoAdministrativo}
         equipo={equipoOperativo}
         respaldo={respaldoVigente}
+        formato={borrador.formato}
         onRespaldo={(r) => set("respaldo", r)}
         onAgregarIncidente={(inc) =>
           setBorrador((b) => (b && b.incidentes.length < FILAS_INCIDENTES ? { ...b, incidentes: [...b.incidentes, inc] } : b))
@@ -403,7 +432,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
           </div>
         )}
         <div className="space-y-5">
-          {FACTORES.map((f) => (
+          {factores.map((f) => (
             <div key={f.numero}>
               <p className="text-sm font-bold tracking-wide text-slate-900 dark:text-slate-100">
                 {f.numero}. {f.titulo}
@@ -440,7 +469,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                   );
                 })}
               </div>
-              <GloboPorque factor={f.numero} puntos={f.puntos} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} />
+              <GloboPorque factor={f.numero} puntos={f.puntos} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} formato={borrador.formato} />
               </div>
             </div>
           ))}
@@ -457,7 +486,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
               <div key={i} className="grid grid-cols-[1fr_auto] gap-2 rounded-xl border border-slate-200 p-2 sm:grid-cols-[9rem_6rem_5rem_1fr_auto] dark:border-slate-700">
                 <input type="date" className={`${input} col-span-2 sm:col-span-1`} value={inc.fecha} onChange={(e) => cambiar({ fecha: e.target.value })} />
                 <select className={input} value={inc.factor} onChange={(e) => cambiar({ factor: Number(e.target.value) })} aria-label="Factor">
-                  {FACTORES.map((f) => (
+                  {factores.map((f) => (
                     <option key={f.numero} value={f.numero}>
                       Factor {f.numero}
                     </option>
@@ -832,16 +861,18 @@ function GloboPorque({
   puntos,
   sugerencia,
   cargado,
+  formato,
 }: {
   factor: number;
   puntos: Record<Opcion, number>;
   sugerencia?: Sugerencia;
   cargado: boolean;
+  formato: FormatoEvaluacion;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [fijo, setFijo] = useState(false); // abierto con clic/toque (no solo hover)
-  const regla = CRITERIOS_TEXTO.find((c) => c.factor === factor);
+  const regla = criteriosEn(formato).find((c) => c.factor === factor);
   const letra = sugerencia?.letra ?? null;
 
   const abrir = () => {
