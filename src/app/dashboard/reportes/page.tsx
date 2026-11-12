@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   collection, query, where, orderBy, getDocs, Timestamp,
 } from "@/lib/firestoreMeter";
@@ -30,7 +31,41 @@ const toInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
 const selectCls =
   "px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-200 shadow-sm cursor-pointer";
 
+// Deshabilitada (2026-11-12): no se usa y se cargaba sola al abrir (todos los
+// egresos del mes, ~600–1.500 lecturas por visita y otra vez por cada fecha
+// elegida). El código queda intacto: para reactivarla, poner HABILITADA = true y
+// descomentar su entrada en src/lib/navEsdomed.ts (sección Reportes).
+const HABILITADA = false;
+
 export default function ReportesPage() {
+  return HABILITADA ? <ReporteriaEgresos /> : <ReporteriaDeshabilitada />;
+}
+
+/** Aviso para quien llegue por la URL: no lee nada de Firestore. */
+function ReporteriaDeshabilitada() {
+  return (
+    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          <BarChart3 size={20} />
+        </span>
+        <h1 className="text-lg font-bold font-heading text-slate-900 dark:text-slate-100">Reportería de egresos deshabilitada</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Esta vista no está en uso por el momento. Para egresos por periodo use Tabuladores.
+        </p>
+        <Link
+          href="/dashboard/reportes/tabuladores"
+          prefetch={false}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+        >
+          Ir a Tabuladores
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ReporteriaEgresos() {
   const { profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const esEsdomed = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";

@@ -1,6 +1,6 @@
 import {
   Activity, Ambulance, ArrowRightLeft, BarChart3, BedDouble, Briefcase, Building2, CalendarClock,
-  CalendarRange, ChartColumn, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
+  CalendarRange, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
   DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FingerprintPattern, FolderOpen, HandHeart, HeartPulse,
   History, LayoutDashboard, LayoutGrid, ListChecks, LogIn, NotebookPen, Phone, PhoneCall, Printer, Radar,
   SearchCheck, Send, Settings, ShieldAlert, ShieldCheck, Siren, Stethoscope, Syringe, Table2, TrendingUp,
@@ -118,7 +118,9 @@ const MENU_ESDOMED: SeccionNav[] = [
     icon: ChartPie,
     visibleSi: esdomedOAdmin,
     entradas: [
-      { href: "/dashboard/reportes", label: "Reportería de egresos", icon: ChartColumn },
+      // Deshabilitada (2026-11-12): no se usa y gastaba lecturas al abrirse. Para
+      // reactivarla, descomentar esta línea y poner HABILITADA = true en su página.
+      // { href: "/dashboard/reportes", label: "Reportería de egresos", icon: ChartColumn },
       { href: "/dashboard/reportes/tabuladores", label: "Tabuladores", icon: Table2 },
       { href: "/dashboard/reportes/tablas-totales", label: "Tablas totales", icon: LayoutGrid },
       { href: "/dashboard/reportes/ocupacion-camas", label: "Ocupación de camas", icon: BedDouble },
