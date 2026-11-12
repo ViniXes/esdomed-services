@@ -14,20 +14,22 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarRange, ClipboardCheck, ClipboardPen, Plus, Printer, Search, UserRound, UsersRound } from "lucide-react";
+import { CalendarRange, ClipboardCheck, ClipboardPen, Plus, Printer, Search, UserRound, UsersRound, Vote } from "lucide-react";
 import { collection, getDocs, query, where, type Timestamp } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/types";
 import {
   COLECCION_EVALUACIONES_DESEMPENO,
+  factoresCompletos,
   partirPeriodo,
   periodoSemestral,
   type EvaluacionDesempeno,
 } from "@/lib/evaluacionDesempeno";
+import { esVotante, quienesVotaron } from "@/lib/evaluacionDesempenoVotacion";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "puesto" | "codigoMarcacion" | "role" | "activo">;
-type Vista = "pendientes" | "evaluadas" | "persona";
+type Vista = "pendientes" | "evaluadas" | "persona" | "votar";
 
 const aFecha = (v: unknown) => ((v as Timestamp | null | undefined)?.toDate ? (v as Timestamp).toDate() : new Date(0));
 const normalizar = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("es").trim();
@@ -99,6 +101,14 @@ export default function EvaluacionPersonalPage() {
     return palabras.every((p) => t.includes(p));
   };
 
+  // Supervisores: evaluaciones en curso de otras personas del periodo, para votar.
+  const miUid = profile?.uid ?? "";
+  const soyVotante = esVotante(miUid);
+  const enVotacion = (lista ?? [])
+    .filter((e) => e.periodo === periodo && e.empleadoId !== miUid && !factoresCompletos(e.respuestas ?? {}))
+    .sort((a, b) => a.empleadoNombre.localeCompare(b.empleadoNombre, "es"));
+  const faltaMiVoto = enVotacion.filter((e) => !quienesVotaron(e.votos, e.empleadoId).includes(miUid)).length;
+
   if (authLoading || !profile || !esAdmin) return null;
 
   return (
@@ -128,7 +138,8 @@ export default function EvaluacionPersonalPage() {
           { id: "pendientes", label: "Pendientes", icon: CalendarRange },
           { id: "evaluadas", label: "Evaluadas", icon: ClipboardCheck },
           { id: "persona", label: "Por persona", icon: UsersRound },
-        ] as { id: Vista; label: string; icon: typeof CalendarRange }[]).map((t) => (
+          ...(soyVotante ? [{ id: "votar", label: "Por votar", icon: Vote, cuenta: faltaMiVoto }] : []),
+        ] as { id: Vista; label: string; icon: typeof CalendarRange; cuenta?: number }[]).map((t) => (
           <button
             key={t.id}
             onClick={() => setVista(t.id)}
@@ -139,6 +150,9 @@ export default function EvaluacionPersonalPage() {
             }`}
           >
             <t.icon size={14} /> {t.label}
+            {!!t.cuenta && (
+              <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">{t.cuenta}</span>
+            )}
           </button>
         ))}
       </div>
@@ -177,6 +191,8 @@ export default function EvaluacionPersonalPage() {
         </div>
       ) : vista === "pendientes" ? (
         <VistaPendientes lista={lista ?? []} personal={personal} periodo={periodo} coincide={coincide} />
+      ) : vista === "votar" && soyVotante ? (
+        <VistaPorVotar enVotacion={enVotacion} periodo={periodo} miUid={miUid} coincide={coincide} />
       ) : vista === "evaluadas" ? (
         <VistaEvaluadas lista={lista ?? []} periodo={periodo} coincide={coincide} />
       ) : (
@@ -267,6 +283,75 @@ function VistaEvaluadas({ lista, periodo, coincide }: { lista: EvaluacionDesempe
           <FilaEvaluacion key={e.id} e={e} />
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Supervisores: evaluaciones en curso (guardadas sin las 7 letras) de otras personas.
+ * Al abrir una marcan su letra en cada factor; su voto le sale a quien evalúa solo
+ * como sugerencia. Sin notas, igual que el resto de listados.
+ */
+function VistaPorVotar({
+  enVotacion,
+  periodo,
+  miUid,
+  coincide,
+}: {
+  enVotacion: EvaluacionDesempeno[];
+  periodo: string;
+  miUid: string;
+  coincide: (t: string) => boolean;
+}) {
+  const visibles = enVotacion.filter((e) => coincide(e.empleadoNombre));
+  if (!visibles.length) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
+        <Vote size={28} className="mx-auto text-slate-300 dark:text-slate-600" />
+        <p className="mt-2 text-sm text-slate-500">
+          {enVotacion.length
+            ? "Nadie coincide con la búsqueda."
+            : `No hay evaluaciones en curso en ${periodo}. Aparecen aquí cuando quien evalúa guarda una evaluación sin terminar.`}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Abre la evaluación y marca tu letra en cada factor. Tu voto le sale a quien evalúa solo como sugerencia; tú ves solo el tuyo.
+      </p>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          {visibles.map((e) => {
+            const yaVoto = quienesVotaron(e.votos, e.empleadoId).includes(miUid);
+            return (
+              <li key={e.id}>
+                <Link
+                  href={`/dashboard/evaluacion-desempeno/${e.id}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{e.empleadoNombre}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {e.periodo} · {e.datos?.cargoNombramiento || "Sin cargo"}
+                    </p>
+                  </div>
+                  {yaVoto ? (
+                    <span className="whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      Ya votaste
+                    </span>
+                  ) : (
+                    <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                      Falta tu voto
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

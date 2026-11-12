@@ -11,8 +11,8 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, Lightbulb, MessageCircleQuestion, Plus, Printer, Save, Search, Trash2, UserRound } from "lucide-react";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, where } from "@/lib/firestoreMeter";
+import { ArrowLeft, Eye, Lightbulb, MessageCircleQuestion, Plus, Printer, Save, Search, Trash2, UserRound, Vote } from "lucide-react";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, Timestamp, updateDoc, where } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/types";
@@ -47,6 +47,14 @@ import {
 import { EvaluacionDesempenoPrintLayout } from "@/components/evaluacionDesempeno/EvaluacionDesempenoPrintLayout";
 import { RespaldoServices } from "@/components/evaluacionDesempeno/RespaldoServices";
 import type { ResumenRespaldo } from "@/lib/evaluacionDesempenoRespaldo";
+import {
+  esVotante,
+  puedeVotar,
+  quienesVotaron,
+  resultadoFactor,
+  type ResultadoFactor,
+  type VotosEvaluacion,
+} from "@/lib/evaluacionDesempenoVotacion";
 import { esAdministrativoPlan } from "@/lib/esdomed/catalogo-plan";
 
 // Administrativo según el catálogo del plan, con la misma excepción que la página de
@@ -186,6 +194,42 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
     };
   }, [esAdmin, empleadoId, periodo, docId]);
 
+  // Votación de supervisores (solo sugerencia): votos en vivo y si la evaluación
+  // guardada ya tiene las 7 letras (entonces deja de estar en curso).
+  const [votos, setVotos] = useState<VotosEvaluacion>({});
+  // null = todavía no se sabe (evaluación nueva o sin leer): no hay votación.
+  const [completaGuardada, setCompletaGuardada] = useState<boolean | null>(null);
+  const [miVoto, setMiVoto] = useState<RespuestasFactores>({});
+  const miVotoCargado = useRef(false);
+  const modoVotoRef = useRef(false);
+  const miUid = profile?.uid ?? null;
+  useEffect(() => {
+    if (!esAdmin || !docId) return;
+    return onSnapshot(
+      doc(db, COLECCION_EVALUACIONES_DESEMPENO, docId),
+      (snap) => {
+        if (!snap.exists()) return;
+        const e = snap.data() as EvaluacionDesempeno;
+        setVotos(e.votos ?? {});
+        setCompletaGuardada(factoresCompletos(e.respuestas ?? {}));
+        // El voto propio se carga una vez: después manda lo que se esté marcando.
+        if (!miVotoCargado.current && miUid) {
+          miVotoCargado.current = true;
+          setMiVoto(e.votos?.[miUid]?.respuestas ?? {});
+        }
+        // Votando no se edita nada más: la pantalla sigue en vivo lo que guarda quien
+        // evalúa, para que al completarse no queden datos viejos que se puedan volver a
+        // guardar encima. El respaldo que se esté viendo se conserva.
+        if (modoVotoRef.current) {
+          setBorrador((b) =>
+            b ? { ...VACIO, ...e, respuestas: e.respuestas ?? {}, incidentes: e.incidentes ?? [], respaldo: b.respaldo ?? e.respaldo ?? null } : b,
+          );
+        }
+      },
+      () => {},
+    );
+  }, [esAdmin, docId, miUid]);
+
   // Personal ESDOMED vigente: equipo operativo para el promedio del respaldo y
   // si la persona evaluada es administrativa (su trabajo no se mide en Services).
   const [equipo, setEquipo] = useState<Persona[]>([]);
@@ -218,11 +262,32 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
     [respaldoVigente, evaluadoAdministrativo, esCoordinador, borrador?.formato],
   );
   const factores = factoresDe(borrador?.formato);
-  const sugeridasPendientes = factores.filter((f) => sugerencias[f.numero]?.letra && !borrador?.respuestas[f.numero]);
 
   const puntaje = useMemo(() => puntajeDe(borrador?.respuestas ?? {}), [borrador?.respuestas]);
   const completos = factoresCompletos(borrador?.respuestas ?? {});
   const calificacion = completos ? calificacionDe(puntaje) : null;
+
+  // En curso = guardada sin las 7 letras. Un supervisor que abre la de otra persona
+  // marca SU voto en la sección II y solo guarda eso (lo demás queda de solo lectura);
+  // quien evalúa ve los votos como sugerencia. Nadie ve votos de su propia evaluación.
+  const enCurso = !!docId && completaGuardada === false;
+  const modoVoto = enCurso && !!empleadoId && puedeVotar(miUid, empleadoId);
+  const verVotacion = enCurso && !!empleadoId && !esVotante(miUid) && miUid !== empleadoId;
+  useEffect(() => {
+    modoVotoRef.current = modoVoto;
+  }, [modoVoto]);
+  const resultadosVoto = useMemo(() => {
+    const r: Record<number, ResultadoFactor> = {};
+    if (empleadoId) for (const f of factores) r[f.numero] = resultadoFactor(votos, f.numero, empleadoId);
+    return r;
+  }, [votos, empleadoId, factores]);
+  const votaron = empleadoId ? quienesVotaron(votos, empleadoId) : [];
+  const puntajeVoto = puntajeDe(miVoto);
+  const calificacionVoto = factoresCompletos(miVoto) ? calificacionDe(puntajeVoto) : null;
+  // Lo que se marca en la sección II: el voto propio o las letras de la evaluación.
+  const marcadas = modoVoto ? miVoto : (borrador?.respuestas ?? {});
+  const marcar = (r: RespuestasFactores) => (modoVoto ? setMiVoto(r) : set("respuestas", r));
+  const sugeridasPendientes = factores.filter((f) => sugerencias[f.numero]?.letra && !marcadas[f.numero]);
 
   const set = <K extends keyof Borrador>(k: K, v: Borrador[K]) => setBorrador((b) => (b ? { ...b, [k]: v } : b));
   const setDato = (k: keyof DatosGeneralesEvaluacion, v: string) => setBorrador((b) => (b ? { ...b, datos: { ...b.datos, [k]: v } } : b));
@@ -246,14 +311,33 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
     setCargando(false);
   };
 
+  // Votando, Guardar escribe SOLO el voto propio: nunca pisa lo que escribe quien evalúa.
+  const guardarVoto = async () => {
+    if (!profile || !docId) return;
+    setGuardando(true);
+    setMensaje("");
+    try {
+      await updateDoc(doc(db, COLECCION_EVALUACIONES_DESEMPENO, docId), {
+        [`votos.${profile.uid}`]: { nombre: profile.nombre, respuestas: miVoto, votadoEn: Timestamp.now() },
+      });
+      setMensaje("Tu voto quedó guardado.");
+    } catch (e) {
+      console.error(e);
+      setMensaje("No se pudo guardar tu voto. Intenta de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const guardar = async () => {
     if (!borrador || !profile) return;
+    if (modoVoto) return guardarVoto();
     setGuardando(true);
     setMensaje("");
     try {
       const ahora = Timestamp.now();
       const incidentes = borrador.incidentes.filter((i) => i.fecha || i.descripcion.trim());
-      const cuerpo = {
+      const cuerpo: Record<string, unknown> = {
         ...borrador,
         incidentes,
         periodo: borrador.datos.periodo,
@@ -261,6 +345,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         calificacion,
         actualizadoEn: ahora,
       };
+      // Los votos de los supervisores se escriben aparte: guardar nunca los pisa.
+      delete cuerpo.votos;
       if (docId) {
         await setDoc(doc(db, COLECCION_EVALUACIONES_DESEMPENO, docId), cuerpo, { merge: true });
       } else {
@@ -367,7 +453,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      {/* I. Datos generales */}
+      {/* I. Datos generales (votando: solo lectura, se guarda únicamente el voto) */}
+      <fieldset disabled={modoVoto} className={`m-0 min-w-0 border-0 p-0 ${modoVoto ? "opacity-75" : ""}`}>
       <Tarjeta titulo="I. Datos generales" nota="Precargados con lo último usado para esta persona; puedes corregirlos antes de guardar.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -414,6 +501,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       </Tarjeta>
+      </fieldset>
 
       <RespaldoServices
         key={`${borrador.empleadoId}-${d.periodo}`}
@@ -427,6 +515,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         formato={borrador.formato}
         guardadoEn={respaldoGuardado}
         autoCargar={!respaldoVigente}
+        soloLectura={modoVoto}
         onRespaldo={recibirRespaldo}
         onAgregarIncidente={(inc) =>
           setBorrador((b) => (b && b.incidentes.length < FILAS_INCIDENTES ? { ...b, incidentes: [...b.incidentes, inc] } : b))
@@ -437,11 +526,23 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
       <Tarjeta
         titulo="II. Evaluación general por parte del jefe inmediato"
         nota={
-          respaldoVigente
-            ? "Elige una opción por factor. La letra con borde punteado es la sugerida por los datos de Services; tú decides."
-            : "Elige una opción por factor; el puntaje sale de la Tabla de Valoración oficial. Carga el respaldo de Services para ver letras sugeridas."
+          modoVoto
+            ? "Marca tu voto en cada factor. La letra con borde punteado es la sugerida por los datos de Services."
+            : respaldoVigente
+              ? "Elige una opción por factor. La letra con borde punteado es la sugerida por los datos de Services; tú decides."
+              : "Elige una opción por factor; el puntaje sale de la Tabla de Valoración oficial. Carga el respaldo de Services para ver letras sugeridas."
         }
       >
+        {modoVoto && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+            <Vote size={15} className="mt-px shrink-0" />
+            <p>
+              <strong>Estás votando.</strong> La letra que marques en cada factor es tu voto: a quien evalúa le sale como sugerencia y no cambia la
+              evaluación. Solo tú ves tu voto, y aquí solo se guarda eso: lo demás lo llena quien evalúa.{" "}
+              {miUid && votaron.includes(miUid) ? "Ya está guardado; si lo cambias, vuelve a darle Guardar mi voto." : "Al terminar, dale Guardar mi voto."}
+            </p>
+          </div>
+        )}
         {sugeridasPendientes.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50/60 px-3 py-2 dark:border-cyan-900 dark:bg-cyan-950/30">
             <Lightbulb size={15} className="text-cyan-700 dark:text-cyan-300" />
@@ -451,8 +552,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
             <button
               type="button"
               onClick={() =>
-                set("respuestas", {
-                  ...borrador.respuestas,
+                marcar({
+                  ...marcadas,
                   ...Object.fromEntries(sugeridasPendientes.map((f) => [f.numero, sugerencias[f.numero].letra as Opcion])),
                 })
               }
@@ -472,13 +573,15 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
               <div className="flex items-start gap-2" data-fila-factor>
               <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 {OPCIONES.map((o) => {
-                  const activa = borrador.respuestas[f.numero] === o;
+                  const activa = marcadas[f.numero] === o;
                   const sugerida = sugerencias[f.numero]?.letra === o;
+                  const voto = verVotacion ? resultadosVoto[f.numero] : undefined;
+                  const votada = voto?.letra === o;
                   return (
                     <button
                       key={o}
                       type="button"
-                      onClick={() => set("respuestas", { ...borrador.respuestas, [f.numero]: o as Opcion })}
+                      onClick={() => marcar({ ...marcadas, [f.numero]: o as Opcion })}
                       aria-pressed={activa}
                       className={`rounded-xl border p-3 text-left transition-colors ${
                         activa
@@ -486,11 +589,14 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                           : sugerida
                             ? "border-2 border-dashed border-cyan-500 bg-white hover:border-blue-300 dark:border-cyan-600 dark:bg-slate-950"
                             : "border-slate-200 bg-white hover:border-blue-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-blue-700"
-                      }`}
+                      } ${votada ? "outline-2 outline-offset-2 outline-dotted outline-blue-700 dark:outline-blue-400" : ""}`}
                     >
                       <div className="mb-1 flex items-center justify-between">
                         <span className={`text-sm font-bold ${activa ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-200"}`}>{o}</span>
                         <span className="flex items-center gap-1.5">
+                          {votada && (
+                            <span className="rounded-full bg-blue-700 px-1.5 py-px text-[10px] font-semibold text-white dark:bg-blue-500">Votación</span>
+                          )}
                           {sugerida && <span className="rounded-full bg-cyan-100 px-1.5 py-px text-[10px] font-semibold text-cyan-800 dark:bg-cyan-900/60 dark:text-cyan-200">Sugerida</span>}
                           <span className="text-[11px] font-semibold tabular-nums text-slate-400">{f.puntos[o]} pts</span>
                         </span>
@@ -500,13 +606,19 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
                   );
                 })}
               </div>
-              <GloboPorque factor={f.numero} puntos={f.puntos} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} formato={borrador.formato} />
+              <div className="flex shrink-0 flex-col gap-2">
+                <GloboPorque factor={f.numero} puntos={f.puntos} sugerencia={sugerencias[f.numero]} cargado={!!respaldoVigente} formato={borrador.formato} />
+                {verVotacion && (resultadosVoto[f.numero]?.votaron ?? 0) > 0 && (
+                  <GloboVotacion factor={f.numero} puntos={f.puntos} resultado={resultadosVoto[f.numero]} />
+                )}
+              </div>
               </div>
             </div>
           ))}
         </div>
       </Tarjeta>
 
+      <fieldset disabled={modoVoto} className={`m-0 min-w-0 space-y-5 border-0 p-0 ${modoVoto ? "opacity-75" : ""}`}>
       {/* Registro de incidentes críticos */}
       <Tarjeta titulo="Registro individual de incidentes críticos" nota={`Opcional. Hasta ${FILAS_INCIDENTES} filas en la hoja impresa. F = favorable, D = desfavorable.`}>
         <div className="space-y-2">
@@ -557,7 +669,11 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         <div className="grid gap-3 sm:grid-cols-2">
           <Campo label="Tiempo de supervisar al evaluado" value={borrador.tiempoSupervisar} onChange={(v) => set("tiempoSupervisar", v)} placeholder="Ej. 6 meses" />
           <div className="flex items-end">
-            <ResumenPuntaje puntaje={puntaje} calificacion={calificacion} />
+            {modoVoto ? (
+              <ResumenPuntaje puntaje={puntajeVoto} calificacion={calificacionVoto} etiqueta="Tu voto" />
+            ) : (
+              <ResumenPuntaje puntaje={puntaje} calificacion={calificacion} />
+            )}
           </div>
           <div className="sm:col-span-2">
             <Area label="Comentarios del evaluador" value={borrador.comentariosEvaluador} onChange={(v) => set("comentariosEvaluador", v)} rows={2} />
@@ -586,13 +702,19 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         </div>
       </Tarjeta>
 
+      </fieldset>
+
       {/* Barra de acciones */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur md:left-auto md:w-[calc(100%-var(--sidebar-w,0px))] dark:border-slate-800 dark:bg-slate-900/95">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2 px-4 py-3">
-          <ResumenPuntaje puntaje={puntaje} calificacion={calificacion} compacto />
+          {modoVoto ? (
+            <ResumenPuntaje puntaje={puntajeVoto} calificacion={calificacionVoto} etiqueta="Tu voto" compacto />
+          ) : (
+            <ResumenPuntaje puntaje={puntaje} calificacion={calificacion} compacto />
+          )}
           {mensaje && <span className="text-xs text-slate-500 dark:text-slate-400">{mensaje}</span>}
           <div className="ml-auto flex gap-2">
-            {docId && (
+            {docId && !modoVoto && (
               <button
                 type="button"
                 onClick={() => setConfirmarEliminar(true)}
@@ -614,7 +736,7 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
               disabled={guardando}
               className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
             >
-              <Save size={15} /> {guardando ? "Guardando…" : "Guardar"}
+              <Save size={15} /> {guardando ? "Guardando…" : modoVoto ? "Guardar mi voto" : "Guardar"}
             </button>
           </div>
         </div>
@@ -736,10 +858,20 @@ function Area({ label, value, onChange, rows }: { label: string; value: string; 
   );
 }
 
-function ResumenPuntaje({ puntaje, calificacion, compacto }: { puntaje: number; calificacion: string | null; compacto?: boolean }) {
+function ResumenPuntaje({
+  puntaje,
+  calificacion,
+  compacto,
+  etiqueta = "Puntaje",
+}: {
+  puntaje: number;
+  calificacion: string | null;
+  compacto?: boolean;
+  etiqueta?: string;
+}) {
   return (
     <div className={`flex items-center gap-2 ${compacto ? "" : "rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700"}`}>
-      <span className="text-sm text-slate-500 dark:text-slate-400">Puntaje</span>
+      <span className="text-sm text-slate-500 dark:text-slate-400">{etiqueta}</span>
       <span className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">
         {puntaje}
         <span className="text-xs font-medium text-slate-400">/{PUNTAJE_MAXIMO}</span>
@@ -880,31 +1012,28 @@ function SelectorSemestre({ value, onChange }: { value: string; onChange: (v: st
 }
 
 /**
- * Globito junto a las casillas de cada factor: por qué se sugiere esa letra
- * (dato de Services + regla). Se abre al pasar el mouse o al tocarlo y NUNCA
- * tapa los literales: sale a la derecha si hay espacio; si no, debajo de la
- * fila completa de casillas.
+ * Globito junto a las casillas de cada factor. Se abre al pasar el mouse o al
+ * tocarlo y NUNCA tapa los literales: sale a la derecha si hay espacio; si no,
+ * debajo de la fila completa de casillas.
  */
 const ANCHO_GLOBO = 320;
 
-function GloboPorque({
-  factor,
-  puntos,
-  sugerencia,
-  cargado,
-  formato,
+function GloboFlotante({
+  ariaLabel,
+  claseBoton,
+  icono,
+  insignia,
+  children,
 }: {
-  factor: number;
-  puntos: Record<Opcion, number>;
-  sugerencia?: Sugerencia;
-  cargado: boolean;
-  formato: FormatoEvaluacion;
+  ariaLabel: string;
+  claseBoton: string;
+  icono: React.ReactNode;
+  insignia?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [fijo, setFijo] = useState(false); // abierto con clic/toque (no solo hover)
-  const regla = criteriosEn(formato).find((c) => c.factor === factor);
-  const letra = sugerencia?.letra ?? null;
 
   const abrir = () => {
     const btn = btnRef.current;
@@ -951,19 +1080,11 @@ function GloboPorque({
         onBlur={cerrar}
         onKeyDown={(e) => e.key === "Escape" && cerrar()}
         aria-expanded={!!pos}
-        aria-label={`Por qué se sugiere esta evaluación en el factor ${factor}`}
-        className={`relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
-          letra
-            ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300"
-            : "border-slate-200 bg-white text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:bg-slate-900"
-        }`}
+        aria-label={ariaLabel}
+        className={`relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${claseBoton}`}
       >
-        <MessageCircleQuestion size={17} />
-        {letra && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-700 px-1 text-[9px] font-bold text-white">
-            {letra}
-          </span>
-        )}
+        {icono}
+        {insignia}
       </button>
       {pos && (
         <div
@@ -971,26 +1092,101 @@ function GloboPorque({
           style={{ position: "fixed", left: pos.left, top: pos.top, width: ANCHO_GLOBO }}
           className="z-50 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
-          <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-            {!cargado ? "Carga el respaldo de Services" : letra ? `Sugerida: ${letra} · ${puntos[letra]} pts` : "Sin sugerencia"}
-          </p>
-          {regla && (
-            <p className="mt-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-slate-600 dark:text-slate-300">Qué se mide:</span> {regla.dato}
-            </p>
-          )}
-          {cargado && (
-            <p className="mt-1.5 text-xs leading-snug text-slate-800 dark:text-slate-100">
-              <span className="font-semibold">Resultado:</span> {sugerencia?.motivo ?? "Sin datos"}
-            </p>
-          )}
-          {regla && (
-            <p className="mt-2 border-t border-slate-100 pt-1.5 text-[11px] leading-snug text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              <span className="font-semibold text-slate-600 dark:text-slate-300">Escala:</span> {regla.regla}
-            </p>
-          )}
+          {children}
         </div>
       )}
     </div>
+  );
+}
+
+/** Por qué se sugiere esa letra (dato de Services + regla). */
+function GloboPorque({
+  factor,
+  puntos,
+  sugerencia,
+  cargado,
+  formato,
+}: {
+  factor: number;
+  puntos: Record<Opcion, number>;
+  sugerencia?: Sugerencia;
+  cargado: boolean;
+  formato: FormatoEvaluacion;
+}) {
+  const regla = criteriosEn(formato).find((c) => c.factor === factor);
+  const letra = sugerencia?.letra ?? null;
+
+  return (
+    <GloboFlotante
+      ariaLabel={`Por qué se sugiere esta evaluación en el factor ${factor}`}
+      claseBoton={
+        letra
+          ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-300"
+          : "border-slate-200 bg-white text-slate-400 hover:text-slate-600 dark:border-slate-700 dark:bg-slate-900"
+      }
+      icono={<MessageCircleQuestion size={17} />}
+      insignia={
+        letra && (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-700 px-1 text-[9px] font-bold text-white">
+            {letra}
+          </span>
+        )
+      }
+    >
+      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+        {!cargado ? "Carga el respaldo de Services" : letra ? `Sugerida: ${letra} · ${puntos[letra]} pts` : "Sin sugerencia"}
+      </p>
+      {regla && (
+        <p className="mt-1.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+          <span className="font-semibold text-slate-600 dark:text-slate-300">Qué se mide:</span> {regla.dato}
+        </p>
+      )}
+      {cargado && (
+        <p className="mt-1.5 text-xs leading-snug text-slate-800 dark:text-slate-100">
+          <span className="font-semibold">Resultado:</span> {sugerencia?.motivo ?? "Sin datos"}
+        </p>
+      )}
+      {regla && (
+        <p className="mt-2 border-t border-slate-100 pt-1.5 text-[11px] leading-snug text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          <span className="font-semibold text-slate-600 dark:text-slate-300">Escala:</span> {regla.regla}
+        </p>
+      )}
+    </GloboFlotante>
+  );
+}
+
+/**
+ * Sugerencia de la votación en este factor (azul, aparte de la de Services): la
+ * letra que salió de quienes votaron (uno, dos o los tres) y qué votó cada uno.
+ * Solo se muestra cuando ya hay votos en el factor.
+ */
+function GloboVotacion({ factor, puntos, resultado }: { factor: number; puntos: Record<Opcion, number>; resultado: ResultadoFactor }) {
+  const { letra, porVotante } = resultado;
+  const votos = porVotante.filter((v): v is typeof v & { letra: Opcion } => !!v.letra);
+  return (
+    <GloboFlotante
+      ariaLabel={`Sugerencia de la votación en el factor ${factor}`}
+      claseBoton="border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300"
+      icono={<Vote size={17} />}
+      insignia={
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-700 px-1 text-[9px] font-bold text-white dark:bg-blue-500">
+          {letra ?? "="}
+        </span>
+      }
+    >
+      <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+        {letra ? `Sugerida por votación: ${letra} · ${puntos[letra]} pts` : "Votación empatada"}
+      </p>
+      <ul className="mt-2 space-y-1">
+        {votos.map((v) => (
+          <li key={v.uid} className="flex items-center justify-between text-xs">
+            <span className="text-slate-700 dark:text-slate-200">{v.corto}</span>
+            <span className="rounded-full bg-blue-50 px-2 py-px font-bold text-blue-800 dark:bg-blue-950/60 dark:text-blue-200">
+              {v.letra} · {puntos[v.letra]} pts
+            </span>
+          </li>
+        ))}
+      </ul>
+    </GloboFlotante>
   );
 }
