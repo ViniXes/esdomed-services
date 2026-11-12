@@ -118,6 +118,9 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
   const [docId, setDocId] = useState<string | null>(esNueva ? null : id);
   // Día en que se hizo la evaluación (para las fechas de las firmas impresas).
   const [creadoEn, setCreadoEn] = useState<Date | null>(null);
+  // Lo que hay en Firestore: `cargadoEn` del respaldo guardado y el periodo de la evaluación.
+  const [respaldoGuardado, setRespaldoGuardado] = useState<string | null>(null);
+  const [periodoGuardado, setPeriodoGuardado] = useState<string | null>(null);
   const [duplicada, setDuplicada] = useState<string | null>(null);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
@@ -141,6 +144,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         const e = snap.data() as EvaluacionDesempeno;
         const creado = (e.creadoEn as unknown as { toDate?: () => Date } | undefined)?.toDate?.();
         if (creado) setCreadoEn(creado);
+        setRespaldoGuardado(e.respaldo?.cargadoEn ?? null);
+        setPeriodoGuardado(e.periodo ?? e.datos?.periodo ?? null);
         setBorrador({ ...VACIO, ...e, respuestas: e.respuestas ?? {}, incidentes: e.incidentes ?? [] });
       })
       .catch(() => {
@@ -273,6 +278,8 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         actualizadoEn: ahora,
       });
       setBorrador((b) => (b ? { ...b, incidentes } : b));
+      setRespaldoGuardado(borrador.respaldo?.cargadoEn ?? null);
+      setPeriodoGuardado(borrador.datos.periodo);
       setMensaje("Evaluación guardada.");
     } catch (e) {
       console.error(e);
@@ -280,6 +287,19 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
     } finally {
       setGuardando(false);
     }
+  };
+
+  // Respaldo recibido. Si se cargó solo en una evaluación ya guardada que no tenía
+  // respaldo, se registra de una vez: se escribe únicamente el campo `respaldo`, sin
+  // tocar letras, nota ni nada más. "Actualizar" (manual) solo cambia la pantalla:
+  // reemplaza el guardado hasta que se dé Guardar.
+  const recibirRespaldo = (r: ResumenRespaldo, origen: "auto" | "manual") => {
+    set("respaldo", r);
+    if (origen !== "auto" || !docId || respaldoGuardado || r.periodo !== periodoGuardado) return;
+    const limpio = JSON.parse(JSON.stringify(r)) as ResumenRespaldo; // Firestore no acepta undefined
+    setDoc(doc(db, COLECCION_EVALUACIONES_DESEMPENO, docId), { respaldo: limpio }, { merge: true })
+      .then(() => setRespaldoGuardado(r.cargadoEn))
+      .catch((e) => console.error("No se pudo registrar el respaldo", e));
   };
 
   // Borra solo esta evaluación (la ficha con los datos laborales de la persona se conserva).
@@ -405,7 +425,9 @@ export default function EditorEvaluacionPage({ params }: { params: Promise<{ id:
         equipo={equipoOperativo}
         respaldo={respaldoVigente}
         formato={borrador.formato}
-        onRespaldo={(r) => set("respaldo", r)}
+        guardadoEn={respaldoGuardado}
+        autoCargar={!respaldoVigente}
+        onRespaldo={recibirRespaldo}
         onAgregarIncidente={(inc) =>
           setBorrador((b) => (b && b.incidentes.length < FILAS_INCIDENTES ? { ...b, incidentes: [...b.incidentes, inc] } : b))
         }

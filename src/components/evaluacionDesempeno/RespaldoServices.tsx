@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarClock, Database, FileWarning, ListChecks, Plus, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CalendarClock, CircleCheck, Database, FileWarning, ListChecks, Plus, RefreshCw, SearchCheck, TrendingUp } from "lucide-react";
 import {
   METRICAS_PRODUCTIVIDAD,
   cargarArchivero,
@@ -25,7 +25,11 @@ interface Props {
   respaldo: ResumenRespaldo | null;
   /** Formulario de la evaluación: define qué número tiene cada factor. */
   formato?: FormatoEvaluacion;
-  onRespaldo: (r: ResumenRespaldo) => void;
+  /** `cargadoEn` del respaldo que quedó guardado con la evaluación (null si no hay). */
+  guardadoEn?: string | null;
+  /** Sin respaldo a la vista: cargarlo solo en cuanto esté el equipo para comparar. */
+  autoCargar?: boolean;
+  onRespaldo: (r: ResumenRespaldo, origen: "auto" | "manual") => void;
   onAgregarIncidente: (i: IncidenteCritico) => void;
 }
 
@@ -35,7 +39,20 @@ interface Props {
  * amonestaciones, reporte del reloj y altas revertidas. Cada hallazgo puede
  * pasarse al Registro de Incidentes Críticos (página 3) con un clic.
  */
-export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo, esAdministrativo, equipo, respaldo, formato = "mpe", onRespaldo, onAgregarIncidente }: Props) {
+export function RespaldoServices({
+  empleadoId,
+  nombre,
+  codigoMarcacion,
+  periodo,
+  esAdministrativo,
+  equipo,
+  respaldo,
+  formato = "mpe",
+  guardadoEn = null,
+  autoCargar = false,
+  onRespaldo,
+  onAgregarIncidente,
+}: Props) {
   // Número de cada factor en el formulario de esta evaluación (cambia entre formatos).
   const num = (c: ConceptoFactor) => numeroFactor(c, formato);
   const etiquetaFactores = (...cs: ConceptoFactor[]) => {
@@ -49,7 +66,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
   const archivero = respaldo?.archivero ?? null;
   const [agregados, setAgregados] = useState<Set<string>>(new Set());
 
-  const cargar = async () => {
+  const cargar = async (origen: "auto" | "manual") => {
     setCargando(true);
     setError("");
     try {
@@ -57,13 +74,23 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
         cargarRespaldo({ empleadoId, uid: empleadoId, nombre, codigoMarcacion, periodo, equipo }),
         cargarArchivero(empleadoId, periodo),
       ]);
-      onRespaldo({ ...r, archivero: a.entradas, sgas: a.sgas });
+      onRespaldo({ ...r, archivero: a.entradas, sgas: a.sgas }, origen);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el respaldo.");
     } finally {
       setCargando(false);
     }
   };
+
+  // Una sola vez por montaje (el componente se remonta al cambiar persona o periodo).
+  const autoIntentado = useRef(false);
+  const listoParaCargar = autoCargar && !respaldo && equipo.length > 0;
+  useEffect(() => {
+    if (!listoParaCargar || autoIntentado.current) return;
+    autoIntentado.current = true;
+    void cargar("auto");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listoParaCargar]);
 
   const agregar = (clave: string, inc: IncidenteCritico) => {
     onAgregarIncidente(inc);
@@ -96,7 +123,7 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
         </div>
         <button
           type="button"
-          onClick={cargar}
+          onClick={() => cargar("manual")}
           disabled={cargando}
           className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
         >
@@ -104,6 +131,8 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
           {cargando ? "Cargando…" : respaldo ? "Actualizar" : "Cargar respaldo"}
         </button>
       </div>
+
+      {respaldo && <EstadoGuardado cargadoEn={respaldo.cargadoEn} guardado={!!guardadoEn && respaldo.cargadoEn === guardadoEn} />}
 
       {verCriterios && (
         <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -353,6 +382,24 @@ export function RespaldoServices({ empleadoId, nombre, codigoMarcacion, periodo,
         </div>
       )}
     </section>
+  );
+}
+
+/** Si lo que se ve es el respaldo guardado con la evaluación o uno recién actualizado. */
+function EstadoGuardado({ cargadoEn, guardado }: { cargadoEn: string; guardado: boolean }) {
+  const f = new Date(cargadoEn);
+  const fecha = Number.isNaN(f.getTime()) ? "" : f.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" });
+  return guardado ? (
+    <p className="mt-3 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+      <CircleCheck size={14} className="shrink-0" />
+      <span>
+        Guardado con la evaluación{fecha && <> · datos al {fecha}</>}. Dale Actualizar y luego Guardar solo si quieres reemplazarlo.
+      </span>
+    </p>
+  ) : (
+    <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+      Datos{fecha && <> al {fecha}</>} <strong>sin guardar</strong>: dale Guardar para que este respaldo quede registrado con la evaluación.
+    </p>
   );
 }
 
