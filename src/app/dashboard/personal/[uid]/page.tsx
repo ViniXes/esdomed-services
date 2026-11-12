@@ -8,17 +8,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/types";
 import { esEnMemoria, fechaBajaCorta } from "@/lib/bajaUsuarios";
 import { EvaluacionesPersonal } from "@/components/personal/EvaluacionesPersonal";
-import { ArrowLeft, ClipboardCheck, IdCard, UserRound } from "lucide-react";
+import { ArrowLeft, Award, ClipboardCheck, IdCard, TriangleAlert, UserRound } from "lucide-react";
 
-// Ficha de un empleado ESDOMED, con el archivero de evaluaciones/amonestaciones
-// (ver EvaluacionesPersonal). El admin puede abrir la ficha de cualquiera; el
+// Ficha de un empleado ESDOMED, con el archivero repartido en pestañas:
+// evaluaciones, amonestaciones y diplomas/certificados (ver EvaluacionesPersonal). El admin puede abrir la ficha de cualquiera; el
 // resto del personal ESDOMED solo la suya — no es ético que vean las notas de
 // un compañero (ver firestore.rules: evaluaciones_personal).
 
 const ROLES_PERMITIDOS = new Set(["esdomed", "asistente_esdomed", "admin"]);
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "email" | "codigoMarcacion" | "puesto" | "role" | "activo" | "baja">;
-type Tab = "datos" | "evaluaciones";
+type Tab = "datos" | "evaluaciones" | "amonestaciones" | "diplomas";
 
 export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = use(params);
@@ -92,10 +92,12 @@ export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: s
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-4">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-4 overflow-x-auto">
         {([
           { id: "datos", label: "Datos", icon: UserRound },
-          { id: "evaluaciones", label: "Evaluaciones y amonestaciones", icon: ClipboardCheck },
+          { id: "evaluaciones", label: "Evaluaciones", icon: ClipboardCheck },
+          { id: "amonestaciones", label: "Amonestaciones", icon: TriangleAlert },
+          { id: "diplomas", label: "Diplomas y certificados", icon: Award },
         ] as { id: Tab; label: string; icon: typeof UserRound }[]).map((t) => (
           <button
             key={t.id}
@@ -122,7 +124,13 @@ export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: s
       )}
 
       {tab === "evaluaciones" && (
-        <EvaluacionesPersonal empleadoId={persona.uid} empleadoNombre={persona.nombre} puedeGestionar={esAdmin} />
+        <EvaluacionesPersonal key="evaluacion" categoria="evaluacion" empleadoId={persona.uid} empleadoNombre={persona.nombre} puedeGestionar={esAdmin} />
+      )}
+      {tab === "amonestaciones" && (
+        <EvaluacionesPersonal key="amonestacion" categoria="amonestacion" empleadoId={persona.uid} empleadoNombre={persona.nombre} puedeGestionar={esAdmin} />
+      )}
+      {tab === "diplomas" && (
+        <EvaluacionesPersonal key="diploma" categoria="diploma" empleadoId={persona.uid} empleadoNombre={persona.nombre} puedeGestionar={esAdmin} />
       )}
     </div>
   );

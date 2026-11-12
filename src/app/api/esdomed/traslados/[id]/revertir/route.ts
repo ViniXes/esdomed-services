@@ -4,7 +4,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { mismoServicio, mismaCama } from "@/lib/servicios";
 
 // Reversión administrativa de un traslado APROBADO por error (el recurso dio
-// "Aprobar" cuando debía "Rechazar"). Solo el rol admin. Deshace, en un solo
+// "Aprobar" cuando debía "Rechazar"). Solo admin y asistente administrativo. Deshace, en un solo
 // batch, todo lo que la aprobación propagó:
 //
 //   1. traslados/{id}  → estado "rechazado" (o "pendiente" para reprocesarlo),
@@ -40,7 +40,7 @@ async function getCaller(req: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const snap = await adminDb.collection("usuarios").doc(decoded.uid).get();
     const data = snap.data();
-    if (data?.role !== "admin" || data?.activo === false) return null;
+    if ((data?.role !== "admin" && data?.role !== "asistente_esdomed") || data?.activo === false) return null;
     return { uid: decoded.uid, nombre: String(data?.nombre ?? decoded.name ?? decoded.email ?? "Administración") };
   } catch {
     return null;
@@ -50,7 +50,7 @@ async function getCaller(req: NextRequest) {
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const caller = await getCaller(req);
   if (!caller) {
-    return NextResponse.json({ error: "Solo un administrador puede revertir un traslado." }, { status: 403 });
+    return NextResponse.json({ error: "Solo el administrador o el asistente administrativo pueden revertir un traslado." }, { status: 403 });
   }
 
   let body: { motivo?: unknown; estadoNuevo?: unknown } = {};

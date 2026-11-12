@@ -544,7 +544,9 @@ export default function DashboardFallecidosPage() {
   // registró (casos cerrados antes de existir el campo); una ya puesta, no.
   const puedeEditarUbicacion = !isLocked || !selectedLive?.ubicacionCertificado;
   const puedeCerrar = todos4 && entregaResuelta && selectedLive?.estado === "confirmado" && (!selectedLive.tramiteCerrado || isUnlocked);
-  const isAdmin     = profile?.role === "admin";
+  // Borrar trámites cerrados y desbloquear registros: admin y asistente administrativo
+  // (firestore.rules valida lo mismo para el borrado).
+  const puedeAdministrar = profile?.role === "admin" || profile?.role === "asistente_esdomed";
 
   const fiehNombreGuardado = typeof selectedLive?.actualizoFieh === "string" && selectedLive.actualizoFieh
     ? selectedLive.actualizoFieh
@@ -806,7 +808,7 @@ export default function DashboardFallecidosPage() {
                           <button type="button" className={ui.openButton} onClick={() => setSelected(n)} aria-label={"Abrir expediente " + n.pacienteExpediente}>
                             Abrir <ArrowUpRight size={14} aria-hidden="true" />
                           </button>
-                          {(!n.tramiteCerrado || isAdmin) && (
+                          {(!n.tramiteCerrado || puedeAdministrar) && (
                             <button type="button" onClick={() => setAEliminar(n)} title="Eliminar notificación duplicada" aria-label="Eliminar notificación duplicada"
                               className="inline-flex w-8 items-center justify-center rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-500 dark:hover:bg-rose-950 dark:hover:text-rose-400">
                               <Trash2 size={14} aria-hidden="true" />
@@ -914,7 +916,7 @@ export default function DashboardFallecidosPage() {
                   </button>
                 )}
               </div>
-              {isLocked && isAdmin && (
+              {isLocked && puedeAdministrar && (
                 <details className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
                   <summary className="cursor-pointer text-xs font-medium text-amber-700 dark:text-amber-400">Desbloquear registro</summary>
                   <div className="mt-3">                <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">

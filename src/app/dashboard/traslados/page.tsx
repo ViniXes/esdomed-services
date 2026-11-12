@@ -59,7 +59,8 @@ export default function DashboardTrasladosPage() {
   const [saveError, setSaveError] = useState("");
 
   // Reversión de una aprobación errónea — solo admin (ver revertirAprobacion).
-  const isAdmin = profile?.role === "admin";
+  // Revertir una aprobación: admin y asistente administrativo (la API valida lo mismo).
+  const puedeRevertir = profile?.role === "admin" || profile?.role === "asistente_esdomed";
   const [revMotivo, setRevMotivo] = useState("");
   const [revEstado, setRevEstado] = useState<"rechazado" | "pendiente">("rechazado");
   const [revirtiendo, setRevirtiendo] = useState(false);
@@ -189,7 +190,7 @@ export default function DashboardTrasladosPage() {
   // quita el movimiento de su historial y reabre la ficha UCI/UCIN si este
   // traslado la había cerrado. Todo queda auditado en traslado.reversion.
   const revertirAprobacion = async () => {
-    if (!selected?.id || !user || !isAdmin) return;
+    if (!selected?.id || !user || !puedeRevertir) return;
     const id = selected.id;
     setRevirtiendo(true); setRevError("");
     try {
@@ -500,8 +501,8 @@ export default function DashboardTrasladosPage() {
             </section>
           )}
 
-          {/* Solo admin: deshacer una aprobación dada por error. */}
-          {selected.estado === "aprobado" && isAdmin && (
+          {/* Solo admin y asistente administrativo: deshacer una aprobación dada por error. */}
+          {selected.estado === "aprobado" && puedeRevertir && (
             <div className="border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/50 rounded-xl p-4 space-y-3">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
                 <Undo2 size={13} /> Revertir aprobación

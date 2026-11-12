@@ -9,7 +9,9 @@ async function esAdministrador(req: NextRequest): Promise<boolean> {
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     const perfil = await adminDb.collection("usuarios").doc(decoded.uid).get();
-    return perfil.data()?.role === "admin";
+    // Admin y asistente administrativo (pestaña Administrativos de Productividad).
+    const role = perfil.data()?.role;
+    return role === "admin" || role === "asistente_esdomed";
   } catch {
     return false;
   }

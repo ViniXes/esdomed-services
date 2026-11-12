@@ -28,7 +28,8 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("datos");
-  const esAdmin = profile?.role === "admin";
+  // Eliminar paciente: admin y asistente administrativo (firestore.rules valida lo mismo).
+  const puedeEliminar = profile?.role === "admin" || profile?.role === "asistente_esdomed";
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "pacientes", id), (snap) => {
@@ -136,7 +137,7 @@ export default function PacienteDetallePage({ params }: { params: Promise<{ id: 
               Registrar egreso
             </Link>
           )}
-          {esAdmin && (
+          {puedeEliminar && (
             <EliminarPacienteButton pacienteId={id} paciente={paciente} />
           )}
         </div>

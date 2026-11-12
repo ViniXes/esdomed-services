@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
+  collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, deleteField, doc, serverTimestamp, Timestamp,
 } from "@/lib/firestoreMeter";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { AdjuntoBitacora, EvaluacionPersonal } from "@/types";
-import { TIPOS_EVALUACION_PERSONAL } from "@/lib/evaluacionesPersonal";
+import type { AdjuntoBitacora, CategoriaArchivoPersonal, EvaluacionPersonal } from "@/types";
+import { CATEGORIAS_ARCHIVO_PERSONAL, NOTA_MINIMA_EVALUACION, aproboEvaluacion, categoriaDeEntrada, leerNota } from "@/lib/evaluacionesPersonal";
 import {
-  Paperclip, FilePlus2, Trash2, FileText, Loader2, X, ExternalLink, ImageOff, ClipboardCheck, Download, RefreshCw,
+  Paperclip, FilePlus2, Trash2, FileText, Loader2, X, ExternalLink, ImageOff, ClipboardCheck, Download, RefreshCw, Pencil, Check,
 } from "lucide-react";
 
 // Archivero permanente de evaluaciones/amonestaciones de un empleado ESDOMED
@@ -80,10 +80,13 @@ interface Props {
   empleadoNombre: string;
   /** Solo el admin registra y elimina entradas. */
   puedeGestionar: boolean;
+  /** Pestaña de la ficha: evaluaciones, amonestaciones o diplomas/certificados. */
+  categoria: CategoriaArchivoPersonal;
 }
 
-export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestionar }: Props) {
+export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestionar, categoria }: Props) {
   const { user, profile } = useAuth();
+  const cfg = CATEGORIAS_ARCHIVO_PERSONAL[categoria];
 
   const [entradas, setEntradas] = useState<EvaluacionPersonal[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -91,6 +94,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
   const [tipo, setTipo] = useState("");
   const [fecha, setFecha] = useState(hoyInput());
   const [notas, setNotas] = useState("");
+  const [nota, setNota] = useState("");
   const [archivos, setArchivos] = useState<File[]>([]);
   const [subiendo, setSubiendo] = useState(false);
   const [progreso, setProgreso] = useState<number | null>(null);
@@ -113,6 +117,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       q,
       (snap) => {
         setErrorCarga(null);
+        // Una sola consulta por empleado; cada pestaña se queda con lo suyo.
         setEntradas(snap.docs.map((d) => {
           const data = d.data();
           return {
@@ -121,7 +126,8 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
             fecha: toDate(data.fecha),
             creadoEn: toDate(data.creadoEn),
           } as EvaluacionPersonal;
-        }).sort((a, b) => b.fecha.getTime() - a.fecha.getTime()));
+        }).filter((e) => categoriaDeEntrada(e) === categoria)
+          .sort((a, b) => b.fecha.getTime() - a.fecha.getTime()));
       },
       (err) => {
         console.error("evaluaciones_personal:", err);
@@ -129,7 +135,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       },
     );
     return unsub;
-  }, [empleadoId]);
+  }, [empleadoId, categoria]);
 
   const agregarArchivos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nuevos = Array.from(e.target.files ?? []);
@@ -151,7 +157,8 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
 
   const quitarArchivo = (idx: number) => setArchivos((prev) => prev.filter((_, i) => i !== idx));
 
-  const puedeRegistrar = !subiendo && tipo.trim().length > 0 && fecha.length > 0;
+  const notaInvalida = cfg.conNota && nota.trim() !== "" && leerNota(nota) === null;
+  const puedeRegistrar = !subiendo && tipo.trim().length > 0 && fecha.length > 0 && !notaInvalida;
 
   const registrar = async () => {
     if (!puedeRegistrar || !user || !profile) return;
@@ -172,6 +179,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       const entrada: Record<string, unknown> = {
         empleadoId,
         empleadoNombre,
+        categoria,
         tipo: tipo.trim(),
         fecha: Timestamp.fromDate(new Date(`${fecha}T00:00:00`)),
         registradaPorId: user.uid,
@@ -179,11 +187,14 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
         creadoEn: serverTimestamp(),
       };
       if (notas.trim()) entrada.notas = notas.trim();
+      const notaNum = cfg.conNota ? leerNota(nota) : null;
+      if (notaNum !== null) entrada.nota = notaNum;
       if (subidos.length) entrada.archivos = subidos;
 
       await addDoc(collection(db, "evaluaciones_personal"), entrada);
       setTipo("");
       setNotas("");
+      setNota("");
       setFecha(hoyInput());
       setArchivos([]);
     } catch (err) {
@@ -226,7 +237,13 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
     try {
       if (nuevo) subido = await subirAdjunto(empleadoId, nuevo, () => {});
       const archivosNuevos = entrada.archivos.flatMap((a, i) => (i !== idx ? [a] : subido ? [subido] : []));
-      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { archivos: archivosNuevos });
+      // Si ya tenía nota y se sube otro archivo (p. ej. la reevaluación), la nota
+      // puede haber cambiado: queda marcada para que el admin la confirme o corrija.
+      const marcarNota = !!subido && cfg.conNota && typeof entrada.nota === "number";
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), {
+        archivos: archivosNuevos,
+        ...(marcarNota ? { notaPorRevisar: true } : {}),
+      });
       if (viejo?.storagePath) await deleteObject(storageRef(storage, viejo.storagePath)).catch(() => {});
     } catch (err) {
       if (subido) await deleteObject(storageRef(storage, subido.storagePath)).catch(() => {});
@@ -238,19 +255,19 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
     <div className="space-y-4">
       {puedeGestionar && (
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 p-3 space-y-2.5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className={`grid grid-cols-1 gap-2.5 ${cfg.conNota ? "sm:grid-cols-[1fr_10rem_7rem]" : "sm:grid-cols-[1fr_10rem]"}`}>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Tipo</label>
               <input
-                list="tipos-evaluacion-personal"
+                list={`tipos-archivo-${categoria}`}
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
                 disabled={subiendo}
-                placeholder="Ej. Norma Técnica de Hechos Vitales"
+                placeholder={cfg.ejemploTipo}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
-              <datalist id="tipos-evaluacion-personal">
-                {TIPOS_EVALUACION_PERSONAL.map((t) => <option key={t} value={t} />)}
+              <datalist id={`tipos-archivo-${categoria}`}>
+                {cfg.tipos.map((t) => <option key={t} value={t} />)}
               </datalist>
             </div>
             <div>
@@ -263,7 +280,19 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
             </div>
+            {cfg.conNota && <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Nota (0–10)</label>
+              <input
+                inputMode="decimal"
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                disabled={subiendo}
+                placeholder="Opcional"
+                className={`w-full bg-white dark:bg-slate-900 border rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${notaInvalida ? "border-rose-400" : "border-slate-200 dark:border-slate-700"}`}
+              />
+            </div>}
           </div>
+          {cfg.conNota && <p className="text-[11px] text-slate-400">Nota mínima para aprobar: {NOTA_MINIMA_EVALUACION}.</p>}
 
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Notas (opcional)</label>
@@ -331,11 +360,9 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       ) : entradas.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
           <ClipboardCheck size={28} className="text-slate-300 dark:text-slate-600" />
-          <p className="text-sm font-medium text-slate-500">Sin evaluaciones registradas</p>
+          <p className="text-sm font-medium text-slate-500">{cfg.vacio}</p>
           <p className="text-xs text-slate-400 max-w-xs">
-            {puedeGestionar
-              ? "Las evaluaciones y amonestaciones que registres aquí quedan permanentes en el expediente."
-              : "Aquí verás las evaluaciones y amonestaciones que ESDOMED registre en tu expediente."}
+            {puedeGestionar ? cfg.vacioAdmin : cfg.vacioEmpleado}
           </p>
         </div>
       ) : (
@@ -349,6 +376,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
                       {e.tipo}
                     </span>
                     <span className="text-xs text-slate-400">{formatFecha(e.fecha)}</span>
+                    {cfg.conNota && <NotaEvaluacion entrada={e} puedeGestionar={puedeGestionar} />}
                   </div>
                   {e.notas && (
                     <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{e.notas}</p>
@@ -520,5 +548,113 @@ function AdjuntoCard({ adjunto, entradaId, indice, puedeGestionar, onReemplazar,
 
       {errorDescarga && <p className="px-2 pb-1.5 text-[11px] text-rose-600 dark:text-rose-400">{errorDescarga}</p>}
     </li>
+  );
+}
+
+/** Etiqueta de la nota (Aprobada ≥ 7 / Reprobada) y, para el admin, edición en línea. */
+function NotaEvaluacion({ entrada, puedeGestionar }: { entrada: EvaluacionPersonal; puedeGestionar: boolean }) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(entrada.nota != null ? String(entrada.nota) : "");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const tieneNota = typeof entrada.nota === "number";
+
+  const guardar = async () => {
+    if (!entrada.id) return;
+    const n = leerNota(valor);
+    if (valor.trim() && n === null) {
+      setError("Nota entre 0 y 10");
+      return;
+    }
+    setGuardando(true);
+    setError(null);
+    try {
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { nota: n === null ? deleteField() : n, notaPorRevisar: deleteField() });
+      setEditando(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la nota.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (editando) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <input
+          autoFocus
+          inputMode="decimal"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") guardar();
+            if (e.key === "Escape") setEditando(false);
+          }}
+          placeholder="0–10"
+          aria-label="Nota"
+          className="w-16 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        />
+        <button type="button" onClick={guardar} disabled={guardando} aria-label="Guardar nota"
+          className="rounded-md p-0.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-950">
+          {guardando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+        </button>
+        <button type="button" onClick={() => setEditando(false)} disabled={guardando} aria-label="Cancelar"
+          className="rounded-md p-0.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <X size={13} />
+        </button>
+        {error && <span className="text-[11px] text-rose-600 dark:text-rose-400">{error}</span>}
+      </span>
+    );
+  }
+
+  const confirmarNota = async () => {
+    if (!entrada.id) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await updateDoc(doc(db, "evaluaciones_personal", entrada.id), { notaPorRevisar: deleteField() });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo confirmar la nota.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {tieneNota && <ChipNota nota={entrada.nota as number} />}
+      {puedeGestionar && entrada.notaPorRevisar && tieneNota && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-px text-[11px] font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          Cambió el archivo: revisa la nota
+          <button type="button" onClick={confirmarNota} disabled={guardando}
+            className="rounded px-1 font-semibold underline-offset-2 hover:underline disabled:opacity-50">
+            {guardando ? "…" : "Sigue igual"}
+          </button>
+        </span>
+      )}
+      {error && <span className="text-[11px] text-rose-600 dark:text-rose-400">{error}</span>}
+      {puedeGestionar && entrada.id && (
+        <button type="button" onClick={() => { setValor(tieneNota ? String(entrada.nota) : ""); setEditando(true); }}
+          className="inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950">
+          <Pencil size={11} /> {tieneNota ? "Nota" : "Poner nota"}
+        </button>
+      )}
+    </span>
+  );
+}
+
+export function ChipNota({ nota }: { nota: number }) {
+  const ok = aproboEvaluacion(nota);
+  return (
+    <span
+      className={`rounded-full border px-2 py-px text-[11px] font-semibold ${
+        ok
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+          : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+      }`}
+      title={`Nota mínima para aprobar: ${NOTA_MINIMA_EVALUACION}`}
+    >
+      Nota {nota} · {ok ? "Aprobada" : "Reprobada"}
+    </span>
   );
 }

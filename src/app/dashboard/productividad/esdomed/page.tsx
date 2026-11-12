@@ -471,7 +471,7 @@ export default function ProductividadEsdomedPage() {
         <p className="text-xs text-slate-500 mt-0.5">Producción del personal de ESDOMED por periodo.</p>
       </div>
 
-      <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin"} />
+      <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin" || profile.role === "asistente_esdomed"} />
 
       <div className={grupo === "administrativos" ? "" : "hidden"}>
         <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} personalAdministrativo={personalAdministrativo} activa={grupo === "administrativos"} />

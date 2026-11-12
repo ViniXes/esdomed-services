@@ -49,7 +49,7 @@ export default function OcupacionCamasPage() {
   const { profile, loading: authLoading } = useAuth();
   const { lista } = useServicios();
   const router = useRouter();
-  const puedeVer = profile?.role === "esdomed" || profile?.role === "admin";
+  const puedeVer = profile?.role === "esdomed" || profile?.role === "asistente_esdomed" || profile?.role === "admin";
 
   const [activos, setActivos] = useState<PacienteEnCama[]>([]);
   const [ajustes, setAjustes] = useState<Ajustes>({});

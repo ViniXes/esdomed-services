@@ -45,6 +45,8 @@ let cacheBusquedas: BusquedaTelefono[] | null = null;
 export default function HistorialBusquedasPage() {
   const { profile, loading } = useAuth();
   const router = useRouter();
+  // Auditoría: admin + asistente administrativo (mismo criterio que firestore.rules).
+  const puedeVerAuditoria = profile?.role === "admin" || profile?.role === "asistente_esdomed";
   // Caché por sesión SPA: evita releer los 500 al volver a entrar a la vista.
   const [registros, setRegistros] = useState<BusquedaTelefono[]>(() => cacheBusquedas ?? []);
   const [cargando, setCargando] = useState(false);
@@ -55,12 +57,12 @@ export default function HistorialBusquedasPage() {
   const [estado, setEstado] = useState<"todos" | "encontrado" | "no_encontrado">("todos");
 
   useEffect(() => {
-    if (!loading && profile?.role !== "admin") router.replace("/dashboard");
-  }, [loading, profile, router]);
+    if (!loading && !puedeVerAuditoria) router.replace("/dashboard");
+  }, [loading, puedeVerAuditoria, router]);
 
   // Lectura puntual bajo demanda (no listener vivo: es un log de auditoría inmutable).
   const consultar = async () => {
-    if (profile?.role !== "admin") return;
+    if (!puedeVerAuditoria) return;
     setCargando(true);
     try {
       const q = query(
@@ -103,7 +105,7 @@ export default function HistorialBusquedasPage() {
     });
   }, [busqueda, desde, hasta, estado, registros]);
 
-  if (loading || profile?.role !== "admin") {
+  if (loading || !puedeVerAuditoria) {
     return (
       <div className="flex items-center justify-center h-full p-10">
         <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
