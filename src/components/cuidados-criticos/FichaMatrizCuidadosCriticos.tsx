@@ -49,7 +49,7 @@ type MensajeFormulario = { tipo: "success" | "error"; texto: string };
 
 function diagnosticoDesdeTexto(value: string): DiagnosticoCIE {
   const text = value.trim();
-  const match = text.match(/^([A-Z][0-9][0-9](?:\.[A-Z0-9]+)?)\s+-\s+(.+)$/i);
+  const match = text.match(/^([A-Z][0-9][0-9](?:\.(?:[A-Z0-9]+|\*))?)\s+-\s+(.+)$/i);
   if (!match) return { codigo: "", descripcion: text };
   return { codigo: match[1].toUpperCase(), descripcion: match[2].trim() };
 }
