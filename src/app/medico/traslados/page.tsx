@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, query, where, onSnapshot, doc, updateDoc, Timestamp } from "@/lib/firestoreMeter";
+import { useEffect, useMemo, useState } from "react";
+import {
+  collection, query, where, onSnapshot, doc, updateDoc, Timestamp, getDocs, orderBy, limit,
+  type QueryConstraint, type QueryDocumentSnapshot, type DocumentData,
+} from "@/lib/firestoreMeter";
 import Link from "next/link";
 import { db } from "@/lib/firebase";
 import { DateField } from "@/components/ui/DateField";
@@ -11,12 +14,23 @@ import { SolicitudTraslado } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { ArrowRightLeft, Plus, Building2, RefreshCw, Search, X, Pencil, Send, MessageSquare, AlertCircle, Clock3, FileText } from "lucide-react";
 
+const LIMIT_RECIENTES = 30;
+const LIMIT_HISTORIAL = 500;
+
+const mapTraslado = (d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as SolicitudTraslado);
+const msDe = (v: unknown) => (v as { toDate?: () => Date } | undefined)?.toDate?.()?.getTime() ?? 0;
+/** Sin repetidos (un traslado puede venir en dos consultas) y del más reciente al más antiguo. */
+const ordenarYUnir = (docs: SolicitudTraslado[]) => {
+  const porId = new Map<string, SolicitudTraslado>();
+  for (const t of docs) porId.set(t.id!, t);
+  return [...porId.values()].sort((a, b) => msDe(b.creadoEn) - msDe(a.creadoEn));
+};
+
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function MedicoTrasladosPage() {
   const { user } = useAuth();
   const { servicios, getCamas } = useServicios();
-  const [traslados, setTraslados] = useState<SolicitudTraslado[]>([]);
   const [busquedaExpediente, setBusquedaExpediente] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -64,6 +78,9 @@ export default function MedicoTrasladosPage() {
         update.camaDestino = editForm.camaDestino;
       }
       await updateDoc(doc(db, "traslados", editando.id), update);
+      // Lo reciente se actualiza solo (listener); los resultados del historial son una foto.
+      const id = editando.id;
+      setResultados(prev => prev?.map(t => (t.id === id ? ({ ...t, ...update } as SolicitudTraslado) : t)) ?? prev);
       setEditando(null);
     } catch (e) {
       setErrEdit(`No se pudo reenviar: ${e instanceof Error ? e.message : "error"}`);
@@ -72,19 +89,60 @@ export default function MedicoTrasladosPage() {
     }
   };
 
+  // En vivo: las LIMIT_RECIENTES más recientes del médico + TODAS las que esperan
+  // algo (pendientes / en revisión), fusionadas. Antes era el historial completo
+  // del médico en cada entrada. Lo anterior se busca bajo demanda.
+  const [recientes, setRecientes] = useState<SolicitudTraslado[]>([]);
+  const [accionables, setAccionables] = useState<SolicitudTraslado[]>([]);
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "traslados"), where("medicoId", "==", user.uid));
-    return onSnapshot(q, s => {
-      const docs = s.docs.map(d => ({ id: d.id, ...d.data() } as SolicitudTraslado));
-      docs.sort((a, b) => {
-        const at = (a.creadoEn as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
-        const bt = (b.creadoEn as { toDate?: () => Date }).toDate?.()?.getTime() ?? 0;
-        return bt - at;
-      });
-      setTraslados(docs);
-    });
+    const col = collection(db, "traslados");
+    const unsubRec = onSnapshot(
+      query(col, where("medicoId", "==", user.uid), orderBy("creadoEn", "desc"), limit(LIMIT_RECIENTES)),
+      s => setRecientes(s.docs.map(mapTraslado)),
+    );
+    const unsubAcc = onSnapshot(
+      query(col, where("medicoId", "==", user.uid), where("estado", "in", ["pendiente", "en_revision"])),
+      s => setAccionables(s.docs.map(mapTraslado)),
+    );
+    return () => { unsubRec(); unsubAcc(); };
   }, [user]);
+  const traslados = useMemo(() => ordenarYUnir([...recientes, ...accionables]), [recientes, accionables]);
+
+  // Búsqueda en todo el historial del médico: lectura puntual, nunca un listener.
+  const [resultados, setResultados] = useState<SolicitudTraslado[] | null>(null); // null = viendo lo reciente
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+  const buscarHistorial = async () => {
+    if (!user) return;
+    const exp = busquedaExpediente.trim();
+    if (!exp && !fechaDesde && !fechaHasta) return;
+    setBuscando(true);
+    setErrorBusqueda("");
+    try {
+      const col = collection(db, "traslados");
+      let docs: SolicitudTraslado[];
+      if (exp) {
+        // El expediente puede estar como paciente A o B (intercambio): dos igualdades, sin índice compuesto.
+        const [a, b] = await Promise.all([
+          getDocs(query(col, where("medicoId", "==", user.uid), where("pacienteExpediente", "==", exp))),
+          getDocs(query(col, where("medicoId", "==", user.uid), where("pacienteBExpediente", "==", exp))),
+        ]);
+        docs = [...a.docs, ...b.docs].map(mapTraslado);
+      } else {
+        const c: QueryConstraint[] = [where("medicoId", "==", user.uid)];
+        if (fechaDesde) c.push(where("creadoEn", ">=", Timestamp.fromDate(new Date(fechaDesde + "T00:00:00"))));
+        if (fechaHasta) c.push(where("creadoEn", "<=", Timestamp.fromDate(new Date(fechaHasta + "T23:59:59"))));
+        c.push(orderBy("creadoEn", "desc"), limit(LIMIT_HISTORIAL));
+        docs = (await getDocs(query(col, ...c))).docs.map(mapTraslado);
+      }
+      setResultados(ordenarYUnir(docs));
+    } catch (e) {
+      setErrorBusqueda(e instanceof Error ? e.message : "No se pudo completar la búsqueda.");
+    } finally {
+      setBuscando(false);
+    }
+  };
 
   const formatFecha = (ts: unknown) => {
     if (!ts) return "—";
@@ -102,7 +160,7 @@ export default function MedicoTrasladosPage() {
     return { label: "Traslado", color: "text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700", icon: ArrowRightLeft };
   };
 
-  const displayList = traslados.filter(t => {
+  const displayList = (resultados ?? traslados).filter(t => {
     if (busquedaExpediente) {
       const q = busquedaExpediente.toLowerCase();
       if (!(t.pacienteExpediente?.toLowerCase() ?? "").includes(q) &&
@@ -154,7 +212,7 @@ export default function MedicoTrasladosPage() {
         <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div className="flex items-center gap-3 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2.5 dark:border-cyan-900/60 dark:bg-cyan-950/25">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 text-white"><FileText size={16} /></span>
-            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{traslados.length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Enviadas</p></div>
+            <div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{(resultados ?? traslados).length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">{resultados ? "En el historial" : "Recientes"}</p></div>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-white"><Clock3 size={16} /></span>
@@ -183,18 +241,32 @@ export default function MedicoTrasladosPage() {
             placeholder="Hasta" ariaLabel="Fecha hasta" />
         </div>
         {(busquedaExpediente || fechaDesde || fechaHasta) && (
-          <button onClick={() => { setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta(""); }}
+          <button onClick={buscarHistorial} disabled={buscando}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:opacity-50">
+            <Search size={12} /> {buscando ? "Buscando…" : "Buscar en mi historial"}
+          </button>
+        )}
+        {(busquedaExpediente || fechaDesde || fechaHasta || resultados) && (
+          <button onClick={() => { setBusquedaExpediente(""); setFechaDesde(""); setFechaHasta(""); setResultados(null); setErrorBusqueda(""); }}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
             <X size={12} /> Limpiar
           </button>
         )}
         </div>
+        <p className="mt-2 text-xs text-slate-500">
+          {resultados
+            ? "Mostrando lo encontrado en todo su historial (expediente exacto o rango de fechas). «Limpiar» vuelve a lo reciente."
+            : `Se muestran sus ${LIMIT_RECIENTES} solicitudes más recientes y todas las pendientes o en revisión. Para anteriores, filtre y use «Buscar en mi historial».`}
+        </p>
+        {errorBusqueda && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{errorBusqueda}</p>}
       </section>
 
       <div className="space-y-3">
         {displayList.length === 0 && (
           <p className="text-sm text-slate-500 py-10 text-center">
-            {traslados.length === 0 ? "No has enviado solicitudes de traslado." : "Sin resultados para los filtros aplicados."}
+            {resultados
+              ? "No se encontró nada en su historial con ese criterio."
+              : traslados.length === 0 ? "No has enviado solicitudes de traslado." : "Sin resultados entre lo reciente. Use «Buscar en mi historial» para ir más atrás."}
           </p>
         )}
         {displayList.map(t => {

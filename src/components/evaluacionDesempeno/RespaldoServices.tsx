@@ -74,7 +74,8 @@ export function RespaldoServices({
     setError("");
     try {
       const [r, a] = await Promise.all([
-        cargarRespaldo({ empleadoId, uid: empleadoId, nombre, codigoMarcacion, periodo, equipo }),
+        // "Actualizar" vuelve a leer el mes en curso; la carga automática reusa lo de la sesión.
+        cargarRespaldo({ empleadoId, uid: empleadoId, nombre, codigoMarcacion, periodo, equipo, forzar: origen === "manual" }),
         cargarArchivero(empleadoId, periodo),
       ]);
       onRespaldo({ ...r, archivero: a.entradas, sgas: a.sgas }, origen);

@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
-  collection, onSnapshot, query, where, orderBy, limit, getCountFromServer, type Query,
+  collection, onSnapshot, query, where, orderBy, limit,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,8 +64,7 @@ const Ctx = createContext<NotificacionesContextType>({
   dismissToast: () => {},
 });
 
-// Refresco de contadores (por agregación, no en vivo). El prompt-cache de lecturas
-// se reduce drásticamente: no se leen los documentos, solo se cuentan en el servidor.
+// Refresco de las solicitudes SIS (van por API, no hay listener posible).
 const POLL_MS = 120_000; // 2 min
 
 type Doc = Record<string, unknown>;
@@ -103,35 +102,31 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  // ── Contadores de pendientes por AGREGACIÓN (getCountFromServer) ──
-  // No lee los documentos (cuenta en el servidor, ~1 lectura por cada 1000).
-  // Se refresca al montar, al enfocar la ventana y cada 2 min (no en tiempo real).
+  // ── Contadores de pendientes: listener en vivo SOLO de los pendientes ──
+  // Antes eran conteos por agregación cada 2 min + en cada focus, también con la
+  // pestaña oculta: ~57-63 mil lecturas/día medidas (cada count cobra mínimo 1).
+  // Los pendientes son pocos (0-5 por colección): el listener cobra esos al montar
+  // y luego 1 lectura por cada cambio; con la pestaña quieta no cuesta nada. Las
+  // bandejas escuchan la misma consulta (`estado == pendiente`) y el SDK la comparte.
   useEffect(() => {
     if (!esEsdomed && !puedeAltas) return;
-    let activo = true;
-    const contar = async (k: keyof Omit<Pendientes, "total">, q: Query) => {
-      try {
-        const r = await getCountFromServer(q);
-        if (activo) setCount(k, r.data().count);
-      } catch { /* el conteo no es crítico */ }
-    };
-    const pend = (coll: string) => query(collection(db, coll), where("estado", "==", "pendiente"));
-    const refrescar = () => {
-      if (esEsdomed) {
-        contar("fallecidos", pend("notificaciones_fallecidos"));
-        contar("traslados", pend("traslados"));
-        contar("trasladosExternos", pend("traslados_externos"));
-        contar("incapacidades", pend("incapacidades"));
-        contar("anexo5", pend("anexo5"));
-        contar("impresiones", pend("solicitudes_impresion"));
-      }
-      if (puedeAltas) contar("altas", pend("notificaciones_altas"));
-    };
-    refrescar();
-    const onFocus = () => refrescar();
-    window.addEventListener("focus", onFocus);
-    const iv = window.setInterval(refrescar, POLL_MS);
-    return () => { activo = false; window.removeEventListener("focus", onFocus); window.clearInterval(iv); };
+    const fuentes: { k: keyof Omit<Pendientes, "total">; coll: string; gate: boolean }[] = [
+      { k: "fallecidos", coll: "notificaciones_fallecidos", gate: esEsdomed },
+      { k: "traslados", coll: "traslados", gate: esEsdomed },
+      { k: "trasladosExternos", coll: "traslados_externos", gate: esEsdomed },
+      { k: "incapacidades", coll: "incapacidades", gate: esEsdomed },
+      { k: "anexo5", coll: "anexo5", gate: esEsdomed },
+      { k: "impresiones", coll: "solicitudes_impresion", gate: esEsdomed },
+      { k: "altas", coll: "notificaciones_altas", gate: puedeAltas },
+    ];
+    const unsubs = fuentes.filter(f => f.gate).map(f =>
+      onSnapshot(
+        query(collection(db, f.coll), where("estado", "==", "pendiente")),
+        snap => setCount(f.k, snap.size),
+        () => { /* el contador no es crítico */ },
+      ),
+    );
+    return () => unsubs.forEach(u => u());
   }, [esEsdomed, puedeAltas, setCount]);
 
   // ── Toasts de nuevos registros: 1 documento por colección (el más reciente) ──
@@ -234,55 +229,34 @@ export function NotificacionesProvider({ children }: { children: ReactNode }) {
   }, [revisaFallecidos, addToast, setCount]);
 
   // ── Comité de Lesiones: notificaciones CONAPINA/FGR pendientes de acuse ──
-  // Contador por agregación (no lee documentos) + 1 listener del más reciente
-  // para el toast, igual que las fuentes de ESDOMED.
-  const knownConapina = useRef<string | null>(null);
+  // Un solo listener sobre las PENDIENTES: da el contador vivo del globo y
+  // detecta las nuevas para el toast (antes: conteo cada 2 min + focus y otro
+  // listener del más reciente).
+  // El comité solo tiene una acción pendiente: recibir el caso. El aviso a
+  // CONAPINA / la Fiscalía ya lo dio el médico y viene declarado en la
+  // notificación, así que una recibida no deja nada por hacer.
+  const knownConapina = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!cuentaConapina) return;
-    let activo = true;
     knownConapina.current = null;
-
-    // El comité solo tiene una acción pendiente: recibir el caso. El aviso a
-    // CONAPINA / la Fiscalía ya lo dio el médico y viene declarado en la
-    // notificación, así que una recibida no deja nada por hacer.
-    const contar = async () => {
-      try {
-        const pend = await getCountFromServer(
-          query(collection(db, "notificaciones_conapina_fgr"), where("estado", "==", "pendiente")),
-        );
-        if (activo) setCount("conapina", pend.data().count);
-      } catch { /* el conteo no es crítico */ }
-    };
-    contar();
-    const onFocus = () => contar();
-    window.addEventListener("focus", onFocus);
-    const iv = window.setInterval(contar, POLL_MS);
-
-    const unsub = onSnapshot(
-      query(collection(db, "notificaciones_conapina_fgr"), orderBy("creadoEn", "desc"), limit(1)),
-      snap => {
-        const d0 = snap.docs[0];
-        if (!d0) return;
-        if (knownConapina.current === null) { knownConapina.current = d0.id; return; }
-        if (d0.id !== knownConapina.current) {
-          knownConapina.current = d0.id;
-          const d = d0.data();
-          addToast({
-            tipo: "conapina",
-            titulo: "Nueva notificación CONAPINA/FGR",
-            mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}`,
-          });
-          contar();
-        }
-      },
-    );
-
-    return () => {
-      activo = false;
-      window.removeEventListener("focus", onFocus);
-      window.clearInterval(iv);
-      unsub();
-    };
+    const q = query(collection(db, "notificaciones_conapina_fgr"), where("estado", "==", "pendiente"));
+    return onSnapshot(q, snap => {
+      const ids = new Set(snap.docs.map(d => d.id));
+      if (knownConapina.current !== null) {
+        snap.docs.forEach(doc => {
+          if (!knownConapina.current!.has(doc.id)) {
+            const d = doc.data();
+            addToast({
+              tipo: "conapina",
+              titulo: "Nueva notificación CONAPINA/FGR",
+              mensaje: `${s(d.pacienteNombre)} · Exp. ${s(d.pacienteExpediente)}`,
+            });
+          }
+        });
+      }
+      knownConapina.current = ids;
+      setCount("conapina", snap.size);
+    }, () => { /* el contador no es crítico */ });
   }, [cuentaConapina, addToast, setCount]);
 
   // ── Médicos: solicitudes de notificación difundidas por el comité ──

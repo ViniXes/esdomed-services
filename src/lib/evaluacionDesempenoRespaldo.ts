@@ -9,7 +9,7 @@
 // lo sigue llenando el jefe. Se carga bajo demanda (consultas por rango del
 // semestre) y al guardar la evaluación queda una foto del resumen.
 
-import { collection, doc, getDoc, getDocs, query, Timestamp, where } from "@/lib/firestoreMeter";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, Timestamp, where } from "@/lib/firestoreMeter";
 import { auth, db } from "@/lib/firebase";
 import type { EmpleadoInconsistenciasMarcacion, NotificacionAltaVivo, NotificacionFallecido, PlanTrabajo, SolicitudImpresion, SolicitudTraslado } from "@/types";
 import { COLECCION_INCONSISTENCIAS } from "@/lib/inconsistenciasMarcacion/personal";
@@ -234,26 +234,49 @@ const aIso = (v: unknown) => {
   return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : "";
 };
 
-/**
- * Productividad (mismas fuentes y criterios que /dashboard/productividad/esdomed,
- * sin las hojas de Drive), reporte mensual del reloj y altas revertidas del periodo.
- * `equipo` = personal operativo para el promedio de comparación.
- */
-export async function cargarRespaldo(params: {
-  empleadoId: string;
-  nombre: string;
-  periodo: string;
-  uid: string;
-  codigoMarcacion?: string;
-  equipo: RefPersonaEquipo[];
-}): Promise<ResumenRespaldo> {
-  const rango = rangoDePeriodo(params.periodo);
-  if (!rango) throw new Error("El periodo no tiene el formato «JUL - DIC 2026».");
-  const ini = Timestamp.fromDate(rango.inicio);
-  const fin = Timestamp.fromDate(rango.fin);
-  const entre = (campo: string, col: string) => getDocs(query(collection(db, col), where(campo, ">=", ini), where(campo, "<=", fin)));
+// ─── Productividad por mes (lo que sale de Firestore) ────────────────────────
+// Leer el semestre completo eran ~28.000 documentos por carga y por persona
+// evaluada (los mismos datos para todo el equipo). Ahora cada mes CERRADO se
+// resume una sola vez en `productividad_resumen/{YYYY-MM}` (conteos por persona y
+// minutos con actividad, sin datos de pacientes) y después cuesta 1 lectura; solo
+// el mes en curso se lee de las colecciones, con caché en la sesión.
 
-  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, traslados, revertidas] = await Promise.all([
+export const COLECCION_RESUMEN_PRODUCTIVIDAD = "productividad_resumen";
+/** Subirla obliga a recalcular los resúmenes guardados (cambio de criterio). */
+const VERSION_RESUMEN = 1;
+
+const METRICAS_FIRESTORE = ["expedientes", "altas", "defunciones", "certificados", "simmow", "documentos", "traslados"] as const;
+type MetricaFirestore = (typeof METRICAS_FIRESTORE)[number];
+
+/** Lo que hizo una persona en el mes. `n` = nombre normalizado tal como quedó escrito. */
+interface PersonaMes {
+  n: string;
+  c: Partial<Record<MetricaFirestore, number>>;
+  /** Minutos (epoch / 60 000) en los que registró algo; para los turnos sin actividad. */
+  a: number[];
+}
+
+interface ProductividadMes {
+  mes: string; // "2026-07"
+  personas: PersonaMes[];
+}
+
+/** Caché de la sesión: los meses cerrados no cambian; el mes en curso se refresca con "Actualizar". */
+const cacheMeses = new Map<string, ProductividadMes>();
+
+const aMs = (v: unknown): number | null => {
+  const d = v instanceof Date ? v : ((v as { toDate?: () => Date })?.toDate?.() ?? null);
+  const t = d?.getTime();
+  return t != null && Number.isFinite(t) ? t : null;
+};
+
+/** Lee un mes de las colecciones (mismas fuentes y criterios que /dashboard/productividad/esdomed). */
+async function leerMesDeColecciones(mes: string): Promise<ProductividadMes> {
+  const [anio, m] = mes.split("-").map(Number);
+  const ini = Timestamp.fromDate(new Date(anio, m - 1, 1));
+  const fin = Timestamp.fromDate(new Date(anio, m, 0, 23, 59, 59, 999));
+  const entre = (campo: string, col: string) => getDocs(query(collection(db, col), where(campo, ">=", ini), where(campo, "<=", fin)));
+  const [ingresos, confirmados, certificados, simmowF, altasProc, simmowA, impresiones, traslados] = await Promise.all([
     entre("creadoEn", "control_ingresos"),
     entre("confirmadoEn", "notificaciones_fallecidos"),
     entre("entregaCertificadoEn", "notificaciones_fallecidos"),
@@ -262,35 +285,137 @@ export async function cargarRespaldo(params: {
     entre("digitaSimmowEn", "notificaciones_altas"),
     entre("impresoEn", "solicitudes_impresion"),
     entre("actualizadoEn", "traslados"),
-    entre("revertidoEn", "notificaciones_altas"),
   ]);
-
-  const [drive, revision] = await Promise.all([leerHojasDrive(rango), leerRevisionDenys(rango)]);
+  const personas = new Map<string, { c: Partial<Record<MetricaFirestore, number>>; a: Set<number> }>();
+  const sumar = (metrica: MetricaFirestore, nombre: string | undefined | null, fecha: unknown) => {
+    const n = normalizar(nombre);
+    if (!n) return;
+    const p = personas.get(n) ?? { c: {}, a: new Set<number>() };
+    p.c[metrica] = (p.c[metrica] ?? 0) + 1;
+    const t = aMs(fecha);
+    if (t != null) p.a.add(Math.floor(t / 60000));
+    personas.set(n, p);
+  };
   const datos = <T>(s: { docs: { data: () => unknown }[] }) => s.docs.map((d) => d.data() as T);
-  const ing = datos<{ responsableIngresoNombre?: string; creadoPorNombre?: string }>(ingresos);
+  for (const i of datos<{ responsableIngresoNombre?: string; creadoPorNombre?: string; creadoEn?: unknown }>(ingresos)) {
+    sumar("expedientes", i.responsableIngresoNombre ?? i.creadoPorNombre, i.creadoEn);
+  }
+  for (const a of datos<NotificacionAltaVivo>(altasProc)) if (a.estado === "procesada") sumar("altas", a.procesadoPorNombre, a.procesadoEn);
+  for (const f of datos<NotificacionFallecido>(confirmados)) sumar("defunciones", f.confirmadoPorNombre, f.confirmadoEn);
+  for (const f of datos<NotificacionFallecido>(certificados)) sumar("certificados", f.entregaCertificado, f.entregaCertificadoEn);
+  for (const a of datos<NotificacionAltaVivo>(simmowA)) sumar("simmow", a.digitaSimmow, a.digitaSimmowEn);
+  for (const f of datos<NotificacionFallecido>(simmowF)) sumar("simmow", f.digitaSimmow, f.digitaSimmowEn);
+  for (const i of datos<SolicitudImpresion>(impresiones)) if (i.estado === "impreso") sumar("documentos", i.impresoPorNombre, i.impresoEn);
+  for (const t of datos<SolicitudTraslado>(traslados)) sumar("traslados", t.revisadoPorNombre, t.actualizadoEn);
+  return {
+    mes,
+    personas: [...personas.entries()].map(([n, p]) => ({ n, c: p.c, a: [...p.a].sort((x, y) => x - y) })),
+  };
+}
+
+/** Un mes se da por cerrado desde el día 2 del siguiente (margen para lo registrado tarde). */
+const mesCerrado = (mes: string) => {
+  const [anio, m] = mes.split("-").map(Number);
+  return Date.now() >= new Date(anio, m, 2).getTime();
+};
+
+async function productividadDelMes(mes: string, forzar: boolean): Promise<ProductividadMes> {
+  const cerrado = mesCerrado(mes);
+  const enCache = cacheMeses.get(mes);
+  if (enCache && (cerrado || !forzar)) return enCache;
+  let datos: ProductividadMes | null = null;
+  if (cerrado) {
+    try {
+      const snap = await getDoc(doc(db, COLECCION_RESUMEN_PRODUCTIVIDAD, mes));
+      const x = snap.exists() ? (snap.data() as { version?: number; personas?: PersonaMes[] }) : null;
+      if (x?.version === VERSION_RESUMEN && Array.isArray(x.personas)) datos = { mes, personas: x.personas };
+    } catch {
+      // Sin permiso o sin red: se calcula desde las colecciones.
+    }
+  }
+  if (!datos) {
+    datos = await leerMesDeColecciones(mes);
+    if (cerrado) {
+      // Se guarda para que el mes no se vuelva a leer completo. Si falla (reglas), solo se pierde el ahorro.
+      setDoc(doc(db, COLECCION_RESUMEN_PRODUCTIVIDAD, mes), {
+        version: VERSION_RESUMEN,
+        mes,
+        personas: datos.personas,
+        generadoEn: serverTimestamp(),
+        generadoPorId: auth.currentUser?.uid ?? null,
+      }).catch((e) => console.warn("No se pudo guardar el resumen de productividad", mes, e));
+    }
+  }
+  cacheMeses.set(mes, datos);
+  return datos;
+}
+
+/** Meses del periodo hasta el actual (los futuros no tienen datos). */
+function mesesHastaHoy(rango: { inicio: Date; fin: Date }): string[] {
+  const hoy = new Date();
+  const hasta = rango.fin < hoy ? rango.fin : hoy;
+  const meses: string[] = [];
+  for (let d = new Date(rango.inicio.getFullYear(), rango.inicio.getMonth(), 1); d <= hasta; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return meses;
+}
+
+/**
+ * Productividad (mismas fuentes y criterios que /dashboard/productividad/esdomed,
+ * más las hojas de Drive), reporte mensual del reloj y altas revertidas del periodo.
+ * `equipo` = personal operativo para el promedio de comparación. `forzar` vuelve a
+ * leer el mes en curso (botón "Actualizar"); los meses cerrados salen del resumen.
+ */
+export async function cargarRespaldo(params: {
+  empleadoId: string;
+  nombre: string;
+  periodo: string;
+  uid: string;
+  codigoMarcacion?: string;
+  equipo: RefPersonaEquipo[];
+  forzar?: boolean;
+}): Promise<ResumenRespaldo> {
+  const rango = rangoDePeriodo(params.periodo);
+  if (!rango) throw new Error("El periodo no tiene el formato «JUL - DIC 2026».");
+  const ini = Timestamp.fromDate(rango.inicio);
+  const fin = Timestamp.fromDate(rango.fin);
+
+  const [mesesProd, revertidas, drive, revision] = await Promise.all([
+    Promise.all(mesesHastaHoy(rango).map((m) => productividadDelMes(m, !!params.forzar))),
+    // Pocas en el semestre (decenas): se leen directo.
+    getDocs(query(collection(db, "notificaciones_altas"), where("revertidoEn", ">=", ini), where("revertidoEn", "<=", fin))),
+    leerHojasDrive(rango),
+    leerRevisionDenys(rango),
+  ]);
+  const datos = <T>(s: { docs: { data: () => unknown }[] }) => s.docs.map((d) => d.data() as T);
   // Nombres del personal evaluado: une las variantes de escritura de cada persona.
   const canon = canonDeNombres([params.nombre, ...params.equipo.map((p) => p.nombre)]);
+  const yo = normalizar(params.nombre);
   const cuenta = <T>(items: T[], nombre: (i: T) => string | undefined | null) => contarPor(items, nombre, canon);
   const reg = <T>(items: T[], nombre: (i: T) => string | undefined | null, fecha: (i: T) => unknown) => registros(items, nombre, fecha, canon);
+  const deFirestore = Object.fromEntries(METRICAS_FIRESTORE.map((id) => [id, new Map<string, number>()])) as Record<MetricaFirestore, Map<string, number>>;
+  // Minutos con actividad de la persona evaluada (de Firestore), para los turnos sin actividad.
+  const actividadYo: number[] = [];
+  for (const mes of mesesProd) {
+    for (const p of mes.personas) {
+      const n = canon(p.n);
+      if (!n) continue;
+      for (const id of METRICAS_FIRESTORE) {
+        const v = p.c[id];
+        if (v) deFirestore[id].set(n, (deFirestore[id].get(n) ?? 0) + v);
+      }
+      if (n === yo) for (const minuto of p.a) actividadYo.push(minuto * 60000);
+    }
+  }
   const mapas: Record<MetricaId, Map<string, number>> = {
-    expedientes: cuenta(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre),
-    altas: cuenta(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre),
-    defunciones: cuenta(datos<NotificacionFallecido>(confirmados), (f) => f.confirmadoPorNombre),
-    certificados: cuenta(datos<NotificacionFallecido>(certificados), (f) => f.entregaCertificado),
-    simmow: (() => {
-      const m = cuenta(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow);
-      for (const [k, v] of cuenta(datos<NotificacionFallecido>(simmowF), (f) => f.digitaSimmow)) m.set(k, (m.get(k) ?? 0) + v);
-      return m;
-    })(),
-    documentos: cuenta(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre),
-    traslados: cuenta(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre),
+    ...deFirestore,
     carpetas: cuenta(drive.hojas.carpetas, (x) => x.nombre),
     actualizaciones: cuenta(drive.hojas.actualizaciones, (x) => x.nombre),
     consentimientos: cuenta(drive.hojas.consentimientos, (x) => x.nombre),
     emergenciasSimmow: cuenta(drive.hojas.emergenciasSimmow, (x) => x.nombre),
   };
 
-  const yo = normalizar(params.nombre);
   const equipo = new Set(params.equipo.map((p) => normalizar(p.nombre)));
   equipo.add(yo);
   const productividad = {} as Record<MetricaId, number>;
@@ -350,17 +475,12 @@ export async function cargarRespaldo(params: {
     .filter((a) => normalizar(a.procesadoPorNombre) === yo)
     .map((a) => ({ fecha: aIso(a.revertidoEn), paciente: a.pacienteNombre ?? "", nota: a.revertidoNota ?? "" }));
 
-  // Registros con fecha (para turnos sin actividad).
-  const todos: Registro[] = [
-    ...reg(ing, (i) => i.responsableIngresoNombre ?? i.creadoPorNombre, (i) => (i as { creadoEn?: unknown }).creadoEn),
-    ...reg(datos<NotificacionAltaVivo>(altasProc).filter((a) => a.estado === "procesada"), (a) => a.procesadoPorNombre, (a) => a.procesadoEn),
-    ...reg(datos<NotificacionFallecido>(confirmados), (x) => x.confirmadoPorNombre, (x) => x.confirmadoEn),
-    ...reg(datos<NotificacionFallecido>(certificados), (x) => x.entregaCertificado, (x) => x.entregaCertificadoEn),
-    ...reg(datos<NotificacionAltaVivo>(simmowA), (a) => a.digitaSimmow, (a) => a.digitaSimmowEn),
-    ...reg(datos<NotificacionFallecido>(simmowF), (x) => x.digitaSimmow, (x) => x.digitaSimmowEn),
-    ...reg(datos<SolicitudImpresion>(impresiones).filter((i) => i.estado === "impreso"), (i) => i.impresoPorNombre, (i) => i.impresoEn),
-    ...reg(datos<SolicitudTraslado>(traslados), (t) => t.revisadoPorNombre, (t) => t.actualizadoEn),
-    ...HOJAS_DRIVE.flatMap((h) => reg(drive.hojas[h], (x) => x.nombre, (x) => new Date(x.fecha))),
+  // Registros con fecha de la persona (para turnos sin actividad): Firestore + hojas de Drive.
+  const registrosYo = [
+    ...actividadYo,
+    ...HOJAS_DRIVE.flatMap((h) => reg(drive.hojas[h], (x) => x.nombre, (x) => new Date(x.fecha)))
+      .filter((r: Registro) => r.n === yo)
+      .map((r) => r.t.getTime()),
   ];
   const marcPorMes = new Map(
     meses.map((m) => {
@@ -376,7 +496,7 @@ export async function cargarRespaldo(params: {
       ] as const;
     }),
   );
-  const plan = await resumenPlan({ marcPorMes, rango, yo: { uid: params.uid, nombre: params.nombre, codigoMarcacion: params.codigoMarcacion }, equipo: params.equipo, totales: totalesEquipo, registrosYo: todos.filter((r) => r.n === yo).map((r) => r.t.getTime()) });
+  const plan = await resumenPlan({ marcPorMes, rango, yo: { uid: params.uid, nombre: params.nombre, codigoMarcacion: params.codigoMarcacion }, equipo: params.equipo, totales: totalesEquipo, registrosYo });
 
   return {
     periodo: params.periodo,

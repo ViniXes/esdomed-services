@@ -905,6 +905,12 @@ service cloud.firestore {
     match /evaluaciones_desempeno_fichas/{uid} {
       allow read, write: if isAdmin();
     }
+    // Resumen mensual de productividad del personal ESDOMED (id "YYYY-MM"): conteos
+    // por persona y minutos con actividad de un mes cerrado, sin datos de pacientes.
+    // Lo genera el respaldo de la evaluación para no releer el semestre completo.
+    match /productividad_resumen/{mes} {
+      allow read, write: if isAdmin();
+    }
 
     // ─── Inconsistencias de marcación (estadísticas) ──────────────────────────
     // Espejo mensual del "Reporte Descuentos" de RRHH (doc id = "YYYY-MM").

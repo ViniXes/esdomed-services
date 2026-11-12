@@ -25,6 +25,10 @@ const FILTROS_ESTADO: { value: FiltroEstado; label: string }[] = [
 // Topes de seguridad. La vista pública ya viene acotada por fecha (ayer y hoy);
 // el histórico es bajo demanda y siempre exige expediente o rango.
 const LIMIT_VENTANA = 200;
+// "Mías": las más recientes del médico (las pendientes se traen todas aparte).
+const LIMIT_MIAS = 30;
+// Lo que el médico todavía puede editar o completar.
+const ESTADOS_POR_ATENDER: EstadoIncapacidad[] = ["pendiente", "pendiente_medico"];
 const LIMIT_HISTORICO = 500;
 const LIMIT_HISTORICO_EXP = 200;
 
@@ -120,12 +124,37 @@ export default function MedicoIncapacidadesPage() {
     if (vista === "historico") return;
 
     if (vista === "mias") {
-      // Vista personal: en vivo, solo las del médico (acotada por medicoId).
-      const q = query(collection(db, "incapacidades"), where("medicoId", "==", user.uid));
-      return onSnapshot(q, (s) => {
-        setSolicitudes(s.docs.map(mapIncapacidad).sort(porFecha));
-        setLoading(false);
-      });
+      // Vista personal en vivo: las LIMIT_MIAS más recientes del médico + TODAS sus
+      // pendientes (incluidas reposiciones por completar), fusionadas. Antes era el
+      // historial completo (hasta 1.600 docs en un médico) en cada entrada.
+      const col = collection(db, "incapacidades");
+      let recientes: SolicitudIncapacidad[] | null = null;
+      let accionables: SolicitudIncapacidad[] | null = null;
+      const publicar = () => {
+        const porId = new Map<string, SolicitudIncapacidad>();
+        for (const s of [...(recientes ?? []), ...(accionables ?? [])]) porId.set(s.id!, s);
+        setSolicitudes([...porId.values()].sort(porFecha));
+        if (recientes && accionables) setLoading(false);
+      };
+      const unsubAcc = onSnapshot(
+        query(col, where("medicoId", "==", user.uid), where("estado", "in", ESTADOS_POR_ATENDER)),
+        (s) => { accionables = s.docs.map(mapIncapacidad); publicar(); },
+        () => { accionables = []; publicar(); },
+      );
+      let unsubRec = onSnapshot(
+        query(col, where("medicoId", "==", user.uid), orderBy("creadoEn", "desc"), limit(LIMIT_MIAS)),
+        (s) => { recientes = s.docs.map(mapIncapacidad); publicar(); },
+        (e) => {
+          // Sin el índice compuesto (medicoId, creadoEn desc) todavía: se cae a la
+          // consulta anterior (todo el historial del médico) para no dejar la vista vacía.
+          console.warn("Incapacidades recientes sin índice; se lee el historial completo.", e);
+          unsubRec = onSnapshot(query(col, where("medicoId", "==", user.uid)), (s) => {
+            recientes = s.docs.map(mapIncapacidad);
+            publicar();
+          });
+        },
+      );
+      return () => { unsubAcc(); unsubRec(); };
     }
 
     // Vista pública: solo ayer y hoy, lectura puntual (no abre un listener
@@ -253,7 +282,7 @@ export default function MedicoIncapacidadesPage() {
 
       {/* Resumen del alcance mostrado (personal, ayer y hoy, o búsqueda) */}
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white"><FileText size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{base.length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">{vista === "mias" ? "Solicitadas" : vista === "todas" ? "Ayer y hoy" : "Resultados"}</p></div></div>
+        <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white"><FileText size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{base.length}</p><p className="mt-1 text-[11px] font-medium text-slate-500">{vista === "mias" ? "Recientes" : vista === "todas" ? "Ayer y hoy" : "Resultados"}</p></div></div>
         <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-white"><Clock size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{pendientes}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Pendientes</p></div></div>
         <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/25"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white"><CheckCircle2 size={16} /></span><div><p className="text-lg font-bold leading-none text-slate-900 dark:text-white">{emitidas}</p><p className="mt-1 text-[11px] font-medium text-slate-500">Emitidas</p></div></div>
       </div>
@@ -292,6 +321,12 @@ export default function MedicoIncapacidadesPage() {
           <Clock size={14} />
           {pendientes} esperando emisión
         </div>
+      )}
+
+      {vista === "mias" && (
+        <p className="mb-4 text-xs text-slate-500">
+          Se muestran sus {LIMIT_MIAS} solicitudes más recientes y todas las pendientes. Para anteriores use la pestaña Histórico.
+        </p>
       )}
 
       {/* Alcance de la vista pública: solo ayer y hoy, con refresco manual */}
