@@ -1,6 +1,6 @@
 import {
   Activity, Ambulance, ArrowRightLeft, BarChart3, BookOpenText, Building2, ClipboardList, ClipboardPen,
-  Contact, DoorOpen, FileClock, FileStack, FileText, FolderOpen, HeartPulse, KeyRound, LayoutDashboard,
+  Contact, DoorOpen, FileChartColumnIncreasing, FileClock, FileStack, FileText, FolderOpen, HeartPulse, KeyRound, LayoutDashboard,
   LayoutGrid, Phone, Printer, Send, ShieldAlert, Siren, Table2, UserSearch,
 } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
@@ -11,6 +11,7 @@ import { SECCION_LESIONES } from "@/lib/navComiteLesiones";
 import { apoyaComiteLesiones } from "@/lib/accesoComiteLesiones";
 import { puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { puedeVerTableroCensos } from "@/lib/accesoTableroCensos";
+import { puedeVerReporteIncapacidades } from "@/lib/accesoReporteIncapacidades";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -49,6 +50,8 @@ const MENU_MEDICO: SeccionNav[] = [
       { href: "/medico/emergencia/egresos", label: "Egresos de emergencia", icon: DoorOpen },
       { href: "/medico/censos", label: "Censos de emergencia", icon: BookOpenText },
       { href: "/medico/censos/tablero", label: "Tablero de censos", icon: BarChart3, visibleSi: puedeVerTableroCensos },
+      // El "Incapacidades por área" de ESDOMED, fijo en Emergencia.
+      { href: "/medico/emergencia/incapacidades", label: "Reporte de incapacidades", icon: FileChartColumnIncreasing, visibleSi: puedeVerReporteIncapacidades },
     ],
   },
   {
