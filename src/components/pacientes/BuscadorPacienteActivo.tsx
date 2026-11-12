@@ -86,7 +86,10 @@ export function BuscadorPacienteActivo({ value, onSelect, accent = "blue" }: Pro
       let q;
       if (modo === "servicio") {
         if (!servicio) { setResultados([]); setBuscado(false); setExisteInactivo(false); return; }
-        q = query(collection(db, "pacientes"), where("servicioActual", "==", servicio));
+        // Solo activos en el servidor: el egreso no limpia `servicioActual`, así que sin
+        // este filtro se leían todos los egresados del servicio (Hematología: 833 por 40).
+        // Dos igualdades → no exige índice compuesto.
+        q = query(collection(db, "pacientes"), where("servicioActual", "==", servicio), where("estado", "==", "activo"));
       } else if (modo === "expediente") {
         if (!t) { setResultados([]); setBuscado(false); setExisteInactivo(false); return; }
         q = query(collection(db, "pacientes"), where("expediente", "==", t));

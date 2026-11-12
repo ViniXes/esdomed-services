@@ -160,7 +160,8 @@ export default function EnfermeriaAltasPage() {
     setCargando(true);
     setRecientes(guardarReciente(s));
     try {
-      const snap = await getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", s)));
+      // Solo activos en el servidor (el egreso no limpia `servicioActual`): dos igualdades, sin índice compuesto.
+      const snap = await getDocs(query(collection(db, "pacientes"), where("servicioActual", "==", s), where("estado", "==", "activo")));
       const activos = snap.docs.map(aPaciente).filter(p => p.estado === "activo").sort(ordenarPorCama);
       const abiertasSrv = await altasAbiertasDe(activos.map(p => p.id!));
       if (id !== peticion.current) return;
