@@ -28,6 +28,9 @@ export interface UserProfile {
   codigoMarcacion?: string; // solo personal ESDOMED — llave para vincular su fila en el plan de horarios (ej. "C-043")
   puesto?: string;          // solo personal ESDOMED — cargo que aparece en el plan (ej. "TECNICO EN ...")
   generico?: boolean;       // cuenta compartida (ej. enfermería por servicio): pide el nombre real de quien actúa
+  // Solo rol consulta_externa: estación de enfermería que atiende la cuenta
+  // ("hematologia" | "oncologia" | "cardiologia" | "infectologia"; ver lib/consultaExterna/especialidades).
+  estacionCE?: "hematologia" | "oncologia" | "cardiologia" | "infectologia";
   // Aceptación de los términos y condiciones de uso. Si la versión no coincide con
   // la vigente (TERMINOS_VERSION), se vuelve a pedir la aceptación al ingresar.
   terminosAceptados?: { version: string; fecha: Date };

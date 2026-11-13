@@ -128,7 +128,76 @@ const segunda = numerarNuevas([carga.citas[0]], ultimoNumero);
 assert.equal(segunda.numeradas[0].codigo, "CA-04", "una segunda carga sigue la numeración");
 assert.equal(ultimoNumero.cardiologia, 3, "no muta el contador recibido");
 
-console.log("✓ test-consulta-externa: lector, catálogo y numeración OK");
+// ── Circuito de la estación ──
+const { aplicarAccion, accionesDe, compararCola, nombreConsultorio, destinoLlamado, agregarLlamado, quitarLlamadosDeCita } =
+  cargar("circuito");
+const paso = (estado, accion, etapa) => aplicarAccion(estado, accion, etapa)?.estado ?? null;
+assert.equal(paso("citado", "llego"), "espera_preconsulta");
+assert.equal(paso("espera_preconsulta", "llamar"), "llamado_preconsulta");
+assert.equal(aplicarAccion("espera_preconsulta", "llamar").llamado, "preconsulta");
+assert.equal(aplicarAccion("llamado_preconsulta", "volver_a_llamar").estado, "llamado_preconsulta");
+assert.equal(aplicarAccion("llamado_preconsulta", "volver_a_llamar").llamado, "preconsulta");
+assert.equal(paso("llamado_preconsulta", "preconsulta_lista"), "espera_consultorio");
+assert.equal(aplicarAccion("espera_consultorio", "llamar").llamado, "consultorio");
+assert.equal(paso("llamado_consultorio", "paso_a_consulta"), "atendido");
+assert.deepEqual(aplicarAccion("llamado_consultorio", "no_respondio"), { estado: "no_respondio", etapaNoRespondio: "consultorio" });
+assert.equal(paso("no_respondio", "regreso", "consultorio"), "espera_consultorio", "regresa a la etapa donde no respondió");
+assert.equal(paso("no_respondio", "regreso", "preconsulta"), "espera_preconsulta");
+assert.equal(paso("llamado_consultorio", "devolver_a_espera"), "espera_consultorio");
+assert.equal(paso("espera_preconsulta", "quitar_llegada"), "citado");
+// Acciones fuera de lugar (otra computadora ya movió la cita): no aplican.
+assert.equal(aplicarAccion("citado", "llamar"), null);
+assert.equal(aplicarAccion("atendido", "no_respondio"), null);
+assert.equal(aplicarAccion("espera_consultorio", "llego"), null);
+assert.equal(aplicarAccion("llamado_preconsulta", "paso_a_consulta"), null, "no se salta la preconsulta lista");
+// Cada acción ofrecida en un estado es aplicable en ese estado.
+for (const estado of ["citado", "espera_preconsulta", "llamado_preconsulta", "espera_consultorio", "llamado_consultorio", "no_respondio", "atendido"]) {
+  for (const accion of accionesDe(estado)) assert.ok(aplicarAccion(estado, accion, "preconsulta"), `${estado} → ${accion}`);
+}
+
+// Cola: franja primero, luego llegada, luego número.
+const cola = [
+  { id: "b", franjaInicio: "09:00", numero: 1, llegadaMs: 100 },
+  { id: "c", franjaInicio: "08:00", numero: 5, llegadaMs: 300 },
+  { id: "d", franjaInicio: "08:00", numero: 2, llegadaMs: 200 },
+  { id: "e", franjaInicio: "08:00", numero: 3, llegadaMs: null },
+].sort(compararCola);
+assert.deepEqual(cola.map((c) => c.id), ["d", "c", "e", "b"]);
+
+// Destinos.
+assert.equal(nombreConsultorio("Cardiologia - 3"), "Consultorio 3 de Cardiología");
+assert.equal(nombreConsultorio("Hematologia - 12"), "Consultorio 12 de Hematología");
+assert.equal(nombreConsultorio("Sala B"), "Consultorio Sala B");
+assert.equal(destinoLlamado("preconsulta", { estacionId: "cardiologia", consultorio: "Cirugia Torax - 1" }), "Preconsulta de Cardiología");
+assert.equal(destinoLlamado("consultorio", { estacionId: "cardiologia", consultorio: "Cirugia Torax - 1" }), "Consultorio 1 de Cirugía de Tórax");
+
+// Lista de la pantalla: lo nuevo arriba, un "volver a llamar" no se duplica, máximo 8.
+const ll = (id, citaId) => ({ id, citaId, codigo: citaId, destino: "x", etapa: "preconsulta", estacionId: "cardiologia", enMs: 0 });
+let lista = [];
+for (let i = 1; i <= 9; i++) lista = agregarLlamado(lista, ll(`l${i}`, `c${i}`));
+assert.equal(lista.length, 8);
+assert.equal(lista[0].id, "l9");
+lista = agregarLlamado(lista, ll("l10", "c5"));
+assert.equal(lista[0].id, "l10");
+assert.equal(lista.filter((l) => l.citaId === "c5").length, 1);
+assert.equal(quitarLlamadosDeCita(lista, "c5").some((l) => l.citaId === "c5"), false);
+
+// ── Búsqueda para marcar llegada ──
+const { coincideCita } = cargar("busqueda");
+const ana = { codigo: "CA-07", expediente: "11431-26", dui: "00440933-7", paciente: "López Gonzales, María Pilar" };
+assert.ok(coincideCita(ana, "CA-07"));
+assert.ok(coincideCita(ana, "ca7"));
+assert.ok(coincideCita(ana, "ca 07"));
+assert.equal(coincideCita(ana, "CA-17"), false);
+assert.equal(coincideCita(ana, "he7"), false);
+assert.ok(coincideCita(ana, "11431"), "expediente por prefijo");
+assert.ok(coincideCita(ana, "11431-26"));
+assert.ok(coincideCita(ana, "004409"), "DUI por prefijo");
+assert.ok(coincideCita(ana, "maria lopez"), "nombre sin tildes y en cualquier orden");
+assert.equal(coincideCita(ana, "maria perez"), false);
+assert.equal(coincideCita(ana, "m"), false, "una letra no busca");
+
+console.log("✓ test-consulta-externa: lector, catálogo, numeración, circuito y búsqueda OK");
 
 // ── Opcional: resumen de un .xls real del SIS ──
 const ruta = process.argv[2];

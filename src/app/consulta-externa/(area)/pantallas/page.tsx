@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ExternalLink, Play, Tv, Volume2 } from "lucide-react";
-import { EnConstruccion } from "@/components/consultaExterna/EnConstruccion";
 import { alCambiarVoces, anunciar, esperarVoces, textoLlamado, tocarAviso, vozDisponible } from "@/lib/consultaExterna/voz";
 
 const TEXTO_EJEMPLO = textoLlamado("HE-12", "preconsulta de Hematología");
@@ -42,29 +41,50 @@ export default function PantallasPage() {
   const sinVoz = !cargando && (!vozDisponible() || voces.length === 0);
 
   return (
-    <div className="pb-6">
-      <EnConstruccion
-        titulo="Pantallas de llamados"
-        subtitulo="Todas las pantallas muestran todos los llamados de la consulta"
-        icono={Tv}
-        queHara={[
-          "Registrar cada pantalla (dónde está) y si lleva voz o va en silencio: dos pantallas que se oyen desde el mismo lugar hacen eco.",
-          "Abrir la pantalla en la computadora conectada a la TV, en pantalla completa.",
-          "Mostrar el llamado actual en grande (código y destino, sin nombres) y los últimos llamados.",
-        ]}
-      >
-        <a
-          href="/consulta-externa/pantalla"
-          target="_blank"
-          rel="noopener"
-          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-cyan-600 dark:hover:bg-cyan-500"
-        >
-          <ExternalLink size={16} aria-hidden="true" />
-          Abrir la pantalla en esta computadora
-        </a>
-      </EnConstruccion>
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-blue-50 dark:bg-blue-950 rounded-xl flex items-center justify-center border border-blue-200 dark:border-blue-900">
+          <Tv size={17} className="text-blue-600 dark:text-cyan-300" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Pantallas de llamados</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Todas las pantallas muestran todos los llamados de la consulta</p>
+        </div>
+      </div>
 
-      <section className="mx-auto max-w-4xl px-4 md:px-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">
+        <h2 className="font-heading text-base font-bold text-slate-900 dark:text-slate-100">Abrir una pantalla</h2>
+        <ol className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+          <li>1. En la computadora conectada a la TV, inicie sesión y abra la pantalla; póngala en pantalla completa con F11.</li>
+          <li>
+            2. La voz se activa <strong>en cada equipo</strong> con el botón discreto «Sin voz / Voz activada» al pie de la pantalla, y
+            queda guardada en ese navegador. Actívela en una sola pantalla por zona: dos que se oyen desde el mismo lugar hacen eco.
+          </li>
+          <li>3. Con la voz activada, el navegador pide un toque en la pantalla cada vez que se abre.</li>
+        </ol>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <a
+            href="/consulta-externa/pantalla"
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-cyan-600 dark:hover:bg-cyan-500"
+          >
+            <ExternalLink size={16} aria-hidden="true" />
+            Abrir la pantalla
+          </a>
+          <a
+            href="/consulta-externa/pantalla?demo=1"
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <ExternalLink size={16} aria-hidden="true" />
+            Modo de prueba (llamados simulados)
+          </a>
+        </div>
+      </section>
+
+      <section>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">
           <div className="flex items-center gap-2">
             <Volume2 size={18} className="text-blue-600 dark:text-cyan-300" aria-hidden="true" />

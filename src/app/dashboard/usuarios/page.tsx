@@ -14,6 +14,30 @@ import {
 } from "@/lib/cuidadosCriticos";
 import { DateField } from "@/components/ui/DateField";
 import { TIPOS_BAJA, TIPO_BAJA_LABEL } from "@/lib/bajaUsuarios";
+import { ESTACIONES_CE, especialidadesDeEstacion, type EstacionCEId } from "@/lib/consultaExterna/especialidades";
+
+// Selector de estación para las cuentas de Consulta Externa (crear y editar).
+function CampoEstacionCE({ value, onChange }: { value: EstacionCEId | ""; onChange: (v: EstacionCEId | "") => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1.5">Estación</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as EstacionCEId | "")}
+        required
+        className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">Elija la estación…</option>
+        {ESTACIONES_CE.map(e => (
+          <option key={e.id} value={e.id}>
+            {e.nombre}{especialidadesDeEstacion(e.id).length > 1 ? ` (+ ${especialidadesDeEstacion(e.id).slice(1).map(x => x.nombre).join(", ")})` : ""}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-[11px] text-slate-400">Cuenta compartida: al entrar se pide el nombre de quien atiende.</p>
+    </div>
+  );
+}
 
 // "YYYY-MM-DD" → "DD/MM/YYYY" (fecha calendario de la baja, sin hora).
 const fechaCorta = (iso: string) => iso.split("-").reverse().join("/");
@@ -38,6 +62,8 @@ interface NuevoUsuario {
   jvpm: string;
   codigoMarcacion: string;
   puesto: string;
+  // Solo cuentas de estación de Consulta Externa: qué estación atiende.
+  estacionCE: EstacionCEId | "";
 }
 
 type EditableUsuario = Omit<NuevoUsuario, "password">;
@@ -69,6 +95,7 @@ const EMPTY_FORM: NuevoUsuario = {
   jvpm: "",
   codigoMarcacion: "",
   puesto: "",
+  estacionCE: "",
 };
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -419,6 +446,7 @@ export default function DashboardUsuariosPage() {
       jvpm: u.jvpm ?? "",
       codigoMarcacion: u.codigoMarcacion ?? "",
       puesto: u.puesto ?? "",
+      estacionCE: u.estacionCE ?? "",
     });
     setEditServiciosOpen(false);
     setError("");
@@ -458,6 +486,10 @@ export default function DashboardUsuariosPage() {
     const base = u.role === "medico" && u.tipoMedico
       ? TIPO_MEDICO_CRITICO_LABEL[u.tipoMedico]
       : roleLabels[u.role] || "Medico";
+    if (u.role === "consulta_externa") {
+      const est = ESTACIONES_CE.find(e => e.id === u.estacionCE);
+      return est ? `${base} · ${est.nombre}` : `${base} · sin estación`;
+    }
     return u.role === "medico" && u.apoyaComiteLesiones ? `${base} · Comité de Lesiones` : base;
   };
 
@@ -626,6 +658,10 @@ export default function DashboardUsuariosPage() {
                 ))}
               </select>
             </div>
+
+            {form.userRole === "consulta_externa" && (
+              <CampoEstacionCE value={form.estacionCE} onChange={v => setForm(prev => ({ ...prev, estacionCE: v }))} />
+            )}
 
             {form.userRole === "medico" && (
               <>
@@ -961,6 +997,13 @@ export default function DashboardUsuariosPage() {
                   ))}
                 </select>
               </div>
+
+              {editForm.userRole === "consulta_externa" && (
+                <CampoEstacionCE
+                  value={editForm.estacionCE}
+                  onChange={v => setEditForm(prev => prev ? { ...prev, estacionCE: v } : prev)}
+                />
+              )}
 
               {editForm.userRole === "medico" && (
                 <>

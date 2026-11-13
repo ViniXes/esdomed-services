@@ -48,6 +48,9 @@ service cloud.firestore {
     function isIsbm()         { return isAuth() && getRole() in ['isbm_tecnico', 'isbm_supervisor', 'isbm_jefe']; }
     // Cuenta compartida de una estación de enfermería de Consulta Externa.
     function isConsultaExterna() { return isAuth() && getRole() == 'consulta_externa'; }
+    function estacionCE() {
+      return get(/databases/$(database)/documents/usuarios/$(uid())).data.get('estacionCE', '');
+    }
     // Sesión real (no anónima). El formulario público de transporte usa sesiones
     // anónimas: NO deben poder leer datos internos del portal.
     function isRealUser() {
@@ -596,9 +599,9 @@ service cloud.firestore {
 
     // ─── Consulta Externa (turnero) ───────────────────────────────────────────
     // ESDOMED carga la Programación de citas por día del SIS: un documento de
-    // contadores por día y una cita por expediente y especialidad. Las
-    // estaciones las leen; sus cambios de estado (llegada, llamados) tendrán
-    // regla propia cuando exista la estación.
+    // contadores por día y una cita por expediente y especialidad. La cuenta de
+    // una estación solo mueve las citas de SU estación (llegada, llamados) y
+    // solo los campos del circuito; ESDOMED y admin (recepción) mueven todas.
     match /consulta_externa_agendas/{fecha} {
       allow read:   if isEsdomed() || isAdmin() || isConsultaExterna();
       allow create, update: if isEsdomed() || isAdmin();
@@ -609,7 +612,20 @@ service cloud.firestore {
       allow create: if (isEsdomed() || isAdmin())
                     && request.resource.data.cargadaPor == uid()
                     && request.resource.data.estado == 'citado';
-      allow update: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin()
+                    || (isConsultaExterna()
+                        && resource.data.estacionId == estacionCE()
+                        && request.resource.data.actualizadoPor == uid()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                             'estado', 'etapaNoRespondio', 'llegadaEn', 'llegadaPor', 'llegadaPorUid',
+                             'llamadas', 'ultimoLlamadoEn', 'historial',
+                             'actualizadoEn', 'actualizadoPor', 'actualizadoPorNombre']));
+      allow delete: if isAdmin();
+    }
+    // Últimos llamados del día: lo único que escuchan las pantallas (1 documento).
+    match /consulta_externa_llamados/{fecha} {
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna();
+      allow create, update: if isEsdomed() || isAdmin() || isConsultaExterna();
       allow delete: if isAdmin();
     }
 

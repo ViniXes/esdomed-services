@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { normalizarUsername, usernameValido } from "@/lib/username";
+import { esEstacionCE } from "@/lib/consultaExterna/especialidades";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const VALID_ROLES = new Set<UserRole>([
@@ -90,13 +91,17 @@ export async function POST(req: NextRequest) {
   const role = await getCallerRole(req);
   if (!isSuperAdmin(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, apoyaComiteLesiones, codigoMarcacion, puesto, username: usernameRaw } = await req.json();
+  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, apoyaComiteLesiones, codigoMarcacion, puesto, estacionCE, username: usernameRaw } = await req.json();
 
   if (!nombre || !email || !password || !userRole) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
   }
   if (!VALID_ROLES.has(userRole as UserRole)) {
     return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
+  }
+  // La cuenta de estación de Consulta Externa no sirve sin su estación.
+  if (userRole === "consulta_externa" && !esEstacionCE(estacionCE)) {
+    return NextResponse.json({ error: "Elija la estación de Consulta Externa" }, { status: 400 });
   }
 
   // Username opcional (alias de login). Si viene, se valida formato y unicidad.
@@ -156,6 +161,8 @@ export async function POST(req: NextRequest) {
     ...(puedeTenerJvpm(userRole as UserRole) && jvpm ? { jvpm } : {}),
     ...(conCodigoPlan && codigoMarcacion ? { codigoMarcacion: String(codigoMarcacion).trim() } : {}),
     ...(conCodigoPlan && puesto ? { puesto: String(puesto).trim() } : {}),
+    // Cuenta compartida por las enfermeras de la estación.
+    ...(userRole === "consulta_externa" ? { estacionCE, generico: true } : {}),
     createdAt: FieldValue.serverTimestamp(),
   });
 

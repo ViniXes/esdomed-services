@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { normalizarUsername, usernameValido } from "@/lib/username";
 import { esTipoBaja } from "@/lib/bajaUsuarios";
+import { esEstacionCE } from "@/lib/consultaExterna/especialidades";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const DEFAULT_TEST_PASSWORD = "123456";
@@ -209,6 +210,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
   if ("puesto" in body || nextRole) {
     const puesto = String(body.puesto ?? "").trim();
     update.puesto = puedeTenerCodigoPlan(targetRole) && puesto ? puesto : FieldValue.delete();
+  }
+
+  // Estación de Consulta Externa: obligatoria para ese rol; se borra si deja de serlo.
+  if ("estacionCE" in body || nextRole) {
+    if (targetRole === "consulta_externa") {
+      const estacion = "estacionCE" in body ? body.estacionCE : targetData?.estacionCE;
+      if (!esEstacionCE(estacion)) {
+        return NextResponse.json({ error: "Elija la estación de Consulta Externa" }, { status: 400 });
+      }
+      update.estacionCE = estacion;
+      update.generico = true;
+    } else if (targetData?.estacionCE) {
+      update.estacionCE = FieldValue.delete();
+    }
   }
 
   if (Object.keys(update).length === 0) {

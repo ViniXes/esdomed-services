@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
-import { ToastContainer } from "@/components/ui/ToastContainer";
 import { rutaVetada } from "@/lib/navRegistro";
 import { entraConsultaExterna } from "@/lib/accesoConsultaExterna";
 import {
@@ -45,7 +44,6 @@ export default function ConsultaExternaLayout({ children }: { children: React.Re
           </div>
         ) : children}
       </main>
-      <ToastContainer />
     </div>
   );
 }

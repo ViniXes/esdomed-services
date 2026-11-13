@@ -82,6 +82,10 @@ export function especialidadPorId(id: string): EspecialidadCE | undefined {
   return ESPECIALIDADES_CE.find((e) => e.id === id);
 }
 
+export function esEstacionCE(v: unknown): v is EstacionCEId {
+  return ESTACIONES_CE.some((e) => e.id === v);
+}
+
 export function estacionPorId(id: string): EstacionCE | undefined {
   return ESTACIONES_CE.find((e) => e.id === id);
 }

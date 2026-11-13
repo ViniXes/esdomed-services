@@ -1,16 +1,24 @@
 import type { Timestamp } from "firebase/firestore";
 import type { EspecialidadCEId, EstacionCEId } from "./especialidades";
+import type { AccionCE, EstadoCitaCE, EtapaCE, LlamadoPantalla } from "./circuito";
+
+export type { EstadoCitaCE } from "./circuito";
 
 // Documentos de Consulta Externa en Firestore.
 //
 //   consulta_externa_agendas/{YYYY-MM-DD}   contadores del día (1 lectura para el resumen)
 //   consulta_externa_citas/{fecha}_{especialidad}_{expediente}
+//   consulta_externa_llamados/{YYYY-MM-DD}  últimos llamados: lo único que escuchan las pantallas
 //
 // Solo se guarda lo que el turnero necesita: el reporte del SIS trae además
 // teléfonos, responsable y dirección, que no se copian.
 
-/** Por ahora la carga solo escribe "citado"; la estación agregará los demás estados. */
-export type EstadoCitaCE = "citado";
+export interface PasoHistorialCE {
+  accion: AccionCE;
+  en: Timestamp;
+  por: string;
+  porUid: string;
+}
 
 export interface CitaCE {
   fecha: string;
@@ -35,7 +43,22 @@ export interface CitaCE {
   cargadaPor: string;
   cargadaPorNombre: string;
   cargadaEn: Timestamp | null;
+
+  // ── Circuito (los escribe la estación o la recepción) ──
+  etapaNoRespondio?: EtapaCE | null;
+  llegadaEn?: Timestamp | null;
+  llegadaPor?: string;
+  llegadaPorUid?: string;
+  /** Llamados hechos (preconsulta + consultorio, con repeticiones). */
+  llamadas?: number;
+  ultimoLlamadoEn?: Timestamp | null;
+  historial?: PasoHistorialCE[];
+  actualizadoEn?: Timestamp | null;
+  actualizadoPor?: string;
+  actualizadoPorNombre?: string;
 }
+
+export type CitaCEConId = CitaCE & { id: string };
 
 export interface CargaAgendaCE {
   en: Timestamp;
@@ -53,4 +76,10 @@ export interface AgendaCE {
   /** Último número de código usado por especialidad; una carga posterior sigue desde aquí. */
   ultimoNumero: Partial<Record<EspecialidadCEId, number>>;
   cargas: CargaAgendaCE[];
+}
+
+export interface LlamadosCE {
+  fecha: string;
+  /** El más reciente primero; máximo MAX_LLAMADOS_PANTALLA. */
+  ultimos: LlamadoPantalla[];
 }

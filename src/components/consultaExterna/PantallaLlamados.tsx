@@ -2,24 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Megaphone, Volume2 } from "lucide-react";
+import { Megaphone, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { alCambiarVoces, anunciar, esperarVoces, textoLlamado, tocarAviso } from "@/lib/consultaExterna/voz";
+import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
+import { agregarLlamado, MAX_LLAMADOS_PANTALLA, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
+import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 
 // Pantalla de llamados (TV de la sala de espera). La página que la monta va
 // fuera del layout del subsistema para ocupar la pantalla completa, sin menú.
 // Es un letrero: usa el degradado institucional de los heros y se ve igual en
 // modo claro y oscuro.
 //
-// Por ahora funciona en MODO DE PRUEBA: "Simular llamado" genera llamados de
-// ejemplo para escuchar la voz y ver el diseño en la TV. Cuando exista la
-// estación, escuchará un único documento con los últimos llamados.
-
-interface Llamado {
-  id: number;
-  codigo: string;
-  destino: string;
-  hora: string;
-}
+// Escucha un solo documento (consulta_externa_llamados/{hoy}) y anuncia solo
+// los llamados nuevos. La voz se activa por equipo (queda en este navegador):
+// dos pantallas que se oyen desde el mismo lugar harían eco. Con ?demo=1 no
+// lee Firestore y ofrece "Simular llamado" para probar el diseño y la voz.
 
 const EJEMPLOS: { codigo: string; destino: string }[] = [
   { codigo: "HE-12", destino: "Preconsulta de Hematología" },
@@ -30,52 +27,119 @@ const EJEMPLOS: { codigo: string; destino: string }[] = [
   { codigo: "CA-15", destino: "Preconsulta de Cardiología" },
 ];
 
-const MAX_HISTORIAL = 6;
+const CLAVE_VOZ = "ce:pantalla:voz";
+/** Un llamado más viejo que esto no se anuncia (p. ej. la pantalla estuvo sin red). */
+const ANUNCIAR_HASTA_MS = 2 * 60_000;
 
-function horaCorta(d: Date) {
-  return d.toLocaleTimeString("es-SV", { hour: "numeric", minute: "2-digit" });
+function horaCorta(ms: number) {
+  return new Date(ms).toLocaleTimeString("es-SV", { hour: "numeric", minute: "2-digit" });
 }
 
-export function PantallaLlamados() {
-  const [ahora, setAhora] = useState<Date | null>(null);
-  const [llamados, setLlamados] = useState<Llamado[]>([]);
+export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
+  const [ahora, setAhora] = useState<number | null>(null);
+  const [fecha, setFecha] = useState(() => hoyLocalISO());
+  const [llamados, setLlamados] = useState<LlamadoPantalla[]>([]);
   const [destello, setDestello] = useState(false);
-  const voz = useRef<SpeechSynthesisVoice | null>(null);
+  const [sinConexion, setSinConexion] = useState(false);
+  const [voz, setVoz] = useState(false);
+  const [sonidoListo, setSonidoListo] = useState(false);
+
+  const vozRef = useRef<SpeechSynthesisVoice | null>(null);
+  const hablar = useRef(false);
+  const vistos = useRef<Set<string> | null>(null);
   const siguiente = useRef(0);
   // Cola de anuncios: si llegan dos llamados juntos, se leen uno tras otro.
   const cola = useRef<Promise<void>>(Promise.resolve());
+  const destelloT = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const tick = () => setAhora(new Date());
+    hablar.current = voz && sonidoListo;
+  }, [voz, sonidoListo]);
+
+  // Reloj, cambio de día y voces.
+  useEffect(() => {
+    try {
+      // Preferencia de este equipo (no existe en SSR).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVoz(localStorage.getItem(CLAVE_VOZ) === "1");
+    } catch { /* sin almacenamiento: sin voz */ }
+    const tick = () => {
+      setAhora(Date.now());
+      const hoy = hoyLocalISO();
+      setFecha((f) => (f === hoy ? f : hoy));
+    };
     tick();
     const t = setInterval(tick, 1000);
-    const elegir = (v: SpeechSynthesisVoice[]) => { voz.current = v[0] ?? null; };
+    const elegir = (v: SpeechSynthesisVoice[]) => { vozRef.current = v[0] ?? null; };
     esperarVoces().then(elegir);
     const dejar = alCambiarVoces(elegir);
     return () => { clearInterval(t); dejar(); };
   }, []);
 
-  const anunciarEnCola = (l: Llamado) => {
+  const anunciarEnCola = (l: LlamadoPantalla) => {
+    if (!hablar.current) return;
     cola.current = cola.current.then(async () => {
       await tocarAviso();
-      await anunciar(textoLlamado(l.codigo, l.destino), voz.current);
+      await anunciar(textoLlamado(l.codigo, l.destino), vozRef.current);
     });
   };
 
+  const destellar = () => {
+    setDestello(true);
+    if (destelloT.current) clearTimeout(destelloT.current);
+    destelloT.current = setTimeout(() => setDestello(false), 2400);
+  };
+
+  // Llamados reales: un solo documento por día.
+  useEffect(() => {
+    if (demo) return;
+    vistos.current = null;
+    return escucharLlamados(
+      fecha,
+      (ultimos) => {
+        setSinConexion(false);
+        setLlamados(ultimos);
+        // Al abrir la pantalla, lo que ya estaba no se anuncia.
+        if (vistos.current === null) {
+          vistos.current = new Set(ultimos.map((l) => l.id));
+          return;
+        }
+        const nuevos = ultimos.filter((l) => !vistos.current!.has(l.id)).reverse();
+        nuevos.forEach((l) => vistos.current!.add(l.id));
+        if (!nuevos.length) return;
+        destellar();
+        nuevos.filter((l) => Date.now() - l.enMs < ANUNCIAR_HASTA_MS).forEach(anunciarEnCola);
+      },
+      (e) => {
+        console.error("Pantalla sin acceso a los llamados", e);
+        setSinConexion(true);
+      },
+    );
+  }, [demo, fecha]);
+
   const simular = () => {
+    setSonidoListo(true);
+    hablar.current = voz;
     const ejemplo = EJEMPLOS[siguiente.current % EJEMPLOS.length];
     siguiente.current += 1;
-    const nuevo: Llamado = { id: Date.now(), ...ejemplo, hora: horaCorta(new Date()) };
-    setLlamados((prev) => [nuevo, ...prev].slice(0, MAX_HISTORIAL + 1));
-    setDestello(true);
-    setTimeout(() => setDestello(false), 2400);
+    const ms = Date.now();
+    const nuevo: LlamadoPantalla = { id: `demo-${ms}`, citaId: `demo-${ejemplo.codigo}`, codigo: ejemplo.codigo, destino: ejemplo.destino, etapa: "preconsulta", estacionId: "cardiologia", enMs: ms };
+    setLlamados((prev) => agregarLlamado(prev, nuevo, MAX_LLAMADOS_PANTALLA));
+    destellar();
     anunciarEnCola(nuevo);
+  };
+
+  const alternarVoz = () => {
+    const nueva = !voz;
+    setVoz(nueva);
+    setSonidoListo(true); // el clic ya habilita el sonido en el navegador
+    try { localStorage.setItem(CLAVE_VOZ, nueva ? "1" : "0"); } catch { /* sin almacenamiento */ }
   };
 
   const [actual, ...anteriores] = llamados;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] text-white">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] text-white">
       {/* Encabezado */}
       <header className="flex items-center justify-between gap-6 border-b border-white/10 px-[3vw] py-[2vh]">
         <div className="flex items-center gap-[1.5vw]">
@@ -125,12 +189,12 @@ export function PantallaLlamados() {
                 Aún no hay llamados anteriores
               </li>
             ) : (
-              anteriores.map((l) => (
+              anteriores.slice(0, 6).map((l) => (
                 <li key={l.id} className="flex items-center justify-between gap-4 rounded-[1vw] bg-white/[0.07] px-[1.5vw] py-[1.6vh]">
                   <span className="font-heading text-[clamp(1.5rem,2.6vw,3rem)] font-bold tabular-nums">{l.codigo}</span>
                   <span className="min-w-0 flex-1 text-right text-[clamp(0.9rem,1.3vw,1.6rem)] leading-tight text-cyan-50/85">
                     {l.destino}
-                    <span className="block text-[0.8em] text-cyan-100/50">{l.hora}</span>
+                    <span className="block text-[0.8em] text-cyan-100/50">{horaCorta(l.enMs)}</span>
                   </span>
                 </li>
               ))
@@ -141,16 +205,43 @@ export function PantallaLlamados() {
 
       <footer className="flex items-center justify-between gap-4 border-t border-white/10 px-[3vw] py-[1.6vh]">
         <p className="text-[clamp(0.9rem,1.3vw,1.6rem)] text-cyan-50/80">Tenga a mano su carné de citas y esté atento a su código.</p>
-        {/* Modo de prueba: el clic también habilita el sonido en el navegador. */}
+        <div className="flex flex-shrink-0 items-center gap-2">
+          {sinConexion && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+              <WifiOff size={14} aria-hidden="true" />
+              Sin conexión
+            </span>
+          )}
+          {demo && (
+            <button type="button" onClick={simular} className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white/20">
+              <Megaphone size={14} aria-hidden="true" />
+              Simular llamado
+            </button>
+          )}
+          {/* Discreto a propósito: se configura una vez por equipo. */}
+          <button
+            type="button"
+            onClick={alternarVoz}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-cyan-50/60 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            {voz ? <Volume2 size={14} aria-hidden="true" /> : <VolumeX size={14} aria-hidden="true" />}
+            {voz ? "Voz activada" : "Sin voz"}
+          </button>
+        </div>
+      </footer>
+
+      {/* El navegador no deja sonar nada hasta el primer toque en la página. */}
+      {voz && !sonidoListo && (
         <button
           type="button"
-          onClick={simular}
-          className="inline-flex flex-shrink-0 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+          onClick={() => { setSonidoListo(true); void tocarAviso(); }}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0d2739]/85 text-center backdrop-blur-sm"
         >
-          <Volume2 size={16} aria-hidden="true" />
-          Simular llamado (prueba)
+          <Volume2 className="h-[12vh] w-[12vh] text-cyan-200" strokeWidth={1.5} aria-hidden="true" />
+          <span className="font-heading text-[clamp(1.5rem,3vw,3.5rem)] font-bold">Toque la pantalla para activar el sonido</span>
+          <span className="text-[clamp(0.9rem,1.4vw,1.6rem)] text-cyan-50/70">El navegador lo pide una vez cada vez que se abre la pantalla.</span>
         </button>
-      </footer>
+      )}
     </div>
   );
 }
