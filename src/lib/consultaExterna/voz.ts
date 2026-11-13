@@ -70,12 +70,34 @@ export function textoLlamado(codigo: string, destino: string): string {
   return `Turno ${deletreo} ${Number(numero) || numero}. Pase a ${destino}.`;
 }
 
+// Un solo AudioContext para toda la página: crearlo y cerrarlo en cada llamado
+// agregaba demora, sobre todo en el primero.
+let ctxCompartido: AudioContext | null = null;
+function contextoAudio(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (ctxCompartido) return ctxCompartido;
+  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  ctxCompartido = Ctx ? new Ctx() : null;
+  return ctxCompartido;
+}
+
+/**
+ * Llamarlo dentro de un clic (activar sonido, activar voz): deja listo el audio
+ * y "despierta" la voz con un aviso audible, para que el primer llamado real no
+ * tarde (las voces en línea descargan su motor la primera vez que hablan).
+ */
+export async function prepararSonido(voz?: SpeechSynthesisVoice | null): Promise<void> {
+  const ctx = contextoAudio();
+  if (ctx?.state === "suspended") await ctx.resume().catch(() => {});
+  await tocarAviso();
+  await anunciar("Sonido activado.", voz);
+}
+
 /** "Din-don" corto antes del anuncio, generado con Web Audio (sin archivo). */
 export async function tocarAviso(): Promise<void> {
-  if (typeof window === "undefined") return;
-  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctx) return;
-  const ctx = new Ctx();
+  const ctx = contextoAudio();
+  if (!ctx) return;
+  if (ctx.state === "suspended") await ctx.resume().catch(() => {});
   const nota = (frecuencia: number, inicio: number, duracion: number) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -88,10 +110,26 @@ export async function tocarAviso(): Promise<void> {
     osc.start(ctx.currentTime + inicio);
     osc.stop(ctx.currentTime + inicio + duracion);
   };
-  nota(880, 0, 0.6); // la
-  nota(659.25, 0.45, 0.9); // mi
-  await new Promise((r) => setTimeout(r, 1400));
-  await ctx.close();
+  nota(880, 0, 0.5); // la
+  nota(659.25, 0.35, 0.7); // mi
+  await new Promise((r) => setTimeout(r, 1000));
+}
+
+/** Veces que se lee cada llamado con un solo clic (pedido del usuario: 2). */
+export const REPETICIONES_LLAMADO = 2;
+const PAUSA_ENTRE_REPETICIONES_MS = 700;
+
+/** Un llamado completo: un "din-don" y el texto leído REPETICIONES_LLAMADO veces. */
+export async function anunciarLlamado(
+  texto: string,
+  voz?: SpeechSynthesisVoice | null,
+  velocidad?: number,
+): Promise<void> {
+  await tocarAviso();
+  for (let i = 0; i < REPETICIONES_LLAMADO; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, PAUSA_ENTRE_REPETICIONES_MS));
+    await anunciar(texto, voz, velocidad);
+  }
 }
 
 /** Lee el texto y resuelve al terminar (o si falla, para no trabar la cola). */

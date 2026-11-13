@@ -93,19 +93,28 @@ export async function ejecutarAccion(
   accion: AccionCE,
   por: { uid: string; nombre: string },
 ): Promise<void> {
+  // El id de la cita empieza con su fecha ("2026-11-13_cardiologia_360-23"):
+  // así el documento de llamados se lee a la vez que la cita, en un solo viaje
+  // al servidor en vez de dos seguidos.
+  const fechaDelId = citaId.match(/^(\d{4}-\d{2}-\d{2})_/)?.[1];
+  const tocaPantalla = accion === "llamar" || accion === "volver_a_llamar" || accion === "devolver_a_espera";
+
   await runTransaction(db, async (tx) => {
     const ref = doc(db, COL_CITAS_CE, citaId);
-    const snap = await tx.get(ref);
+    const [snap, snapLlamadosAnticipado] = await Promise.all([
+      tx.get(ref),
+      tocaPantalla && fechaDelId ? tx.get(doc(db, COL_LLAMADOS_CE, fechaDelId)) : Promise.resolve(null),
+    ]);
     if (!snap.exists()) throw new Error("La cita ya no existe.");
     const cita = snap.data() as CitaCE;
 
     const t = aplicarAccion(cita.estado, accion);
     if (!t) throw new AccionNoAplica(cita.estado);
 
-    // Todas las lecturas antes de escribir.
-    const tocaPantalla = !!t.anuncia || accion === "devolver_a_espera";
+    // Todas las lecturas antes de escribir (si el id no traía la fecha, se lee ahora).
     const refLlamados = doc(db, COL_LLAMADOS_CE, cita.fecha);
-    const snapLlamados = tocaPantalla ? await tx.get(refLlamados) : null;
+    const snapLlamados =
+      tocaPantalla && cita.fecha === fechaDelId ? snapLlamadosAnticipado : tocaPantalla ? await tx.get(refLlamados) : null;
     const ultimos: LlamadoPantalla[] = snapLlamados?.exists() ? ((snapLlamados.data() as LlamadosCE).ultimos ?? []) : [];
 
     const update: Record<string, unknown> = {

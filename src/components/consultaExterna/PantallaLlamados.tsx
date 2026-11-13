@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Megaphone, Volume2, VolumeX, WifiOff } from "lucide-react";
-import { alCambiarVoces, anunciar, esperarVoces, textoLlamado, tocarAviso } from "@/lib/consultaExterna/voz";
+import { alCambiarVoces, anunciarLlamado, esperarVoces, prepararSonido, textoLlamado } from "@/lib/consultaExterna/voz";
 import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
 import { agregarLlamado, MAX_LLAMADOS_PANTALLA, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
 import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
@@ -78,10 +78,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
 
   const anunciarEnCola = (l: LlamadoPantalla) => {
     if (!hablar.current) return;
-    cola.current = cola.current.then(async () => {
-      await tocarAviso();
-      await anunciar(textoLlamado(l.codigo, l.destino), vozRef.current);
-    });
+    cola.current = cola.current.then(() => anunciarLlamado(textoLlamado(l.codigo, l.destino), vozRef.current));
   };
 
   const destellar = () => {
@@ -129,10 +126,19 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     anunciarEnCola(nuevo);
   };
 
+  // Dentro del clic: habilita el audio y despierta la voz ("Sonido activado"),
+  // así el primer llamado real sale sin demora. Va por la cola para no
+  // encimarse con un anuncio.
+  const activarSonido = () => {
+    setSonidoListo(true);
+    cola.current = cola.current.then(() => prepararSonido(vozRef.current));
+  };
+
   const alternarVoz = () => {
     const nueva = !voz;
     setVoz(nueva);
-    setSonidoListo(true); // el clic ya habilita el sonido en el navegador
+    if (nueva) activarSonido();
+    else setSonidoListo(true); // el clic ya habilita el sonido en el navegador
     try { localStorage.setItem(CLAVE_VOZ, nueva ? "1" : "0"); } catch { /* sin almacenamiento */ }
   };
 
@@ -142,8 +148,11 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     <div className="relative flex h-screen flex-col overflow-hidden bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] text-white">
       {/* Encabezado */}
       <header className="flex items-center justify-between gap-6 border-b border-white/10 px-[3vw] py-[2vh]">
-        <div className="flex items-center gap-[1.5vw]">
-          <Image src="/logo_hnes_sidebar.png" alt="Hospital Nacional El Salvador" width={160} height={160} className="h-[7vh] w-auto object-contain" priority />
+        <div className="flex items-center gap-[2vw]">
+          {/* Logo de trazo grueso en blanco sólido: el de trazo fino casi no
+              se leía sobre el degradado desde lejos. */}
+          <Image src="/logo_hnes.png" alt="Hospital Nacional El Salvador" width={1500} height={720} className="h-[10vh] w-auto object-contain brightness-0 invert" priority />
+          <span className="h-[7vh] w-px bg-white/25" aria-hidden="true" />
           <div>
             <p className="font-heading text-[clamp(1.25rem,2.2vw,2.5rem)] font-bold leading-tight">Consulta Externa</p>
             <p className="text-[clamp(0.8rem,1.1vw,1.25rem)] uppercase tracking-[0.2em] text-cyan-100/70">Llamados</p>
@@ -234,7 +243,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
       {voz && !sonidoListo && (
         <button
           type="button"
-          onClick={() => { setSonidoListo(true); void tocarAviso(); }}
+          onClick={activarSonido}
           className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0d2739]/85 text-center backdrop-blur-sm"
         >
           <Volume2 className="h-[12vh] w-[12vh] text-cyan-200" strokeWidth={1.5} aria-hidden="true" />

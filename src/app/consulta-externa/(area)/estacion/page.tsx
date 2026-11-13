@@ -7,7 +7,7 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 import { esCuentaEstacion } from "@/lib/accesoConsultaExterna";
 import { ESTACIONES_CE, especialidadesDeEstacion, estacionPorId, esEstacionCE, type EstacionCEId } from "@/lib/consultaExterna/especialidades";
 import { AccionNoAplica, ejecutarAccion, escucharCitasEstacion } from "@/lib/consultaExterna/estacionDatos";
-import type { AccionCE } from "@/lib/consultaExterna/circuito";
+import { aplicarAccion, type AccionCE, type EstadoCitaCE } from "@/lib/consultaExterna/circuito";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
 import { EstacionVista } from "@/components/consultaExterna/EstacionVista";
 import { PedirQuienAtiende, useQuienAtiende } from "@/components/consultaExterna/QuienAtiende";
@@ -49,6 +49,11 @@ export default function EstacionEspecialidadPage() {
   const [aviso, setAviso] = useState("");
   const [recienId, setRecienId] = useState<string | null>(null);
   const [ahoraMs, setAhoraMs] = useState(() => Date.now());
+  // Estado que se muestra mientras el servidor confirma la acción: la tarjeta
+  // se mueve al instante (una transacción no actualiza la pantalla por
+  // adelantado como una escritura normal). Se descarta cuando llega la cita
+  // con ese estado, o se revierte si la acción falla.
+  const [optimistas, setOptimistas] = useState<Record<string, EstadoCitaCE>>({});
 
   useEffect(() => {
     const t = setInterval(() => setAhoraMs(Date.now()), 30_000);
@@ -64,7 +69,13 @@ export default function EstacionEspecialidadPage() {
     return escucharCitasEstacion(
       hoy,
       estacionId,
-      setCitas,
+      (nuevas) => {
+        setCitas(nuevas);
+        setOptimistas((prev) => {
+          const pendientes = Object.entries(prev).filter(([id, estado]) => nuevas.find((c) => c.id === id)?.estado !== estado);
+          return pendientes.length === Object.keys(prev).length ? prev : Object.fromEntries(pendientes);
+        });
+      },
       (e) => {
         console.error("No se pudieron leer las citas de la estación", e);
         setErrorCarga("No se pudieron leer las citas. Revise la conexión y recargue la página.");
@@ -76,10 +87,18 @@ export default function EstacionEspecialidadPage() {
     if (!user) return;
     setAviso("");
     setOcupadas((s) => new Set(s).add(cita.id));
+    const t = aplicarAccion(cita.estado, a);
+    if (t) setOptimistas((prev) => ({ ...prev, [cita.id]: t.estado }));
+    if (a === "llego") setRecienId(cita.id);
     try {
       await ejecutarAccion(cita.id, a, { uid: user.uid, nombre: nombreQuien || profile?.nombre || "" });
-      if (a === "llego") setRecienId(cita.id);
     } catch (e) {
+      setOptimistas((prev) => {
+        const n = { ...prev };
+        delete n[cita.id];
+        return n;
+      });
+      if (a === "llego") setRecienId(null);
       console.error("No se pudo registrar la acción", e);
       setAviso(
         e instanceof AccionNoAplica
@@ -110,7 +129,8 @@ export default function EstacionEspecialidadPage() {
   }
 
   const especialidades = estacionId ? especialidadesDeEstacion(estacionId) : [];
-  const recien = recienId ? citas?.find((c) => c.id === recienId) ?? null : null;
+  const citasVista = citas?.map((c) => (optimistas[c.id] ? { ...c, estado: optimistas[c.id] } : c)) ?? null;
+  const recien = recienId ? citasVista?.find((c) => c.id === recienId) ?? null : null;
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
@@ -173,9 +193,9 @@ export default function EstacionEspecialidadPage() {
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
           No hay citas cargadas hoy para esta estación. ESDOMED carga la agenda del día desde el SIS.
         </p>
-      ) : estacion ? (
+      ) : estacion && citasVista ? (
         <EstacionVista
-          citas={citas}
+          citas={citasVista}
           ocupadas={ocupadas}
           ahoraMs={ahoraMs}
           recienLlegada={recien}

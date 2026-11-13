@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ExternalLink, Play, Tv, Volume2 } from "lucide-react";
-import { alCambiarVoces, anunciar, esperarVoces, textoLlamado, tocarAviso, vozDisponible } from "@/lib/consultaExterna/voz";
+import { alCambiarVoces, anunciarLlamado, esperarVoces, textoLlamado, vozDisponible } from "@/lib/consultaExterna/voz";
 
 const TEXTO_EJEMPLO = textoLlamado("HE-12", "consultorio 4 de Hematología");
 
@@ -31,8 +31,7 @@ export default function PantallasPage() {
   const probar = async () => {
     setSonando(true);
     try {
-      await tocarAviso();
-      await anunciar(texto, voces.find((v) => v.name === vozNombre) ?? null, velocidad);
+      await anunciarLlamado(texto, voces.find((v) => v.name === vozNombre) ?? null, velocidad);
     } finally {
       setSonando(false);
     }
