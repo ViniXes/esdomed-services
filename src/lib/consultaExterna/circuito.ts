@@ -2,38 +2,27 @@
 // qué estado, el orden de las colas y el texto del destino en la pantalla.
 // Puro (sin Firestore) para poder probarlo: scripts/test-consulta-externa.mjs.
 //
-//   citado ──Llegó──▶ espera_preconsulta ──Llamar──▶ llamado_preconsulta
-//                       ▲                              │ Preconsulta lista
-//                       │ Regresó                      ▼
-//                 no_respondio ◀──No respondió── espera_consultorio ──Llamar──▶ llamado_consultorio
-//                       │ Regresó                      ▲                        │ Pasó a consulta
-//                       └──────────────────────────────┘                        ▼
-//                                                                            atendido
+//   citado ──Llegó──▶ espera ──Llamar──▶ llamado ──Pasó a consulta──▶ atendido
+//                       ▲  ▲                │
+//                       │  └─Devolver───────┤
+//                       │                   │ No respondió
+//                       └──Regresó── no_respondio
 //
-// "Volver a llamar" repite el llamado (y el anuncio) sin cambiar de estado.
-// "No respondió" sale de un llamado; "Regresó" lo devuelve a la espera de la
-// etapa en la que estaba. La enfermera elige a quién llamar: las colas solo
-// sugieren el orden.
+// La enfermera llama al paciente directo al consultorio de su médico. La
+// preconsulta (signos vitales) se coordina de palabra con enfermería y no pasa
+// por el sistema (decisión del usuario, 2026-11-13). "Volver a llamar" repite
+// el llamado (y el anuncio) sin cambiar de estado. La cola solo sugiere el
+// orden: la enfermera elige a quién llamar.
 
-import { especialidadPorId, estacionPorId, resolverEspecialidad, type EstacionCEId } from "./especialidades";
+import { especialidadPorId, resolverEspecialidad, type EstacionCEId } from "./especialidades";
 
-export type EstadoCitaCE =
-  | "citado"
-  | "espera_preconsulta"
-  | "llamado_preconsulta"
-  | "espera_consultorio"
-  | "llamado_consultorio"
-  | "atendido"
-  | "no_respondio";
-
-export type EtapaCE = "preconsulta" | "consultorio";
+export type EstadoCitaCE = "citado" | "espera" | "llamado" | "atendido" | "no_respondio";
 
 export type AccionCE =
   | "llego"
   | "quitar_llegada"
   | "llamar"
   | "volver_a_llamar"
-  | "preconsulta_lista"
   | "paso_a_consulta"
   | "no_respondio"
   | "regreso"
@@ -42,9 +31,8 @@ export type AccionCE =
 export const ETIQUETA_ACCION: Record<AccionCE, string> = {
   llego: "Llegó",
   quitar_llegada: "Quitar llegada",
-  llamar: "Llamar",
+  llamar: "Llamar a consultorio",
   volver_a_llamar: "Volver a llamar",
-  preconsulta_lista: "Preconsulta lista",
   paso_a_consulta: "Pasó a consulta",
   no_respondio: "No respondió",
   regreso: "Regresó",
@@ -53,77 +41,67 @@ export const ETIQUETA_ACCION: Record<AccionCE, string> = {
 
 export const ETIQUETA_ESTADO: Record<EstadoCitaCE, string> = {
   citado: "Citado",
-  espera_preconsulta: "Espera preconsulta",
-  llamado_preconsulta: "Llamado a preconsulta",
-  espera_consultorio: "Espera consultorio",
-  llamado_consultorio: "Llamado a consultorio",
+  espera: "En espera",
+  llamado: "Llamado a consultorio",
   atendido: "Pasó a consulta",
   no_respondio: "No respondió",
 };
 
+/**
+ * Estados de la primera versión, que tenía preconsulta (solo los usó la
+ * prueba del 13/11/2026). Se leen como su equivalente actual.
+ */
+const ESTADOS_ANTERIORES: Record<string, EstadoCitaCE> = {
+  espera_preconsulta: "espera",
+  espera_consultorio: "espera",
+  llamado_preconsulta: "llamado",
+  llamado_consultorio: "llamado",
+};
+
+export function normalizarEstado(estado: string): EstadoCitaCE {
+  return ESTADOS_ANTERIORES[estado] ?? (estado as EstadoCitaCE);
+}
+
 export interface Transicion {
   estado: EstadoCitaCE;
-  /** Etapa en la que quedó un "No respondió" (para devolverlo con "Regresó"). */
-  etapaNoRespondio?: EtapaCE | null;
-  /** Si la acción anuncia un llamado en las pantallas, a qué destino. */
-  llamado?: EtapaCE;
+  /** La acción anuncia un llamado en las pantallas. */
+  anuncia?: boolean;
 }
 
 /**
  * Estado al que lleva una acción, o null si no aplica en el estado actual
- * (p. ej. alguien ya la movió desde otra computadora).
+ * (p. ej. alguien ya movió la cita desde otra computadora).
  */
-export function aplicarAccion(
-  estado: EstadoCitaCE,
-  accion: AccionCE,
-  etapaNoRespondio?: EtapaCE | null,
-): Transicion | null {
+export function aplicarAccion(estadoGuardado: string, accion: AccionCE): Transicion | null {
+  const estado = normalizarEstado(estadoGuardado);
   switch (accion) {
     case "llego":
-      return estado === "citado" ? { estado: "espera_preconsulta" } : null;
+      return estado === "citado" ? { estado: "espera" } : null;
     case "quitar_llegada":
-      return estado === "espera_preconsulta" ? { estado: "citado" } : null;
+      return estado === "espera" ? { estado: "citado" } : null;
     case "llamar":
-      if (estado === "espera_preconsulta") return { estado: "llamado_preconsulta", llamado: "preconsulta" };
-      if (estado === "espera_consultorio") return { estado: "llamado_consultorio", llamado: "consultorio" };
-      return null;
+      return estado === "espera" ? { estado: "llamado", anuncia: true } : null;
     case "volver_a_llamar":
-      if (estado === "llamado_preconsulta") return { estado, llamado: "preconsulta" };
-      if (estado === "llamado_consultorio") return { estado, llamado: "consultorio" };
-      return null;
-    case "preconsulta_lista":
-      return estado === "llamado_preconsulta" ? { estado: "espera_consultorio" } : null;
+      return estado === "llamado" ? { estado: "llamado", anuncia: true } : null;
     case "paso_a_consulta":
-      return estado === "llamado_consultorio" ? { estado: "atendido" } : null;
+      return estado === "llamado" ? { estado: "atendido" } : null;
     case "no_respondio":
-      if (estado === "llamado_preconsulta") return { estado: "no_respondio", etapaNoRespondio: "preconsulta" };
-      if (estado === "llamado_consultorio") return { estado: "no_respondio", etapaNoRespondio: "consultorio" };
-      return null;
+      return estado === "llamado" ? { estado: "no_respondio" } : null;
     case "regreso":
-      if (estado !== "no_respondio") return null;
-      return {
-        estado: etapaNoRespondio === "consultorio" ? "espera_consultorio" : "espera_preconsulta",
-        etapaNoRespondio: null,
-      };
+      return estado === "no_respondio" ? { estado: "espera" } : null;
     case "devolver_a_espera":
-      if (estado === "llamado_preconsulta") return { estado: "espera_preconsulta" };
-      if (estado === "llamado_consultorio") return { estado: "espera_consultorio" };
-      return null;
+      return estado === "llamado" ? { estado: "espera" } : null;
   }
 }
 
 /** Acciones que se ofrecen en cada estado; la primera es la principal. */
-export function accionesDe(estado: EstadoCitaCE): AccionCE[] {
-  switch (estado) {
+export function accionesDe(estadoGuardado: string): AccionCE[] {
+  switch (normalizarEstado(estadoGuardado)) {
     case "citado":
       return ["llego"];
-    case "espera_preconsulta":
+    case "espera":
       return ["llamar", "quitar_llegada"];
-    case "llamado_preconsulta":
-      return ["preconsulta_lista", "volver_a_llamar", "no_respondio", "devolver_a_espera"];
-    case "espera_consultorio":
-      return ["llamar"];
-    case "llamado_consultorio":
+    case "llamado":
       return ["paso_a_consulta", "volver_a_llamar", "no_respondio", "devolver_a_espera"];
     case "no_respondio":
       return ["regreso"];
@@ -163,15 +141,6 @@ export function nombreConsultorio(consultorio: string, especialidadId?: string):
   return `Consultorio ${m[2]} de ${esp?.nombre ?? m[1]}`;
 }
 
-/** Texto del destino que muestra la pantalla y lee la voz. */
-export function destinoLlamado(
-  etapa: EtapaCE,
-  cita: { estacionId: EstacionCEId; consultorio: string; especialidadId?: string },
-): string {
-  if (etapa === "preconsulta") return `Preconsulta de ${estacionPorId(cita.estacionId)?.nombre ?? "la estación"}`;
-  return nombreConsultorio(cita.consultorio, cita.especialidadId);
-}
-
 // ─── Documento de llamados (lo que escuchan las pantallas) ──────────────────
 
 export interface LlamadoPantalla {
@@ -180,7 +149,6 @@ export interface LlamadoPantalla {
   citaId: string;
   codigo: string;
   destino: string;
-  etapa: EtapaCE;
   estacionId: EstacionCEId;
   /** Milisegundos (Date.now()); en un arreglo no cabe serverTimestamp. */
   enMs: number;

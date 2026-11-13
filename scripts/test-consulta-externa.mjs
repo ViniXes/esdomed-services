@@ -129,30 +129,33 @@ assert.equal(segunda.numeradas[0].codigo, "CA-04", "una segunda carga sigue la n
 assert.equal(ultimoNumero.cardiologia, 3, "no muta el contador recibido");
 
 // ── Circuito de la estación ──
-const { aplicarAccion, accionesDe, compararCola, nombreConsultorio, destinoLlamado, agregarLlamado, quitarLlamadosDeCita } =
+const { aplicarAccion, accionesDe, compararCola, nombreConsultorio, normalizarEstado, agregarLlamado, quitarLlamadosDeCita } =
   cargar("circuito");
-const paso = (estado, accion, etapa) => aplicarAccion(estado, accion, etapa)?.estado ?? null;
-assert.equal(paso("citado", "llego"), "espera_preconsulta");
-assert.equal(paso("espera_preconsulta", "llamar"), "llamado_preconsulta");
-assert.equal(aplicarAccion("espera_preconsulta", "llamar").llamado, "preconsulta");
-assert.equal(aplicarAccion("llamado_preconsulta", "volver_a_llamar").estado, "llamado_preconsulta");
-assert.equal(aplicarAccion("llamado_preconsulta", "volver_a_llamar").llamado, "preconsulta");
-assert.equal(paso("llamado_preconsulta", "preconsulta_lista"), "espera_consultorio");
-assert.equal(aplicarAccion("espera_consultorio", "llamar").llamado, "consultorio");
-assert.equal(paso("llamado_consultorio", "paso_a_consulta"), "atendido");
-assert.deepEqual(aplicarAccion("llamado_consultorio", "no_respondio"), { estado: "no_respondio", etapaNoRespondio: "consultorio" });
-assert.equal(paso("no_respondio", "regreso", "consultorio"), "espera_consultorio", "regresa a la etapa donde no respondió");
-assert.equal(paso("no_respondio", "regreso", "preconsulta"), "espera_preconsulta");
-assert.equal(paso("llamado_consultorio", "devolver_a_espera"), "espera_consultorio");
-assert.equal(paso("espera_preconsulta", "quitar_llegada"), "citado");
+const paso = (estado, accion) => aplicarAccion(estado, accion)?.estado ?? null;
+// Sin preconsulta en el sistema: de la espera se llama directo al consultorio.
+assert.equal(paso("citado", "llego"), "espera");
+assert.deepEqual(aplicarAccion("espera", "llamar"), { estado: "llamado", anuncia: true });
+assert.deepEqual(aplicarAccion("llamado", "volver_a_llamar"), { estado: "llamado", anuncia: true });
+assert.equal(paso("llamado", "paso_a_consulta"), "atendido");
+assert.equal(paso("llamado", "no_respondio"), "no_respondio");
+assert.equal(paso("no_respondio", "regreso"), "espera");
+assert.equal(paso("llamado", "devolver_a_espera"), "espera");
+assert.equal(paso("espera", "quitar_llegada"), "citado");
+assert.equal(aplicarAccion("llamado", "paso_a_consulta").anuncia, undefined, "pasar a consulta no anuncia");
 // Acciones fuera de lugar (otra computadora ya movió la cita): no aplican.
 assert.equal(aplicarAccion("citado", "llamar"), null);
 assert.equal(aplicarAccion("atendido", "no_respondio"), null);
-assert.equal(aplicarAccion("espera_consultorio", "llego"), null);
-assert.equal(aplicarAccion("llamado_preconsulta", "paso_a_consulta"), null, "no se salta la preconsulta lista");
+assert.equal(aplicarAccion("espera", "llego"), null);
+assert.equal(aplicarAccion("espera", "paso_a_consulta"), null, "hay que llamarlo antes");
+// Estados de la primera versión (con preconsulta) se leen como los actuales.
+assert.equal(normalizarEstado("llamado_preconsulta"), "llamado");
+assert.equal(normalizarEstado("espera_consultorio"), "espera");
+assert.equal(normalizarEstado("citado"), "citado");
+assert.equal(paso("llamado_preconsulta", "paso_a_consulta"), "atendido");
+assert.equal(paso("espera_preconsulta", "llamar"), "llamado");
 // Cada acción ofrecida en un estado es aplicable en ese estado.
-for (const estado of ["citado", "espera_preconsulta", "llamado_preconsulta", "espera_consultorio", "llamado_consultorio", "no_respondio", "atendido"]) {
-  for (const accion of accionesDe(estado)) assert.ok(aplicarAccion(estado, accion, "preconsulta"), `${estado} → ${accion}`);
+for (const estado of ["citado", "espera", "llamado", "no_respondio", "atendido", "llamado_preconsulta"]) {
+  for (const accion of accionesDe(estado)) assert.ok(aplicarAccion(estado, accion), `${estado} → ${accion}`);
 }
 
 // Cola: franja primero, luego llegada, luego número.
@@ -168,11 +171,10 @@ assert.deepEqual(cola.map((c) => c.id), ["d", "c", "e", "b"]);
 assert.equal(nombreConsultorio("Cardiologia - 3"), "Consultorio 3 de Cardiología");
 assert.equal(nombreConsultorio("Hematologia - 12"), "Consultorio 12 de Hematología");
 assert.equal(nombreConsultorio("Sala B"), "Consultorio Sala B");
-assert.equal(destinoLlamado("preconsulta", { estacionId: "cardiologia", consultorio: "Cirugia Torax - 1" }), "Preconsulta de Cardiología");
-assert.equal(destinoLlamado("consultorio", { estacionId: "cardiologia", consultorio: "Cirugia Torax - 1" }), "Consultorio 1 de Cirugía de Tórax");
+assert.equal(nombreConsultorio("Cirugia Torax - 1"), "Consultorio 1 de Cirugía de Tórax");
 
 // Lista de la pantalla: lo nuevo arriba, un "volver a llamar" no se duplica, máximo 8.
-const ll = (id, citaId) => ({ id, citaId, codigo: citaId, destino: "x", etapa: "preconsulta", estacionId: "cardiologia", enMs: 0 });
+const ll = (id, citaId) => ({ id, citaId, codigo: citaId, destino: "x", estacionId: "cardiologia", enMs: 0 });
 let lista = [];
 for (let i = 1; i <= 9; i++) lista = agregarLlamado(lista, ll(`l${i}`, `c${i}`));
 assert.equal(lista.length, 8);

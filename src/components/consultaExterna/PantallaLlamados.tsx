@@ -19,12 +19,12 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // lee Firestore y ofrece "Simular llamado" para probar el diseño y la voz.
 
 const EJEMPLOS: { codigo: string; destino: string }[] = [
-  { codigo: "HE-12", destino: "Preconsulta de Hematología" },
+  { codigo: "HE-12", destino: "Consultorio 2 de Hematología" },
   { codigo: "CA-07", destino: "Consultorio 3 de Cardiología" },
-  { codigo: "IN-04", destino: "Preconsulta de Infectología" },
+  { codigo: "IN-04", destino: "Consultorio 1 de Infectología" },
   { codigo: "ON-09", destino: "Consultorio 1 de Oncología" },
   { codigo: "HE-03", destino: "Consultorio 4 de Hematología" },
-  { codigo: "CA-15", destino: "Preconsulta de Cardiología" },
+  { codigo: "CV-02", destino: "Consultorio 1 de Cirugía Cardiovascular" },
 ];
 
 const CLAVE_VOZ = "ce:pantalla:voz";
@@ -123,7 +123,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     const ejemplo = EJEMPLOS[siguiente.current % EJEMPLOS.length];
     siguiente.current += 1;
     const ms = Date.now();
-    const nuevo: LlamadoPantalla = { id: `demo-${ms}`, citaId: `demo-${ejemplo.codigo}`, codigo: ejemplo.codigo, destino: ejemplo.destino, etapa: "preconsulta", estacionId: "cardiologia", enMs: ms };
+    const nuevo: LlamadoPantalla = { id: `demo-${ms}`, citaId: `demo-${ejemplo.codigo}`, codigo: ejemplo.codigo, destino: ejemplo.destino, estacionId: "cardiologia", enMs: ms };
     setLlamados((prev) => agregarLlamado(prev, nuevo, MAX_LLAMADOS_PANTALLA));
     destellar();
     anunciarEnCola(nuevo);

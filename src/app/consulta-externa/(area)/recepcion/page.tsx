@@ -46,7 +46,7 @@ export default function RecepcionPrimeraVezPage() {
     setOcupadas((s) => new Set(s).add(cita.id));
     try {
       await ejecutarAccion(cita.id, a, { uid: user.uid, nombre: profile?.nombre ?? "" });
-      const actualizada = { ...cita, estado: "espera_preconsulta" as const };
+      const actualizada = { ...cita, estado: "espera" as const };
       setCitas((prev) => prev?.map((c) => (c.id === cita.id ? actualizada : c)) ?? prev);
       setRecien(actualizada);
     } catch (e) {

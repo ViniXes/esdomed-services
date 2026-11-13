@@ -3,7 +3,7 @@ import type { UserProfile } from "@/types";
 // Quién entra al subsistema de Consulta Externa (turnero de llamados).
 //
 // - Cuenta de estación (`consulta_externa`): cuenta compartida de la estación de
-//   enfermería de una especialidad. Marca llegadas y llama a preconsulta y al
+//   enfermería de una especialidad. Marca llegadas y llama a los pacientes al
 //   consultorio. Su único portal es este subsistema: no tiene "Volver al panel".
 // - Gestión (carga de citas del SIS, recepción de primera vez, pantallas):
 //   ESDOMED y admin. Mientras el módulo está en construcción solo lo ve el

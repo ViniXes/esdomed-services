@@ -617,7 +617,7 @@ service cloud.firestore {
                         && resource.data.estacionId == estacionCE()
                         && request.resource.data.actualizadoPor == uid()
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                             'estado', 'etapaNoRespondio', 'llegadaEn', 'llegadaPor', 'llegadaPorUid',
+                             'estado', 'llegadaEn', 'llegadaPor', 'llegadaPorUid',
                              'llamadas', 'ultimoLlamadoEn', 'historial',
                              'actualizadoEn', 'actualizadoPor', 'actualizadoPorNombre']));
       allow delete: if isAdmin();

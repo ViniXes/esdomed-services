@@ -18,8 +18,9 @@ import { COL_CITAS_CE } from "./agendaDatos";
 import {
   agregarLlamado,
   aplicarAccion,
-  destinoLlamado,
   ETIQUETA_ESTADO,
+  nombreConsultorio,
+  normalizarEstado,
   quitarLlamadosDeCita,
   type AccionCE,
   type LlamadoPantalla,
@@ -28,6 +29,11 @@ import type { EstacionCEId } from "./especialidades";
 import type { CitaCE, CitaCEConId, LlamadosCE } from "./tipos";
 
 export const COL_LLAMADOS_CE = "consulta_externa_llamados";
+
+/** Documento → cita, con el estado ya en su forma actual (ver normalizarEstado). */
+function aCita(id: string, datos: CitaCE): CitaCEConId {
+  return { id, ...datos, estado: normalizarEstado(datos.estado) };
+}
 
 /**
  * Citas del día de una estación, en vivo. Dos igualdades: no necesita índice
@@ -44,7 +50,7 @@ export function escucharCitasEstacion(
     q,
     // "estimate": la hora de llegada recién marcada se ve al instante, sin
     // esperar a que el servidor confirme el serverTimestamp.
-    (snap) => alCambiar(snap.docs.map((d) => ({ id: d.id, ...(d.data({ serverTimestamps: "estimate" }) as CitaCE) }))),
+    (snap) => alCambiar(snap.docs.map((d) => aCita(d.id, d.data({ serverTimestamps: "estimate" }) as CitaCE))),
     alFallar,
   );
 }
@@ -52,7 +58,7 @@ export function escucharCitasEstacion(
 /** Todas las citas del día, una sola vez (recepción de primera vez). */
 export async function leerCitasDelDia(fechaISO: string): Promise<CitaCEConId[]> {
   const snap = await getDocs(query(collection(db, COL_CITAS_CE), where("fecha", "==", fechaISO)));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as CitaCE) }));
+  return snap.docs.map((d) => aCita(d.id, d.data() as CitaCE));
 }
 
 /** Últimos llamados del día: un solo documento, lo único que escuchan las pantallas. */
@@ -71,7 +77,7 @@ export function escucharLlamados(
 /** La cita cambió en otra computadora y la acción ya no aplica. */
 export class AccionNoAplica extends Error {
   constructor(public estadoActual: CitaCE["estado"]) {
-    super(`La cita ya está en «${ETIQUETA_ESTADO[estadoActual]}»: otra persona la movió.`);
+    super(`La cita ya está en «${ETIQUETA_ESTADO[normalizarEstado(estadoActual)]}»: otra persona la movió.`);
     this.name = "AccionNoAplica";
   }
 }
@@ -79,8 +85,8 @@ export class AccionNoAplica extends Error {
 /**
  * Aplica una acción de la estación (o de la recepción) a una cita. Va en una
  * transacción: verifica el estado actual, así dos computadoras no llaman dos
- * veces al mismo paciente, y si es un llamado lo publica en el documento de
- * las pantallas en el mismo paso.
+ * veces al mismo paciente, y si es un llamado lo publica (con el consultorio
+ * de su médico como destino) en el documento de las pantallas en el mismo paso.
  */
 export async function ejecutarAccion(
   citaId: string,
@@ -93,11 +99,11 @@ export async function ejecutarAccion(
     if (!snap.exists()) throw new Error("La cita ya no existe.");
     const cita = snap.data() as CitaCE;
 
-    const t = aplicarAccion(cita.estado, accion, cita.etapaNoRespondio);
+    const t = aplicarAccion(cita.estado, accion);
     if (!t) throw new AccionNoAplica(cita.estado);
 
     // Todas las lecturas antes de escribir.
-    const tocaPantalla = !!t.llamado || accion === "devolver_a_espera";
+    const tocaPantalla = !!t.anuncia || accion === "devolver_a_espera";
     const refLlamados = doc(db, COL_LLAMADOS_CE, cita.fecha);
     const snapLlamados = tocaPantalla ? await tx.get(refLlamados) : null;
     const ultimos: LlamadoPantalla[] = snapLlamados?.exists() ? ((snapLlamados.data() as LlamadosCE).ultimos ?? []) : [];
@@ -109,7 +115,6 @@ export async function ejecutarAccion(
       actualizadoPor: por.uid,
       actualizadoPorNombre: por.nombre,
     };
-    if ("etapaNoRespondio" in t) update.etapaNoRespondio = t.etapaNoRespondio ?? null;
     if (accion === "llego") {
       update.llegadaEn = serverTimestamp();
       update.llegadaPor = por.nombre;
@@ -120,20 +125,19 @@ export async function ejecutarAccion(
       update.llegadaPor = deleteField();
       update.llegadaPorUid = deleteField();
     }
-    if (t.llamado) {
+    if (t.anuncia) {
       update.llamadas = increment(1);
       update.ultimoLlamadoEn = serverTimestamp();
     }
     tx.update(ref, update);
 
-    if (t.llamado) {
+    if (t.anuncia) {
       const ahora = Date.now();
       const nuevo: LlamadoPantalla = {
         id: `${citaId}#${ahora}`,
         citaId,
         codigo: cita.codigo,
-        destino: destinoLlamado(t.llamado, cita),
-        etapa: t.llamado,
+        destino: nombreConsultorio(cita.consultorio, cita.especialidadId),
         estacionId: cita.estacionId,
         enMs: ahora,
       };

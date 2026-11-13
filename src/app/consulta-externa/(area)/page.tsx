@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, ClipboardCheck, DoorOpen, FileUp, HeartPulse, Stethoscope } from "lucide-react";
+import { ChevronRight, ClipboardCheck, DoorOpen, FileUp, Stethoscope } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { navItemsConsultaExterna } from "@/lib/navConsultaExterna";
 import { EN_CONSTRUCCION } from "@/lib/accesoConsultaExterna";
@@ -23,16 +23,10 @@ const PASOS = [
     texto: "Primera vez se marca en recepción de ESDOMED; subsecuente, en la estación de su especialidad.",
   },
   {
-    icon: HeartPulse,
-    titulo: "Preconsulta",
-    quien: "Enfermera de la estación",
-    texto: "Llama al paciente a preconsulta; la pantalla muestra el código y el destino, y lo anuncia por voz.",
-  },
-  {
     icon: Stethoscope,
-    titulo: "Consultorio",
+    titulo: "Llamado al consultorio",
     quien: "Enfermera de la estación",
-    texto: "Con la preconsulta lista, lo llama al consultorio de su médico. Ella decide el orden; la agenda sugiere.",
+    texto: "Lo llama directo al consultorio de su médico; la pantalla muestra el código y lo anuncia por voz. Ella decide el orden; la agenda sugiere.",
   },
 ];
 
@@ -74,7 +68,7 @@ export default function InicioConsultaExternaPage() {
 
       <section>
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">El circuito del día</h2>
-        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {PASOS.map(({ icon: Icon, titulo, quien, texto }, i) => (
             <li key={titulo} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center gap-3">

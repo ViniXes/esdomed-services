@@ -175,7 +175,6 @@ export default function EstacionEspecialidadPage() {
         </p>
       ) : estacion ? (
         <EstacionVista
-          estacion={estacion}
           citas={citas}
           ocupadas={ocupadas}
           ahoraMs={ahoraMs}

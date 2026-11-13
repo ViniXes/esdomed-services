@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, Clock, Loader2, Megaphone, Search, Stethoscope, HeartPulse, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, Loader2, Megaphone, Search, X } from "lucide-react";
 import {
   accionesDe,
   compararCola,
@@ -12,11 +12,12 @@ import {
   type EstadoCitaCE,
 } from "@/lib/consultaExterna/circuito";
 import { buscarCitas } from "@/lib/consultaExterna/busqueda";
-import type { EstacionCE } from "@/lib/consultaExterna/especialidades";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
 
-// Pantalla de trabajo de la enfermera de una estación. Solo presenta: los
-// datos y las acciones los pone la página (así se puede probar sin Firestore).
+// Pantalla de trabajo de la enfermera de una estación: marca llegadas y llama
+// a cada paciente directo al consultorio de su médico (la preconsulta se
+// coordina de palabra). Solo presenta: los datos y las acciones los pone la
+// página, así se puede probar sin Firestore.
 
 const llegadaMs = (c: CitaCEConId) => c.llegadaEn?.toMillis?.() ?? null;
 const ordenCola = (a: CitaCEConId, b: CitaCEConId) =>
@@ -27,11 +28,6 @@ const ordenCola = (a: CitaCEConId, b: CitaCEConId) =>
 const minutosDesde = (ms: number | null | undefined, ahora: number) =>
   ms ? Math.max(0, Math.floor((ahora - ms) / 60000)) : null;
 
-function etiquetaAccion(estado: EstadoCitaCE, accion: AccionCE): string {
-  if (accion === "llamar") return estado === "espera_consultorio" ? "Llamar a consultorio" : "Llamar a preconsulta";
-  return ETIQUETA_ACCION[accion];
-}
-
 const btnPrincipal =
   "inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-600 dark:hover:bg-cyan-500";
 const btnSecundario =
@@ -40,7 +36,6 @@ const btnEnlace =
   "rounded px-1.5 py-1 text-xs font-medium text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline disabled:opacity-60 dark:text-slate-400 dark:hover:text-white";
 
 interface Props {
-  estacion: EstacionCE;
   citas: CitaCEConId[];
   ocupadas: Set<string>;
   ahoraMs: number;
@@ -49,20 +44,17 @@ interface Props {
   onCerrarRecien: () => void;
 }
 
-export function EstacionVista({ estacion, citas, ocupadas, ahoraMs, recienLlegada, onAccion, onCerrarRecien }: Props) {
-  const por = (estados: EstadoCitaCE[]) => citas.filter((c) => estados.includes(c.estado)).sort(ordenCola);
-
-  const preLlamados = por(["llamado_preconsulta"]);
-  const preEspera = por(["espera_preconsulta"]);
-  const sinLlegar = por(["citado"]);
-  const noRespondieron = por(["no_respondio"]);
+export function EstacionVista({ citas, ocupadas, ahoraMs, recienLlegada, onAccion, onCerrarRecien }: Props) {
+  const cuenta = (e: EstadoCitaCE) => citas.filter((c) => c.estado === e).length;
+  const sinLlegar = citas.filter((c) => c.estado === "citado").sort(ordenCola);
+  const noRespondieron = citas.filter((c) => c.estado === "no_respondio").sort(ordenCola);
   const atendidos = citas.filter((c) => c.estado === "atendido").sort((a, b) => a.numero - b.numero);
 
-  // Consultorio: una cola por médico (cada uno atiende a sus pacientes).
-  const gruposConsultorio = useMemo(() => {
+  // Una cola por médico: cada uno atiende a sus pacientes en su consultorio.
+  // Se muestran todos los médicos del día, aunque nadie espere todavía.
+  const medicos = useMemo(() => {
     const mapa = new Map<string, CitaCEConId[]>();
     for (const c of citas) {
-      if (c.estado !== "espera_consultorio" && c.estado !== "llamado_consultorio") continue;
       const k = `${c.medico}|${c.consultorio}`;
       mapa.set(k, [...(mapa.get(k) ?? []), c]);
     }
@@ -70,28 +62,18 @@ export function EstacionVista({ estacion, citas, ocupadas, ahoraMs, recienLlegad
       .map((grupo) => {
         const ordenadas = [...grupo].sort(ordenCola);
         return {
+          clave: `${grupo[0].medico}|${grupo[0].consultorio}`,
           medico: grupo[0].medico,
           consultorio: nombreConsultorio(grupo[0].consultorio, grupo[0].especialidadId),
-          llamados: ordenadas.filter((c) => c.estado === "llamado_consultorio"),
-          espera: ordenadas.filter((c) => c.estado === "espera_consultorio"),
-          inicio: ordenadas[0].franjaInicio,
+          llamados: ordenadas.filter((c) => c.estado === "llamado"),
+          espera: ordenadas.filter((c) => c.estado === "espera"),
+          sinLlegar: grupo.filter((c) => c.estado === "citado").length,
+          atendidos: grupo.filter((c) => c.estado === "atendido").length,
+          inicio: grupo.map((c) => c.franjaInicio).sort()[0] ?? "",
         };
       })
       .sort((a, b) => a.inicio.localeCompare(b.inicio) || a.medico.localeCompare(b.medico));
   }, [citas]);
-  const enConsultorio = gruposConsultorio.reduce((n, g) => n + g.llamados.length + g.espera.length, 0);
-
-  const tarjeta = (c: CitaCEConId, opciones: { sugerida?: boolean; mostrarMedico?: boolean } = {}) => (
-    <TarjetaCita
-      key={c.id}
-      cita={c}
-      sugerida={opciones.sugerida}
-      mostrarMedico={opciones.mostrarMedico}
-      ocupada={ocupadas.has(c.id)}
-      ahoraMs={ahoraMs}
-      onAccion={onAccion}
-    />
-  );
 
   return (
     <div className="space-y-5">
@@ -114,11 +96,11 @@ export function EstacionVista({ estacion, citas, ocupadas, ahoraMs, recienLlegad
 
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {[
-          ["Sin llegar", sinLlegar.length],
-          ["Preconsulta", preLlamados.length + preEspera.length],
-          ["Consultorio", enConsultorio],
-          ["Pasaron a consulta", atendidos.length],
-          ["No respondieron", noRespondieron.length],
+          ["Sin llegar", cuenta("citado")],
+          ["En espera", cuenta("espera")],
+          ["Llamados", cuenta("llamado")],
+          ["Pasaron a consulta", cuenta("atendido")],
+          ["No respondieron", cuenta("no_respondio")],
         ].map(([k, v]) => (
           <div key={k} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{k}</dt>
@@ -127,26 +109,36 @@ export function EstacionVista({ estacion, citas, ocupadas, ahoraMs, recienLlegad
         ))}
       </dl>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Columna icono={HeartPulse} titulo={`Preconsulta · ${estacion.nombre}`} vacia={!preLlamados.length && !preEspera.length} textoVacio="Nadie espera preconsulta.">
-          {preLlamados.length > 0 && <Subtitulo>Llamados</Subtitulo>}
-          {preLlamados.map((c) => tarjeta(c, { mostrarMedico: true }))}
-          {preEspera.length > 0 && <Subtitulo>En espera · orden sugerido</Subtitulo>}
-          {preEspera.map((c, i) => tarjeta(c, { sugerida: i === 0, mostrarMedico: true }))}
-        </Columna>
-
-        <Columna icono={Stethoscope} titulo="Consultorio" vacia={!gruposConsultorio.length} textoVacio="Nadie con la preconsulta lista.">
-          {gruposConsultorio.map((g) => (
-            <div key={`${g.medico}|${g.consultorio}`} className="space-y-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-slate-200 pb-1.5 dark:border-slate-800">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{g.medico}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{g.consultorio}</p>
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        {medicos.map((m) => {
+          const vacio = !m.llamados.length && !m.espera.length;
+          return (
+            <section key={m.clave} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+              <header className="mb-3 border-b border-slate-200 pb-2 dark:border-slate-800">
+                <h2 className="font-heading text-base font-bold text-slate-900 dark:text-slate-100">{m.medico}</h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {m.consultorio}
+                  {m.sinLlegar ? ` · ${m.sinLlegar} sin llegar` : ""}
+                  {m.atendidos ? ` · ${m.atendidos} ${m.atendidos === 1 ? "ya pasó" : "ya pasaron"}` : ""}
+                </p>
+              </header>
+              <div className="space-y-2">
+                {vacio ? (
+                  <p className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">Nadie en espera.</p>
+                ) : (
+                  <>
+                    {m.llamados.map((c) => (
+                      <TarjetaCita key={c.id} cita={c} ocupada={ocupadas.has(c.id)} ahoraMs={ahoraMs} onAccion={onAccion} />
+                    ))}
+                    {m.espera.map((c, i) => (
+                      <TarjetaCita key={c.id} cita={c} sugerida={i === 0} ocupada={ocupadas.has(c.id)} ahoraMs={ahoraMs} onAccion={onAccion} />
+                    ))}
+                  </>
+                )}
               </div>
-              {g.llamados.map((c) => tarjeta(c))}
-              {g.espera.map((c, i) => tarjeta(c, { sugerida: i === 0 && !g.llamados.length }))}
-            </div>
-          ))}
-        </Columna>
+            </section>
+          );
+        })}
       </div>
 
       <Desplegable titulo={`Sin llegar (${sinLlegar.length})`}>
@@ -157,8 +149,7 @@ export function EstacionVista({ estacion, citas, ocupadas, ahoraMs, recienLlegad
       {noRespondieron.length > 0 && (
         <Desplegable titulo={`No respondieron (${noRespondieron.length})`} abierto>
           {noRespondieron.map((c) => (
-            <FilaSimple key={c.id} cita={c} ocupada={ocupadas.has(c.id)} accion="regreso" onAccion={onAccion}
-              detalle={c.etapaNoRespondio === "consultorio" ? "al llamado a consultorio" : "al llamado a preconsulta"} />
+            <FilaSimple key={c.id} cita={c} ocupada={ocupadas.has(c.id)} accion="regreso" onAccion={onAccion} />
           ))}
         </Desplegable>
       )}
@@ -175,43 +166,16 @@ export function EstacionVista({ estacion, citas, ocupadas, ahoraMs, recienLlegad
 
 // ─── Piezas ─────────────────────────────────────────────────────────────────
 
-function Columna({
-  icono: Icono, titulo, vacia, textoVacio, children,
-}: {
-  icono: React.ElementType;
-  titulo: string;
-  vacia: boolean;
-  textoVacio: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-      <h2 className="mb-3 flex items-center gap-2 font-heading text-base font-bold text-slate-900 dark:text-slate-100">
-        <Icono size={18} className="text-blue-600 dark:text-cyan-300" aria-hidden="true" />
-        {titulo}
-      </h2>
-      <div className="space-y-2">
-        {vacia ? <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">{textoVacio}</p> : children}
-      </div>
-    </section>
-  );
-}
-
-const Subtitulo = ({ children }: { children: React.ReactNode }) => (
-  <p className="pt-1 text-[11px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">{children}</p>
-);
-
 function TarjetaCita({
-  cita: c, sugerida, mostrarMedico, ocupada, ahoraMs, onAccion,
+  cita: c, sugerida, ocupada, ahoraMs, onAccion,
 }: {
   cita: CitaCEConId;
   sugerida?: boolean;
-  mostrarMedico?: boolean;
   ocupada: boolean;
   ahoraMs: number;
   onAccion: (cita: CitaCEConId, accion: AccionCE) => void;
 }) {
-  const llamado = c.estado === "llamado_preconsulta" || c.estado === "llamado_consultorio";
+  const llamado = c.estado === "llamado";
   const espera = minutosDesde(llegadaMs(c), ahoraMs);
   const desdeLlamado = minutosDesde(c.ultimoLlamadoEn?.toMillis?.(), ahoraMs);
   const [principal, ...otras] = accionesDe(c.estado);
@@ -230,7 +194,6 @@ function TarjetaCita({
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{c.paciente}</p>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             Exp. {c.expediente} · Cita {c.franjaInicio}
-            {mostrarMedico ? ` · ${c.medico}` : ""}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {sugerida && (
@@ -263,17 +226,17 @@ function TarjetaCita({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" disabled={ocupada} onClick={() => onAccion(c, principal)} className={btnPrincipal}>
             {ocupada && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
-            {etiquetaAccion(c.estado, principal)}
+            {ETIQUETA_ACCION[principal]}
           </button>
           {secundarias.map((a) => (
             <button key={a} type="button" disabled={ocupada} onClick={() => onAccion(c, a)} className={btnSecundario}>
-              {etiquetaAccion(c.estado, a)}
+              {ETIQUETA_ACCION[a]}
             </button>
           ))}
           <span className="ml-auto flex flex-wrap gap-1">
             {enlaces.map((a) => (
               <button key={a} type="button" disabled={ocupada} onClick={() => onAccion(c, a)} className={btnEnlace}>
-                {etiquetaAccion(c.estado, a)}
+                {ETIQUETA_ACCION[a]}
               </button>
             ))}
           </span>
@@ -284,12 +247,11 @@ function TarjetaCita({
 }
 
 function FilaSimple({
-  cita: c, ocupada, accion, detalle, onAccion,
+  cita: c, ocupada, accion, onAccion,
 }: {
   cita: CitaCEConId;
   ocupada: boolean;
   accion?: AccionCE;
-  detalle?: string;
   onAccion: (cita: CitaCEConId, accion: AccionCE) => void;
 }) {
   return (
@@ -300,7 +262,6 @@ function FilaSimple({
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Cita {c.franjaInicio} · {c.medico}
           {c.primeraVez ? " · Primera vez" : ""}
-          {detalle ? ` · ${detalle}` : ""}
         </p>
       </div>
       {accion && (

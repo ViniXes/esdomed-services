@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Play, Tv, Volume2 } from "lucide-react";
 import { alCambiarVoces, anunciar, esperarVoces, textoLlamado, tocarAviso, vozDisponible } from "@/lib/consultaExterna/voz";
 
-const TEXTO_EJEMPLO = textoLlamado("HE-12", "preconsulta de Hematología");
+const TEXTO_EJEMPLO = textoLlamado("HE-12", "consultorio 4 de Hematología");
 
 export default function PantallasPage() {
   const [voces, setVoces] = useState<SpeechSynthesisVoice[]>([]);

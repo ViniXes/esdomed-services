@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 import type { EspecialidadCEId, EstacionCEId } from "./especialidades";
-import type { AccionCE, EstadoCitaCE, EtapaCE, LlamadoPantalla } from "./circuito";
+import type { AccionCE, EstadoCitaCE, LlamadoPantalla } from "./circuito";
 
 export type { EstadoCitaCE } from "./circuito";
 
@@ -45,11 +45,10 @@ export interface CitaCE {
   cargadaEn: Timestamp | null;
 
   // ── Circuito (los escribe la estación o la recepción) ──
-  etapaNoRespondio?: EtapaCE | null;
   llegadaEn?: Timestamp | null;
   llegadaPor?: string;
   llegadaPorUid?: string;
-  /** Llamados hechos (preconsulta + consultorio, con repeticiones). */
+  /** Llamados al consultorio hechos, con repeticiones. */
   llamadas?: number;
   ultimoLlamadoEn?: Timestamp | null;
   historial?: PasoHistorialCE[];
