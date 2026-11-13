@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   collection, query, orderBy, onSnapshot, limit, where, getDocs, Timestamp, QueryConstraint,
+  doc, updateDoc, serverTimestamp, deleteField,
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DateField } from "@/components/ui/DateField";
 import { censosDeAtenciones } from "@/lib/emergencia/resumenCensoDatos";
+import { mismoServicio } from "@/lib/servicios";
 import { Ambulance, Download } from "lucide-react";
 import { Icon } from "@iconify/react";
 import medicalKit from "@iconify-icons/solar/medical-kit-linear";
@@ -23,6 +25,7 @@ import addCircle from "@iconify-icons/solar/add-circle-linear";
 import clipboardList from "@iconify-icons/solar/clipboard-list-linear";
 import hospital from "@iconify-icons/solar/hospital-linear";
 import pen from "@iconify-icons/solar/pen-2-linear";
+import checkCircle from "@iconify-icons/solar/check-circle-linear";
 
 type ControlIngreso = {
   id?: string;
@@ -36,6 +39,10 @@ type ControlIngreso = {
   ingresoDirectoServicio?: boolean;
   responsableIngresoNombre: string;
   creadoEn: Date;
+  // Marca de un médico: esta atención no lleva censo (la fila deja de
+  // resaltarse y no cuenta como pendiente). Las reglas solo dejan al médico
+  // tocar este campo, con su uid y la hora del servidor.
+  censoNoAplica?: { porUid: string; porNombre?: string; en?: unknown };
 };
 
 function tsToDate(ts: unknown): Date {
@@ -113,10 +120,93 @@ function BadgeCenso({ censo }: { censo: CensoEstado | null }) {
 // un paciente no se registra en los dos censos.
 const MENU_CENSO_W = 288;
 
-function MenuCensoFila({ ingreso, censo, verificado, consultando }: { ingreso: ControlIngreso; censo: CensoEstado | null; verificado: boolean; consultando: boolean }) {
+// Estado de la columna Censo cuando un médico marcó "No aplica censo".
+function BadgeNoAplica({ quien }: { quien?: string }) {
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
+        No aplica censo
+      </span>
+      {quien && <span title={`Marcó ${quien}`} className="max-w-[170px] truncate text-[11px] text-slate-500 dark:text-slate-400">Marcó {quien}</span>}
+    </span>
+  );
+}
+
+// Casilla "No aplica censo". En la tabla vive en su propia columna (sin texto
+// visible: lo da el encabezado); en la tarjeta de celular lleva su texto.
+// Solo se ofrece mientras la atención no tenga censo: si ya lo tiene, aplica.
+function CasillaNoAplica({ ingreso, censo, verificado, enTarjeta = false, onNoAplica }: {
+  ingreso: ControlIngreso;
+  censo: CensoEstado | null;
+  verificado: boolean;
+  enTarjeta?: boolean;
+  onNoAplica: (marcar: boolean) => Promise<void>;
+}) {
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(false);
+  const noAplica = !!ingreso.censoNoAplica;
+  const quien = ingreso.censoNoAplica?.porNombre?.trim();
+
+  if (censo || (!verificado && !noAplica)) return null;
+
+  const alternar = async () => {
+    if (guardando) return;
+    setGuardando(true);
+    setError(false);
+    try {
+      await onNoAplica(!noAplica);
+    } catch (err) {
+      console.error("No se pudo guardar la marca No aplica censo", err);
+      setError(true);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <span className={`inline-flex flex-col ${enTarjeta ? "items-start" : "items-center"}`}>
+      <label
+        title={noAplica ? (quien ? `Marcado por ${quien}` : "Marcado: no aplica censo") : "Marca si esta atención no lleva censo"}
+        className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors ${
+          enTarjeta ? "px-2" : "min-w-11"
+        } ${
+          noAplica
+            ? "text-slate-700 dark:text-slate-200"
+            : "text-slate-500 hover:bg-slate-900/5 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100"
+        } ${guardando ? "cursor-wait opacity-60" : ""}`}
+      >
+        <input
+          type="checkbox"
+          checked={noAplica}
+          disabled={guardando}
+          onChange={alternar}
+          aria-label={enTarjeta ? undefined : `No aplica censo, expediente ${ingreso.expediente}`}
+          className="h-[18px] w-[18px] shrink-0 cursor-pointer accent-blue-800 dark:accent-blue-400"
+        />
+        {enTarjeta && "No aplica censo"}
+      </label>
+      {enTarjeta && noAplica && quien && (
+        <span className="-mt-2 max-w-[220px] truncate pb-1 pl-8 text-[11px] text-slate-500 dark:text-slate-400">Marcó {quien}</span>
+      )}
+      {error && (
+        <span role="alert" className="text-[11px] font-medium text-rose-600 dark:text-rose-400">No se pudo guardar</span>
+      )}
+    </span>
+  );
+}
+
+function MenuCensoFila({ ingreso, censo, verificado, consultando, ocultarNoAplica = false }: {
+  ingreso: ControlIngreso;
+  censo: CensoEstado | null;
+  verificado: boolean;
+  consultando: boolean;
+  // En la tarjeta de celular la casilla ya dice "No aplica censo" y quién.
+  ocultarNoAplica?: boolean;
+}) {
   const router = useRouter();
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const noAplica = !!ingreso.censoNoAplica;
 
   useEffect(() => {
     if (!pos) return;
@@ -163,7 +253,10 @@ function MenuCensoFila({ ingreso, censo, verificado, consultando }: { ingreso: C
   };
 
   // Ya registrado en un censo: se muestra el estado con lápiz para editarlo;
-  // no se permite volver a registrarlo (ni en el otro censo).
+  // no se permite volver a registrarlo (ni en el otro censo). Si existe censo,
+  // manda el censo aunque alguien haya marcado "No aplica".
+  // Marcada "No aplica censo": sin botón (se desmarca desde la casilla).
+  if (noAplica && !censo) return ocultarNoAplica ? null : <BadgeNoAplica quien={ingreso.censoNoAplica?.porNombre?.trim()} />;
   if (!verificado) {
     return <span className="text-xs text-slate-500 dark:text-slate-400">{consultando ? "Consultando censo…" : "Estado no consultado"}</span>;
   }
@@ -190,10 +283,10 @@ function MenuCensoFila({ ingreso, censo, verificado, consultando }: { ingreso: C
         title="Registrar en censo"
         aria-label="Registrar en censo"
         aria-expanded={!!pos}
-        className={`inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg border text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 ${
+        className={`inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg border text-sm font-semibold text-white shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
           pos
-            ? "bg-blue-600 text-white border-blue-600"
-            : "text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950 hover:bg-blue-600 hover:text-white hover:border-blue-600"
+            ? "bg-blue-900 border-blue-900 dark:bg-blue-800 dark:border-blue-800"
+            : "bg-blue-800 border-blue-800 hover:bg-blue-700 hover:border-blue-700 dark:bg-blue-700 dark:border-blue-700 dark:hover:bg-blue-600"
         }`}
       >
         <Icon icon={addCircle} width={17} />
@@ -252,6 +345,93 @@ function fechaIsoLocal(d: Date) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+// Origen de la atención: lo que no es Emergencia entró directo a un servicio,
+// aunque ESDOMED no haya marcado la casilla "directo" (el servicio manda).
+const esDeEmergencia = (i: ControlIngreso) => mismoServicio(i.servicio, "Emergencia");
+
+// Estado de censo para resaltar la fila. "desconocido" = aún no se sabe (o el
+// usuario no ve censos): esa fila no se resalta ni entra a "pendientes".
+// "no-aplica" = un médico marcó que la atención no lleva censo.
+type EstadoCensoFila = "sin-censo" | "en-proceso" | "completado" | "no-aplica" | "desconocido";
+const esPendienteCenso = (e: EstadoCensoFila) => e === "sin-censo" || e === "en-proceso";
+
+// En oscuro la rampa amber del tema es el beige MINSAL (globals.css): como
+// relleno sobre el fondo azul pizarra se ve gris. Por eso en oscuro la fila
+// pendiente se ELEVA (slate-800) y el color lo pone una barra beige clara.
+const FILA_CENSO_CLS: Record<EstadoCensoFila, string> = {
+  "sin-censo": "bg-amber-100/70 hover:bg-amber-100 dark:bg-slate-700/60 dark:hover:bg-slate-700/85",
+  "en-proceso": "bg-amber-50/70 hover:bg-amber-50 dark:bg-slate-800/70 dark:hover:bg-slate-700/50",
+  completado: "hover:bg-blue-50/55 dark:hover:bg-slate-800/60",
+  "no-aplica": "hover:bg-blue-50/55 dark:hover:bg-slate-800/60",
+  desconocido: "hover:bg-blue-50/55 dark:hover:bg-slate-800/60",
+};
+// Barra lateral (sombra interior: no mueve el contenido ni el ancho de la tabla).
+const BARRA_CENSO_CLS: Record<EstadoCensoFila, string> = {
+  "sin-censo": "shadow-[inset_4px_0_0_var(--color-amber-500)] dark:shadow-[inset_5px_0_0_var(--color-amber-400)]",
+  "en-proceso": "shadow-[inset_4px_0_0_var(--color-amber-300)] dark:shadow-[inset_5px_0_0_var(--color-amber-700)]",
+  completado: "",
+  "no-aplica": "",
+  desconocido: "",
+};
+
+// Filtros de la cola. Se guardan en la pestaña (sessionStorage) para que
+// sigan puestos al volver del formulario de censo.
+type FiltroDia = "ambos" | "hoy" | "ayer";
+type FiltroOrigen = "todos" | "emergencia" | "directos";
+type FiltrosCola = { dia: FiltroDia; origen: FiltroOrigen; soloPendientes: boolean };
+const FILTROS_INICIALES: FiltrosCola = { dia: "ambos", origen: "todos", soloPendientes: false };
+const CLAVE_FILTROS = "colaExpedientes:filtros";
+
+function leerFiltrosGuardados(): FiltrosCola | null {
+  try {
+    const raw = window.sessionStorage.getItem(CLAVE_FILTROS);
+    if (!raw) return null;
+    const f = JSON.parse(raw) as Partial<FiltrosCola>;
+    return {
+      dia: f.dia === "hoy" || f.dia === "ayer" ? f.dia : "ambos",
+      origen: f.origen === "emergencia" || f.origen === "directos" ? f.origen : "todos",
+      soloPendientes: f.soloPendientes === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambio }: {
+  etiqueta: string;
+  valor: T;
+  opciones: { valor: T; label: string; conteo?: number }[];
+  onCambio: (v: T) => void;
+}) {
+  return (
+    <div role="group" aria-label={etiqueta} className="inline-flex max-w-full items-center gap-0.5 rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      {opciones.map(o => {
+        const activo = o.valor === valor;
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            aria-pressed={activo}
+            onClick={() => onCambio(o.valor)}
+            className={`inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 ${
+              activo
+                ? "bg-blue-800 text-white shadow-sm dark:bg-blue-700"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+            }`}
+          >
+            {o.label}
+            {o.conteo !== undefined && (
+              <span className={`hidden rounded-full px-1.5 text-[11px] font-semibold tabular-nums sm:inline ${activo ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"}`}>
+                {o.conteo}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ColaExpedientesPage() {
   const { profile } = useAuth();
   // Trabajo Social entra por /dashboard/cola-expedientes (re-export) a
@@ -262,7 +442,17 @@ export default function ColaExpedientesPage() {
   const [errorExport, setErrorExport] = useState("");
   const [ingresos, setIngresos] = useState<ControlIngreso[]>([]);
   const [busqueda, setBusqueda] = useState("");
-  const [soloAyer, setSoloAyer] = useState(false);
+  const [filtros, setFiltros] = useState<FiltrosCola>(FILTROS_INICIALES);
+  const { dia, origen } = filtros;
+  // Trabajo Social no ve censos: el filtro de pendientes no aplica.
+  const soloPendientes = filtros.soloPendientes && !soloConsulta;
+  const cambiarFiltros = (cambio: Partial<FiltrosCola>) => {
+    setFiltros(prev => {
+      const sig = { ...prev, ...cambio };
+      try { window.sessionStorage.setItem(CLAVE_FILTROS, JSON.stringify(sig)); } catch { /* sin persistencia */ }
+      return sig;
+    });
+  };
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null);
   const [conexion, setConexion] = useState<"cargando" | "cache" | "en-vivo" | "error">("cargando");
   const [errorHistorico, setErrorHistorico] = useState("");
@@ -277,6 +467,15 @@ export default function ColaExpedientesPage() {
   const [censosReferido, setCensosReferido] = useState<CensoLookup>({ verificado: false, porCi: new Map(), porExpSinCi: new Map() });
   // Estado de censo de las filas del Histórico: una lectura junto con la búsqueda.
   const [censosHistorico, setCensosHistorico] = useState<{ estado: "cargando" | "listo" | "error"; porCi: Map<string, CensoEstado> }>({ estado: "listo", porCi: new Map() });
+
+  // Restaura los filtros de la pestaña al montar EN EL CLIENTE: la página se
+  // pre-renderiza en el servidor (sin sessionStorage), así que un initializer
+  // de useState no vería el valor guardado y rompería la hidratación.
+  useEffect(() => {
+    const guardados = leerFiltrosGuardados();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga única desde una fuente externa al montar
+    if (guardados) setFiltros(guardados);
+  }, []);
 
   // Vista en vivo acotada a ayer + hoy (mismo campo en where/orderBy, no exige
   // índice compuesto). Fechas anteriores se consultan bajo demanda en la
@@ -436,7 +635,7 @@ export default function ColaExpedientesPage() {
     setCensosHistorico({ estado: "listo", porCi: new Map() });
   };
 
-  const base = soloAyer ? ayer : ingresos;
+  const base = dia === "hoy" ? hoy : dia === "ayer" ? ayer : ingresos;
   const recientesFiltrados = base.filter(i => {
     if (!busqueda) return true;
     const q = busqueda.trim().toLowerCase();
@@ -447,14 +646,64 @@ export default function ColaExpedientesPage() {
       (i.nombres?.toLowerCase() ?? "").includes(q)
     );
   });
-  const lista = vista === "recientes" ? recientesFiltrados : (historicos ?? []);
+  // Lo que hay en la vista antes de los filtros de origen y de censo.
+  const universo = vista === "recientes" ? recientesFiltrados : (historicos ?? []);
   // Ayer y hoy los cubren las suscripciones en vivo; el resto del Histórico, la
   // lectura que acompaña a la búsqueda (también cuando falla: ver cargarCensosHistorico).
   const consultandoCenso = vista === "historico" && censosHistorico.estado === "cargando";
+  const enVentanaViva = (ingreso: ControlIngreso) => esFechaHoy(ingreso.creadoEn) || esFechaAyer(ingreso.creadoEn);
+  const vivosVerificados = censosDemanda.verificado && censosReferido.verificado;
   const censoVerificado = (ingreso: ControlIngreso) =>
-    ((esFechaHoy(ingreso.creadoEn) || esFechaAyer(ingreso.creadoEn)) &&
-      censosDemanda.verificado && censosReferido.verificado) ||
+    (enVentanaViva(ingreso) && vivosVerificados) ||
     (vista === "historico" && !consultandoCenso);
+
+  // Para resaltar solo se afirma "sin censo" cuando de verdad se consultó: si
+  // la lectura del Histórico falló, la fila no se pinta como pendiente.
+  const estados = new Map<ControlIngreso, EstadoCensoFila>();
+  universo.forEach(i => {
+    let estado: EstadoCensoFila = "desconocido";
+    if (!soloConsulta) {
+      const censo = censoDe(i);
+      if (censo) estado = censo.estado === "cerrado" ? "completado" : "en-proceso";
+      else if (i.censoNoAplica) estado = "no-aplica";
+      else if ((enVentanaViva(i) && vivosVerificados) || (vista === "historico" && censosHistorico.estado === "listo")) estado = "sin-censo";
+    }
+    estados.set(i, estado);
+  });
+  const estadoDe = (i: ControlIngreso) => estados.get(i) ?? "desconocido";
+
+  const conteoEmergencia = universo.filter(esDeEmergencia).length;
+  const porOrigen = origen === "todos"
+    ? universo
+    : universo.filter(i => esDeEmergencia(i) === (origen === "emergencia"));
+  const pendientesCenso = porOrigen.filter(i => esPendienteCenso(estadoDe(i)));
+  const sinCensoCount = pendientesCenso.filter(i => estadoDe(i) === "sin-censo").length;
+  const lista = soloPendientes ? pendientesCenso : porOrigen;
+
+  // "No aplica censo": se guarda en el mismo registro de la cola, que ya se
+  // escucha en vivo (cero lecturas extra). El Histórico no es en vivo, así
+  // que ahí se refleja a mano y se revierte si la escritura falla.
+  const marcarNoAplica = async (ingreso: ControlIngreso, marcar: boolean) => {
+    if (!ingreso.id || !profile) throw new Error("Sin sesión o sin id de la atención");
+    const anterior = ingreso.censoNoAplica;
+    const reflejar = (valor: ControlIngreso["censoNoAplica"]) =>
+      setHistoricos(prev => prev && prev.map(i => (i.id === ingreso.id ? { ...i, censoNoAplica: valor } : i)));
+    reflejar(marcar ? { porUid: profile.uid, porNombre: profile.nombre ?? "", en: new Date() } : undefined);
+    try {
+      await updateDoc(doc(db, "control_ingresos", ingreso.id), {
+        censoNoAplica: marcar
+          ? { porUid: profile.uid, porNombre: profile.nombre ?? "", en: serverTimestamp() }
+          : deleteField(),
+      });
+    } catch (err) {
+      reflejar(anterior);
+      throw err;
+    }
+  };
+
+  const hayFiltros = (vista === "recientes" && dia !== "ambos") || origen !== "todos" || soloPendientes;
+  const quitarFiltros = () =>
+    cambiarFiltros(vista === "recientes" ? FILTROS_INICIALES : { origen: "todos", soloPendientes: false });
 
   // Exporta lo que está en pantalla: ayer/hoy con la búsqueda y el filtro
   // aplicados, o el resultado del histórico. El archivo lleva el rango real
@@ -475,7 +724,7 @@ export default function ColaExpedientesPage() {
         Edad: i.edad ?? "",
         Género: i.genero === "masculino" ? "Masculino" : i.genero === "femenino" ? "Femenino" : "",
         Servicio: i.servicio,
-        "Tipo de ingreso": i.ingresoDirectoServicio ? "Directo a servicio" : "Triage",
+        "Tipo de ingreso": esDeEmergencia(i) ? "Triage" : "Directo a servicio",
         "Registrado por": i.responsableIngresoNombre ?? "",
       }));
       const ws = XLSX.utils.json_to_sheet(filas);
@@ -495,6 +744,70 @@ export default function ColaExpedientesPage() {
       setExportando(false);
     }
   };
+
+  const enProcesoCount = pendientesCenso.length - sinCensoCount;
+  const barraFiltros = (
+    <div className="flex flex-wrap items-center gap-2">
+      {vista === "recientes" && (
+        <Segmentado<FiltroDia>
+          etiqueta="Día"
+          valor={dia}
+          onCambio={v => cambiarFiltros({ dia: v })}
+          opciones={[
+            { valor: "ambos", label: "Ambos días" },
+            { valor: "hoy", label: "Hoy" },
+            { valor: "ayer", label: "Ayer" },
+          ]}
+        />
+      )}
+      <Segmentado<FiltroOrigen>
+        etiqueta="Origen del paciente"
+        valor={origen}
+        onCambio={v => cambiarFiltros({ origen: v })}
+        opciones={[
+          { valor: "todos", label: "Todos", conteo: universo.length },
+          { valor: "emergencia", label: "Solo Emergencia", conteo: conteoEmergencia },
+          { valor: "directos", label: "Directos", conteo: universo.length - conteoEmergencia },
+        ]}
+      />
+      {!soloConsulta && (
+        <button
+          type="button"
+          aria-pressed={soloPendientes}
+          onClick={() => cambiarFiltros({ soloPendientes: !soloPendientes })}
+          title={`${sinCensoCount} sin registrar · ${enProcesoCount} en proceso`}
+          className={`inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 ${
+            soloPendientes
+              ? "border-amber-700 bg-amber-700 text-white dark:border-amber-500 dark:bg-amber-500 dark:text-amber-950"
+              : pendientesCenso.length > 0
+                ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          }`}
+        >
+          <Icon icon={clipboardList} width={16} />
+          Pendientes de censo
+          <span className={`rounded-full px-1.5 text-[11px] font-bold tabular-nums ${
+            soloPendientes
+              ? "bg-white/25 dark:bg-amber-950/15"
+              : pendientesCenso.length > 0
+                ? "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200"
+                : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+          }`}>
+            {pendientesCenso.length}
+          </span>
+        </button>
+      )}
+      {hayFiltros && (
+        <button
+          type="button"
+          onClick={quitarFiltros}
+          className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        >
+          <Icon icon={closeCircle} width={15} /> Quitar filtros
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4">
@@ -594,17 +907,20 @@ export default function ColaExpedientesPage() {
 
         {/* Toolbar */}
         {vista === "recientes" ? (
-          <div className="space-y-2 bg-slate-50/80 px-4 py-3.5 dark:bg-slate-900 md:flex md:items-center md:gap-3 md:space-y-0">
+          <div className="space-y-3 bg-slate-50/80 px-4 py-3.5 dark:bg-slate-900">
+          <div className="space-y-2 md:flex md:items-center md:gap-3 md:space-y-0">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <div className="grid h-7 w-7 place-items-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300"><Icon icon={medicalKit} width={17} /></div>
               <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-heading truncate">
-                {soloAyer ? "Registros de ayer" : "Registros de ayer y hoy"}
+                {dia === "hoy" ? "Registros de hoy" : dia === "ayer" ? "Registros de ayer" : "Registros de ayer y hoy"}
               </span>
-              <span className="text-xs text-slate-400 flex-shrink-0">({lista.length})</span>
+              <span className="text-xs text-slate-400 flex-shrink-0 tabular-nums">
+                ({lista.length}{lista.length !== universo.length && ` de ${universo.length}`})
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {/* Search */}
-              <div className="relative flex-1 md:w-56 md:flex-none">
+              <div className="relative flex-1 md:w-64 md:flex-none">
                 <Icon icon={magnifer} width={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -621,19 +937,9 @@ export default function ColaExpedientesPage() {
                   </button>
                 )}
               </div>
-              {/* Ayer toggle */}
-              <button
-                aria-pressed={soloAyer}
-                onClick={() => setSoloAyer(v => !v)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-                  soloAyer
-                    ? "border-blue-800 bg-blue-800 text-white shadow-sm shadow-blue-500/25"
-                    : "border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
-                }`}
-              >
-                {soloAyer ? "Ver ambos días" : "Solo ayer"}
-              </button>
             </div>
+          </div>
+          {barraFiltros}
           </div>
         ) : (
           <div className="space-y-2 bg-slate-50/80 px-4 py-3.5 dark:bg-slate-900">
@@ -643,7 +949,9 @@ export default function ColaExpedientesPage() {
                 Buscar en fechas anteriores
               </span>
               {historicos !== null && (
-                <span className="text-xs text-slate-400 flex-shrink-0">({historicos.length})</span>
+                <span className="text-xs text-slate-400 flex-shrink-0 tabular-nums">
+                  ({lista.length}{lista.length !== historicos.length && ` de ${historicos.length}`})
+                </span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -686,6 +994,7 @@ export default function ColaExpedientesPage() {
             <p className="text-[11px] text-slate-400">
               Indica un expediente exacto (ej. 123-25), un rango de fechas, o ambos.
             </p>
+            {historicos !== null && <div className="pt-1">{barraFiltros}</div>}
           </div>
         )}
 
@@ -703,6 +1012,31 @@ export default function ColaExpedientesPage() {
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent motion-reduce:animate-none" />
             {vista === "recientes" ? "Cargando expedientes…" : "Buscando expedientes…"}
           </div>
+        ) : lista.length === 0 && universo.length > 0 ? (
+          // Hay registros, pero los filtros de origen/censo los dejan fuera.
+          <div role="status" className="flex flex-col items-center gap-3 px-4 py-12 text-center">
+            {soloPendientes && porOrigen.some(i => estadoDe(i) === "desconocido") ? (
+              <p className="text-sm text-slate-500">
+                {consultandoCenso || (vista === "recientes" && !vivosVerificados)
+                  ? "Consultando el estado de censo…"
+                  : "No se pudo confirmar el estado de censo de estas atenciones."}
+              </p>
+            ) : soloPendientes && porOrigen.length > 0 ? (
+              <p className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                <Icon icon={checkCircle} width={20} />
+                No quedan censos pendientes{origen === "emergencia" ? " de Emergencia" : origen === "directos" ? " de directos" : ""} en esta vista.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500">Ningún expediente coincide con los filtros.</p>
+            )}
+            <button
+              type="button"
+              onClick={quitarFiltros}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              <Icon icon={closeCircle} width={15} /> Quitar filtros
+            </button>
+          </div>
         ) : lista.length === 0 && !(vista === "historico" && errorHistorico) && !(vista === "recientes" && conexion === "error") ? (
           <p role="status" className="text-sm text-slate-500 py-12 text-center">
             {vista === "historico"
@@ -711,25 +1045,32 @@ export default function ColaExpedientesPage() {
                 : "Sin resultados para esa búsqueda."
               : ingresos.length === 0
                 ? conexion === "cache" ? "Esperando conexión para consultar los expedientes." : "No hay expedientes registrados ayer ni hoy."
-                : "Sin resultados para la búsqueda."}
+                : busqueda.trim()
+                  ? "Sin resultados para la búsqueda."
+                  : dia === "hoy" ? "Aún no hay expedientes registrados hoy." : "No hay expedientes registrados ayer."}
           </p>
         ) : lista.length > 0 ? (
           <>
             {/* Tabla md+ */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm min-w-[760px]">
+              <table className={`w-full text-sm ${soloConsulta ? "min-w-[760px]" : "min-w-[860px]"}`}>
                 <caption className="sr-only">{vista === "recientes" ? "Cola de expedientes recientes" : "Resultados del histórico de expedientes"}</caption>
                 <thead>
                   <tr className="border-y border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-800/50">
                     {["Paciente", "Expediente", "Fecha y hora", "Servicio", ...(soloConsulta ? [] : ["Censo"])].map(titulo => (
                       <th key={titulo} scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500">{titulo}</th>
                     ))}
+                    {!soloConsulta && (
+                      <th scope="col" className="w-24 px-2 py-3 text-center text-xs font-semibold leading-tight text-slate-500">No aplica censo</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {lista.map(ingreso => (
-                    <tr key={ingreso.id} className="transition-colors hover:bg-blue-50/55 dark:hover:bg-slate-800/60">
-                      <td className="px-4 py-3 min-w-[180px]">
+                  {lista.map(ingreso => {
+                    const estado = estadoDe(ingreso);
+                    return (
+                    <tr key={ingreso.id} className={`transition-colors ${FILA_CENSO_CLS[estado]}`}>
+                      <td className={`px-4 py-3 min-w-[180px] ${BARRA_CENSO_CLS[estado]}`}>
                         <p className="font-semibold text-slate-900 dark:text-slate-100">{ingreso.apellidos}, {ingreso.nombres}</p>
                         <p className="mt-1 text-xs text-slate-500">DUI: <span className="font-mono">{ingreso.dui || "—"}</span></p>
                       </td>
@@ -738,7 +1079,7 @@ export default function ColaExpedientesPage() {
                           <span className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
                             {ingreso.expediente}
                           </span>
-                          {ingreso.ingresoDirectoServicio && (
+                          {!esDeEmergencia(ingreso) && (
                             <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">
                               Directo
                             </span>
@@ -759,23 +1100,31 @@ export default function ColaExpedientesPage() {
                           <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} consultando={consultandoCenso} />
                         </td>
                       )}
+                      {!soloConsulta && (
+                        <td className="px-2 py-3 text-center">
+                          <CasillaNoAplica ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} onNoAplica={marcar => marcarNoAplica(ingreso, marcar)} />
+                        </td>
+                      )}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Cards mobile */}
             <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
-              {lista.map(ingreso => (
-                <div key={ingreso.id} className="px-4 py-3 transition-colors hover:bg-blue-50/55 dark:hover:bg-slate-800/60">
+              {lista.map(ingreso => {
+                const estado = estadoDe(ingreso);
+                return (
+                <div key={ingreso.id} className={`px-4 py-3 transition-colors ${FILA_CENSO_CLS[estado]} ${BARRA_CENSO_CLS[estado]}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 font-mono text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
                           {ingreso.expediente}
                         </span>
-                        {ingreso.ingresoDirectoServicio && (
+                        {!esDeEmergencia(ingreso) && (
                           <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300">
                             Directo
                           </span>
@@ -801,12 +1150,16 @@ export default function ColaExpedientesPage() {
                     </div>
                   </div>
                   {!soloConsulta && (
-                    <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                      <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} consultando={consultandoCenso} />
+                    <div className={`mt-3 border-t pt-3 ${esPendienteCenso(estado) ? "border-amber-200/80 dark:border-amber-900/60" : "border-slate-100 dark:border-slate-800"}`}>
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <MenuCensoFila ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} consultando={consultandoCenso} ocultarNoAplica />
+                        <CasillaNoAplica ingreso={ingreso} censo={censoDe(ingreso)} verificado={censoVerificado(ingreso)} enTarjeta onNoAplica={marcar => marcarNoAplica(ingreso, marcar)} />
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </>
         ) : null}

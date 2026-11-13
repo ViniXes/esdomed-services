@@ -565,9 +565,19 @@ service cloud.firestore {
     }
 
     match /control_ingresos/{id} {
+      // Cola de expedientes: el médico solo puede marcar o quitar "No aplica
+      // censo" (campo censoNoAplica); la marca lleva su uid y la hora del servidor.
+      function soloMarcaNoAplicaCenso() {
+        let nuevo = request.resource.data;
+        return nuevo.diff(resource.data).affectedKeys().hasOnly(['censoNoAplica'])
+          && (!('censoNoAplica' in nuevo)
+              || (nuevo.censoNoAplica.keys().hasOnly(['porUid', 'porNombre', 'en'])
+                  && nuevo.censoNoAplica.porUid == uid()
+                  && nuevo.censoNoAplica.en == request.time));
+      }
       allow read:   if isRealUser();
       allow create: if isEsdomed() || isAdmin();
-      allow update: if isEsdomed() || isAdmin();
+      allow update: if isEsdomed() || isAdmin() || (isMedico() && soloMarcaNoAplicaCenso());
       allow delete: if isAdmin();
     }
 

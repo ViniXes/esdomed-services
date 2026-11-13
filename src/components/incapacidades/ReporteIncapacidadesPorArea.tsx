@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import type { SolicitudIncapacidad } from "@/types";
 import { formatFecha, formatFechaHora } from "@/lib/pacientes/helpers";
-import { mapIncapacidadData } from "@/lib/incapacidades/helpers";
+import { diasAdicionalesGuardados, mapIncapacidadData } from "@/lib/incapacidades/helpers";
 import { claveServicio, resolverServicioCanonico } from "@/lib/servicios";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -34,6 +34,81 @@ const areaDe = (s: SolicitudIncapacidad, catalogo: readonly string[]) => {
 };
 
 interface FilaArea { clave: string; area: string; emitidas: number; dias: number }
+
+// ── Hoja "Detalle" del Excel: todo lo que el médico llenó al solicitarla ──
+
+const esEmergencia = (s: SolicitudIncapacidad) => s.origen === "emergencia";
+/** Días que cuenta el médico hoy: en emergencia el total prescrito, si no los adicionales post-alta. */
+const diasDelMedico = (s: SolicitudIncapacidad) => (esEmergencia(s) ? s.diasIncapacidad : diasAdicionalesGuardados(s));
+const conAclaracion = (texto: string, aclaracion: string | undefined, verAclaracion: boolean) =>
+  verAclaracion && aclaracion?.trim() ? `${texto} (${aclaracion.trim()})` : texto;
+
+/** Correcciones de ESDOMED, para que "Días otorgados por el médico" y "Total de días" cuadren. */
+function correccionesEsdomed(s: SolicitudIncapacidad, verAclaracion: boolean): string {
+  const partes: string[] = [];
+  if (s.diasMedicoOriginal != null) {
+    partes.push(conAclaracion(
+      `Días: el médico otorgó ${s.diasMedicoOriginal}, ${s.diasCorregidosPor ?? "ESDOMED"} los cambió a ${diasDelMedico(s)}`,
+      s.diasAclaracion, verAclaracion,
+    ));
+  }
+  if (s.fechaIngresoCorregida) {
+    partes.push(conAclaracion(
+      `Fecha de ingreso cambiada al ${formatFecha(s.fechaIngresoCorregida)} por ${s.fechaIngresoCorregidaPor ?? "ESDOMED"}`,
+      s.fechaIngresoAclaracion, verAclaracion,
+    ));
+  }
+  return partes.join(" · ");
+}
+
+interface ColumnaDetalle { titulo: string; ancho: number; valor: (s: SolicitudIncapacidad) => string | number }
+
+/**
+ * Columnas de la hoja "Detalle". El reporte de ESDOMED (todas las áreas) agrega
+ * área, cama, días de hospitalización y las aclaraciones de sus correcciones; en
+ * el de un área fija (médicos de Emergencia) las aclaraciones no salen, igual
+ * que en la app solo las ve ESDOMED.
+ */
+function columnasDetalle(todasLasAreas: boolean, catalogo: readonly string[]): ColumnaDetalle[] {
+  const fecha = (d?: Date | null) => (d ? formatFecha(d) : "");
+  const cols: (ColumnaDetalle | false)[] = [
+    todasLasAreas && { titulo: "Área", ancho: 24, valor: (s) => areaDe(s, catalogo) },
+    { titulo: "Expediente", ancho: 12, valor: (s) => s.pacienteExpediente },
+    { titulo: "Paciente", ancho: 32, valor: (s) => s.pacienteNombre },
+    todasLasAreas && { titulo: "Cama", ancho: 8, valor: (s) => s.camaPaciente ?? "" },
+    { titulo: "Médico solicitante", ancho: 28, valor: (s) => s.medicoNombre },
+    { titulo: "JVPM", ancho: 9, valor: (s) => s.medicoJvpm ?? "" },
+    { titulo: "Solicitada el", ancho: 19, valor: (s) => formatFechaHora(s.creadoEn) },
+    { titulo: "Condición de egreso", ancho: 11, valor: (s) => (s.condicionEgreso === "muerto" ? "Muerto" : "Vivo") },
+    { titulo: "Fecha de alta / inicio", ancho: 13, valor: (s) => fecha(s.fechaAlta) },
+    { titulo: "Desde", ancho: 13, valor: (s) => fecha(s.fechaDesde) },
+    { titulo: "Hasta", ancho: 13, valor: (s) => fecha(s.fechaHasta) },
+    todasLasAreas && {
+      titulo: "Días de hospitalización", ancho: 10,
+      valor: (s) => (esEmergencia(s) ? 0 : Math.max(0, s.diasIncapacidad - diasAdicionalesGuardados(s))),
+    },
+    { titulo: "Días otorgados por el médico", ancho: 10, valor: (s) => s.diasMedicoOriginal ?? diasDelMedico(s) },
+    { titulo: "Total de días", ancho: 8, valor: (s) => s.diasIncapacidad },
+    { titulo: "Diagnóstico de egreso", ancho: 50, valor: (s) => s.diagnosticoEgreso ?? "" },
+    { titulo: "Tratamiento al alta", ancho: 50, valor: (s) => s.tratamientoAlta ?? "" },
+    { titulo: "Recomendaciones", ancho: 40, valor: (s) => s.recomendaciones ?? "" },
+    { titulo: "Seguimiento", ancho: 30, valor: (s) => s.seguimiento ?? "" },
+    {
+      titulo: "Continuación de otra incapacidad", ancho: 32,
+      valor: (s) => (s.continuaDe
+        ? conAclaracion(`Sí: la anterior terminaba el ${formatFecha(s.continuaDe.hastaAnterior)}`, s.continuaDe.aclaracion, todasLasAreas)
+        : ""),
+    },
+    { titulo: "Correcciones de ESDOMED", ancho: 45, valor: (s) => correccionesEsdomed(s, todasLasAreas) },
+    { titulo: "Emitida el", ancho: 19, valor: (s) => (s.emitidaEn ? formatFechaHora(s.emitidaEn) : "") },
+    { titulo: "Emitida por", ancho: 26, valor: (s) => s.emitidaPorNombre ?? "" },
+    {
+      titulo: "Origen", ancho: 15,
+      valor: (s) => (esEmergencia(s) ? "Emergencia" : s.origen === "reposicion" ? "Reposición" : "Hospitalización"),
+    },
+  ];
+  return cols.filter((c): c is ColumnaDetalle => c !== false);
+}
 
 const selectCls =
   "px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-200 shadow-sm cursor-pointer max-w-[280px]";
@@ -151,18 +226,13 @@ export function ReporteIncapacidadesPorArea({ titulo, subtitulo, areaFija, hrefD
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Por área");
       }
 
-      const filas = detalle.map((s) => ({
-        ...(areaFija ? {} : { Área: areaDe(s, servicios) }),
-        Expediente: s.pacienteExpediente,
-        Paciente: s.pacienteNombre,
-        "Médico solicitante": s.medicoNombre,
-        Días: s.diasIncapacidad,
-        "Fecha de alta": formatFecha(s.fechaAlta),
-        "Emitida el": s.emitidaEn ? formatFechaHora(s.emitidaEn) : "",
-        "Emitida por": s.emitidaPorNombre ?? "",
-        Origen: s.origen === "emergencia" ? "Emergencia" : s.origen === "reposicion" ? "Reposición" : "Hospitalización",
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), "Detalle");
+      const columnas = columnasDetalle(!areaFija, servicios);
+      const hojaDetalle = XLSX.utils.aoa_to_sheet([
+        columnas.map((c) => c.titulo),
+        ...detalle.map((s) => columnas.map((c) => c.valor(s))),
+      ]);
+      hojaDetalle["!cols"] = columnas.map((c) => ({ wch: c.ancho }));
+      XLSX.utils.book_append_sheet(wb, hojaDetalle, "Detalle");
 
       const sufijo = areaNombre ? `_${areaNombre.replace(/[^\p{L}\p{N}]+/gu, "_")}` : "";
       XLSX.writeFile(wb, `incapacidades_emitidas_${rangoConsultado.desde}_a_${rangoConsultado.hasta}${sufijo}.xlsx`);
