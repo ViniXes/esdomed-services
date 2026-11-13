@@ -175,6 +175,20 @@ Los censos digitados sin pasar por la cola (`controlIngresoId` nulo) quedan fuer
 
 La cola de expedientes vigila en vivo solo los censos de ayer y hoy; en la pestaña Histórico el estado de censo de las filas se lee una vez al buscar con `censosDeAtenciones()` (`controlIngresoId` "in" de a 30). Así se puede registrar el censo de una atención de hace días. Si esa lectura falla, el botón se muestra igual, porque el formulario abre el censo que ya exista y `guardarCenso()` impide el duplicado.
 
+### Consulta Externa — subsistema con turnero (en construcción)
+
+`/consulta-externa` es un **subsistema** como Mi horario: layout y menú propios (`src/lib/navConsultaExterna.ts`, acordeón) y "Volver al panel" fijo al pie del Sidebar (prop `regreso`). Se entra desde Pacientes → Consulta Externa en el panel de ESDOMED. El circuito es: ESDOMED carga la "Programación de citas por día" del SIS (.xls) y cada cita recibe un código con prefijo de especialidad (HE-12). La llegada de **primera vez** se marca en la recepción de ESDOMED y la de **subsecuente**, en la estación de su especialidad. La enfermera de la estación llama dos veces: a **preconsulta** y luego al **consultorio**; la agenda sugiere el orden, pero ella elige.
+
+Reglas:
+- **Cuentas.** Las estaciones usan cuentas compartidas, rol `consulta_externa`, una por estación. Su único portal es este, así que no llevan "Volver al panel". Quién entra lo decide `src/lib/accesoConsultaExterna.ts`: mientras `EN_CONSTRUCCION = true`, solo admin.
+- **Pantallas.** Todas las pantallas muestran todos los llamados. Están en `/consulta-externa/pantalla`, fuera del grupo `(area)`, para ir a pantalla completa. Muestran el código y el destino, **nunca el nombre del paciente** (Infectología y Oncología son sensibles). Deben escuchar un solo documento con los últimos llamados para no gastar lecturas.
+- **Voz.** Web Speech API en `src/lib/consultaExterna/voz.ts`, sin backend. Las voces "Natural" de Edge son las mejores. El navegador exige un clic antes de reproducir sonido. Cada pantalla se configura con voz o sin voz, porque dos pantallas que se oyen desde el mismo lugar hacen eco.
+- **Especialidades y estaciones.** Son seis especialidades y cuatro estaciones; Cardiología atiende además Cirugía Cardiovascular y Cirugía de Tórax. El catálogo, con prefijo y alias, está en `src/lib/consultaExterna/especialidades.ts`. Una especialidad que no esté en el catálogo no se carga: la vista previa la lista.
+- **Carga del día.** El `.xls` del SIS es HTML, y SheetJS lo abre con una hoja por agenda de médico. Lo lee `leerProgramacionCitas()` (`programacion.ts`), que guarda la franja y el consultorio de cada cita. Es distinto de `leerProgramacion()` de SIMMOW, que solo busca DUI y nombre. Los consultorios se comparten entre médicos por turnos, así que la cola va por agenda (médico) y el consultorio es solo el destino.
+- **Códigos.** Cada especialidad numera aparte (`numerarNuevas()` en `agenda.ts`), por inicio de franja y luego en el orden del reporte. Una segunda carga del mismo día agrega solo las citas que falten y sigue la numeración. **Nunca se renumera** lo ya cargado, porque el paciente pudo haber recibido su código.
+- **Colecciones.** `consulta_externa_agendas/{YYYY-MM-DD}` guarda los contadores del día; `consulta_externa_citas/{fecha}_{especialidad}_{expediente}` guarda una cita por documento. Ambas se escriben en una sola transacción (`guardarAgendaCE()`). No se copian teléfonos, responsable ni dirección.
+- **Prueba.** `node scripts/test-consulta-externa.mjs [xls-del-SIS]`. Con un `.xls` real, además imprime el resumen; no guarda nada.
+
 ### Navegación (menú lateral) — registro declarativo
 
 Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:

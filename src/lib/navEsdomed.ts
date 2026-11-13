@@ -1,5 +1,5 @@
 import {
-  Activity, Ambulance, ArrowRightLeft, BarChart3, BedDouble, Briefcase, Building2, CalendarClock,
+  Activity, Ambulance, ArrowRightLeft, BarChart3, BedDouble, Briefcase, Building2, CalendarCheck2, CalendarClock,
   CalendarRange, ChartPie, ClipboardCheck, ClipboardList, ClipboardPen, Contact,
   DoorOpen, FileClock, FileCode2, FileInput, FileSearch, FileText, FingerprintPattern, FolderOpen, HandHeart, HeartPulse,
   History, LayoutDashboard, LayoutGrid, ListChecks, LogIn, NotebookPen, Phone, PhoneCall, Printer, Radar,
@@ -12,6 +12,7 @@ import type { UserProfile } from "@/types";
 import { construirMenu, type SeccionNav } from "@/lib/navRegistro";
 import { esJefeCuidadosCriticos, puedeVerModuloCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { esPersonalPlan } from "@/lib/esdomed/plan";
+import { entraConsultaExterna } from "@/lib/accesoConsultaExterna";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -49,6 +50,8 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/control-ingresos", label: "Control de ingresos", icon: FileInput },
       { href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble },
       { href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe },
+      // Subsistema con menú propio (turnero de llamados); en construcción, solo admin.
+      { href: "/consulta-externa", label: "Consulta Externa", icon: CalendarCheck2, visibleSi: entraConsultaExterna },
       { href: "/dashboard/busqueda-telefono", label: "Búsqueda de teléfono", icon: Phone, visibleSi: esAdmin },
     ],
   },

@@ -4,7 +4,7 @@ import { useState, useEffect, useId, useRef, type FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X, LogOut, Sun, Moon, LockKeyhole, ChevronDown, Folder, PanelLeftClose, PanelLeftOpen, Info } from "lucide-react";
+import { Menu, X, LogOut, Sun, Moon, LockKeyhole, ChevronDown, Folder, PanelLeftClose, PanelLeftOpen, Info, ArrowLeft } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -42,6 +42,11 @@ interface SidebarProps {
   variant?: "default" | "portal";
   /** Habilita el control de escritorio para ocultar el panel lateral. */
   allowDesktopPanelCollapse?: boolean;
+  /**
+   * Salida de un subsistema (Consulta Externa) a su panel de origen. Va fija al
+   * pie del menú, sobre las acciones de cuenta, para que siempre esté a la vista.
+   */
+  regreso?: { href: string; label: string };
 }
 
 interface SidebarBodyProps extends SidebarProps {
@@ -254,6 +259,7 @@ function SidebarBody({
   onAcercaDe,
   onCollapseDesktopPanel,
   variant,
+  regreso,
 }: SidebarBodyProps) {
   const portal = variant === "portal";
   const portalFooterAction = portal
@@ -371,6 +377,17 @@ function SidebarBody({
       </nav>
 
       <div className={`px-2 pb-4 pt-2 border-t space-y-1 ${portal ? "border-blue-100 dark:border-cyan-950" : "border-slate-200 dark:border-cyan-900/40"}`}>
+        {regreso && (
+          <Link
+            prefetch={false}
+            href={regreso.href}
+            onClick={onNavigate}
+            className="group mb-1 flex w-full items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2.5 text-sm font-semibold text-blue-800 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-cyan-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950/60 dark:hover:text-white"
+          >
+            <ArrowLeft size={16} className="flex-shrink-0 transition-transform group-hover:-translate-x-0.5" />
+            {regreso.label}
+          </Link>
+        )}
         {profile?.tipoMedico ? (
           <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400">
             {TIPO_MEDICO_CRITICO_LABEL[profile.tipoMedico]} · {profile.servicios?.length ?? 0} unidades
@@ -431,6 +448,7 @@ export function Sidebar({
   roleLabel,
   variant = "default",
   allowDesktopPanelCollapse = false,
+  regreso,
 }: SidebarProps) {
   const [open, setOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -571,6 +589,7 @@ export function Sidebar({
     },
     onCollapseDesktopPanel: allowDesktopPanelCollapse ? toggleDesktopPanel : undefined,
     variant,
+    regreso,
   };
 
   return (

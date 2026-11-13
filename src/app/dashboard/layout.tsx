@@ -35,7 +35,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         profile.role === "motorista" ||
         profile.role === "isbm_tecnico" ||
         profile.role === "isbm_supervisor" ||
-        profile.role === "isbm_jefe")
+        profile.role === "isbm_jefe" ||
+        profile.role === "consulta_externa")
     ) {
       router.replace("/login");
     }

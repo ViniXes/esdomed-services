@@ -46,6 +46,8 @@ service cloud.firestore {
     // Roles del módulo Convenio ISBM. Sus datos viven en Supabase; en Firestore
     // solo LEEN el padrón (pacientes/personas) para afiliar — nunca escriben.
     function isIsbm()         { return isAuth() && getRole() in ['isbm_tecnico', 'isbm_supervisor', 'isbm_jefe']; }
+    // Cuenta compartida de una estación de enfermería de Consulta Externa.
+    function isConsultaExterna() { return isAuth() && getRole() == 'consulta_externa'; }
     // Sesión real (no anónima). El formulario público de transporte usa sesiones
     // anónimas: NO deben poder leer datos internos del portal.
     function isRealUser() {
@@ -588,6 +590,25 @@ service cloud.firestore {
       allow read:   if isEsdomed() || isAdmin();
       allow create: if (isEsdomed() || isAdmin())
                     && request.resource.data.creadoPor == uid();
+      allow update: if isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Consulta Externa (turnero) ───────────────────────────────────────────
+    // ESDOMED carga la Programación de citas por día del SIS: un documento de
+    // contadores por día y una cita por expediente y especialidad. Las
+    // estaciones las leen; sus cambios de estado (llegada, llamados) tendrán
+    // regla propia cuando exista la estación.
+    match /consulta_externa_agendas/{fecha} {
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna();
+      allow create, update: if isEsdomed() || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /consulta_externa_citas/{id} {
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna();
+      allow create: if (isEsdomed() || isAdmin())
+                    && request.resource.data.cargadaPor == uid()
+                    && request.resource.data.estado == 'citado';
       allow update: if isEsdomed() || isAdmin();
       allow delete: if isAdmin();
     }

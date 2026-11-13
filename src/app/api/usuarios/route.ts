@@ -21,6 +21,7 @@ const VALID_ROLES = new Set<UserRole>([
   "isbm_tecnico",
   "isbm_supervisor",
   "isbm_jefe",
+  "consulta_externa",
 ]);
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {

@@ -89,6 +89,7 @@ const roleColors: Record<UserRole, string> = {
   isbm_tecnico: "bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-400 border-sky-200 dark:border-sky-900",
   isbm_supervisor: "bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900",
   isbm_jefe: "bg-fuchsia-50 dark:bg-fuchsia-950 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-900",
+  consulta_externa: "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 border-blue-200 dark:border-cyan-900",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -107,6 +108,7 @@ const roleLabels: Record<UserRole, string> = {
   isbm_tecnico: "Técnico ISBM",
   isbm_supervisor: "Supervisor ISBM",
   isbm_jefe: "Jefe ISBM",
+  consulta_externa: "Estación Consulta Externa",
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -124,6 +126,8 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "isbm_tecnico", label: "Técnico ISBM" },
   { value: "isbm_supervisor", label: "Supervisor ISBM" },
   { value: "isbm_jefe", label: "Jefe ISBM" },
+  // Cuenta compartida de la estación de enfermería de una especialidad.
+  { value: "consulta_externa", label: "Estación Consulta Externa" },
   { value: "admin", label: "Administrador Superusuario" },
 ];
 
