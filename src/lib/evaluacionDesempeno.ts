@@ -354,6 +354,8 @@ export interface EvaluacionDesempeno {
   respaldo?: import("@/lib/evaluacionDesempenoRespaldo").ResumenRespaldo | null;
   /** Formulario usado; ausente = "mpe" (las evaluaciones anteriores a los formatos). */
   formato?: FormatoEvaluacion;
+  /** Votos de los supervisores mientras estuvo en curso: solo sugerencia (ver evaluacionDesempenoVotacion.ts). */
+  votos?: import("@/lib/evaluacionDesempenoVotacion").VotosEvaluacion;
   creadoPorId: string;
   creadoPorNombre: string;
   creadoEn: Date;

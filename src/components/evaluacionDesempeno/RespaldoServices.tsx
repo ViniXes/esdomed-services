@@ -29,6 +29,8 @@ interface Props {
   guardadoEn?: string | null;
   /** Sin respaldo a la vista: cargarlo solo en cuanto esté el equipo para comparar. */
   autoCargar?: boolean;
+  /** Supervisor votando: solo consulta (sin Actualizar ni pasar hallazgos a incidentes). */
+  soloLectura?: boolean;
   onRespaldo: (r: ResumenRespaldo, origen: "auto" | "manual") => void;
   onAgregarIncidente: (i: IncidenteCritico) => void;
 }
@@ -50,6 +52,7 @@ export function RespaldoServices({
   formato = "mpe",
   guardadoEn = null,
   autoCargar = false,
+  soloLectura = false,
   onRespaldo,
   onAgregarIncidente,
 }: Props) {
@@ -98,9 +101,8 @@ export function RespaldoServices({
     setAgregados((s) => new Set(s).add(clave));
   };
 
-  const botonIncidente = (clave: string, inc: IncidenteCritico) => (
-    <BotonAgregar hecho={agregados.has(clave)} onClick={() => agregar(clave, inc)} />
-  );
+  const botonIncidente = (clave: string, inc: IncidenteCritico) =>
+    soloLectura ? null : <BotonAgregar hecho={agregados.has(clave)} onClick={() => agregar(clave, inc)} />;
 
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -122,18 +124,28 @@ export function RespaldoServices({
             <ListChecks size={13} /> {verCriterios ? "Ocultar criterios" : "Ver criterios de sugerencia"}
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => cargar("manual")}
-          disabled={cargando}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
-        >
-          <RefreshCw size={14} className={cargando ? "animate-spin" : ""} />
-          {cargando ? "Cargando…" : respaldo ? "Actualizar" : "Cargar respaldo"}
-        </button>
+        {soloLectura ? (
+          cargando && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
+              <RefreshCw size={14} className="animate-spin" /> Cargando…
+            </span>
+          )
+        ) : (
+          <button
+            type="button"
+            onClick={() => cargar("manual")}
+            disabled={cargando}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={cargando ? "animate-spin" : ""} />
+            {cargando ? "Cargando…" : respaldo ? "Actualizar" : "Cargar respaldo"}
+          </button>
+        )}
       </div>
 
-      {respaldo && <EstadoGuardado cargadoEn={respaldo.cargadoEn} guardado={!!guardadoEn && respaldo.cargadoEn === guardadoEn} />}
+      {respaldo && (
+        <EstadoGuardado cargadoEn={respaldo.cargadoEn} guardado={!!guardadoEn && respaldo.cargadoEn === guardadoEn} soloLectura={soloLectura} />
+      )}
 
       {verCriterios && (
         <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -387,9 +399,10 @@ export function RespaldoServices({
 }
 
 /** Si lo que se ve es el respaldo guardado con la evaluación o uno recién actualizado. */
-function EstadoGuardado({ cargadoEn, guardado }: { cargadoEn: string; guardado: boolean }) {
+function EstadoGuardado({ cargadoEn, guardado, soloLectura }: { cargadoEn: string; guardado: boolean; soloLectura?: boolean }) {
   const f = new Date(cargadoEn);
   const fecha = Number.isNaN(f.getTime()) ? "" : f.toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" });
+  if (soloLectura) return fecha ? <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Datos al {fecha}.</p> : null;
   return guardado ? (
     <p className="mt-3 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
       <CircleCheck size={14} className="shrink-0" />
