@@ -20,10 +20,12 @@ import type { Genero, TurnoEmergencia } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
-  DESENLACES_SIN_INGRESO, DISPOSITIVOS_O2, HOSPITALES_REFERENCIA, PROCEDIMIENTOS, RAZONES_DEMORA,
-  TIEMPOS_PERMANENCIA, clasificacionSis, medicosGeneralesLista, procedimientosUnificados,
+  DESENLACES_SIN_INGRESO, DISPOSITIVOS_O2, PROCEDIMIENTOS, RAZONES_DEMORA,
+  TIEMPOS_PERMANENCIA, medicosGeneralesLista, procedimientosUnificados,
   tipoEvaluador, turnoSegunHora, unirFormularios,
 } from "@/lib/emergencia/censos";
+import { clasificacionSis, nombreEstablecimiento } from "@/lib/emergencia/establecimientosCenso";
+import { BuscadorEstablecimiento } from "@/components/emergencia/BuscadorEstablecimiento";
 import { useCatalogoPersonal } from "@/lib/emergencia/catalogoPersonal";
 import {
   CensoYaRegistrado, buscarCensoDeAtencion, guardarCenso, versionCenso, type CensoGuardado,
@@ -102,7 +104,7 @@ function formDesdeRegistro(r: DocumentData, f: FormState): FormState {
     nombre: r.pacienteNombre ?? "",
     edad: r.edad !== undefined && r.edad !== null ? String(r.edad) : "",
     genero: r.genero ?? null,
-    hospitalReferencia: r.hospitalReferencia ?? "",
+    hospitalReferencia: nombreEstablecimiento(r.hospitalReferencia),
     referenciaSis: r.referenciaSis !== false,
     condicion: r.condicion ?? null,
     dispositivoO2: r.dispositivoO2 ?? "No",
@@ -470,7 +472,11 @@ export default function CensoReferidosPage() {
       <Seccion num="03" titulo="Referencia" icon={Building2}>
         <div className="grid sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)_minmax(0,1fr)] gap-4">
           <Field label="Hospital de referencia" required>
-            <SelectCatalogo options={HOSPITALES_REFERENCIA} value={form.hospitalReferencia} onChange={(v) => set("hospitalReferencia", v)} />
+            <BuscadorEstablecimiento
+              ariaLabel="Hospital de referencia"
+              value={form.hospitalReferencia}
+              onChange={(v) => set("hospitalReferencia", v)}
+            />
           </Field>
           <Field label="¿Referencia registrada en SIS?" required>
             <SiNoChips value={form.referenciaSis} onChange={(v) => set("referenciaSis", v)} />

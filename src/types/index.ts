@@ -2254,7 +2254,7 @@ export interface CensoReferido {
   controlIngresoId?: string | null;
 
   // ── Referencia ──
-  hospitalReferencia: string;     // catálogo HOSPITALES_REFERENCIA
+  hospitalReferencia: string;     // lib/emergencia/establecimientosCenso (frecuente o nombre SIMMOW)
   referenciaSis: boolean;         // ¿trae referencia registrada en SIS?
   clasificacionSis: ClasificacionSisReferido | null; // derivada (null sin hospital)
 

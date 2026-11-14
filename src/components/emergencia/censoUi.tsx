@@ -194,10 +194,11 @@ const LISTA_ALTO_MIN = 220;
 const LISTA_ANCHO_MIN = 300;
 const MARGEN = 8;
 
-type PosicionLista = { left: number; width: number; maxHeight: number; top?: number; bottom?: number };
+export type PosicionLista = { left: number; width: number; maxHeight: number; top?: number; bottom?: number };
 
 // visualViewport descuenta el teclado en pantalla de los celulares.
-function posicionLista(input: HTMLElement): PosicionLista {
+// También la usa BuscadorEstablecimiento.
+export function posicionLista(input: HTMLElement, altoMax = LISTA_ALTO_MAX): PosicionLista {
   const r = input.getBoundingClientRect();
   const altoVisible = window.visualViewport?.height ?? window.innerHeight;
   const width = Math.min(Math.max(r.width, LISTA_ANCHO_MIN), window.innerWidth - MARGEN * 2);
@@ -205,9 +206,9 @@ function posicionLista(input: HTMLElement): PosicionLista {
   const abajo = altoVisible - r.bottom - MARGEN * 2;
   const arriba = r.top - MARGEN * 2;
   if (abajo >= LISTA_ALTO_MIN || abajo >= arriba) {
-    return { left, width, top: r.bottom + 6, maxHeight: Math.min(LISTA_ALTO_MAX, abajo) };
+    return { left, width, top: r.bottom + 6, maxHeight: Math.min(altoMax, abajo) };
   }
-  return { left, width, bottom: window.innerHeight - r.top + 6, maxHeight: Math.min(LISTA_ALTO_MAX, arriba) };
+  return { left, width, bottom: window.innerHeight - r.top + 6, maxHeight: Math.min(altoMax, arriba) };
 }
 
 export function BuscadorPersonal({

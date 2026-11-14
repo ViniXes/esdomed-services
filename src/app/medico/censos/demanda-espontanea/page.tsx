@@ -17,13 +17,14 @@ import {
 } from "lucide-react";
 import type { DestinoEmergencia, Genero, TriageEmergencia, TurnoEmergencia } from "@/types";
 import { toDate } from "@/lib/pacientes/helpers";
-import { ESTABLECIMIENTOS } from "@/lib/establecimientos";
 import { SERVICIOS_HOSPITALARIOS } from "@/lib/servicios";
 import {
-  DEPENDENCIAS_HES, DESTINOS, HOSPITALES_REFERENCIA, PROCEDIMIENTOS,
+  DEPENDENCIAS_HES, DESTINOS, PROCEDIMIENTOS,
   TRIAGES, medicosGeneralesLista, procedimientosUnificados, tipoEvaluador, turnoSegunHora,
   unirFormularios,
 } from "@/lib/emergencia/censos";
+import { nombreEstablecimiento } from "@/lib/emergencia/establecimientosCenso";
+import { BuscadorEstablecimiento } from "@/components/emergencia/BuscadorEstablecimiento";
 import { useCatalogoPersonal } from "@/lib/emergencia/catalogoPersonal";
 import {
   CensoYaRegistrado, buscarCensoDeAtencion, guardarCenso, versionCenso, type CensoGuardado,
@@ -31,7 +32,7 @@ import {
 import { buscarIdentidadPaciente, leerPrefillCola } from "@/lib/emergencia/prefillCenso";
 import {
   ChipMulti, ChipSelect, DiagnosticosEditor,
-  FaltantesHint, Field, SelectCatalogo, SiNoChips, inputCls,
+  FaltantesHint, Field, SelectCatalogo, SiNoChips,
 } from "@/components/emergencia/censoUi";
 import {
   AvisoCenso, AvisoCensoExistente, BOTON_PRIMARIO, BOTON_SECUNDARIO, CamposIdentidad, CamposMomento,
@@ -106,10 +107,11 @@ function formDesdeRegistro(r: DocumentData, f: FormState): FormState {
     diagnosticos: r.diagnosticos ?? [],
     especialidad: r.especialidad ?? "",
     traeReferencia: !!r.traeReferencia,
-    lugarReferencia: r.lugarReferencia ?? "",
+    // Los registros viejos pueden traer el nombre largo o en mayúsculas.
+    lugarReferencia: nombreEstablecimiento(r.lugarReferencia),
     destino: r.destino ?? null,
     servicioIngresar: r.servicioIngresar ?? "",
-    centroRefiere: r.centroRefiere ?? "",
+    centroRefiere: nombreEstablecimiento(r.centroRefiere),
     staffEvalua: r.staffEvalua ?? "",
     reevaluacion: r.reevaluacion ?? "",
     ventilacionMecanica: !!r.ventilacionMecanica,
@@ -508,7 +510,11 @@ export default function CensoDemandaEspontaneaPage() {
           </Field>
           {form.traeReferencia && (
             <Field label="Lugar de la referencia" required>
-              <SelectCatalogo options={HOSPITALES_REFERENCIA} value={form.lugarReferencia} onChange={(v) => set("lugarReferencia", v)} />
+              <BuscadorEstablecimiento
+                ariaLabel="Lugar de la referencia"
+                value={form.lugarReferencia}
+                onChange={(v) => set("lugarReferencia", v)}
+              />
             </Field>
           )}
         </div>
@@ -524,17 +530,11 @@ export default function CensoDemandaEspontaneaPage() {
           )}
           {form.destino === "referencia" && (
             <Field label="Centro de salud al que refiere" required>
-              <input
-                type="text"
-                list="centros-refiere"
+              <BuscadorEstablecimiento
+                ariaLabel="Centro de salud al que refiere"
                 value={form.centroRefiere}
-                onChange={(e) => set("centroRefiere", e.target.value.toUpperCase())}
-                placeholder="UCSF / hospital destino"
-                className={inputCls}
+                onChange={(v) => set("centroRefiere", v)}
               />
-              <datalist id="centros-refiere">
-                {ESTABLECIMIENTOS.map((e) => <option key={e} value={e.toUpperCase()} />)}
-              </datalist>
             </Field>
           )}
         </div>

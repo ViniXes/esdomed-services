@@ -13,6 +13,7 @@ import {
 import {
   FALLECE_EN_EMERGENCIA, NO_APLICA, SIN_DATO, type DeltaMes,
 } from "@/lib/emergencia/resumenCenso";
+import { agruparEstablecimientos } from "@/lib/emergencia/establecimientosCenso";
 import { claveServicio } from "@/lib/servicios";
 import { useServicios } from "@/contexts/ServiciosContext";
 import {
@@ -192,11 +193,11 @@ export function VistaDemanda({ resumen, puntos, subtituloEvolucion, detalleTotal
         <Tarjeta titulo="Referencia de entrada" subtitulo="Pacientes que llegan referidos" className="lg:col-span-4">
           <p className="text-2xl font-bold leading-none text-slate-900 dark:text-slate-100 font-heading">{porcentaje(conReferencia, total)}</p>
           <p className="mt-1 mb-3 text-xs text-slate-500 dark:text-slate-400">{cifra(conReferencia)} traen referencia</p>
-          {conReferencia > 0 && <Barras {...filasDe(conteos.lugarReferencia)} total={conReferencia} maximo={6} />}
+          {conReferencia > 0 && <Barras {...filasDe(agruparEstablecimientos(conteos.lugarReferencia))} total={conReferencia} maximo={6} />}
         </Tarjeta>
         <div className="flex min-w-0 flex-col gap-3 lg:col-span-4">
         <Tarjeta titulo="Referidos a otro centro" subtitulo="Destino Referencia">
-          <Barras {...filasDe(conteos.centroRefiere)} total={conteos.destino?.referencia ?? 0} maximo={6} />
+          <Barras {...filasDe(agruparEstablecimientos(conteos.centroRefiere))} total={conteos.destino?.referencia ?? 0} maximo={6} />
         </Tarjeta>
 
         <Tarjeta titulo="Condición administrativa" className="flex-1">
@@ -286,7 +287,7 @@ export function VistaReferidos({ resumen, puntos, subtituloEvolucion, detalleTot
         <Edades conteos={conteos} />
 
         <Tarjeta titulo="Hospital que refiere" className="lg:col-span-6">
-          <Barras {...filasDe(conteos.hospitalReferencia)} total={total} />
+          <Barras {...filasDe(agruparEstablecimientos(conteos.hospitalReferencia))} total={total} />
         </Tarjeta>
         <Tarjeta titulo="Referencia en SIS" subtitulo="Clasificación según hospital y registro" className="lg:col-span-6">
           <Barras {...filasDe(conteos.clasificacionSis)} total={total} />

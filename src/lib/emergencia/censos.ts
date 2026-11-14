@@ -10,7 +10,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type {
-  ClasificacionSisReferido,
   DestinoEmergencia,
   EntradaCatalogoPersonal,
   TipoEvaluadorEmergencia,
@@ -106,61 +105,8 @@ export const SERVICIOS_INGRESO = [
   "Otro",
 ] as const;
 
-// ── Hospitales / establecimientos que refieren ──────────────────────────────
-// Nombres cortos como los usa el censo (el catálogo largo de establecimientos
-// de lib/establecimientos.ts es para referencias formales de salida).
-
-export const HOSPITALES_REFERENCIA = [
-  "HN San Rafael",
-  "HN Zacamil",
-  "DoctorSV",
-  "HN Rosales",
-  "HN Cojutepeque",
-  "HN Saldaña",
-  "HN Sonsonate",
-  "HN Chalatenango",
-  "HN San Miguel",
-  "HN San Vicente",
-  "HN Santa Ana",
-  "HN Molina (Soyapango)",
-  "HN Ahuachapán",
-  "HN San Bartolo",
-  "HN Zacatecoluca",
-  "HN Chalchuapa",
-  "HN Suchitoto",
-  "HN Nueva Concepción",
-  "HN Santa Rosa de Lima",
-  "HN Sensuntepeque",
-  "HN Ilobasco",
-  "HN Jiquilisco",
-  "HN Usulután",
-  "HNN Benjamín Bloom",
-  "HN de la Mujer",
-  // Red hospitalaria del ISSS (nombres cortos; el catálogo formal está en
-  // lib/establecimientos.ts).
-  "ISSS General",
-  "ISSS Médico Quirúrgico y Oncológico",
-  "ISSS 1° de Mayo (Materno Infantil)",
-  "ISSS Amatepec",
-  "ISSS Policlínico Arce",
-  "ISSS Policlínico Zacamil",
-  "ISSS Policlínico Roma",
-  "ISSS Policlínico Planes de Renderos",
-  "ISSS Regional San Miguel",
-  "ISSS Regional Santa Ana",
-  "ISSS Regional Sonsonate",
-  "Hospital Central",
-  "Hospital Militar",
-  "Hospital privado",
-  "Otro",
-] as const;
-
-// Deriva la columna-fórmula "REFERENCIA EN SIS (no modificar)".
-export function clasificacionSis(hospital: string, referenciaSis: boolean): ClasificacionSisReferido {
-  if (hospital === "DoctorSV") return "DR SV";
-  if (hospital === "HN San Rafael") return referenciaSis ? "HNSR CON REF SIS" : "HNSR SIN REF SIS";
-  return referenciaSis ? "OTROS HOSP CON REF SIS" : "OTROS HOSP SIN REF SIS";
-}
+// Los establecimientos (de dónde llega y a dónde se refiere) y la clasificación
+// "REFERENCIA EN SIS" viven en lib/emergencia/establecimientosCenso.ts.
 
 // ── Dispositivos de oxígeno al ingreso (referidos) ───────────────────────────
 

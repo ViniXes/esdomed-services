@@ -20,6 +20,7 @@ import {
   DESTINO_LABEL, TRIAGE_LABEL, TURNO_LABEL, medicosGeneralesLista, procedimientosUnificados,
 } from "@/lib/emergencia/censos";
 import { EstadoRegistroBadge } from "@/components/emergencia/censoUi";
+import { nombreEstablecimiento } from "@/lib/emergencia/establecimientosCenso";
 import { BOTON_PRIMARIO, pad } from "@/components/emergencia/censoSecciones";
 
 type TabCenso = "demanda" | "referido";
@@ -165,7 +166,7 @@ export default function ConsultaCensosPage() {
           "IMPRESION DIAGNOSTICA": dxCelda(r.diagnosticos) === "—" ? "" : dxCelda(r.diagnosticos),
           "ESPECIALIDAD": (r.especialidad ?? "").toUpperCase(),
           "TRAE REFERENCIA": r.traeReferencia ? "Sí" : "No",
-          "LUGAR DE REFERENCIA": r.lugarReferencia ?? "",
+          "LUGAR DE REFERENCIA": nombreEstablecimiento(r.lugarReferencia),
           "DESTINO DE PACIENTE": r.destino ? DESTINO_LABEL[r.destino] : "",
           "SERVICIO A INGRESAR": r.servicioIngresar ?? "",
           // Convención del libro: si evaluó un médico general, la columna de
@@ -174,7 +175,7 @@ export default function ConsultaCensosPage() {
           "REEVALUACION MEDICA": r.reevaluacion || "NO APLICA",
           "VENTILACION MECANICA": r.ventilacionMecanica ? "Sí" : "No",
           "MEDICO GENERAL QUE ASISTE EN LA ATENCION": generalesCelda(r),
-          "CENTRO DE SALUD AL QUE REFIERE": r.centroRefiere ?? "",
+          "CENTRO DE SALUD AL QUE REFIERE": nombreEstablecimiento(r.centroRefiere),
           "CONSULTA NUEVAMENTE EN < 48H": siNo(r.consulta48h),
           "ASEGURADO ISSS": siNo(r.aseguradoIsss),
           "EMPLEADO DE HES": siNo(r.empleadoHes),
@@ -190,7 +191,7 @@ export default function ConsultaCensosPage() {
           "REGISTRO": r.expediente,
           "EDAD": r.edad ?? "",
           "SEXO": r.genero === "masculino" ? "Masculino" : r.genero === "femenino" ? "Femenino" : "",
-          "HOSPITAL DE REFERENCIA": r.hospitalReferencia ?? "",
+          "HOSPITAL DE REFERENCIA": nombreEstablecimiento(r.hospitalReferencia),
           "REFERENCIA EN SIS": r.clasificacionSis ?? "",
           "CONDICION PACIENTE": r.condicion === "estable" ? "Estable" : r.condicion === "inestable" ? "Inestable" : "",
           "DISPOSITIVO DE OXIGENO AL INGRESO": (r.dispositivoO2 ?? "No").toUpperCase(),
@@ -388,7 +389,7 @@ export default function ConsultaCensosPage() {
                     <td className={tdCls}><CeldaLarga texto={dxCelda(r.diagnosticos)} /></td>
                     <td className={tdCls}>{(r.especialidad || "—").toUpperCase()}</td>
                     <td className={tdCls}>{siNo(r.traeReferencia)}</td>
-                    <td className={tdCls}><CeldaLarga texto={r.lugarReferencia || "—"} ancho="max-w-[160px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={nombreEstablecimiento(r.lugarReferencia) || "—"} ancho="max-w-[160px]" /></td>
                     <td className={tdCls}>{r.destino ? DESTINO_LABEL[r.destino] : "—"}</td>
                     <td className={tdCls}><CeldaLarga texto={r.servicioIngresar || "—"} ancho="max-w-[200px]" /></td>
                     {/* Convención del libro: si evaluó un médico general, la columna
@@ -397,7 +398,7 @@ export default function ConsultaCensosPage() {
                     <td className={tdCls}><CeldaLarga texto={r.reevaluacion || "NO APLICA"} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}>{siNo(r.ventilacionMecanica)}</td>
                     <td className={tdCls}><CeldaLarga texto={generalesCelda(r) || "—"} ancho="max-w-[200px]" /></td>
-                    <td className={tdCls}><CeldaLarga texto={r.centroRefiere || "—"} ancho="max-w-[180px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={nombreEstablecimiento(r.centroRefiere) || "—"} ancho="max-w-[180px]" /></td>
                     <td className={tdCls}>{siNo(r.consulta48h)}</td>
                     <td className={tdCls}>{siNo(r.aseguradoIsss)}</td>
                     <td className={tdCls}>{siNo(r.empleadoHes)}</td>
@@ -443,7 +444,7 @@ export default function ConsultaCensosPage() {
                     <td className={`${tdCls} font-mono font-semibold`}>{r.expediente}</td>
                     <td className={tdCls}>{r.edad ?? "—"}</td>
                     <td className={tdCls}>{generoMF(r.genero)}</td>
-                    <td className={tdCls}><CeldaLarga texto={r.hospitalReferencia || "—"} ancho="max-w-[180px]" /></td>
+                    <td className={tdCls}><CeldaLarga texto={nombreEstablecimiento(r.hospitalReferencia) || "—"} ancho="max-w-[180px]" /></td>
                     <td className={`${tdCls} font-mono`}>{r.clasificacionSis ?? "—"}</td>
                     <td className={tdCls}>{r.condicion === "inestable" ? "INESTABLE" : r.condicion === "estable" ? "ESTABLE" : "—"}</td>
                     <td className={tdCls}>{r.dispositivoO2 || "—"}</td>

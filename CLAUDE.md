@@ -175,6 +175,12 @@ Los censos digitados sin pasar por la cola (`controlIngresoId` nulo) quedan fuer
 
 La cola de expedientes vigila en vivo solo los censos de ayer y hoy; en la pestaña Histórico el estado de censo de las filas se lee una vez al buscar con `censosDeAtenciones()` (`controlIngresoId` "in" de a 30). Así se puede registrar el censo de una atención de hace días. Si esa lectura falla, el botón se muestra igual, porque el formulario abre el censo que ya exista y `guardarCenso()` impide el duplicado.
 
+### Establecimientos en los censos de emergencia
+
+"Lugar de la referencia" y "Centro de salud al que refiere" (demanda espontánea) y "Hospital de referencia" (referidos) usan `BuscadorEstablecimiento`. Arriba van los frecuentes con nombre corto (`ESTABLECIMIENTOS_FRECUENTES` en `src/lib/emergencia/establecimientosCenso.ts`, cada uno con su código SIMMOW), con **DoctorSV siempre primero**: no es hospital ni unidad de salud, pero el usuario lo necesita. Al escribir aparece el catálogo completo de SIMMOW (`establecimientosSimmow.json`: UCSF, ISSS, privados…), sin el propio HES. Un frecuente se guarda con su nombre corto y no se repite desde SIMMOW; lo demás se guarda con el nombre de SIMMOW tal cual.
+
+Reglas: para mostrar, contar o comparar se usa `nombreEstablecimiento()`, que lleva los nombres largos o viejos al corto (el tablero agrupa con `agruparEstablecimientos()` y `clasificacionSis()` compara así). No renombrar un frecuente, porque partiría el tablero; otra forma de escribirlo va en su `alias`. Prueba: `node scripts/test-establecimientos-censo.mjs` (verifica los códigos contra SIMMOW).
+
 ### Consulta Externa — subsistema con turnero (en construcción)
 
 `/consulta-externa` es un **subsistema** como Mi horario: layout y menú propios (`src/lib/navConsultaExterna.ts`, acordeón) y "Volver al panel" fijo al pie del Sidebar (prop `regreso`). Se entra desde Pacientes → Consulta Externa en el panel de ESDOMED. El circuito es: ESDOMED carga la "Programación de citas por día" del SIS (.xls) y cada cita recibe un código con prefijo de especialidad (HE-12). La llegada de **primera vez** se marca en la recepción de ESDOMED y la de **subsecuente**, en la estación de su especialidad. La enfermera llama al paciente **directo al consultorio** de su médico; la agenda sugiere el orden, pero ella elige. La **preconsulta no pasa por el sistema**: se coordina de palabra con enfermería (decisión del usuario).
