@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { entraConsultaExterna } from "@/lib/accesoConsultaExterna";
+import { veLaPantallaCE } from "@/lib/accesoConsultaExterna";
 import { PantallaLlamados } from "@/components/consultaExterna/PantallaLlamados";
 
 // Pantalla de llamados a pantalla completa (fuera del layout con menú).
@@ -11,7 +11,8 @@ import { PantallaLlamados } from "@/components/consultaExterna/PantallaLlamados"
 export default function PantallaLlamadosPage() {
   const { profile, loading } = useAuth();
   const router = useRouter();
-  const permitido = entraConsultaExterna(profile);
+  // También la cuenta de pantalla (pantalla_ce), que no entra a nada más.
+  const permitido = veLaPantallaCE(profile);
   const [demo, setDemo] = useState<boolean | null>(null);
 
   useEffect(() => {

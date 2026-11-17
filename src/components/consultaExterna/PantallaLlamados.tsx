@@ -16,6 +16,7 @@ import {
 import { aplicarPronunciacion, type ReglaPronunciacion } from "@/lib/consultaExterna/pronunciacion";
 import { escucharPronunciacion } from "@/lib/consultaExterna/pronunciacionDatos";
 import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
+import { useAuth } from "@/contexts/AuthContext";
 import { agregarLlamado, destinoEstacion, MAX_LLAMADOS_PANTALLA, tituloLlamado, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
 import type { EstacionCEId } from "@/lib/consultaExterna/especialidades";
 import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
@@ -57,6 +58,7 @@ function horaCorta(ms: number) {
 }
 
 export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
+  const { profile, logout } = useAuth();
   const [ahora, setAhora] = useState<number | null>(null);
   const [fecha, setFecha] = useState(() => hoyLocalISO());
   const [llamados, setLlamados] = useState<LlamadoPantalla[]>([]);
@@ -378,6 +380,17 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
           <p className="mt-3 text-xs text-cyan-50/60">
             Si un nombre se oye en inglés, agréguelo al diccionario de pronunciación en Consulta Externa → Pantallas.
           </p>
+          {/* Para saber con qué cuenta quedó la TV (debe ser la de pantalla, no una personal). */}
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-xs text-cyan-50/60">
+            <span className="min-w-0 truncate">Sesión: {profile?.nombre ?? "—"}</span>
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="flex-shrink-0 rounded px-1.5 py-1 font-medium text-cyan-50/70 underline-offset-2 hover:text-white hover:underline"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       )}
 

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { rutaVetada } from "@/lib/navRegistro";
-import { entraConsultaExterna } from "@/lib/accesoConsultaExterna";
+import { entraConsultaExterna, esCuentaPantalla, RUTA_PANTALLA_CE } from "@/lib/accesoConsultaExterna";
 import {
   ENTRADAS_CONSULTA_EXTERNA,
   navItemsConsultaExterna,
@@ -25,9 +25,10 @@ export default function ConsultaExternaLayout({ children }: { children: React.Re
 
   useEffect(() => {
     if (loading) return;
-    if (!permitido) router.replace("/login");
+    if (esCuentaPantalla(profile)) router.replace(RUTA_PANTALLA_CE);
+    else if (!permitido) router.replace("/login");
     else if (vetada) router.replace("/consulta-externa");
-  }, [loading, permitido, vetada, router]);
+  }, [loading, permitido, vetada, profile, router]);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">

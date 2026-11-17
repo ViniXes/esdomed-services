@@ -35,12 +35,16 @@ export function TerminosGate() {
   }, [user?.uid]);
 
   const yaAcepto = profile?.terminosAceptados?.version === TERMINOS_VERSION;
+  // La cuenta de una pantalla de llamados no es una persona ni opera el
+  // sistema: si se le pidieran los términos, la TV quedaría bloqueada.
+  const exenta = profile?.role === "pantalla_ce";
 
   const debeMostrar =
     !loading &&
     !!user &&
     !!profile &&
     !yaAcepto &&
+    !exenta &&
     !aceptadoEnSesion &&
     pathname !== "/login";
 

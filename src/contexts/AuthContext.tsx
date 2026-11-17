@@ -65,8 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // entre pestañas vía localStorage: si otra pestaña sigue activa, una pestaña en
   // segundo plano no cierra la sesión. Al expirar, deja una marca para que /login
   // muestre el aviso y luego hace signOut.
+  // La cuenta de una pantalla de llamados (pantalla_ce) no se cierra: nadie
+  // toca la TV y solo puede leer los llamados del día.
+  const sinCierrePorInactividad = profile?.role === "pantalla_ce";
   useEffect(() => {
-    if (!user) return;
+    if (!user || sinCierrePorInactividad) return;
 
     const LIMITE_MS = 2 * 60 * 60 * 1000; // 2 horas
     const KEY_ACTIVIDAD = "esdomed:last_activity";
@@ -115,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(timeoutId);
       eventos.forEach(e => window.removeEventListener(e, registrarActividad));
     };
-  }, [user]);
+  }, [user, sinCierrePorInactividad]);
 
   // Acepta correo (lleva "@") o username. Si es username, lo traduce a correo en el
   // servidor antes de autenticar. Cualquier fallo se reporta como credenciales

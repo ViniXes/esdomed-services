@@ -51,6 +51,10 @@ service cloud.firestore {
     function estacionCE() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.get('estacionCE', '');
     }
+    // Computadora de una TV de Consulta Externa: queda sesionada en la sala de
+    // espera, así que solo lee los llamados del día (lo mismo que muestra la
+    // TV). Se excluye de lo que se abre a "cualquier usuario real".
+    function isPantallaCE() { return isAuth() && getRole() == 'pantalla_ce'; }
     // Sesión real (no anónima). El formulario público de transporte usa sesiones
     // anónimas: NO deben poder leer datos internos del portal.
     function isRealUser() {
@@ -82,8 +86,9 @@ service cloud.firestore {
     // selects de personal y para que las reglas lean el rol).
     match /usuarios/{userId} {
       // Sesiones anónimas: solo pueden intentar leer su propio doc (no existe),
-      // necesario para que el AuthContext resuelva "sin perfil" sin error.
-      allow read:   if isRealUser() || (isAuth() && uid() == userId);
+      // necesario para que el AuthContext resuelva "sin perfil" sin error. La
+      // cuenta de una pantalla de llamados (TV) solo lee el suyo.
+      allow read:   if (isAuth() && uid() == userId) || (isRealUser() && !isPantallaCE());
       allow create: if isAdmin();
       // El admin puede actualizar cualquier campo. Además, cada usuario puede
       // registrar SOLO su propia aceptación de términos (generales y/o los
@@ -580,7 +585,7 @@ service cloud.firestore {
                   && nuevo.censoNoAplica.porUid == uid()
                   && nuevo.censoNoAplica.en == request.time));
       }
-      allow read:   if isRealUser();
+      allow read:   if isRealUser() && !isPantallaCE();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin() || (isMedico() && soloMarcaNoAplicaCenso());
       allow delete: if isAdmin();
@@ -623,8 +628,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     // Últimos llamados del día: lo único que escuchan las pantallas (1 documento).
+    // La cuenta de pantalla (TV) solo lee.
     match /consulta_externa_llamados/{fecha} {
-      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna();
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna() || isPantallaCE();
       allow create, update: if isEsdomed() || isAdmin() || isConsultaExterna();
       allow delete: if isAdmin();
     }

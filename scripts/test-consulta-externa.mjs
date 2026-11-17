@@ -247,6 +247,16 @@ assert.equal(lista[0].id, "l10");
 assert.equal(lista.filter((l) => l.citaId === "c5").length, 1);
 assert.equal(quitarLlamadosDeCita(lista, "c5").some((l) => l.citaId === "c5"), false);
 
+// ── Quién abre la pantalla de llamados ──
+const acceso = cargar("../accesoConsultaExterna");
+const conRol = (role) => ({ role });
+assert.ok(acceso.veLaPantallaCE(conRol("pantalla_ce")), "la cuenta de la TV abre la pantalla");
+assert.equal(acceso.entraConsultaExterna(conRol("pantalla_ce")), false, "pero no el resto del subsistema");
+assert.ok(acceso.veLaPantallaCE(conRol("consulta_externa")));
+assert.ok(acceso.veLaPantallaCE(conRol("admin")));
+assert.equal(acceso.veLaPantallaCE(conRol("medico")), false);
+assert.equal(acceso.veLaPantallaCE(null), false);
+
 // ── Búsqueda para marcar llegada ──
 const { coincideCita } = cargar("busqueda");
 const ana = { codigo: "CA-07", expediente: "11431-26", dui: "00440933-7", paciente: "López Gonzales, María Pilar" };

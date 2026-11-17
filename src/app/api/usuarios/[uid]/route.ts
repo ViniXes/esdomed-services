@@ -25,6 +25,7 @@ const VALID_ROLES = new Set<UserRole>([
   "isbm_supervisor",
   "isbm_jefe",
   "consulta_externa",
+  "pantalla_ce",
 ]);
 
 function esPersonalEsdomed(role: string | undefined) {
