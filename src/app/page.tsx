@@ -19,6 +19,7 @@ export default function Home() {
     else if (profile?.role === "transporte" || profile?.role === "motorista") router.replace("/transporte");
     else if (profile?.role === "isbm_tecnico" || profile?.role === "isbm_supervisor" || profile?.role === "isbm_jefe") router.replace("/isbm");
     else if (profile?.role === "consulta_externa") router.replace("/consulta-externa");
+    else if (profile?.role === "agenda_ce") router.replace("/consulta-externa/citas-2027");
     else if (profile?.role === "pantalla_ce") router.replace("/consulta-externa/pantalla");
     else if (profile) router.replace("/dashboard");
     // Sesión sin perfil (anónima del formulario público de transporte): al login.

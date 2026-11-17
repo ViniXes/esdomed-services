@@ -255,6 +255,7 @@ assert.equal(acceso.entraConsultaExterna(conRol("pantalla_ce")), false, "pero no
 assert.ok(acceso.veLaPantallaCE(conRol("consulta_externa")));
 assert.ok(acceso.veLaPantallaCE(conRol("admin")));
 assert.equal(acceso.veLaPantallaCE(conRol("medico")), false);
+assert.equal(acceso.veLaPantallaCE(conRol("agenda_ce")), false, "agenda_ce no lee los llamados");
 assert.equal(acceso.veLaPantallaCE(null), false);
 
 // ── Búsqueda para marcar llegada ──

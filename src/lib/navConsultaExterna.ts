@@ -1,9 +1,9 @@
-import { CalendarDays, FileUp, LayoutDashboard, ListOrdered, Megaphone, Tv, UserPlus } from "lucide-react";
+import { CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
 import { construirMenu, type EntradaNav, type SeccionNav } from "@/lib/navRegistro";
-import { esCuentaEstacion, gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
+import { esAgendaCE, esCuentaEstacion, gestionaConsultaExterna, registraCitas2027, veLlamadosCE } from "@/lib/accesoConsultaExterna";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -16,7 +16,8 @@ type Perfil = UserProfile | null | undefined;
 
 export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
   {
-    entradas: [{ href: "/consulta-externa", label: "Inicio", icon: LayoutDashboard, exact: true }],
+    // agenda_ce solo ve la pestaña de citas 2027.
+    entradas: [{ href: "/consulta-externa", label: "Inicio", icon: LayoutDashboard, exact: true, visibleSi: (p) => !esAgendaCE(p) }],
   },
   {
     titulo: "Agenda del día",
@@ -28,8 +29,14 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     ],
   },
   {
+    // Una sola pantalla: formulario arriba y lista abajo, como Control de ingresos.
+    // El catálogo de agendas se abre desde un botón de esa pantalla (solo gestión).
+    entradas: [{ href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 }],
+  },
+  {
     titulo: "Llamados",
     icon: Megaphone,
+    visibleSi: veLlamadosCE,
     entradas: [
       { href: "/consulta-externa/estacion", label: "Estación de especialidad", icon: ListOrdered },
       { href: "/consulta-externa/pantallas", label: "Pantallas de llamados", icon: Tv, visibleSi: gestionaConsultaExterna },
@@ -50,6 +57,6 @@ export function navItemsConsultaExterna(profile: Perfil): NavItem[] {
 
 /** Salida al panel principal; la cuenta de estación no tiene otro panel. */
 export function regresoConsultaExterna(profile: Perfil): { href: string; label: string } | undefined {
-  if (!profile || esCuentaEstacion(profile)) return undefined;
+  if (!profile || esCuentaEstacion(profile) || esAgendaCE(profile)) return undefined;
   return { href: "/dashboard", label: "Volver al panel" };
 }

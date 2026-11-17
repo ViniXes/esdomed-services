@@ -21,17 +21,29 @@ export const esCuentaEstacion = (p: Perfil) => p?.role === "consulta_externa";
 
 export const esCuentaPantalla = (p: Perfil) => p?.role === "pantalla_ce";
 
+/** Personal que por ahora solo registra las citas 2027 (rol agenda_ce). Su único portal es este. */
+export const esAgendaCE = (p: Perfil) => p?.role === "agenda_ce";
+
 const esEsdomed = (p: Perfil) => p?.role === "esdomed" || p?.role === "asistente_esdomed";
 const esAdmin = (p: Perfil) => p?.role === "admin";
 
 /** Carga de citas, recepción de primera vez y configuración de pantallas. */
 export const gestionaConsultaExterna = (p: Perfil) => esAdmin(p) || (!EN_CONSTRUCCION && esEsdomed(p));
 
+/** Registra citas 2027 (sin editar el catálogo de agendas, que es de gestión). */
+export const registraCitas2027 = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
+
+/** Llamados: estación de especialidad y pantallas. */
+export const veLlamadosCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p);
+
 /** Puede entrar al subsistema (también decide si ve la entrada en el panel de ESDOMED). */
-export const entraConsultaExterna = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p);
+export const entraConsultaExterna = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p) || esAgendaCE(p);
 
-/** Puede abrir la pantalla de llamados (/consulta-externa/pantalla). */
-export const veLaPantallaCE = (p: Perfil) => entraConsultaExterna(p) || esCuentaPantalla(p);
+/**
+ * Puede abrir la pantalla de llamados (/consulta-externa/pantalla). Sin
+ * agenda_ce: las reglas no le dejan leer los llamados.
+ */
+export const veLaPantallaCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p) || esCuentaPantalla(p);
 
-/** Adónde va al entrar al sistema. */
+/** Adónde va la cuenta de pantalla al entrar al sistema. */
 export const RUTA_PANTALLA_CE = "/consulta-externa/pantalla";
