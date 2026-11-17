@@ -18,8 +18,11 @@ import { COL_CITAS_CE } from "./agendaDatos";
 import {
   agregarLlamado,
   aplicarAccion,
+  destinoEstacion,
   ETIQUETA_ESTADO,
-  nombreConsultorio,
+  idLlamadoManual,
+  limpiarExpediente,
+  nombreParaLlamado,
   normalizarEstado,
   quitarLlamadosDeCita,
   type AccionCE,
@@ -85,8 +88,8 @@ export class AccionNoAplica extends Error {
 /**
  * Aplica una acción de la estación (o de la recepción) a una cita. Va en una
  * transacción: verifica el estado actual, así dos computadoras no llaman dos
- * veces al mismo paciente, y si es un llamado lo publica (con el consultorio
- * de su médico como destino) en el documento de las pantallas en el mismo paso.
+ * veces al mismo paciente, y si es un llamado lo publica (expediente, nombre y
+ * su estación como destino) en el documento de las pantallas en el mismo paso.
  */
 export async function ejecutarAccion(
   citaId: string,
@@ -145,8 +148,9 @@ export async function ejecutarAccion(
       const nuevo: LlamadoPantalla = {
         id: `${citaId}#${ahora}`,
         citaId,
-        codigo: cita.codigo,
-        destino: nombreConsultorio(cita.consultorio, cita.especialidadId),
+        paciente: nombreParaLlamado(cita.paciente),
+        expediente: cita.expediente,
+        destino: destinoEstacion(cita.estacionId),
         estacionId: cita.estacionId,
         enMs: ahora,
       };
@@ -159,5 +163,63 @@ export async function ejecutarAccion(
       // Llamado por error: sale de la lista de las pantallas.
       tx.set(refLlamados, { ultimos: quitarLlamadosDeCita(ultimos, citaId), actualizadoEn: serverTimestamp() }, { merge: true });
     }
+  });
+}
+
+// ─── Llamado manual ─────────────────────────────────────────────────────────
+
+export interface DatosLlamadoManual {
+  expediente: string;
+  paciente: string;
+  estacionId: EstacionCEId;
+}
+
+/** Lee la lista de la pantalla del día y la reemplaza con lo que devuelva `cambiar`. */
+async function cambiarLlamados(
+  fechaISO: string,
+  cambiar: (ultimos: LlamadoPantalla[]) => LlamadoPantalla[] | null,
+): Promise<void> {
+  const ref = doc(db, COL_LLAMADOS_CE, fechaISO);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const ultimos: LlamadoPantalla[] = snap.exists() ? ((snap.data() as LlamadosCE).ultimos ?? []) : [];
+    const nuevos = cambiar(ultimos);
+    if (nuevos) tx.set(ref, { fecha: fechaISO, ultimos: nuevos, actualizadoEn: serverTimestamp() }, { merge: true });
+  });
+}
+
+/**
+ * Llamado que la enfermera escribe a mano (expediente y nombre): un
+ * paciente que no está en la agenda del día, o un día sin agenda cargada. Solo
+ * toca el documento de las pantallas; no hay cita que mover. Volver a llamar
+ * al mismo expediente reemplaza su entrada en la lista.
+ */
+export async function publicarLlamadoManual(
+  fechaISO: string,
+  datos: DatosLlamadoManual,
+  porNombre: string,
+): Promise<LlamadoPantalla> {
+  const ahora = Date.now();
+  const citaId = idLlamadoManual(datos.estacionId, datos.expediente);
+  const nuevo: LlamadoPantalla = {
+    id: `${citaId}#${ahora}`,
+    citaId,
+    paciente: nombreParaLlamado(datos.paciente),
+    expediente: limpiarExpediente(datos.expediente),
+    destino: destinoEstacion(datos.estacionId),
+    estacionId: datos.estacionId,
+    enMs: ahora,
+    manual: true,
+    porNombre,
+  };
+  await cambiarLlamados(fechaISO, (ultimos) => agregarLlamado(ultimos, nuevo));
+  return nuevo;
+}
+
+/** Saca de las pantallas un llamado manual (p. ej. el nombre se escribió mal). */
+export async function quitarLlamadoDePantalla(fechaISO: string, citaId: string): Promise<void> {
+  await cambiarLlamados(fechaISO, (ultimos) => {
+    const quedan = quitarLlamadosDeCita(ultimos, citaId);
+    return quedan.length === ultimos.length ? null : quedan;
   });
 }

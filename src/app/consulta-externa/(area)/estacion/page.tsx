@@ -9,11 +9,15 @@ import { ESTACIONES_CE, especialidadesDeEstacion, estacionPorId, esEstacionCE, t
 import { AccionNoAplica, ejecutarAccion, escucharCitasEstacion } from "@/lib/consultaExterna/estacionDatos";
 import { aplicarAccion, type AccionCE, type EstadoCitaCE } from "@/lib/consultaExterna/circuito";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
-import { EstacionVista } from "@/components/consultaExterna/EstacionVista";
+import { BuscadorLlegada, EstacionVista } from "@/components/consultaExterna/EstacionVista";
+import { LlamadoManual } from "@/components/consultaExterna/LlamadoManual";
 import { PedirQuienAtiende, useQuienAtiende } from "@/components/consultaExterna/QuienAtiende";
 
 // Estación de enfermería de una especialidad. La cuenta de estación ve la suya;
 // ESDOMED y admin eligen cuál ver (y pueden operar en ella, p. ej. para probar).
+// Arriba van "Marcar llegada" (citas de la agenda) y "Llamar escribiendo los
+// datos" (paciente fuera de la agenda); este último funciona aunque no haya
+// agenda cargada.
 
 const CLAVE_ESTACION = "ce:estacion-elegida";
 
@@ -131,6 +135,7 @@ export default function EstacionEspecialidadPage() {
   const especialidades = estacionId ? especialidadesDeEstacion(estacionId) : [];
   const citasVista = citas?.map((c) => (optimistas[c.id] ? { ...c, estado: optimistas[c.id] } : c)) ?? null;
   const recien = recienId ? citasVista?.find((c) => c.id === recienId) ?? null : null;
+  const hayCitas = !errorCarga && !!citasVista?.length;
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
@@ -183,6 +188,21 @@ export default function EstacionEspecialidadPage() {
         </div>
       )}
 
+      {estacionId && (
+        // El llamado manual queda siempre en la misma posición: así no pierde
+        // lo escrito cuando terminan de llegar las citas.
+        <div className={`grid items-start gap-4 ${hayCitas ? "lg:grid-cols-2" : ""}`}>
+          {hayCitas && citasVista && <BuscadorLlegada citas={citasVista} ocupadas={ocupadas} onAccion={accion} />}
+          <LlamadoManual
+            key={estacionId}
+            fechaISO={hoy}
+            estacionId={estacionId}
+            citas={citas ?? []}
+            porNombre={nombreQuien || profile?.nombre || ""}
+          />
+        </div>
+      )}
+
       {errorCarga ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{errorCarga}</p>
       ) : citas === null ? (
@@ -191,7 +211,8 @@ export default function EstacionEspecialidadPage() {
         </div>
       ) : citas.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-          No hay citas cargadas hoy para esta estación. ESDOMED carga la agenda del día desde el SIS.
+          No hay citas cargadas hoy para esta estación (ESDOMED carga la agenda del día desde el SIS). Mientras tanto puede llamar
+          escribiendo el expediente y el nombre.
         </p>
       ) : estacion && citasVista ? (
         <EstacionVista

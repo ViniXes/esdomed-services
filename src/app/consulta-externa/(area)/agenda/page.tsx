@@ -11,8 +11,9 @@ import { ESPECIALIDADES_CE, estacionPorId } from "@/lib/consultaExterna/especial
 import type { AgendaCE } from "@/lib/consultaExterna/tipos";
 
 // Carga diaria de la "Programación de citas por día" del SIS. Se lee en el
-// navegador, se muestra un resumen y al guardar cada cita recibe su código de
-// llamado. Lecturas: 1 (resumen del día) + 1 por cita al guardar.
+// navegador, se muestra un resumen y al guardar cada cita recibe su número
+// interno (orden de la cola; ya no se anuncia: se llama por expediente y
+// nombre). Lecturas: 1 (resumen del día) + 1 por cita al guardar.
 
 async function leerLibro(file: File): Promise<unknown[][][]> {
   const XLSX = await import("xlsx");
@@ -142,7 +143,7 @@ export default function CargarCitasPage() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Cargar citas del SIS</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Programación de citas por día · cada cita recibe su código de llamado</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Programación de citas por día · cada cita queda en la cola de su médico</p>
         </div>
       </div>
 
@@ -293,8 +294,8 @@ function VistaPrevia({
 
       {existente && (
         <Aviso>
-          Este día ya tiene <strong>{existente.totalCitas} citas</strong> cargadas. Solo se agregarán las que falten, con los
-          códigos siguientes; las ya cargadas conservan su código.
+          Este día ya tiene <strong>{existente.totalCitas} citas</strong> cargadas. Solo se agregarán las que falten; las ya
+          cargadas no cambian.
         </Aviso>
       )}
       {carga.noReconocidas.length > 0 && (
@@ -382,7 +383,7 @@ function VistaPrevia({
   );
 }
 
-// ─── Resultado: códigos asignados ───────────────────────────────────────────
+// ─── Resultado: citas cargadas ──────────────────────────────────────────────
 
 function ResultadoCarga({
   resultado, onOtra,
@@ -407,7 +408,7 @@ function ResultadoCarga({
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {fechaLarga(fechaISO)}
-              {yaCargadas ? ` · ${yaCargadas} ya estaban cargadas y conservan su código` : ""}
+              {yaCargadas ? ` · ${yaCargadas} ya estaban cargadas` : ""}
             </p>
           </div>
         </div>
@@ -430,7 +431,6 @@ function ResultadoCarga({
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800/60">
                 <tr>
-                  <th className={th}>Código</th>
                   <th className={th}>Franja</th>
                   <th className={th}>Expediente</th>
                   <th className={th}>Paciente</th>
@@ -442,9 +442,8 @@ function ResultadoCarga({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {citas.map((c: CitaNumerada) => (
                   <tr key={c.codigo}>
-                    <td className={`${td} font-mono font-bold text-blue-700 dark:text-cyan-300`}>{c.codigo}</td>
                     <td className={`${td} tabular-nums whitespace-nowrap`}>{c.franjaInicio}–{c.franjaFin}</td>
-                    <td className={`${td} tabular-nums`}>{c.expediente}</td>
+                    <td className={`${td} font-mono font-bold text-blue-700 dark:text-cyan-300`}>{c.expediente}</td>
                     <td className={td}>{c.paciente}</td>
                     <td className={td}>
                       {c.primeraVez ? (

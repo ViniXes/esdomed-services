@@ -14,7 +14,7 @@ const PASOS = [
     icon: FileUp,
     titulo: "Carga de citas",
     quien: "ESDOMED",
-    texto: "Se sube la Programación de citas por día del SIS y cada cita recibe su código (p. ej. HE-12).",
+    texto: "Se sube la Programación de citas por día del SIS y cada cita queda en la cola de su médico.",
   },
   {
     icon: DoorOpen,
@@ -24,9 +24,9 @@ const PASOS = [
   },
   {
     icon: Stethoscope,
-    titulo: "Llamado al consultorio",
+    titulo: "Llamado a la estación",
     quien: "Enfermera de la estación",
-    texto: "Lo llama directo al consultorio de su médico; la pantalla muestra el código y lo anuncia por voz. Ella decide el orden; la agenda sugiere.",
+    texto: "La pantalla lo llama por expediente y nombre a la estación, y de ahí pasa al consultorio. Ella decide el orden; la agenda sugiere. Quien no está en la agenda se llama escribiendo sus datos.",
   },
 ];
 

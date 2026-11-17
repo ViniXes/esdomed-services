@@ -14,10 +14,12 @@ import {
 import { buscarCitas } from "@/lib/consultaExterna/busqueda";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
 
-// Pantalla de trabajo de la enfermera de una estación: marca llegadas y llama
-// a cada paciente directo al consultorio de su médico (la preconsulta se
-// coordina de palabra). Solo presenta: los datos y las acciones los pone la
-// página, así se puede probar sin Firestore.
+// Pantalla de trabajo de la enfermera de una estación: las colas por médico.
+// La enfermera llama a cada paciente a su estación (la pantalla dice expediente
+// y nombre) y de ahí lo pasa al consultorio de su médico; la preconsulta se
+// coordina de palabra. Solo presenta: los datos y las acciones los pone la
+// página, así se puede probar sin Firestore. El buscador de llegada
+// (BuscadorLlegada) lo monta la página, junto al llamado manual.
 
 const llegadaMs = (c: CitaCEConId) => c.llegadaEn?.toMillis?.() ?? null;
 const ordenCola = (a: CitaCEConId, b: CitaCEConId) =>
@@ -77,16 +79,17 @@ export function EstacionVista({ citas, ocupadas, ahoraMs, recienLlegada, onAccio
 
   return (
     <div className="space-y-5">
-      <BuscadorLlegada citas={citas} ocupadas={ocupadas} onAccion={onAccion} />
-
       {recienLlegada && (
         <div className="flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 dark:border-emerald-900 dark:bg-emerald-950/40">
           <CheckCircle2 size={24} className="flex-shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-emerald-800 dark:text-emerald-200">
-              Llegó <strong>{recienLlegada.paciente}</strong>. Dígale su código:
+          <div className="min-w-0 flex-1 text-sm text-emerald-800 dark:text-emerald-200">
+            <p>
+              Llegó <strong>{recienLlegada.paciente}</strong> · Exp. <span className="font-mono font-semibold">{recienLlegada.expediente}</span>
             </p>
-            <p className="font-mono text-3xl font-extrabold tracking-tight text-emerald-900 dark:text-emerald-100">{recienLlegada.codigo}</p>
+            <p className="mt-0.5">
+              Quedó en la cola de <strong>{recienLlegada.medico}</strong>. Pídale que esté atento a la pantalla: lo llamarán por
+              su expediente y nombre.
+            </p>
           </div>
           <button type="button" onClick={onCerrarRecien} className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/50" aria-label="Cerrar aviso">
             <X size={18} />
@@ -189,11 +192,10 @@ function TarjetaCita({
       }`}
     >
       <div className="flex items-start gap-3">
-        <p className="w-16 flex-shrink-0 font-mono text-lg font-extrabold leading-tight text-blue-700 dark:text-cyan-300">{c.codigo}</p>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{c.paciente}</p>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Exp. {c.expediente} · Cita {c.franjaInicio}
+            Exp. <span className="font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.expediente}</span> · Cita {c.franjaInicio}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {sugerida && (
@@ -256,7 +258,7 @@ function FilaSimple({
 }) {
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
-      <span className="w-14 flex-shrink-0 font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.codigo}</span>
+      <span className="w-20 flex-shrink-0 font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.expediente}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-slate-800 dark:text-slate-100">{c.paciente}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -286,7 +288,7 @@ function Desplegable({ titulo, abierto, children }: { titulo: string; abierto?: 
   );
 }
 
-/** Buscar por código, expediente, DUI o nombre y marcar la llegada. */
+/** Buscar por expediente, DUI o nombre (acepta también el código interno) y marcar la llegada. */
 export function BuscadorLlegada({
   citas, ocupadas, onAccion, mostrarEspecialidad,
 }: {
@@ -306,7 +308,7 @@ export function BuscadorLlegada({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Código, expediente, DUI o nombre"
+          placeholder="Expediente, DUI o nombre"
           className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-10 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
         />
         {q && (
@@ -322,11 +324,11 @@ export function BuscadorLlegada({
           ) : (
             resultados.map((c) => (
               <li key={c.id} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="w-14 flex-shrink-0 font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.codigo}</span>
+                <span className="w-20 flex-shrink-0 font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.expediente}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{c.paciente}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Exp. {c.expediente} · Cita {c.franjaInicio}
+                    Cita {c.franjaInicio}
                     {mostrarEspecialidad ? ` · ${c.especialidad}` : ` · ${c.medico}`}
                     {c.primeraVez ? " · Primera vez" : ""}
                   </p>

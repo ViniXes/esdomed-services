@@ -173,6 +173,30 @@ assert.equal(nombreConsultorio("Hematologia - 12"), "Consultorio 12 de Hematolog
 assert.equal(nombreConsultorio("Sala B"), "Consultorio Sala B");
 assert.equal(nombreConsultorio("Cirugia Torax - 1"), "Consultorio 1 de Cirugía de Tórax");
 
+// ── Llamado por expediente y nombre, a la estación (desde 2026-11-17) ──
+const { nombreParaLlamado, limpiarExpediente, idLlamadoManual, destinoEstacion, tituloLlamado } = cargar("circuito");
+assert.equal(nombreParaLlamado("López Gonzales, María Pilar"), "María Pilar López Gonzales", "el SIS escribe Apellidos, Nombres");
+assert.equal(nombreParaLlamado("DE LEÓN MARTÍNEZ, JOSÉ ANTONIO"), "José Antonio de León Martínez", "mayúsculas → nombre propio");
+assert.equal(nombreParaLlamado("  ana   maría  pérez "), "Ana María Pérez", "escrito a mano en minúsculas");
+assert.equal(nombreParaLlamado("Ana María Pérez"), "Ana María Pérez", "lo que ya viene bien no se toca");
+assert.equal(nombreParaLlamado("María José McDonald"), "María José McDonald", "caja mixta se respeta");
+assert.equal(nombreParaLlamado("RUIZ-LÓPEZ, ANA"), "Ana Ruiz-López", "apellido compuesto con guion");
+assert.equal(nombreParaLlamado(nombreParaLlamado("PÉREZ, JUAN")), "Juan Pérez", "idempotente");
+assert.equal(limpiarExpediente(" 11431 - 26 "), "11431-26");
+assert.equal(idLlamadoManual("cardiologia", "11431 -26"), "manual:cardiologia:11431-26");
+assert.equal(destinoEstacion("cardiologia"), "Estación Cardiología");
+assert.equal(destinoEstacion("infectologia"), "Estación Infectología");
+assert.equal(tituloLlamado({ paciente: "Ana Pérez", codigo: "CA-01" }), "Ana Pérez");
+assert.equal(tituloLlamado({ codigo: "CA-01" }), "CA-01", "llamados anteriores: el código");
+
+const { textoLlamado } = cargar("voz");
+assert.equal(
+  textoLlamado({ expediente: "11431-26", paciente: "María Pilar López Gonzales", destino: "Estación Hematología" }),
+  "Expediente 11431 guion 26, María Pilar López Gonzales. Acercarse a estación Hematología.",
+);
+assert.equal(textoLlamado({ paciente: "Ana Pérez", destino: "Estación Cardiología" }), "Ana Pérez. Acercarse a estación Cardiología.");
+assert.equal(textoLlamado({ codigo: "HE-12", destino: "Consultorio 4 de Hematología" }), "Turno H E 12. Acercarse a consultorio 4 de Hematología.");
+
 // Lista de la pantalla: lo nuevo arriba, un "volver a llamar" no se duplica, máximo 8.
 const ll = (id, citaId) => ({ id, citaId, codigo: citaId, destino: "x", estacionId: "cardiologia", enMs: 0 });
 let lista = [];

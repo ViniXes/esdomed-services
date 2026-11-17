@@ -11,7 +11,7 @@ import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
 import { BuscadorLlegada } from "@/components/consultaExterna/EstacionVista";
 
 // Recepción de ESDOMED: el paciente de primera vez se presenta aquí; se marca
-// su llegada y se le da su código y la estación a la que debe ir. Lee las
+// su llegada y se le indica la estación a la que debe ir. Lee las
 // citas del día una vez (botón Actualizar), no en vivo.
 
 export default function RecepcionPrimeraVezPage() {
@@ -73,7 +73,7 @@ export default function RecepcionPrimeraVezPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-heading">Recepción primera vez</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Marque la llegada y entregue al paciente su código</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Marque la llegada e indique al paciente a qué estación pasar</p>
           </div>
         </div>
         <button
@@ -111,11 +111,11 @@ export default function RecepcionPrimeraVezPage() {
               <CheckCircle2 size={24} className="flex-shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-emerald-800 dark:text-emerald-200">
-                  Llegó <strong>{recien.paciente}</strong>. Su código es
+                  Llegó <strong>{recien.paciente}</strong> · Exp. <span className="font-mono font-semibold">{recien.expediente}</span>
                 </p>
-                <p className="font-mono text-3xl font-extrabold tracking-tight text-emerald-900 dark:text-emerald-100">{recien.codigo}</p>
                 <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
-                  Indíquele que pase a la <strong>estación de {estacionPorId(recien.estacionId)?.nombre}</strong>.
+                  Indíquele que pase a la <strong>estación de {estacionPorId(recien.estacionId)?.nombre}</strong>: ahí lo llamarán por su
+                  expediente y nombre.
                 </p>
               </div>
               <button type="button" onClick={() => setRecien(null)} className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/50" aria-label="Cerrar aviso">
@@ -134,11 +134,11 @@ export default function RecepcionPrimeraVezPage() {
               <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                 {primeraVez.map((c) => (
                   <li key={c.id} className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="w-14 flex-shrink-0 font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.codigo}</span>
+                    <span className="w-20 flex-shrink-0 font-mono text-sm font-bold text-blue-700 dark:text-cyan-300">{c.expediente}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{c.paciente}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Exp. {c.expediente} · {c.especialidad} · Cita {c.franjaInicio} · {c.medico}
+                        {c.especialidad} · Cita {c.franjaInicio} · {c.medico}
                       </p>
                     </div>
                     {c.estado === "citado" ? (

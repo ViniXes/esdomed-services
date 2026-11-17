@@ -8,13 +8,14 @@
 //                       │                   │ No respondió
 //                       └──Regresó── no_respondio
 //
-// La enfermera llama al paciente directo al consultorio de su médico. La
-// preconsulta (signos vitales) se coordina de palabra con enfermería y no pasa
-// por el sistema (decisión del usuario, 2026-11-13). "Volver a llamar" repite
-// el llamado (y el anuncio) sin cambiar de estado. La cola solo sugiere el
-// orden: la enfermera elige a quién llamar.
+// La enfermera llama al paciente a su estación por expediente y nombre; de
+// ahí lo pasa al consultorio de su médico (desde el 2026-11-17 la pantalla ya
+// no anuncia el consultorio, decisión del usuario). La preconsulta (signos
+// vitales) se coordina de palabra con enfermería y no pasa por el sistema
+// (2026-11-13). "Volver a llamar" repite el llamado (y el anuncio) sin cambiar
+// de estado. La cola solo sugiere el orden: la enfermera elige a quién llamar.
 
-import { especialidadPorId, resolverEspecialidad, type EstacionCEId } from "./especialidades";
+import { especialidadPorId, estacionPorId, resolverEspecialidad, type EstacionCEId } from "./especialidades";
 
 export type EstadoCitaCE = "citado" | "espera" | "llamado" | "atendido" | "no_respondio";
 
@@ -31,7 +32,7 @@ export type AccionCE =
 export const ETIQUETA_ACCION: Record<AccionCE, string> = {
   llego: "Llegó",
   quitar_llegada: "Quitar llegada",
-  llamar: "Llamar a consultorio",
+  llamar: "Llamar",
   volver_a_llamar: "Volver a llamar",
   paso_a_consulta: "Pasó a consulta",
   no_respondio: "No respondió",
@@ -42,7 +43,7 @@ export const ETIQUETA_ACCION: Record<AccionCE, string> = {
 export const ETIQUETA_ESTADO: Record<EstadoCitaCE, string> = {
   citado: "Citado",
   espera: "En espera",
-  llamado: "Llamado a consultorio",
+  llamado: "Llamado",
   atendido: "Pasó a consulta",
   no_respondio: "No respondió",
 };
@@ -142,16 +143,34 @@ export function nombreConsultorio(consultorio: string, especialidadId?: string):
 }
 
 // ─── Documento de llamados (lo que escuchan las pantallas) ──────────────────
+//
+// Desde el 2026-11-17 se llama por expediente y nombre, a la estación de
+// enfermería (decisión del usuario); antes, por código ("HE-12", para no
+// mostrar nombres) y al consultorio. Los llamados anteriores solo traen
+// `codigo` y la pantalla los sigue mostrando así.
 
 export interface LlamadoPantalla {
   /** Identifica cada anuncio; un "Volver a llamar" genera uno nuevo. */
   id: string;
+  /**
+   * Agrupa los llamados de una misma persona: el id de su cita, o
+   * idLlamadoManual() si la enfermera escribió los datos a mano.
+   */
   citaId: string;
-  codigo: string;
+  /** En orden natural, listo para mostrar y leer (ver nombreParaLlamado). */
+  paciente?: string;
+  expediente?: string;
+  /** Solo en los llamados anteriores al 2026-11-17. */
+  codigo?: string;
+  /** "Estación Cardiología" (ver destinoEstacion); antes, el consultorio. */
   destino: string;
   estacionId: EstacionCEId;
   /** Milisegundos (Date.now()); en un arreglo no cabe serverTimestamp. */
   enMs: number;
+  /** Escrito a mano en la estación: paciente que no está en la agenda del día. */
+  manual?: boolean;
+  /** Quién lo escribió (solo en los manuales, que no tienen cita con historial). */
+  porNombre?: string;
 }
 
 export const MAX_LLAMADOS_PANTALLA = 8;
@@ -171,4 +190,60 @@ export function agregarLlamado(
 /** Quita de la pantalla los llamados de una cita (al devolverla a la espera por error). */
 export function quitarLlamadosDeCita(ultimos: LlamadoPantalla[], citaId: string): LlamadoPantalla[] {
   return ultimos.filter((l) => l.citaId !== citaId);
+}
+
+// ─── Nombre y expediente para el llamado ────────────────────────────────────
+
+/** Partículas que van en minúscula dentro de un nombre ("José de León"). */
+const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y", "e", "vda.", "viuda"]);
+
+const mayusculaInicial = (palabra: string) =>
+  palabra.replace(/(^|[-'’])([a-záéíóúüñ])/g, (_, sep: string, letra: string) => sep + letra.toUpperCase());
+
+/**
+ * Nombre como se muestra y se lee en la pantalla. El SIS lo escribe
+ * "Apellidos, Nombres"; aquí va en orden natural ("María Pilar López
+ * Gonzales"). Si viene todo en mayúsculas (o todo en minúsculas) se pasa a
+ * nombre propio: se lee mejor de lejos y la voz no deletrea palabras cortas
+ * como si fueran siglas.
+ */
+export function nombreParaLlamado(nombre: string): string {
+  let n = String(nombre ?? "").replace(/\s+/g, " ").trim();
+  const coma = n.indexOf(",");
+  if (coma >= 0) {
+    const apellidos = n.slice(0, coma).trim();
+    const nombres = n.slice(coma + 1).replace(/,/g, " ").replace(/\s+/g, " ").trim();
+    n = [nombres, apellidos].filter(Boolean).join(" ");
+  }
+  if (n === n.toUpperCase() || n === n.toLowerCase()) {
+    n = n
+      .toLowerCase()
+      .split(" ")
+      .map((p, i) => (i > 0 && PARTICULAS.has(p) ? p : mayusculaInicial(p)))
+      .join(" ");
+  }
+  return n;
+}
+
+/** Expediente escrito a mano, sin espacios: " 11431 - 26 " → "11431-26". */
+export function limpiarExpediente(expediente: string): string {
+  return String(expediente ?? "").replace(/\s+/g, "").toUpperCase();
+}
+
+/**
+ * citaId de un llamado manual. Volver a llamar al mismo expediente desde la
+ * misma estación reemplaza su entrada en la pantalla en vez de repetirla.
+ */
+export function idLlamadoManual(estacionId: EstacionCEId, expediente: string): string {
+  return `manual:${estacionId}:${limpiarExpediente(expediente)}`;
+}
+
+/** Destino de todo llamado: la estación de enfermería que llama ("Estación Cardiología"). */
+export function destinoEstacion(estacionId: EstacionCEId): string {
+  return `Estación ${estacionPorId(estacionId)?.nombre ?? estacionId}`;
+}
+
+/** Lo que la pantalla muestra en grande: el nombre, o el código en los llamados anteriores. */
+export function tituloLlamado(l: Pick<LlamadoPantalla, "paciente" | "codigo">): string {
+  return l.paciente || l.codigo || "";
 }

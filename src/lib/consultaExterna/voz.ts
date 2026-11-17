@@ -60,14 +60,24 @@ export function esperarVoces(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]> 
   });
 }
 
+const minusculaInicial = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
 /**
- * Texto que se lee: las letras del código separadas para que se deletreen
- * ("HE-12" → "H E 12": "hache, e, doce") y el destino tal cual.
+ * Texto que se lee (pedido del usuario, 2026-11-17): expediente, nombre y la
+ * estación, sin consultorio. "Expediente 11431 guion 26, María Pilar López
+ * Gonzales. Acercarse a estación Cardiología." El guion se dice, para que el
+ * número no se lea como una resta. Los llamados anteriores solo traen código:
+ * sus letras se separan para que se deletreen ("HE-12" → "hache, e, doce").
  */
-export function textoLlamado(codigo: string, destino: string): string {
-  const [letras = "", numero = ""] = codigo.split("-");
+export function textoLlamado(l: { paciente?: string; expediente?: string; codigo?: string; destino: string }): string {
+  const destino = `Acercarse a ${minusculaInicial(String(l.destino ?? "").trim())}.`;
+  if (l.paciente) {
+    const expediente = l.expediente ? `Expediente ${l.expediente.replace(/-/g, " guion ")}, ` : "";
+    return `${expediente}${l.paciente}. ${destino}`;
+  }
+  const [letras = "", numero = ""] = String(l.codigo ?? "").split("-");
   const deletreo = letras.split("").join(" ");
-  return `Turno ${deletreo} ${Number(numero) || numero}. Pase a ${destino}.`;
+  return `Turno ${deletreo} ${Number(numero) || numero}. ${destino}`;
 }
 
 // Un solo AudioContext para toda la página: crearlo y cerrarlo en cada llamado

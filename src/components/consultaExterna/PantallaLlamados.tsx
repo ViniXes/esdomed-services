@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Megaphone, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { alCambiarVoces, anunciarLlamado, esperarVoces, prepararSonido, textoLlamado } from "@/lib/consultaExterna/voz";
 import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
-import { agregarLlamado, MAX_LLAMADOS_PANTALLA, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
+import { agregarLlamado, destinoEstacion, MAX_LLAMADOS_PANTALLA, tituloLlamado, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
+import type { EstacionCEId } from "@/lib/consultaExterna/especialidades";
 import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 
 // Pantalla de llamados (TV de la sala de espera). La página que la monta va
@@ -13,18 +14,24 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // Es un letrero: usa el degradado institucional de los heros y se ve igual en
 // modo claro y oscuro.
 //
+// Cada llamado muestra expediente y nombre del paciente y la estación a la que
+// debe acercarse (decisión del usuario, 2026-11-17; antes era un código y el
+// consultorio, para no mostrar nombres). Los llamados anteriores, que solo
+// traen código, se siguen viendo con su código.
+//
 // Escucha un solo documento (consulta_externa_llamados/{hoy}) y anuncia solo
 // los llamados nuevos. La voz se activa por equipo (queda en este navegador):
 // dos pantallas que se oyen desde el mismo lugar harían eco. Con ?demo=1 no
 // lee Firestore y ofrece "Simular llamado" para probar el diseño y la voz.
 
-const EJEMPLOS: { codigo: string; destino: string }[] = [
-  { codigo: "HE-12", destino: "Consultorio 2 de Hematología" },
-  { codigo: "CA-07", destino: "Consultorio 3 de Cardiología" },
-  { codigo: "IN-04", destino: "Consultorio 1 de Infectología" },
-  { codigo: "ON-09", destino: "Consultorio 1 de Oncología" },
-  { codigo: "HE-03", destino: "Consultorio 4 de Hematología" },
-  { codigo: "CV-02", destino: "Consultorio 1 de Cirugía Cardiovascular" },
+// Datos inventados, solo para el modo de prueba.
+const EJEMPLOS: { expediente: string; paciente: string; estacionId: EstacionCEId }[] = [
+  { expediente: "11431-26", paciente: "María Pilar López Gonzales", estacionId: "hematologia" },
+  { expediente: "2087-19", paciente: "José Antonio Martínez de León", estacionId: "cardiologia" },
+  { expediente: "45210-24", paciente: "Ana Gabriela Rivas Hernández", estacionId: "infectologia" },
+  { expediente: "907-21", paciente: "Carlos Ernesto Pineda Flores", estacionId: "oncologia" },
+  { expediente: "33018-25", paciente: "Rosa Elena Cruz Ventura", estacionId: "hematologia" },
+  { expediente: "1502-26", paciente: "Juan Francisco Alvarado Mejía", estacionId: "cardiologia" },
 ];
 
 const CLAVE_VOZ = "ce:pantalla:voz";
@@ -78,7 +85,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
 
   const anunciarEnCola = (l: LlamadoPantalla) => {
     if (!hablar.current) return;
-    cola.current = cola.current.then(() => anunciarLlamado(textoLlamado(l.codigo, l.destino), vozRef.current));
+    cola.current = cola.current.then(() => anunciarLlamado(textoLlamado(l), vozRef.current));
   };
 
   const destellar = () => {
@@ -120,7 +127,15 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     const ejemplo = EJEMPLOS[siguiente.current % EJEMPLOS.length];
     siguiente.current += 1;
     const ms = Date.now();
-    const nuevo: LlamadoPantalla = { id: `demo-${ms}`, citaId: `demo-${ejemplo.codigo}`, codigo: ejemplo.codigo, destino: ejemplo.destino, estacionId: "cardiologia", enMs: ms };
+    const nuevo: LlamadoPantalla = {
+      id: `demo-${ms}`,
+      citaId: `demo-${ejemplo.expediente}`,
+      expediente: ejemplo.expediente,
+      paciente: ejemplo.paciente,
+      destino: destinoEstacion(ejemplo.estacionId),
+      estacionId: ejemplo.estacionId,
+      enMs: ms,
+    };
     setLlamados((prev) => agregarLlamado(prev, nuevo, MAX_LLAMADOS_PANTALLA));
     destellar();
     anunciarEnCola(nuevo);
@@ -173,11 +188,21 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
         >
           {actual ? (
             <>
-              <p className="text-[clamp(1rem,1.6vw,2rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">Turno</p>
-              <p className="font-heading text-[clamp(5rem,13vw,16rem)] font-extrabold leading-none tracking-tight tabular-nums">
-                {actual.codigo}
+              <p className="text-[clamp(1rem,1.6vw,2rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">
+                {actual.expediente ? "Expediente" : "Turno"}
               </p>
-              <p className="mt-[3vh] max-w-[90%] text-[clamp(1.5rem,3.2vw,4rem)] font-semibold leading-tight">{actual.destino}</p>
+              {actual.expediente && (
+                <p className="font-heading text-[clamp(2.5rem,5.5vw,7rem)] font-bold leading-none tracking-tight">
+                  {actual.expediente}
+                </p>
+              )}
+              <p className="mt-[2.5vh] line-clamp-3 max-w-[92%] font-heading text-[clamp(2.5rem,5.6vw,7.5rem)] font-extrabold leading-[1.05] tracking-tight [text-wrap:balance]">
+                {tituloLlamado(actual)}
+              </p>
+              <div className="mt-[4vh] rounded-[1.2vw] bg-white/10 px-[2.5vw] py-[1.6vh]">
+                <p className="text-[clamp(0.9rem,1.3vw,1.6rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">Acercarse a</p>
+                <p className="font-heading text-[clamp(1.6rem,3.2vw,4rem)] font-bold leading-tight">{actual.destino}</p>
+              </div>
             </>
           ) : (
             <>
@@ -199,12 +224,17 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
               </li>
             ) : (
               anteriores.slice(0, 6).map((l) => (
-                <li key={l.id} className="flex items-center justify-between gap-4 rounded-[1vw] bg-white/[0.07] px-[1.5vw] py-[1.6vh]">
-                  <span className="font-heading text-[clamp(1.5rem,2.6vw,3rem)] font-bold tabular-nums">{l.codigo}</span>
-                  <span className="min-w-0 flex-1 text-right text-[clamp(0.9rem,1.3vw,1.6rem)] leading-tight text-cyan-50/85">
+                <li key={l.id} className="flex items-center justify-between gap-4 rounded-[1vw] bg-white/[0.07] px-[1.5vw] py-[1.4vh]">
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 font-heading text-[clamp(1.1rem,1.8vw,2.2rem)] font-bold leading-tight">{tituloLlamado(l)}</p>
+                    {l.expediente && (
+                      <p className="mt-[0.4vh] text-[clamp(0.85rem,1.2vw,1.5rem)] text-cyan-50/80">Exp. {l.expediente}</p>
+                    )}
+                  </div>
+                  <p className="max-w-[45%] flex-shrink-0 text-right text-[clamp(0.85rem,1.2vw,1.5rem)] leading-tight text-cyan-50/85">
                     {l.destino}
                     <span className="block text-[0.8em] text-cyan-100/50">{horaCorta(l.enMs)}</span>
-                  </span>
+                  </p>
                 </li>
               ))
             )}
@@ -213,7 +243,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
       </main>
 
       <footer className="flex items-center justify-between gap-4 border-t border-white/10 px-[3vw] py-[1.6vh]">
-        <p className="text-[clamp(0.9rem,1.3vw,1.6rem)] text-cyan-50/80">Tenga a mano su carné de citas y esté atento a su código.</p>
+        <p className="text-[clamp(0.9rem,1.3vw,1.6rem)] text-cyan-50/80">Tenga a mano su carné de citas y esté atento a su número de expediente y su nombre.</p>
         <div className="flex flex-shrink-0 items-center gap-2">
           {sinConexion && (
             <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
