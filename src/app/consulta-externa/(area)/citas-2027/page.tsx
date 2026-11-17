@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
@@ -40,6 +41,7 @@ import {
 } from "@/lib/consultaExterna/citasProgramadas";
 import {
   anularCitaProgramada,
+  eliminarCitasProgramadas,
   buscarPacientePorExpediente,
   catalogoSemilla,
   citasDeMedicoEnFecha,
@@ -99,6 +101,7 @@ export default function Citas2027Page() {
   );
 
   const editaCatalogo = gestionaConsultaExterna(profile);
+  const esAdmin = profile?.role === "admin";
   const [catalogo, setCatalogo] = useState<CatalogoGuardado | null | undefined>(undefined);
   const [errorCatalogo, setErrorCatalogo] = useState("");
   const [catalogoProvisional, setCatalogoProvisional] = useState(false);
@@ -332,6 +335,22 @@ export default function Citas2027Page() {
       await cargarLista(mes);
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "No se pudo anular la cita.");
+    } finally {
+      setAccionando(false);
+    }
+  };
+
+  const eliminar = async (ids: string[], descripcion: string) => {
+    if (!esAdmin || !ids.length) return;
+    if (!window.confirm(`¿Eliminar ${descripcion}? Se borra para siempre, sin dejar rastro. Para una cita que no va, use Anular.`)) return;
+    setAccionando(true);
+    try {
+      await eliminarCitasProgramadas(ids);
+      setSeleccion(new Set());
+      await cargarLista(mes);
+    } catch (e) {
+      console.error("No se pudieron eliminar las citas", e);
+      window.alert("No se pudieron eliminar las citas. Intente de nuevo.");
     } finally {
       setAccionando(false);
     }
@@ -691,6 +710,17 @@ export default function Citas2027Page() {
             <button type="button" onClick={() => void marcarSis()} disabled={!seleccion.size || accionando} className={`${boton} bg-emerald-600 text-white hover:bg-emerald-700`}>
               <CheckCircle2 size={16} /> Registradas en SIS ({seleccion.size})
             </button>
+            {esAdmin && (
+              <button
+                type="button"
+                onClick={() => void eliminar([...seleccion], `${seleccion.size} cita(s) seleccionada(s)`)}
+                disabled={!seleccion.size || accionando}
+                className={`${boton} bg-rose-600 text-white hover:bg-rose-700`}
+                title="Solo admin: borra para siempre"
+              >
+                <Trash2 size={16} /> Eliminar ({seleccion.size})
+              </button>
+            )}
           </div>
         </div>
 
@@ -769,6 +799,17 @@ export default function Citas2027Page() {
                       ) : (
                         <button type="button" disabled={accionando} onClick={() => void reabrir(c)} className="text-slate-500 hover:text-blue-600" title="Volver a pendiente">
                           <RotateCcw size={16} />
+                        </button>
+                      )}
+                      {esAdmin && (
+                        <button
+                          type="button"
+                          disabled={accionando}
+                          onClick={() => void eliminar([c.id], `la cita de ${c.paciente} (${fechaCorta(c.fecha)})`)}
+                          className="ml-3 text-slate-500 hover:text-rose-600"
+                          title="Eliminar (solo admin)"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       )}
                     </td>

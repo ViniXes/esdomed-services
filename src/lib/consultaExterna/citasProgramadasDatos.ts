@@ -253,3 +253,16 @@ export async function anularCitaProgramada(id: string, motivo: string, usuario: 
     actualizadoEn: serverTimestamp(),
   });
 }
+
+/**
+ * Borra citas para siempre. Solo admin (las reglas lo exigen): es para
+ * deshacer cargas de prueba o una migración. Lo normal es anular, que deja
+ * rastro.
+ */
+export async function eliminarCitasProgramadas(ids: string[]): Promise<void> {
+  for (let i = 0; i < ids.length; i += 400) {
+    const lote = writeBatch(db);
+    for (const id of ids.slice(i, i + 400)) lote.delete(doc(db, COL_CITAS_PROGRAMADAS, id));
+    await lote.commit();
+  }
+}
