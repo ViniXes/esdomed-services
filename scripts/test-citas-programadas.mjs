@@ -112,3 +112,22 @@ assert.deepEqual(grupos[0].citas.map((c) => c.n), [2, 3], "conserva el orden de 
 assert.equal(m.nombrePestana("Cirugía Cardiovascular"), "Cirugía Cardiovascular");
 assert.equal(m.nombrePestana("a/b:c"), "a b c");
 console.log("OK: descargas por especialidad");
+
+// ── Horario opcional y búsqueda en listas ──
+assert.deepEqual(m.validarCita({ ...base, franjaInicio: "", franjaFin: "" }), [], "se puede guardar sin horario");
+assert.ok(m.validarCita({ ...base, franjaInicio: "25:00", franjaFin: "" }).length);
+assert.equal(m.textoFranja("", ""), "Sin horario");
+const ops = [
+  { etiqueta: "Astul Elias Campos Ibarra" },
+  { etiqueta: "Carlos Josue Perez Rivas" },
+  { etiqueta: "Marcial Fidel Cabrera Candray" },
+  { etiqueta: "Ricardo Ernesto Menjivar Castillo" },
+];
+assert.deepEqual(m.filtrarOpciones(ops, "car").map((o) => o.etiqueta), [
+  "Carlos Josue Perez Rivas",
+  "Ricardo Ernesto Menjivar Castillo",
+], "empieza por lo escrito primero; Marcial no contiene 'car'");
+assert.deepEqual(m.filtrarOpciones(ops, "ric cas").map((o) => o.etiqueta), ["Ricardo Ernesto Menjivar Castillo"]);
+assert.equal(m.filtrarOpciones(ops, "").length, 4);
+assert.deepEqual(m.filtrarOpciones([{ etiqueta: "Hematología" }], "hemato").length, 1);
+console.log("OK: horario opcional y búsqueda");
