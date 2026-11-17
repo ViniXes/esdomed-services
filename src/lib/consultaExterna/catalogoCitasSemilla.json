@@ -1,0 +1,1874 @@
+{
+ "fuente": "agendas_redistribuidas_ACTUALIZADO_13-10-2026.xlsx (citas del 01/10 al 23/12/2026; franjas con 3 o más sesiones)",
+ "medicos": [
+  {
+   "id": "astul_elias_campos_ibarra",
+   "nombre": "Astul Elias Campos Ibarra",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 1",
+   "activo": true
+  },
+  {
+   "id": "carlos_josue_perez_rivas",
+   "nombre": "Carlos Josue Perez Rivas",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 6",
+   "activo": true
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle",
+   "nombre": "Clara Esperanza Hernandez De Valle",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 4",
+   "activo": true
+  },
+  {
+   "id": "jessica_mirella_mercedes",
+   "nombre": "Jessica Mirella Mercedes",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 3",
+   "activo": true
+  },
+  {
+   "id": "luis_ramon_colato_garcia",
+   "nombre": "Luis Ramon Colato Garcia",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 6",
+   "activo": true
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray",
+   "nombre": "Marcial Fidel Cabrera Candray",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 2",
+   "activo": true
+  },
+  {
+   "id": "ricardo_ernesto_menjivar_castillo",
+   "nombre": "Ricardo Ernesto Menjivar Castillo",
+   "especialidad": "Cardiología",
+   "consultorioFijo": "Cardiología - 5",
+   "activo": true
+  },
+  {
+   "id": "elenilson_mauricio_mejia_melgar",
+   "nombre": "Elenilson Mauricio Mejia Melgar",
+   "especialidad": "Cirugía Cardiovascular",
+   "consultorioFijo": "Cirugía Cardiovascular - 1",
+   "activo": true
+  },
+  {
+   "id": "francisco_guillermo_antonio_rodriguez_funes",
+   "nombre": "Francisco Guillermo Antonio Rodriguez Funes",
+   "especialidad": "Cirugía Cardiovascular",
+   "consultorioFijo": "Cirugía Cardiovascular - 1",
+   "activo": true
+  },
+  {
+   "id": "ricardo_jose_argueta_cruz",
+   "nombre": "Ricardo Jose Argueta Cruz",
+   "especialidad": "Cirugía de Tórax",
+   "consultorioFijo": "Cirugía de Tórax - 1",
+   "activo": true
+  },
+  {
+   "id": "cecilia_vanessa_cantizzano_blandon",
+   "nombre": "Cecilia Vanessa Cantizzano Blandon",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 2",
+   "activo": true
+  },
+  {
+   "id": "jose_hector_valencia_morales",
+   "nombre": "Jose Hector Valencia Morales",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 4",
+   "activo": true
+  },
+  {
+   "id": "juan_donato_milla_rivera",
+   "nombre": "Juan Donato Milla Rivera",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 5",
+   "activo": true
+  },
+  {
+   "id": "maritza_martinez_miranda",
+   "nombre": "Maritza Martinez Miranda",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 2",
+   "activo": true
+  },
+  {
+   "id": "marta_griselda_lima_valencia",
+   "nombre": "Marta Griselda Lima Valencia",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 5",
+   "activo": true
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez",
+   "nombre": "Rafael Eduardo Orellana Martinez",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 5",
+   "activo": true
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo",
+   "nombre": "Ricardo Ernesto Franco Castillo",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 3",
+   "activo": true
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez",
+   "nombre": "Sonia Elizabeth Alfaro Lopez",
+   "especialidad": "Hematología",
+   "consultorioFijo": "Hematología - 1",
+   "activo": true
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez",
+   "nombre": "Alvaro Enrique Sandoval Vilchez",
+   "especialidad": "Infectología",
+   "consultorioFijo": "Infectología - 2",
+   "activo": true
+  },
+  {
+   "id": "beatriz_eugenia_solorzano_de_gomez",
+   "nombre": "Beatriz Eugenia Solorzano De Gomez",
+   "especialidad": "Infectología",
+   "consultorioFijo": "Infectología - 1",
+   "activo": true
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman",
+   "nombre": "Gustavo Antonio Molina Guzman",
+   "especialidad": "Infectología",
+   "consultorioFijo": "Infectología - 1",
+   "activo": true
+  },
+  {
+   "id": "rolando_alberto_cedillos_ortiz",
+   "nombre": "Rolando Alberto Cedillos Ortiz",
+   "especialidad": "Infectología",
+   "consultorioFijo": "Infectología - 2",
+   "activo": true
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez",
+   "nombre": "Alvaro Ernesto Palacios Martinez",
+   "especialidad": "Oncología",
+   "consultorioFijo": "Oncología - 1",
+   "activo": true
+  },
+  {
+   "id": "edwin_jair_lopez_vasquez",
+   "nombre": "Edwin Jair Lopez Vasquez",
+   "especialidad": "Oncología",
+   "consultorioFijo": "Oncología - 2",
+   "activo": true
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio",
+   "nombre": "Efrain De Jesus Orellana Rubio",
+   "especialidad": "Oncología",
+   "consultorioFijo": "Oncología - 1",
+   "activo": true
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero",
+   "nombre": "Leandro Jeovany Rodriguez Marinero",
+   "especialidad": "Oncología",
+   "consultorioFijo": "Oncología - 2",
+   "activo": true
+  },
+  {
+   "id": "luis_fernando_chicas_garcia",
+   "nombre": "Luis Fernando Chicas Garcia",
+   "especialidad": "Oncología",
+   "consultorioFijo": "Oncología - 2",
+   "activo": true
+  },
+  {
+   "id": "teresa_de_jesus_quijada_franco",
+   "nombre": "Teresa De Jesus Quijada Franco",
+   "especialidad": "Oncología",
+   "consultorioFijo": "Oncología - 2",
+   "activo": true
+  }
+ ],
+ "consultorios": [
+  {
+   "nombre": "Cardiología - 1",
+   "especialidad": "Cardiología",
+   "activo": true
+  },
+  {
+   "nombre": "Cardiología - 2",
+   "especialidad": "Cardiología",
+   "activo": true
+  },
+  {
+   "nombre": "Cardiología - 3",
+   "especialidad": "Cardiología",
+   "activo": true
+  },
+  {
+   "nombre": "Cardiología - 4",
+   "especialidad": "Cardiología",
+   "activo": true
+  },
+  {
+   "nombre": "Cardiología - 5",
+   "especialidad": "Cardiología",
+   "activo": true
+  },
+  {
+   "nombre": "Cardiología - 6",
+   "especialidad": "Cardiología",
+   "activo": true
+  },
+  {
+   "nombre": "Cirugía Cardiovascular - 1",
+   "especialidad": "Cirugía Cardiovascular",
+   "activo": true
+  },
+  {
+   "nombre": "Cirugía de Tórax - 1",
+   "especialidad": "Cirugía de Tórax",
+   "activo": true
+  },
+  {
+   "nombre": "Hematología - 1",
+   "especialidad": "Hematología",
+   "activo": true
+  },
+  {
+   "nombre": "Hematología - 2",
+   "especialidad": "Hematología",
+   "activo": true
+  },
+  {
+   "nombre": "Hematología - 3",
+   "especialidad": "Hematología",
+   "activo": true
+  },
+  {
+   "nombre": "Hematología - 4",
+   "especialidad": "Hematología",
+   "activo": true
+  },
+  {
+   "nombre": "Hematología - 5",
+   "especialidad": "Hematología",
+   "activo": true
+  },
+  {
+   "nombre": "Infectología - 1",
+   "especialidad": "Infectología",
+   "activo": true
+  },
+  {
+   "nombre": "Infectología - 2",
+   "especialidad": "Infectología",
+   "activo": true
+  },
+  {
+   "nombre": "Oncología - 1",
+   "especialidad": "Oncología",
+   "activo": true
+  },
+  {
+   "nombre": "Oncología - 2",
+   "especialidad": "Oncología",
+   "activo": true
+  }
+ ],
+ "franjas": [
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_lunes_0900",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "lunes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_lunes_1000",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_martes_0900",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_martes_1000",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "martes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_miercoles_0900",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_miercoles_1000",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "miercoles",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_jueves_0900",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_jueves_1000",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "jueves",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_viernes_0900",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_enrique_sandoval_vilchez_viernes_1000",
+   "medicoId": "alvaro_enrique_sandoval_vilchez",
+   "dia": "viernes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_lunes_0700",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "lunes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_lunes_0800",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "lunes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_martes_0700",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "martes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_martes_0800",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_miercoles_0700",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "miercoles",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_miercoles_0800",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_jueves_0700",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "jueves",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_jueves_0800",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "jueves",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "alvaro_ernesto_palacios_martinez_viernes_0700",
+   "medicoId": "alvaro_ernesto_palacios_martinez",
+   "dia": "viernes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_lunes_0900",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "lunes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_lunes_1000",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_lunes_1100",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "lunes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_martes_0800",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_martes_0900",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_martes_1000",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "martes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_martes_1100",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "martes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_miercoles_0800",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_miercoles_0900",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_miercoles_1000",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "miercoles",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_miercoles_1100",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "miercoles",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_jueves_0800",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "jueves",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_jueves_0900",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_jueves_1000",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "jueves",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_jueves_1100",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "jueves",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_viernes_0800",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "viernes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_viernes_0900",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_viernes_1000",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "viernes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "astul_elias_campos_ibarra_viernes_1100",
+   "medicoId": "astul_elias_campos_ibarra",
+   "dia": "viernes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 1"
+  },
+  {
+   "id": "beatriz_eugenia_solorzano_de_gomez_jueves_0900",
+   "medicoId": "beatriz_eugenia_solorzano_de_gomez",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 1,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "beatriz_eugenia_solorzano_de_gomez_viernes_0900",
+   "medicoId": "beatriz_eugenia_solorzano_de_gomez",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 2,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "cecilia_vanessa_cantizzano_blandon_jueves_0900",
+   "medicoId": "cecilia_vanessa_cantizzano_blandon",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 1,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "cecilia_vanessa_cantizzano_blandon_viernes_0900",
+   "medicoId": "cecilia_vanessa_cantizzano_blandon",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 1,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle_martes_0800",
+   "medicoId": "clara_esperanza_hernandez_de_valle",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 4"
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle_martes_0900",
+   "medicoId": "clara_esperanza_hernandez_de_valle",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 4"
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle_miercoles_0800",
+   "medicoId": "clara_esperanza_hernandez_de_valle",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 4"
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle_miercoles_0900",
+   "medicoId": "clara_esperanza_hernandez_de_valle",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 4"
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle_jueves_0800",
+   "medicoId": "clara_esperanza_hernandez_de_valle",
+   "dia": "jueves",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 4"
+  },
+  {
+   "id": "clara_esperanza_hernandez_de_valle_jueves_0900",
+   "medicoId": "clara_esperanza_hernandez_de_valle",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 4"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_lunes_0900",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "lunes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_lunes_1000",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_martes_0900",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_martes_1000",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "martes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_miercoles_0900",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_miercoles_1000",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "miercoles",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_jueves_0900",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_jueves_1000",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "jueves",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_viernes_0900",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "efrain_de_jesus_orellana_rubio_viernes_1000",
+   "medicoId": "efrain_de_jesus_orellana_rubio",
+   "dia": "viernes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 1"
+  },
+  {
+   "id": "elenilson_mauricio_mejia_melgar_lunes_1000",
+   "medicoId": "elenilson_mauricio_mejia_melgar",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Cirugía Cardiovascular - 1"
+  },
+  {
+   "id": "elenilson_mauricio_mejia_melgar_lunes_1100",
+   "medicoId": "elenilson_mauricio_mejia_melgar",
+   "dia": "lunes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Cirugía Cardiovascular - 1"
+  },
+  {
+   "id": "francisco_guillermo_antonio_rodriguez_funes_miercoles_0730",
+   "medicoId": "francisco_guillermo_antonio_rodriguez_funes",
+   "dia": "miercoles",
+   "inicio": "07:30",
+   "fin": "08:30",
+   "cupo": 4,
+   "consultorio": "Cirugía Cardiovascular - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_lunes_0700",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "lunes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_lunes_0800",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "lunes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_martes_0700",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "martes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_martes_0800",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_miercoles_0700",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "miercoles",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_miercoles_0800",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_jueves_0700",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "jueves",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_jueves_0800",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "jueves",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_viernes_0700",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "viernes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "gustavo_antonio_molina_guzman_viernes_0800",
+   "medicoId": "gustavo_antonio_molina_guzman",
+   "dia": "viernes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 1"
+  },
+  {
+   "id": "jessica_mirella_mercedes_lunes_0800",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "lunes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 9,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_lunes_0900",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "lunes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_martes_0800",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 12,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_martes_0900",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_miercoles_0800",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 9,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_miercoles_0900",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_viernes_0800",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "viernes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 12,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jessica_mirella_mercedes_viernes_0900",
+   "medicoId": "jessica_mirella_mercedes",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Cardiología - 3"
+  },
+  {
+   "id": "jose_hector_valencia_morales_lunes_0800",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "lunes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_lunes_0900",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "lunes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_martes_0800",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_martes_0900",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_miercoles_0800",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_miercoles_0900",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_jueves_0800",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "jueves",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_jueves_0900",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_viernes_0800",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "viernes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "jose_hector_valencia_morales_viernes_0900",
+   "medicoId": "jose_hector_valencia_morales",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 4"
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero_lunes_1300",
+   "medicoId": "leandro_jeovany_rodriguez_marinero",
+   "dia": "lunes",
+   "inicio": "13:00",
+   "fin": "14:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero_lunes_1400",
+   "medicoId": "leandro_jeovany_rodriguez_marinero",
+   "dia": "lunes",
+   "inicio": "14:00",
+   "fin": "15:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero_miercoles_1300",
+   "medicoId": "leandro_jeovany_rodriguez_marinero",
+   "dia": "miercoles",
+   "inicio": "13:00",
+   "fin": "14:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero_miercoles_1400",
+   "medicoId": "leandro_jeovany_rodriguez_marinero",
+   "dia": "miercoles",
+   "inicio": "14:00",
+   "fin": "15:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero_viernes_1300",
+   "medicoId": "leandro_jeovany_rodriguez_marinero",
+   "dia": "viernes",
+   "inicio": "13:00",
+   "fin": "14:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "leandro_jeovany_rodriguez_marinero_viernes_1400",
+   "medicoId": "leandro_jeovany_rodriguez_marinero",
+   "dia": "viernes",
+   "inicio": "14:00",
+   "fin": "15:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_lunes_0700",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "lunes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_lunes_0800",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "lunes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_martes_0700",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "martes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_martes_0800",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_miercoles_0700",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "miercoles",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_miercoles_0800",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_jueves_0700",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "jueves",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_jueves_0800",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "jueves",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_viernes_0700",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "viernes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "luis_fernando_chicas_garcia_viernes_0800",
+   "medicoId": "luis_fernando_chicas_garcia",
+   "dia": "viernes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Oncología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_martes_0830",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "martes",
+   "inicio": "08:30",
+   "fin": "09:30",
+   "cupo": 4,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_martes_0930",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "martes",
+   "inicio": "09:30",
+   "fin": "10:30",
+   "cupo": 4,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_martes_1030",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "martes",
+   "inicio": "10:30",
+   "fin": "11:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_martes_1130",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "martes",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_miercoles_0830",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "miercoles",
+   "inicio": "08:30",
+   "fin": "09:30",
+   "cupo": 4,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_miercoles_0930",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "miercoles",
+   "inicio": "09:30",
+   "fin": "10:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_miercoles_1030",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "miercoles",
+   "inicio": "10:30",
+   "fin": "11:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_miercoles_1130",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "miercoles",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_viernes_0830",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "viernes",
+   "inicio": "08:30",
+   "fin": "09:30",
+   "cupo": 4,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_viernes_0930",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "viernes",
+   "inicio": "09:30",
+   "fin": "10:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_viernes_1030",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "viernes",
+   "inicio": "10:30",
+   "fin": "11:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "marcial_fidel_cabrera_candray_viernes_1130",
+   "medicoId": "marcial_fidel_cabrera_candray",
+   "dia": "viernes",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Cardiología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_lunes_0630",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "lunes",
+   "inicio": "06:30",
+   "fin": "07:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_lunes_0730",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "lunes",
+   "inicio": "07:30",
+   "fin": "08:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_martes_0630",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "martes",
+   "inicio": "06:30",
+   "fin": "07:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_martes_0730",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "martes",
+   "inicio": "07:30",
+   "fin": "08:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_miercoles_0630",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "miercoles",
+   "inicio": "06:30",
+   "fin": "07:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_miercoles_0730",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "miercoles",
+   "inicio": "07:30",
+   "fin": "08:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_jueves_0630",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "jueves",
+   "inicio": "06:30",
+   "fin": "07:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_jueves_0730",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "jueves",
+   "inicio": "07:30",
+   "fin": "08:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_viernes_0630",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "viernes",
+   "inicio": "06:30",
+   "fin": "07:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "maritza_martinez_miranda_viernes_0730",
+   "medicoId": "maritza_martinez_miranda",
+   "dia": "viernes",
+   "inicio": "07:30",
+   "fin": "08:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 2"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_lunes_0700",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "lunes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_lunes_0800",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "lunes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_martes_0700",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "martes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_martes_0800",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "martes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_miercoles_0700",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "miercoles",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_miercoles_0800",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "miercoles",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_viernes_0700",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "viernes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "marta_griselda_lima_valencia_viernes_0800",
+   "medicoId": "marta_griselda_lima_valencia",
+   "dia": "viernes",
+   "inicio": "08:00",
+   "fin": "09:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_lunes_1130",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "lunes",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_lunes_1230",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "lunes",
+   "inicio": "12:30",
+   "fin": "13:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_martes_1130",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "martes",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 4,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_martes_1230",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "martes",
+   "inicio": "12:30",
+   "fin": "13:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_miercoles_1130",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "miercoles",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_miercoles_1230",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "miercoles",
+   "inicio": "12:30",
+   "fin": "13:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_jueves_1130",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "jueves",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_jueves_1230",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "jueves",
+   "inicio": "12:30",
+   "fin": "13:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_viernes_1130",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "viernes",
+   "inicio": "11:30",
+   "fin": "12:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "rafael_eduardo_orellana_martinez_viernes_1230",
+   "medicoId": "rafael_eduardo_orellana_martinez",
+   "dia": "viernes",
+   "inicio": "12:30",
+   "fin": "13:30",
+   "cupo": 3,
+   "consultorio": "Hematología - 5"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_lunes_0900",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "lunes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_lunes_1000",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_martes_0900",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "martes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_martes_1000",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "martes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_miercoles_0900",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "miercoles",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_miercoles_1000",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "miercoles",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_jueves_0900",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "jueves",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_jueves_1000",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "jueves",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_viernes_0900",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "viernes",
+   "inicio": "09:00",
+   "fin": "10:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_franco_castillo_viernes_1000",
+   "medicoId": "ricardo_ernesto_franco_castillo",
+   "dia": "viernes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 3"
+  },
+  {
+   "id": "ricardo_ernesto_menjivar_castillo_lunes_1000",
+   "medicoId": "ricardo_ernesto_menjivar_castillo",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 5"
+  },
+  {
+   "id": "ricardo_ernesto_menjivar_castillo_miercoles_1000",
+   "medicoId": "ricardo_ernesto_menjivar_castillo",
+   "dia": "miercoles",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 5"
+  },
+  {
+   "id": "ricardo_ernesto_menjivar_castillo_jueves_1000",
+   "medicoId": "ricardo_ernesto_menjivar_castillo",
+   "dia": "jueves",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 2,
+   "consultorio": "Cardiología - 5"
+  },
+  {
+   "id": "ricardo_ernesto_menjivar_castillo_viernes_1000",
+   "medicoId": "ricardo_ernesto_menjivar_castillo",
+   "dia": "viernes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 3,
+   "consultorio": "Cardiología - 5"
+  },
+  {
+   "id": "ricardo_jose_argueta_cruz_martes_1300",
+   "medicoId": "ricardo_jose_argueta_cruz",
+   "dia": "martes",
+   "inicio": "13:00",
+   "fin": "14:00",
+   "cupo": 3,
+   "consultorio": "Cirugía de Tórax - 1"
+  },
+  {
+   "id": "rolando_alberto_cedillos_ortiz_viernes_0700",
+   "medicoId": "rolando_alberto_cedillos_ortiz",
+   "dia": "viernes",
+   "inicio": "07:00",
+   "fin": "08:00",
+   "cupo": 3,
+   "consultorio": "Infectología - 2"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_lunes_1000",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "lunes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_lunes_1100",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "lunes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_lunes_1200",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "lunes",
+   "inicio": "12:00",
+   "fin": "13:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_martes_1000",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "martes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_martes_1100",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "martes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_martes_1200",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "martes",
+   "inicio": "12:00",
+   "fin": "13:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_miercoles_1000",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "miercoles",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_miercoles_1100",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "miercoles",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_miercoles_1200",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "miercoles",
+   "inicio": "12:00",
+   "fin": "13:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_jueves_1000",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "jueves",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_jueves_1100",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "jueves",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_jueves_1200",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "jueves",
+   "inicio": "12:00",
+   "fin": "13:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_viernes_1000",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "viernes",
+   "inicio": "10:00",
+   "fin": "11:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_viernes_1100",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "viernes",
+   "inicio": "11:00",
+   "fin": "12:00",
+   "cupo": 4,
+   "consultorio": "Hematología - 1"
+  },
+  {
+   "id": "sonia_elizabeth_alfaro_lopez_viernes_1200",
+   "medicoId": "sonia_elizabeth_alfaro_lopez",
+   "dia": "viernes",
+   "inicio": "12:00",
+   "fin": "13:00",
+   "cupo": 3,
+   "consultorio": "Hematología - 1"
+  }
+ ]
+}

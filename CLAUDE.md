@@ -202,6 +202,17 @@ Reglas:
 - **Pantalla.** Escucha solo el documento de llamados y anuncia los ids nuevos; no anuncia lo que ya estaba al abrir ni llamados de más de 2 minutos. La voz se activa por equipo con el botón al pie de la pantalla (también en localStorage). `?demo=1` simula llamados sin Firestore.
 - **Prueba.** `node scripts/test-consulta-externa.mjs [xls-del-SIS]` cubre el lector, el catálogo, la numeración, el circuito y la búsqueda. Con un `.xls` real, además imprime el resumen; no guarda nada.
 
+### Consulta Externa — programación de citas 2027
+
+`/consulta-externa/citas-2027` es donde ESDOMED registra las citas de 2027 mientras el SIS no abre las agendas; cuando se abran, se pasan al SIS desde esa lista (filtro por mes, especialidad, médico y estado, y Excel) y se marcan "Registrada en SIS" en lote. Objetivo del usuario: datos ordenados para que la migración al SIS no cueste, así que **todo lo que irá al SIS sale de listas cerradas** (especialidad, médico, franja y consultorio). Solo se escriben el expediente y, si services no lo conoce, el nombre.
+
+Reglas:
+- **Catálogo.** Un solo documento, `consulta_externa_catalogo/programacion` (médicos, consultorios, franjas semanales con cupo). Se edita en `/consulta-externa/citas-2027/catalogo`. La primera vez se siembra de `src/lib/consultaExterna/catalogoCitasSemilla.json`, que salió del libro *agendas_redistribuidas_ACTUALIZADO_13-10-2026.xlsx* (citas del 01/10 al 23/12/2026; una franja entra si el médico la tuvo 3 o más veces; cupo = máximo observado). Los nombres de médicos y consultorios se escriben **como en el SIS**. El id del médico es el slug del nombre original y no cambia al corregir el nombre.
+- **Citas.** `consulta_externa_citas_programadas/{auto}`, estados `pendiente → registrada_sis`, más `anulada` (con motivo; nunca se borra). Guardan médico, consultorio y franja como texto: cambiar el catálogo no toca citas ya registradas. Un cupo lleno se puede pasar como sobrecupo con confirmación. No se guardan teléfonos.
+- **Paciente.** `buscarPacientePorExpediente()` busca en vivo, en este orden: citas 2027, `consulta_externa_citas` y `personas/{expediente}` (hospitalización). Así, quien se vaya registrando en services aparece solo. Si no está, se escribe "Apellidos, Nombres" a mano y la cita queda con `origenNombre: "manual"`.
+- **Acceso.** El mismo de la gestión de Consulta Externa (`gestionaConsultaExterna`): mientras `EN_CONSTRUCCION`, solo admin. Reglas de Firestore: ESDOMED y admin.
+- **Prueba.** `node scripts/test-citas-programadas.mjs` (fechas, catálogo semilla sin choques de consultorio, cupo, validaciones y orden).
+
 ### Navegación (menú lateral) — registro declarativo
 
 Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:
