@@ -360,3 +360,37 @@ export function filtrarOpciones<T extends { etiqueta: string }>(opciones: T[], c
     .sort((a, b) => a.p - b.p || a.i - b.i)
     .map((x) => x.o);
 }
+
+/**
+ * Lee una fecha escrita a mano en día/mes/año: "18/12/2027", "18-12-27",
+ * "18.12.2027", "18122027" o "18/12" (toma ANIO_PROGRAMACION). Devuelve
+ * "YYYY-MM-DD" o null si no es una fecha real.
+ */
+export function fechaEscritaAISO(texto: string): string | null {
+  const t = texto.trim();
+  let d: number, m: number, a: number;
+  const partes = t.match(/^(\d{1,2})\s*[/.\-\s]\s*(\d{1,2})(?:\s*[/.\-\s]\s*(\d{2}|\d{4}))?$/);
+  if (partes) {
+    d = Number(partes[1]);
+    m = Number(partes[2]);
+    a = partes[3] ? Number(partes[3]) : ANIO_PROGRAMACION;
+  } else if (/^\d{8}$/.test(t)) {
+    d = Number(t.slice(0, 2));
+    m = Number(t.slice(2, 4));
+    a = Number(t.slice(4));
+  } else if (/^\d{6}$/.test(t)) {
+    d = Number(t.slice(0, 2));
+    m = Number(t.slice(2, 4));
+    a = Number(t.slice(4));
+  } else return null;
+  if (a < 100) a += 2000;
+  const f = new Date(Date.UTC(a, m - 1, d));
+  if (f.getUTCFullYear() !== a || f.getUTCMonth() !== m - 1 || f.getUTCDate() !== d) return null;
+  return `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** "2027-01-06" → "06/01/2027". */
+export function isoADdMmAaaa(iso: string): string {
+  const [a, m, d] = iso.split("-");
+  return a && m && d ? `${d}/${m}/${a}` : "";
+}

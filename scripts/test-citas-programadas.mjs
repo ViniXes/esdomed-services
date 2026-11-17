@@ -131,3 +131,15 @@ assert.deepEqual(m.filtrarOpciones(ops, "ric cas").map((o) => o.etiqueta), ["Ric
 assert.equal(m.filtrarOpciones(ops, "").length, 4);
 assert.deepEqual(m.filtrarOpciones([{ etiqueta: "Hematología" }], "hemato").length, 1);
 console.log("OK: horario opcional y búsqueda");
+
+// Fecha escrita en números (día/mes/año)
+assert.equal(m.fechaEscritaAISO("18/12/2027"), "2027-12-18");
+assert.equal(m.fechaEscritaAISO("6-1-27"), "2027-01-06");
+assert.equal(m.fechaEscritaAISO("06.01.2027"), "2027-01-06");
+assert.equal(m.fechaEscritaAISO("06012027"), "2027-01-06");
+assert.equal(m.fechaEscritaAISO("6/1"), "2027-01-06");
+assert.equal(m.fechaEscritaAISO("31/02/2027"), null);
+assert.equal(m.fechaEscritaAISO("13/13/2027"), null);
+assert.equal(m.fechaEscritaAISO("18 de diciembre"), null);
+assert.equal(m.isoADdMmAaaa("2027-01-06"), "06/01/2027");
+console.log("OK: fecha en números");
