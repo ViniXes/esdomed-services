@@ -1,4 +1,4 @@
-import { CalendarDays, FileUp, LayoutDashboard, ListOrdered, Megaphone, Tv, UserPlus } from "lucide-react";
+import { CalendarDays, CalendarPlus, CalendarRange, FileUp, LayoutDashboard, ListOrdered, Megaphone, Settings2, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -25,6 +25,15 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     entradas: [
       { href: "/consulta-externa/agenda", label: "Cargar citas del SIS", icon: FileUp },
       { href: "/consulta-externa/recepcion", label: "Recepción primera vez", icon: UserPlus },
+    ],
+  },
+  {
+    titulo: "Citas 2027",
+    icon: CalendarRange,
+    visibleSi: gestionaConsultaExterna,
+    entradas: [
+      { href: "/consulta-externa/citas-2027", label: "Registrar citas", icon: CalendarPlus, exact: true },
+      { href: "/consulta-externa/citas-2027/catalogo", label: "Catálogo de agendas", icon: Settings2 },
     ],
   },
   {
