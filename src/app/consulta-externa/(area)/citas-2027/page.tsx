@@ -38,6 +38,8 @@ import {
   citasDeMedicoEnFecha,
   citasDelExpediente,
   citasDelMes,
+  ultimasCitasRegistradas,
+  MAX_RECIENTES,
   crearCitaProgramada,
   leerCatalogoCitas,
   marcarRegistradasSis,
@@ -60,6 +62,10 @@ const th = "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wid
 const td = "px-3 py-2 text-slate-700 dark:text-slate-200 align-top";
 const boton =
   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+
+// "recientes" = en el orden en que se registraron en services (la más nueva arriba).
+const RECIENTES = "recientes";
+const leerVista = (v: string) => (v === RECIENTES ? ultimasCitasRegistradas() : citasDelMes(v));
 
 const MESES = Array.from({ length: 12 }, (_, i) => {
   const mes = `${ANIO_PROGRAMACION}-${String(i + 1).padStart(2, "0")}`;
@@ -105,7 +111,7 @@ export default function Citas2027Page() {
   const [mensaje, setMensaje] = useState<{ tono: "ok" | "error"; texto: string } | null>(null);
 
   // ── Lista ──
-  const [mes, setMes] = useState(`${ANIO_PROGRAMACION}-01`);
+  const [mes, setMes] = useState(RECIENTES);
   const [citas, setCitas] = useState<CitaProgramadaConId[] | null>(null);
   const [cargandoLista, setCargandoLista] = useState(false);
   const [filtroEsp, setFiltroEsp] = useState("");
@@ -219,7 +225,7 @@ export default function Citas2027Page() {
       setMensaje({ tono: "ok", texto: `Cita registrada: ${expNormal}, ${fechaCorta(fecha)} ${textoFranja(franja.inicio, franja.fin)} con ${medico.nombre}.` });
       limpiarPaciente();
       setVersionOcupacion((v) => v + 1);
-      if (citas && fecha.slice(0, 7) === mes) void cargarLista(mes);
+      if (citas && (mes === RECIENTES || fecha.slice(0, 7) === mes)) void cargarLista(mes);
     } catch (e) {
       console.error("No se pudo guardar la cita", e);
       setMensaje({ tono: "error", texto: e instanceof Error ? e.message : "No se pudo guardar la cita." });
@@ -233,7 +239,7 @@ export default function Citas2027Page() {
     setCargandoLista(true);
     setSeleccion(new Set());
     try {
-      setCitas(await citasDelMes(m));
+      setCitas(await leerVista(m));
     } catch (e) {
       console.error("No se pudieron leer las citas del mes", e);
       setCitas([]);
@@ -244,7 +250,7 @@ export default function Citas2027Page() {
 
   useEffect(() => {
     let vivo = true;
-    citasDelMes(mes)
+    leerVista(mes)
       .then((l) => { if (vivo) setCitas(l); })
       .catch((e) => {
         console.error("No se pudieron leer las citas del mes", e);
@@ -339,11 +345,13 @@ export default function Citas2027Page() {
       Estado: NOMBRE_ESTADO[c.estado],
       Observaciones: c.observaciones ?? "",
       "Registrada por": c.creadaPorNombre,
+      "Registrada el": c.creadaEn ? c.creadaEn.toDate().toLocaleString("es-SV") : "",
+      "Nombre del paciente tomado de": c.origenNombre === "manual" ? "Escrito a mano" : "services",
     }));
     const hoja = XLSX.utils.json_to_sheet(filas);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Citas");
-    XLSX.writeFile(libro, `citas-${mes}.xlsx`);
+    XLSX.writeFile(libro, mes === RECIENTES ? "citas-2027-ultimas-registradas.xlsx" : `citas-${mes}.xlsx`);
   };
 
   // ── Render ──
@@ -592,14 +600,15 @@ export default function Citas2027Page() {
       <section className={tarjeta}>
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className={etiqueta} htmlFor="mes">Mes</label>
+            <label className={etiqueta} htmlFor="mes">Ver</label>
             <select id="mes" className={campo} value={mes} onChange={(e) => {
                 setMes(e.target.value);
                 setCitas(null);
                 setSeleccion(new Set());
               }}>
+              <option value={RECIENTES}>Últimas registradas</option>
               {MESES.map((m) => (
-                <option key={m.mes} value={m.mes}>{m.nombre}</option>
+                <option key={m.mes} value={m.mes}>Citas de {m.nombre.toLowerCase()}</option>
               ))}
             </select>
           </div>
@@ -649,7 +658,10 @@ export default function Citas2027Page() {
         </div>
 
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          En el mes: {conteo.pendiente} pendientes · {conteo.registrada_sis} registradas en SIS · {conteo.anulada} anuladas
+          {mes === RECIENTES
+            ? `Las últimas ${MAX_RECIENTES} registradas, la más nueva arriba. Para pasar al SIS, elija el mes de la cita: se ordena por fecha, médico y horario. `
+            : "En el mes: "}
+          {conteo.pendiente} pendientes · {conteo.registrada_sis} registradas en SIS · {conteo.anulada} anuladas
         </p>
 
         <div className="mt-3 overflow-x-auto">
@@ -698,6 +710,10 @@ export default function Citas2027Page() {
                     <td className={td}>
                       <span className="font-medium">{c.expediente}</span> {c.paciente}
                       {c.observaciones && <span className="block text-xs text-slate-500">{c.observaciones}</span>}
+                      <span className="block text-xs text-slate-400">
+                        Registrada {c.creadaEn ? c.creadaEn.toDate().toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) : "ahora"} por {c.creadaPorNombre}
+                        {c.origenNombre === "manual" ? " · nombre escrito a mano" : ""}
+                      </span>
                       {c.estado === "anulada" && c.motivoAnulacion && (
                         <span className="block text-xs text-slate-500">Anulada: {c.motivoAnulacion}</span>
                       )}

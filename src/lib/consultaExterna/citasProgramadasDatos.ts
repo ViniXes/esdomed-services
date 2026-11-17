@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -155,6 +156,14 @@ export async function citasDelMes(mes: string): Promise<CitaProgramadaConId[]> {
     query(collection(db, COL_CITAS_PROGRAMADAS), where("fecha", ">=", desde), where("fecha", "<=", hasta)),
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as CitaProgramada) })).sort(compararCitas);
+}
+
+export const MAX_RECIENTES = 300;
+
+/** Las últimas citas registradas en services, la más nueva primero (como la cola de ingresos). */
+export async function ultimasCitasRegistradas(n = MAX_RECIENTES): Promise<CitaProgramadaConId[]> {
+  const snap = await getDocs(query(collection(db, COL_CITAS_PROGRAMADAS), orderBy("creadaEn", "desc"), limit(n)));
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as CitaProgramada) }));
 }
 
 /** Citas vigentes del mismo expediente (para avisar duplicados). */
