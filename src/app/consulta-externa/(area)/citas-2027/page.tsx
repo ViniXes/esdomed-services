@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
 import { CitasProgramadasPdf } from "@/components/consultaExterna/CitasProgramadasPdf";
+import { ListaConBusqueda } from "@/components/consultaExterna/ListaConBusqueda";
 import {
   ANIO_PROGRAMACION,
   NOMBRE_DIA,
@@ -203,7 +204,7 @@ export default function Citas2027Page() {
 
   const cupoLleno = franja && ocupadas ? (ocupadas.get(franja.inicio) ?? 0) >= franja.cupo : false;
   const listo =
-    !!usuario && !!medico && !!franja && fechaValida && !!expNormal && buscado === expNormal && !!paciente.trim() && !!tipo;
+    !!usuario && !!medico && fechaValida && !!expNormal && buscado === expNormal && !!paciente.trim() && !!tipo;
 
   const limpiarPaciente = () => {
     setExpediente("");
@@ -216,8 +217,8 @@ export default function Citas2027Page() {
   };
 
   const guardar = async () => {
-    if (!listo || !medico || !franja || !usuario || !tipo) return;
-    if (cupoLleno && !window.confirm(`La franja ${textoFranja(franja.inicio, franja.fin)} ya tiene su cupo de ${franja.cupo}. ¿Agregar la cita como sobrecupo?`)) {
+    if (!listo || !medico || !usuario || !tipo) return;
+    if (franja && cupoLleno && !window.confirm(`La franja ${textoFranja(franja.inicio, franja.fin)} ya tiene su cupo de ${franja.cupo}. ¿Agregar la cita como sobrecupo?`)) {
       return;
     }
     setGuardando(true);
@@ -229,9 +230,9 @@ export default function Citas2027Page() {
           especialidad: medico.especialidad,
           medicoId: medico.id,
           medico: medico.nombre,
-          consultorio: franja.consultorio || medico.consultorioFijo,
-          franjaInicio: franja.inicio,
-          franjaFin: franja.fin,
+          consultorio: franja?.consultorio || medico.consultorioFijo,
+          franjaInicio: franja?.inicio ?? "",
+          franjaFin: franja?.fin ?? "",
           expediente: expNormal,
           paciente,
           tipo,
@@ -240,7 +241,7 @@ export default function Citas2027Page() {
         encontrado && encontrado.nombre === paciente ? "services" : "manual",
         usuario,
       );
-      setMensaje({ tono: "ok", texto: `Cita registrada: ${expNormal}, ${fechaCorta(fecha)} ${textoFranja(franja.inicio, franja.fin)} con ${medico.nombre}.` });
+      setMensaje({ tono: "ok", texto: `Cita registrada: ${expNormal}, ${fechaCorta(fecha)} ${franja ? textoFranja(franja.inicio, franja.fin) : "sin horario"} con ${medico.nombre}.` });
       limpiarPaciente();
       setVersionOcupacion((v) => v + 1);
       if (citas && (mes === RECIENTES || fecha.slice(0, 7) === mes)) void cargarLista(mes);
@@ -436,33 +437,30 @@ export default function Citas2027Page() {
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className={etiqueta} htmlFor="esp">Especialidad</label>
-              <select
+              <ListaConBusqueda
                 id="esp"
-                className={campo}
-                value={especialidad}
-                onChange={(e) => {
-                  setEspecialidad(e.target.value);
+                opciones={especialidades.map((e) => ({ valor: e, etiqueta: e }))}
+                valor={especialidad}
+                onChange={(v) => {
+                  setEspecialidad(v);
                   setMedicoId("");
                   setFranjaId("");
                 }}
-              >
-                <option value="">Elija…</option>
-                {especialidades.map((e) => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
+              />
             </div>
             <div>
               <label className={etiqueta} htmlFor="med">Médico</label>
-              <select id="med" className={campo} value={medicoId} disabled={!especialidad} onChange={(e) => {
-                  setMedicoId(e.target.value);
+              <ListaConBusqueda
+                id="med"
+                opciones={medicos.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+                valor={medicoId}
+                disabled={!especialidad}
+                placeholder={especialidad ? "Escriba para buscar…" : "Elija primero la especialidad"}
+                onChange={(v) => {
+                  setMedicoId(v);
                   setFranjaId("");
-                }}>
-                <option value="">Elija…</option>
-                {medicos.map((m) => (
-                  <option key={m.id} value={m.id}>{m.nombre}</option>
-                ))}
-              </select>
+                }}
+              />
               {medicoId && (
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {diasMedico.length ? `Atiende: ${diasMedico.map((d) => NOMBRE_DIA[d]).join(", ")}` : "Sin horario en el catálogo."}
@@ -490,10 +488,10 @@ export default function Citas2027Page() {
 
           {medicoId && fechaValida && (
             <div className="mt-4">
-              <p className={etiqueta}>Horario</p>
+              <p className={etiqueta}>Horario <span className="font-normal normal-case text-slate-500 dark:text-slate-400">(opcional; se puede guardar sin horario)</span></p>
               {franjas.length === 0 ? (
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {medico?.nombre} no atiende los {NOMBRE_DIA[diaSemanaDeISO(fecha)].toLowerCase()} según el catálogo.
+                  {medico?.nombre} no atiende los {NOMBRE_DIA[diaSemanaDeISO(fecha)].toLowerCase()} según el catálogo. Se puede guardar sin horario.
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -505,7 +503,9 @@ export default function Citas2027Page() {
                       <button
                         key={f.id}
                         type="button"
-                        onClick={() => setFranjaId(f.id)}
+                        onClick={() => setFranjaId(activo ? "" : f.id)}
+                        aria-pressed={activo}
+                        title={activo ? "Clic otra vez para quitar el horario" : undefined}
                         className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
                           activo
                             ? "border-blue-600 bg-blue-600 text-white"
@@ -650,29 +650,27 @@ export default function Citas2027Page() {
           </div>
           <div>
             <label className={etiqueta} htmlFor="fesp">Especialidad</label>
-            <select
+            <ListaConBusqueda
               id="fesp"
-              className={campo}
-              value={filtroEsp}
-              onChange={(e) => {
-                setFiltroEsp(e.target.value);
+              textoVacio="Todas"
+              opciones={especialidades.map((e) => ({ valor: e, etiqueta: e }))}
+              valor={filtroEsp}
+              onChange={(v) => {
+                setFiltroEsp(v);
                 setFiltroMedico("");
               }}
-            >
-              <option value="">Todas</option>
-              {especialidades.map((e) => (
-                <option key={e} value={e}>{e}</option>
-              ))}
-            </select>
+            />
           </div>
           <div>
             <label className={etiqueta} htmlFor="fmed">Médico</label>
-            <select id="fmed" className={campo} value={filtroMedico} disabled={!filtroEsp} onChange={(e) => setFiltroMedico(e.target.value)}>
-              <option value="">Todos</option>
-              {medicosFiltro.map((m) => (
-                <option key={m.id} value={m.id}>{m.nombre}</option>
-              ))}
-            </select>
+            <ListaConBusqueda
+              id="fmed"
+              textoVacio="Todos"
+              opciones={medicosFiltro.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+              valor={filtroMedico}
+              disabled={!filtroEsp}
+              onChange={setFiltroMedico}
+            />
           </div>
           <div>
             <label className={etiqueta} htmlFor="fest">Estado</label>

@@ -103,6 +103,7 @@ export function hora12(h24: string): string {
 }
 
 export function textoFranja(inicio: string, fin: string): string {
+  if (!inicio || !fin) return "Sin horario";
   return `${hora12(inicio)} - ${hora12(fin)}`;
 }
 
@@ -263,7 +264,10 @@ export function validarCita(d: DatosCitaProgramada): string[] {
   if (!esFechaDelAnio(d.fecha)) e.push(`La fecha debe ser de ${ANIO_PROGRAMACION}.`);
   if (!d.especialidad) e.push("Elija la especialidad.");
   if (!d.medicoId || !d.medico) e.push("Elija el médico.");
-  if (!esHora(d.franjaInicio) || !esHora(d.franjaFin)) e.push("Elija el horario.");
+  // El horario es opcional: las agendas de 2027 todavía no tienen horas.
+  if (d.franjaInicio || d.franjaFin) {
+    if (!esHora(d.franjaInicio) || !esHora(d.franjaFin)) e.push("El horario no es válido.");
+  }
   if (!d.expediente) e.push("Escriba el expediente.");
   if (!limpiarTexto(d.paciente)) e.push("Escriba el nombre del paciente.");
   if (d.tipo !== "Primera Vez" && d.tipo !== "Subsecuente") e.push("Elija si es primera vez o subsecuente.");
@@ -328,4 +332,31 @@ export function agruparPorEspecialidad<T extends { especialidad: string }>(citas
 /** Nombre válido de pestaña de Excel: sin : \ / ? * [ ] y máximo 31 caracteres. */
 export function nombrePestana(s: string): string {
   return s.replace(/[:\\/?*[\]]/g, " ").slice(0, 31).trim() || "Citas";
+}
+
+// ── Listas con búsqueda ─────────────────────────────────────────────────────
+
+/**
+ * Opciones que calzan con lo escrito, la más parecida primero: todas las
+ * palabras escritas deben aparecer (sin tildes ni mayúsculas); primero las que
+ * empiezan por lo escrito, luego las que tienen una palabra que empieza así, y
+ * al final las que solo lo contienen. Sin texto, devuelve todas en su orden.
+ */
+export function filtrarOpciones<T extends { etiqueta: string }>(opciones: T[], consulta: string): T[] {
+  const q = clave(consulta);
+  if (!q) return opciones;
+  const palabras = q.split(" ");
+  const puntaje = (etiqueta: string): number => {
+    const k = clave(etiqueta);
+    if (!palabras.every((p) => k.includes(p))) return -1;
+    if (k.startsWith(q)) return 0;
+    const inicios = k.split(" ");
+    if (palabras.every((p) => inicios.some((w) => w.startsWith(p)))) return 1;
+    return 2;
+  };
+  return opciones
+    .map((o, i) => ({ o, i, p: puntaje(o.etiqueta) }))
+    .filter((x) => x.p >= 0)
+    .sort((a, b) => a.p - b.p || a.i - b.i)
+    .map((x) => x.o);
 }
