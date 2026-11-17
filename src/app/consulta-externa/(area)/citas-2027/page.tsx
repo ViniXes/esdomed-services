@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
 import { CitasProgramadasPdf } from "@/components/consultaExterna/CitasProgramadasPdf";
 import { ListaConBusqueda } from "@/components/consultaExterna/ListaConBusqueda";
+import { CampoFecha } from "@/components/consultaExterna/CampoFecha";
 import {
   ANIO_PROGRAMACION,
   NOMBRE_DIA,
@@ -488,16 +489,15 @@ export default function Citas2027Page() {
             </div>
             <div>
               <label className={etiqueta} htmlFor="fecha">Fecha</label>
-              <input
+              <CampoFecha
                 id="fecha"
-                type="date"
                 className={campo}
                 min={`${ANIO_PROGRAMACION}-01-01`}
                 max={`${ANIO_PROGRAMACION}-12-31`}
-                value={fecha}
+                valor={fecha}
                 disabled={!medicoId}
-                onChange={(e) => {
-                  setFecha(e.target.value);
+                onChange={(v) => {
+                  setFecha(v);
                   setFranjaId("");
                 }}
               />
