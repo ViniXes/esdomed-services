@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, CheckCircle2, Database, Loader2, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +38,12 @@ const DIAS_ORDEN: DiaSemana[] = ["lunes", "martes", "miercoles", "jueves", "vier
 
 export default function CatalogoCitasPage() {
   const { user, profile } = useAuth();
+  const router = useRouter();
+  // No está en el menú: el layout no la veta. Quien solo registra citas vuelve a la lista.
+  const permitido = gestionaConsultaExterna(profile);
+  useEffect(() => {
+    if (profile && !permitido) router.replace("/consulta-externa/citas-2027");
+  }, [profile, permitido, router]);
   const [cat, setCat] = useState<CatalogoCitas | null | undefined>(undefined);
   const [guardadoEn, setGuardadoEn] = useState<string>("");
   const [cambios, setCambios] = useState(false);
@@ -158,6 +166,8 @@ export default function CatalogoCitasPage() {
       ],
     }));
   };
+
+  if (!permitido) return null;
 
   if (cat === undefined) {
     return (

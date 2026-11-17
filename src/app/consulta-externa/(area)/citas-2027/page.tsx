@@ -40,6 +40,7 @@ import {
 import {
   anularCitaProgramada,
   buscarPacientePorExpediente,
+  catalogoSemilla,
   citasDeMedicoEnFecha,
   citasDelExpediente,
   citasDelMes,
@@ -99,6 +100,7 @@ export default function Citas2027Page() {
   const editaCatalogo = gestionaConsultaExterna(profile);
   const [catalogo, setCatalogo] = useState<CatalogoGuardado | null | undefined>(undefined);
   const [errorCatalogo, setErrorCatalogo] = useState("");
+  const [catalogoProvisional, setCatalogoProvisional] = useState(false);
 
   // ── Formulario ──
   const [especialidad, setEspecialidad] = useState("");
@@ -128,8 +130,17 @@ export default function Citas2027Page() {
   const [verPdf, setVerPdf] = useState(false);
 
   useEffect(() => {
+    // Sin catálogo guardado se usa el del libro de agendas, para poder registrar
+    // desde el primer día; el admin lo guarda o corrige en Catálogo.
     leerCatalogoCitas()
-      .then(setCatalogo)
+      .then(async (c) => {
+        if (c) {
+          setCatalogo(c);
+          return;
+        }
+        setCatalogo(await catalogoSemilla());
+        setCatalogoProvisional(true);
+      })
       .catch((e) => {
         console.error("No se pudo leer el catálogo de citas", e);
         setErrorCatalogo("No se pudo leer el catálogo. Revise la conexión y recargue.");
@@ -389,12 +400,18 @@ export default function Citas2027Page() {
             href="/consulta-externa/citas-2027/catalogo"
             className={`${boton} border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800`}
           >
-            <Settings2 size={16} /> Catálogo
+            <Settings2 size={16} /> Catálogo de agendas
           </Link>
         )}
       </div>
 
       {errorCatalogo && <p className="text-sm text-rose-600">{errorCatalogo}</p>}
+      {catalogoProvisional && editaCatalogo && (
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          Se usa el catálogo del libro de agendas porque aún no se ha guardado uno.{" "}
+          <Link href="/consulta-externa/citas-2027/catalogo" className="underline">Revíselo y guárdelo</Link> para corregir nombres u horarios.
+        </p>
+      )}
 
       {!catalogo ? (
         <div className={`${tarjeta} text-sm text-slate-600 dark:text-slate-300`}>
@@ -413,7 +430,7 @@ export default function Citas2027Page() {
       ) : (
         <section className={tarjeta}>
           <h2 className="mb-4 flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
-            <CalendarPlus size={18} className="text-blue-600" /> Nueva cita
+            <CalendarPlus size={18} className="text-blue-600" /> Registrar cita
           </h2>
 
           <div className="grid gap-4 md:grid-cols-3">
