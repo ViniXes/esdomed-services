@@ -99,3 +99,16 @@ assert.deepEqual(orden.map((c) => `${c.fecha} ${c.especialidad} ${c.franjaInicio
 ]);
 
 console.log("OK: programación de citas 2027");
+
+// ── Descargas ──
+const grupos = m.agruparPorEspecialidad([
+  { especialidad: "Cirugía de Tórax", n: 1 },
+  { especialidad: "Hematología", n: 2 },
+  { especialidad: "Hematología", n: 3 },
+  { especialidad: "Infectología", n: 4 },
+]);
+assert.deepEqual(grupos.map((g) => g.especialidad), ["Hematología", "Infectología", "Cirugía de Tórax"]);
+assert.deepEqual(grupos[0].citas.map((c) => c.n), [2, 3], "conserva el orden de la lista");
+assert.equal(m.nombrePestana("Cirugía Cardiovascular"), "Cirugía Cardiovascular");
+assert.equal(m.nombrePestana("a/b:c"), "a b c");
+console.log("OK: descargas por especialidad");

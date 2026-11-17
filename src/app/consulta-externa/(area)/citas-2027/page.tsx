@@ -8,12 +8,14 @@ import {
   CalendarPlus,
   CheckCircle2,
   Download,
+  FileText,
   Loader2,
   RotateCcw,
   Search,
   Settings2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { CitasProgramadasPdf } from "@/components/consultaExterna/CitasProgramadasPdf";
 import {
   ANIO_PROGRAMACION,
   NOMBRE_DIA,
@@ -28,6 +30,8 @@ import {
   normalizarExpediente,
   ocupacionPorFranja,
   textoFranja,
+  agruparPorEspecialidad,
+  nombrePestana,
   type EstadoCitaProgramada,
   type FranjaCatalogo,
   type TipoCitaProgramada,
@@ -119,6 +123,7 @@ export default function Citas2027Page() {
   const [filtroEstado, setFiltroEstado] = useState<EstadoCitaProgramada | "">("pendiente");
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [accionando, setAccionando] = useState(false);
+  const [verPdf, setVerPdf] = useState(false);
 
   useEffect(() => {
     leerCatalogoCitas()
@@ -332,13 +337,14 @@ export default function Citas2027Page() {
 
   const exportar = async () => {
     const XLSX = await import("xlsx");
-    const filas = visibles.map((c) => ({
+    // Una pestaña por especialidad, con las filas en el orden de la lista.
+    const fila = (c: CitaProgramadaConId) => ({
       Fecha: fechaCorta(c.fecha),
       Día: NOMBRE_DIA[diaSemanaDeISO(c.fecha)],
-      Especialidad: c.especialidad,
-      Médico: c.medico,
-      Consultorio: c.consultorio,
       Horario: textoFranja(c.franjaInicio, c.franjaFin),
+      Médico: c.medico,
+      Especialidad: c.especialidad,
+      Consultorio: c.consultorio,
       Expediente: c.expediente,
       "Nombre del paciente": c.paciente,
       "Tipo de cita": c.tipo,
@@ -347,10 +353,13 @@ export default function Citas2027Page() {
       "Registrada por": c.creadaPorNombre,
       "Registrada el": c.creadaEn ? c.creadaEn.toDate().toLocaleString("es-SV") : "",
       "Nombre del paciente tomado de": c.origenNombre === "manual" ? "Escrito a mano" : "services",
-    }));
-    const hoja = XLSX.utils.json_to_sheet(filas);
+    });
     const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, hoja, "Citas");
+    for (const g of agruparPorEspecialidad(visibles)) {
+      const hoja = XLSX.utils.json_to_sheet(g.citas.map(fila));
+      hoja["!cols"] = [11, 10, 20, 34, 20, 24, 11, 36, 12, 24, 30, 26, 20, 16].map((wch) => ({ wch }));
+      XLSX.utils.book_append_sheet(libro, hoja, nombrePestana(g.especialidad));
+    }
     XLSX.writeFile(libro, mes === RECIENTES ? "citas-2027-ultimas-registradas.xlsx" : `citas-${mes}.xlsx`);
   };
 
@@ -651,6 +660,9 @@ export default function Citas2027Page() {
             <button type="button" onClick={() => void exportar()} disabled={!visibles.length} className={`${boton} border border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200`}>
               <Download size={16} /> Excel
             </button>
+            <button type="button" onClick={() => setVerPdf(true)} disabled={!visibles.length} className={`${boton} border border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200`}>
+              <FileText size={16} /> PDF
+            </button>
             <button type="button" onClick={() => void marcarSis()} disabled={!seleccion.size || accionando} className={`${boton} bg-emerald-600 text-white hover:bg-emerald-700`}>
               <CheckCircle2 size={16} /> Registradas en SIS ({seleccion.size})
             </button>
@@ -742,6 +754,14 @@ export default function Citas2027Page() {
           )}
         </div>
       </section>
+      {verPdf && (
+        <CitasProgramadasPdf
+          citas={visibles}
+          titulo={mes === RECIENTES ? `Últimas registradas (${ANIO_PROGRAMACION})` : `Citas de ${MESES.find((m) => m.mes === mes)?.nombre.toLowerCase() ?? mes} ${ANIO_PROGRAMACION}`}
+          generadoPor={usuario?.nombre ?? ""}
+          onClose={() => setVerPdf(false)}
+        />
+      )}
     </div>
   );
 }

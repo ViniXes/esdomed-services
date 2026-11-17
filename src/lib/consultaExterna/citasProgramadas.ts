@@ -295,3 +295,37 @@ export function rangoDelMes(mes: string): [string, string] {
   const ultimo = new Date(y, m, 0).getDate();
   return [`${mes}-01`, `${mes}-${String(ultimo).padStart(2, "0")}`];
 }
+
+// ── Descargas ───────────────────────────────────────────────────────────────
+
+/** Orden de las pestañas del Excel y de las hojas del PDF. Las que no estén aquí van al final. */
+export const ORDEN_ESPECIALIDADES = [
+  "Hematología",
+  "Oncología",
+  "Cardiología",
+  "Infectología",
+  "Cirugía Cardiovascular",
+  "Cirugía de Tórax",
+];
+
+/** Agrupa por especialidad respetando el orden en que vienen las citas dentro de cada grupo. */
+export function agruparPorEspecialidad<T extends { especialidad: string }>(citas: T[]): { especialidad: string; citas: T[] }[] {
+  const grupos = new Map<string, T[]>();
+  for (const c of citas) {
+    const lista = grupos.get(c.especialidad) ?? [];
+    lista.push(c);
+    grupos.set(c.especialidad, lista);
+  }
+  const pos = (e: string) => {
+    const i = ORDEN_ESPECIALIDADES.findIndex((x) => clave(x) === clave(e));
+    return i === -1 ? ORDEN_ESPECIALIDADES.length : i;
+  };
+  return [...grupos.entries()]
+    .sort(([a], [b]) => pos(a) - pos(b) || a.localeCompare(b, "es"))
+    .map(([especialidad, lista]) => ({ especialidad, citas: lista }));
+}
+
+/** Nombre válido de pestaña de Excel: sin : \ / ? * [ ] y máximo 31 caracteres. */
+export function nombrePestana(s: string): string {
+  return s.replace(/[:\\/?*[\]]/g, " ").slice(0, 31).trim() || "Citas";
+}
