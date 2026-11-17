@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import { rutaVetada } from "@/lib/navRegistro";
-import { entraConsultaExterna } from "@/lib/accesoConsultaExterna";
+import { entraConsultaExterna, esAgendaCE } from "@/lib/accesoConsultaExterna";
 import {
   ENTRADAS_CONSULTA_EXTERNA,
   navItemsConsultaExterna,
@@ -26,8 +26,9 @@ export default function ConsultaExternaLayout({ children }: { children: React.Re
   useEffect(() => {
     if (loading) return;
     if (!permitido) router.replace("/login");
-    else if (vetada) router.replace("/consulta-externa");
-  }, [loading, permitido, vetada, router]);
+    // agenda_ce no tiene Inicio: su página es la de citas 2027.
+    else if (vetada) router.replace(esAgendaCE(profile) ? "/consulta-externa/citas-2027" : "/consulta-externa");
+  }, [loading, permitido, vetada, router, profile]);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">

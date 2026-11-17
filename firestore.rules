@@ -48,6 +48,8 @@ service cloud.firestore {
     function isIsbm()         { return isAuth() && getRole() in ['isbm_tecnico', 'isbm_supervisor', 'isbm_jefe']; }
     // Cuenta compartida de una estación de enfermería de Consulta Externa.
     function isConsultaExterna() { return isAuth() && getRole() == 'consulta_externa'; }
+    // Solo registra citas 2027 de Consulta Externa (rol agenda_ce).
+    function isAgendaCE() { return isAuth() && getRole() == 'agenda_ce'; }
     function estacionCE() {
       return get(/databases/$(database)/documents/usuarios/$(uid())).data.get('estacionCE', '');
     }
@@ -480,6 +482,8 @@ service cloud.firestore {
     // que pacientes: el personal los consulta y ESDOMED/admin los crean y editan.
     match /personas/{expediente} {
       allow read:   if isStaff() || isMedico() || isEnfermeria() || isIsbm();
+      // agenda_ce: solo leer un expediente puntual, para llenar el nombre en Citas 2027.
+      allow get:    if isAgendaCE();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin();
       allow delete: if isAdmin();
@@ -608,7 +612,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /consulta_externa_citas/{id} {
-      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna();
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna() || isAgendaCE();
       allow create: if (isEsdomed() || isAdmin())
                     && request.resource.data.cargadaPor == uid()
                     && request.resource.data.estado == 'citado';
@@ -625,17 +629,17 @@ service cloud.firestore {
     // Programación de citas 2027 (se pasan al SIS cuando abra las agendas).
     // El catálogo es un solo documento: médicos, consultorios y franjas.
     match /consulta_externa_catalogo/{id} {
-      allow read:   if isEsdomed() || isAdmin();
+      allow read:   if isEsdomed() || isAdmin() || isAgendaCE();
       allow create, update: if (isEsdomed() || isAdmin())
                     && request.resource.data.actualizadoPor == uid();
       allow delete: if isAdmin();
     }
     match /consulta_externa_citas_programadas/{id} {
-      allow read:   if isEsdomed() || isAdmin();
-      allow create: if (isEsdomed() || isAdmin())
+      allow read:   if isEsdomed() || isAdmin() || isAgendaCE();
+      allow create: if (isEsdomed() || isAdmin() || isAgendaCE())
                     && request.resource.data.creadaPor == uid()
                     && request.resource.data.estado == 'pendiente';
-      allow update: if (isEsdomed() || isAdmin())
+      allow update: if (isEsdomed() || isAdmin() || isAgendaCE())
                     && request.resource.data.actualizadoPor == uid()
                     && request.resource.data.estado in ['pendiente', 'registrada_sis', 'anulada']
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
