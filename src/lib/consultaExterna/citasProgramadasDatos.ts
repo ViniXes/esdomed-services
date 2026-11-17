@@ -128,10 +128,12 @@ export async function buscarPacientePorExpediente(expedienteCrudo: string): Prom
   };
 
   const prog = await intentar(() =>
-    getDocs(query(collection(db, COL_CITAS_PROGRAMADAS), where("expediente", "==", expediente), limit(1))),
+    getDocs(query(collection(db, COL_CITAS_PROGRAMADAS), where("expediente", "==", expediente), limit(10))),
   );
-  if (prog && !prog.empty) {
-    return { expediente, nombre: String(prog.docs[0].data().paciente ?? ""), fuente: "citas 2027" };
+  // Hay citas migradas sin nombre: esas no cuentan y se busca en las demás fuentes.
+  const conNombre = prog?.docs.map((d) => limpiarTexto(String(d.data().paciente ?? ""))).find(Boolean);
+  if (conNombre) {
+    return { expediente, nombre: conNombre, fuente: "citas 2027" };
   }
 
   const ce = await intentar(() =>

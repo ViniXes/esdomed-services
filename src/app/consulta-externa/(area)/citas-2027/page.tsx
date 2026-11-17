@@ -328,7 +328,7 @@ export default function Citas2027Page() {
 
   const anular = async (c: CitaProgramadaConId) => {
     if (!usuario) return;
-    const motivo = window.prompt(`Motivo para anular la cita de ${c.paciente} (${fechaCorta(c.fecha)}):`);
+    const motivo = window.prompt(`Motivo para anular la cita de ${c.paciente || c.expediente} (${fechaCorta(c.fecha)}):`);
     if (!motivo?.trim()) return;
     setAccionando(true);
     try {
@@ -359,7 +359,7 @@ export default function Citas2027Page() {
 
   const reabrir = async (c: CitaProgramadaConId) => {
     if (!usuario) return;
-    if (!window.confirm(`¿Devolver la cita de ${c.paciente} a "Pendiente de pasar al SIS"?`)) return;
+    if (!window.confirm(`¿Devolver la cita de ${c.paciente || c.expediente} a "Pendiente de pasar al SIS"?`)) return;
     setAccionando(true);
     try {
       await volverAPendiente(c.id, usuario);
@@ -775,7 +775,8 @@ export default function Citas2027Page() {
                     </td>
                     <td className={`${td} whitespace-nowrap`}>{textoFranja(c.franjaInicio, c.franjaFin)}</td>
                     <td className={td}>
-                      <span className="font-medium">{c.expediente}</span> {c.paciente}
+                      <span className="font-medium">{c.expediente}</span>{" "}
+                      {c.paciente || <span className="text-amber-700 dark:text-amber-300">Sin nombre</span>}
                       {c.observaciones && <span className="block text-xs text-slate-500">{c.observaciones}</span>}
                       <span className="block text-xs text-slate-400">
                         Registrada {c.creadaEn ? c.creadaEn.toDate().toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) : "ahora"} por {c.creadaPorNombre}
@@ -805,7 +806,7 @@ export default function Citas2027Page() {
                         <button
                           type="button"
                           disabled={accionando}
-                          onClick={() => void eliminar([c.id], `la cita de ${c.paciente} (${fechaCorta(c.fecha)})`)}
+                          onClick={() => void eliminar([c.id], `la cita de ${c.paciente || c.expediente} (${fechaCorta(c.fecha)})`)}
                           className="ml-3 text-slate-500 hover:text-rose-600"
                           title="Eliminar (solo admin)"
                         >
