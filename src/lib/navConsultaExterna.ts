@@ -16,7 +16,8 @@ type Perfil = UserProfile | null | undefined;
 
 export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
   {
-    entradas: [{ href: "/consulta-externa", label: "Inicio", icon: LayoutDashboard, exact: true }],
+    // agenda_ce solo ve la pestaña de citas 2027.
+    entradas: [{ href: "/consulta-externa", label: "Inicio", icon: LayoutDashboard, exact: true, visibleSi: (p) => !esAgendaCE(p) }],
   },
   {
     titulo: "Agenda del día",
