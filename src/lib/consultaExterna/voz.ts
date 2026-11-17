@@ -1,7 +1,9 @@
 // Voz de los llamados de Consulta Externa. Usa la síntesis de voz del navegador
 // (Web Speech API): sin costo y sin backend. La calidad depende del equipo: en
-// Windows, Microsoft Edge trae voces "Natural" en español (p. ej. Dalia, de
-// México) que suenan casi humanas; Chrome ofrece "Google español".
+// Windows, Microsoft Edge trae voces "Natural" en español (p. ej. Lorena, de
+// El Salvador) que suenan casi humanas; Chrome ofrece "Google español". Esas
+// voces naturales dicen en inglés los nombres de origen inglés (Kevin,
+// Jennifer…): para eso está el diccionario de pronunciación.ts.
 //
 // El navegador bloquea el sonido hasta el primer clic en la página, así que la
 // pantalla de llamados pide un clic en "Activar sonido" al arrancar (o se abre
@@ -11,13 +13,17 @@ export function vozDisponible(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
-const PREFERENCIA_REGION = ["es-MX", "es-US", "es-419", "es-SV", "es-ES"];
+// El Salvador primero: Edge trae voces naturales de aquí (Lorena, Rodrigo).
+const PREFERENCIA_REGION = ["es-SV", "es-MX", "es-US", "es-419", "es-GT", "es-HN", "es-ES"];
 
 // Calidad: las "Natural" de Edge suenan casi humanas; las de Google (Chrome)
 // son buenas; las de escritorio de Windows (Sabina, Raúl) suenan robóticas.
-function puntaje(v: SpeechSynthesisVoice): number {
+function puntaje(v: VozBasica): number {
   let p = 0;
   if (/natural|neural/i.test(v.name)) p += 200;
+  // Las "Multilingual" cambian de idioma según el texto: con un nombre inglés
+  // leerían todo el llamado en inglés.
+  if (/multilingual/i.test(v.name)) p -= 150;
   else if (/google/i.test(v.name)) p += 100;
   const region = PREFERENCIA_REGION.indexOf(v.lang);
   p += region >= 0 ? 50 - region * 5 : 0;
@@ -35,14 +41,38 @@ export function alCambiarVoces(cb: (voces: SpeechSynthesisVoice[]) => void): () 
   return () => window.speechSynthesis.removeEventListener("voiceschanged", avisar);
 }
 
-/** Voces en español del equipo, la más recomendable primero. */
-export function vocesEspanol(): SpeechSynthesisVoice[] {
-  if (!vozDisponible()) return [];
-  return window.speechSynthesis
-    .getVoices()
+type VozBasica = Pick<SpeechSynthesisVoice, "name" | "lang">;
+
+/** Solo las voces en español, la más recomendable primero. */
+export function ordenarVoces<V extends VozBasica>(voces: V[]): V[] {
+  return voces
     .filter((v) => v.lang.toLowerCase().startsWith("es"))
     .sort((a, b) => puntaje(b) - puntaje(a) || a.name.localeCompare(b.name));
 }
+
+/** Voces en español del equipo, la más recomendable primero. */
+export function vocesEspanol(): SpeechSynthesisVoice[] {
+  if (!vozDisponible()) return [];
+  return ordenarVoces(window.speechSynthesis.getVoices());
+}
+
+/**
+ * La voz elegida en este equipo, si sigue disponible; si no, la más
+ * recomendable. Nunca una voz que no sea en español: con una en inglés el
+ * llamado entero sonaría en inglés.
+ */
+export function elegirVoz<V extends VozBasica>(vocesOrdenadas: V[], nombreGuardado: string | null | undefined): V | null {
+  return vocesOrdenadas.find((v) => v.name === nombreGuardado) ?? vocesOrdenadas[0] ?? null;
+}
+
+/** "Microsoft Lorena Online (Natural) - Spanish (El Salvador)" → "Lorena (El Salvador)". */
+export function nombreCortoVoz(nombre: string): string {
+  const m = String(nombre ?? "").match(/^Microsoft\s+(.+?)(?:\s+Online)?(?:\s+\(Natural\))?\s+-\s+[^(]+\((.+)\)\s*$/);
+  return m ? `${m[1]} (${m[2]})` : nombre;
+}
+
+/** Dónde guarda cada equipo la voz de su pantalla. */
+export const CLAVE_VOZ_PANTALLA = "ce:pantalla:voz-nombre";
 
 /** Las voces llegan después de cargar la página (evento voiceschanged). */
 export function esperarVoces(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]> {

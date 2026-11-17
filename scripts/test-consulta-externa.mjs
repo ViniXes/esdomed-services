@@ -197,6 +197,45 @@ assert.equal(
 assert.equal(textoLlamado({ paciente: "Ana Pérez", destino: "Estación Cardiología" }), "Ana Pérez. Acercarse a estación Cardiología.");
 assert.equal(textoLlamado({ codigo: "HE-12", destino: "Consultorio 4 de Hematología" }), "Turno H E 12. Acercarse a consultorio 4 de Hematología.");
 
+// ── Voz: El Salvador primero, nunca una voz que no sea en español ──
+const { ordenarVoces, elegirVoz, nombreCortoVoz } = cargar("voz");
+const VOCES = [
+  { name: "Microsoft Ava Multilingual Online (Natural) - English (United States)", lang: "en-US" },
+  { name: "Microsoft Sabina - Spanish (Mexico)", lang: "es-MX" },
+  { name: "Microsoft Dalia Online (Natural) - Spanish (Mexico)", lang: "es-MX" },
+  { name: "Microsoft Rodrigo Online (Natural) - Spanish (El Salvador)", lang: "es-SV" },
+  { name: "Microsoft Lorena Online (Natural) - Spanish (El Salvador)", lang: "es-SV" },
+];
+const ordenadas = ordenarVoces(VOCES);
+assert.equal(ordenadas[0].name, "Microsoft Lorena Online (Natural) - Spanish (El Salvador)");
+assert.equal(ordenadas.at(-1).name, "Microsoft Sabina - Spanish (Mexico)", "las de escritorio, al final");
+assert.ok(!ordenadas.some((v) => v.lang.startsWith("en")), "sin voces en inglés");
+assert.equal(elegirVoz(ordenadas, "Microsoft Dalia Online (Natural) - Spanish (Mexico)").lang, "es-MX", "respeta la elegida");
+assert.equal(elegirVoz(ordenadas, "Voz que ya no existe").lang, "es-SV", "si ya no está, la recomendada");
+assert.equal(elegirVoz([], "x"), null);
+assert.equal(nombreCortoVoz("Microsoft Lorena Online (Natural) - Spanish (El Salvador)"), "Lorena (El Salvador)");
+assert.equal(nombreCortoVoz("Microsoft Sabina - Spanish (Mexico)"), "Sabina (Mexico)");
+assert.equal(nombreCortoVoz("Google español de Estados Unidos"), "Google español de Estados Unidos");
+
+// ── Diccionario de pronunciación ──
+const { aplicarPronunciacion, palabraValida, reglasDeMapa } = cargar("pronunciacion");
+const reglas = [{ escrito: "Jennifer", leido: "Yénifer" }, { escrito: "Kevin", leido: "Kébin" }];
+assert.equal(
+  aplicarPronunciacion("Expediente 1234 guion 26, Jennifer Kevin Pérez. Acercarse a estación Cardiología.", reglas),
+  "Expediente 1234 guion 26, Yénifer Kébin Pérez. Acercarse a estación Cardiología.",
+);
+assert.equal(aplicarPronunciacion("JENNIFER y Jénnifer", reglas), "Yénifer y Yénifer", "sin importar mayúsculas ni tildes");
+assert.equal(aplicarPronunciacion("Kevinson", reglas), "Kevinson", "solo palabras completas");
+assert.equal(aplicarPronunciacion("Ana", []), "Ana");
+assert.ok(palabraValida("Jennifer"));
+assert.ok(palabraValida("O'Brien"));
+assert.equal(palabraValida("Ana María"), false, "una sola palabra");
+assert.equal(palabraValida("J"), false);
+assert.deepEqual(
+  reglasDeMapa({ kevin: { escrito: "Kevin", leido: "Kébin" }, brenda: { escrito: "Brenda", leido: "Brenda" }, rota: { escrito: "", leido: "x" } }).map((r) => r.escrito),
+  ["Brenda", "Kevin"],
+);
+
 // Lista de la pantalla: lo nuevo arriba, un "volver a llamar" no se duplica, máximo 8.
 const ll = (id, citaId) => ({ id, citaId, codigo: citaId, destino: "x", estacionId: "cardiologia", enMs: 0 });
 let lista = [];

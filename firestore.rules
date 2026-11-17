@@ -978,7 +978,9 @@ service cloud.firestore {
     // el asistente administrativo solo el catálogo de servicios y camas.
     match /configuracion/{docId} {
       allow read:  if true;
-      allow write: if isAdmin() || (isAsistenteEsdomed() && docId == 'servicios');
+      // pronunciacion_ce: diccionario de voz de las pantallas de Consulta Externa.
+      allow write: if isAdmin() || (isAsistenteEsdomed() && docId == 'servicios')
+                   || (isEsdomed() && docId == 'pronunciacion_ce');
     }
   }
 }

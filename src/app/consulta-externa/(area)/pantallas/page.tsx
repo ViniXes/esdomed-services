@@ -2,11 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { ExternalLink, Play, Tv, Volume2 } from "lucide-react";
-import { alCambiarVoces, anunciarLlamado, esperarVoces, textoLlamado, vozDisponible } from "@/lib/consultaExterna/voz";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  alCambiarVoces,
+  anunciarLlamado,
+  CLAVE_VOZ_PANTALLA,
+  elegirVoz,
+  esperarVoces,
+  textoLlamado,
+  vozDisponible,
+} from "@/lib/consultaExterna/voz";
+import { aplicarPronunciacion, type ReglaPronunciacion } from "@/lib/consultaExterna/pronunciacion";
+import { escucharPronunciacion } from "@/lib/consultaExterna/pronunciacionDatos";
+import { DiccionarioPronunciacion } from "@/components/consultaExterna/DiccionarioPronunciacion";
 
 const TEXTO_EJEMPLO = textoLlamado({ expediente: "11431-26", paciente: "María Pilar López Gonzales", destino: "Estación Hematología" });
 
+function vozGuardadaEnEsteEquipo(): string {
+  try { return localStorage.getItem(CLAVE_VOZ_PANTALLA) ?? ""; } catch { return ""; }
+}
+
 export default function PantallasPage() {
+  const { profile } = useAuth();
+  const [reglas, setReglas] = useState<ReglaPronunciacion[]>([]);
   const [voces, setVoces] = useState<SpeechSynthesisVoice[]>([]);
   const [cargando, setCargando] = useState(true);
   const [vozNombre, setVozNombre] = useState("");
@@ -16,11 +34,12 @@ export default function PantallasPage() {
 
   useEffect(() => {
     let vivo = true;
-    // Conserva la voz elegida si sigue en la lista; si no, la más recomendable.
+    // Conserva la voz elegida si sigue en la lista; si no, la de la pantalla
+    // de este equipo (si es la computadora de la TV) o la más recomendable.
     const actualizar = (v: SpeechSynthesisVoice[]) => {
       if (!vivo) return;
       setVoces(v);
-      setVozNombre((previa) => (v.some((x) => x.name === previa) ? previa : v[0]?.name ?? ""));
+      setVozNombre((previa) => (v.some((x) => x.name === previa) ? previa : elegirVoz(v, vozGuardadaEnEsteEquipo())?.name ?? ""));
       setCargando(false);
     };
     esperarVoces().then(actualizar);
@@ -28,10 +47,14 @@ export default function PantallasPage() {
     return () => { vivo = false; dejar(); };
   }, []);
 
+  useEffect(() => escucharPronunciacion(setReglas), []);
+
+  const vozElegida = voces.find((v) => v.name === vozNombre) ?? null;
+
   const probar = async () => {
     setSonando(true);
     try {
-      await anunciarLlamado(texto, voces.find((v) => v.name === vozNombre) ?? null, velocidad);
+      await anunciarLlamado(aplicarPronunciacion(texto, reglas), vozElegida, velocidad);
     } finally {
       setSonando(false);
     }
@@ -56,8 +79,8 @@ export default function PantallasPage() {
         <ol className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
           <li>1. En la computadora conectada a la TV, inicie sesión y abra la pantalla; póngala en pantalla completa con F11.</li>
           <li>
-            2. La voz se activa <strong>en cada equipo</strong> con el botón discreto «Sin voz / Voz activada» al pie de la pantalla, y
-            queda guardada en ese navegador. Actívela en una sola pantalla por zona: dos que se oyen desde el mismo lugar hacen eco.
+            2. La voz se activa y se elige <strong>en cada equipo</strong> con el botón discreto «Sin voz / Voz: …» al pie de la
+            pantalla, y queda guardada en ese navegador. Recomendada: Lorena o Rodrigo (El Salvador). Actívela en una sola pantalla por zona: dos que se oyen desde el mismo lugar hacen eco.
           </li>
           <li>3. Con la voz activada, el navegador pide un toque en la pantalla cada vez que se abre.</li>
         </ol>
@@ -90,7 +113,9 @@ export default function PantallasPage() {
             <h2 className="font-heading text-base font-bold text-slate-900 dark:text-slate-100">Prueba de voz en este equipo</h2>
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Escuche cómo sonará un llamado con las voces que trae esta computadora. Haga la prueba en la que irá conectada a la TV.
+            Escuche cómo sonará un llamado con las voces que trae esta computadora (con el diccionario de pronunciación ya
+            aplicado). Haga la prueba en la que irá conectada a la TV. La voz de cada pantalla se elige en la propia pantalla, con
+            el botón del pie.
           </p>
 
           {cargando ? (
@@ -152,6 +177,10 @@ export default function PantallasPage() {
             </div>
           )}
         </div>
+      </section>
+
+      <section>
+        <DiccionarioPronunciacion reglas={reglas} voz={vozElegida} velocidad={velocidad} porNombre={profile?.nombre ?? ""} />
       </section>
     </div>
   );

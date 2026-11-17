@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Megaphone, Volume2, VolumeX, WifiOff } from "lucide-react";
-import { alCambiarVoces, anunciarLlamado, esperarVoces, prepararSonido, textoLlamado } from "@/lib/consultaExterna/voz";
+import { Megaphone, Play, Volume2, VolumeX, WifiOff, X } from "lucide-react";
+import {
+  alCambiarVoces,
+  anunciarLlamado,
+  CLAVE_VOZ_PANTALLA,
+  elegirVoz,
+  esperarVoces,
+  nombreCortoVoz,
+  prepararSonido,
+  textoLlamado,
+} from "@/lib/consultaExterna/voz";
+import { aplicarPronunciacion, type ReglaPronunciacion } from "@/lib/consultaExterna/pronunciacion";
+import { escucharPronunciacion } from "@/lib/consultaExterna/pronunciacionDatos";
 import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
 import { agregarLlamado, destinoEstacion, MAX_LLAMADOS_PANTALLA, tituloLlamado, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
 import type { EstacionCEId } from "@/lib/consultaExterna/especialidades";
@@ -20,9 +31,12 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // traen código, se siguen viendo con su código.
 //
 // Escucha un solo documento (consulta_externa_llamados/{hoy}) y anuncia solo
-// los llamados nuevos. La voz se activa por equipo (queda en este navegador):
-// dos pantallas que se oyen desde el mismo lugar harían eco. Con ?demo=1 no
-// lee Firestore y ofrece "Simular llamado" para probar el diseño y la voz.
+// los llamados nuevos. La voz se activa y se elige por equipo, desde el botón
+// del pie (queda en este navegador): dos pantallas que se oyen desde el mismo
+// lugar harían eco. Antes de leer, cada llamado pasa por el diccionario de
+// pronunciación (configuracion/pronunciacion_ce), para que los nombres de
+// origen inglés no se lean en inglés. Con ?demo=1 no escucha los llamados y
+// ofrece "Simular llamado" para probar el diseño y la voz.
 
 // Datos inventados, solo para el modo de prueba.
 const EJEMPLOS: { expediente: string; paciente: string; estacionId: EstacionCEId }[] = [
@@ -50,8 +64,13 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
   const [sinConexion, setSinConexion] = useState(false);
   const [voz, setVoz] = useState(false);
   const [sonidoListo, setSonidoListo] = useState(false);
+  const [voces, setVoces] = useState<SpeechSynthesisVoice[]>([]);
+  const [vocesListas, setVocesListas] = useState(false);
+  const [vozNombre, setVozNombre] = useState("");
+  const [panelVoz, setPanelVoz] = useState(false);
 
   const vozRef = useRef<SpeechSynthesisVoice | null>(null);
+  const reglasRef = useRef<ReglaPronunciacion[]>([]);
   const hablar = useRef(false);
   const vistos = useRef<Set<string> | null>(null);
   const siguiente = useRef(0);
@@ -63,12 +82,22 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     hablar.current = voz && sonidoListo;
   }, [voz, sonidoListo]);
 
+  // La voz guardada en este equipo, o la más recomendable (nunca una que no sea en español).
+  const vozActual = elegirVoz(voces, vozNombre);
+  useEffect(() => {
+    vozRef.current = vozActual;
+  }, [vozActual]);
+
+  // Diccionario de pronunciación: un documento que casi nunca cambia.
+  useEffect(() => escucharPronunciacion((reglas) => { reglasRef.current = reglas; }), []);
+
   // Reloj, cambio de día y voces.
   useEffect(() => {
     try {
       // Preferencia de este equipo (no existe en SSR).
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVoz(localStorage.getItem(CLAVE_VOZ) === "1");
+      setVozNombre(localStorage.getItem(CLAVE_VOZ_PANTALLA) ?? "");
     } catch { /* sin almacenamiento: sin voz */ }
     const tick = () => {
       setAhora(Date.now());
@@ -77,16 +106,28 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     };
     tick();
     const t = setInterval(tick, 1000);
-    const elegir = (v: SpeechSynthesisVoice[]) => { vozRef.current = v[0] ?? null; };
-    esperarVoces().then(elegir);
-    const dejar = alCambiarVoces(elegir);
+    const recibir = (v: SpeechSynthesisVoice[]) => {
+      setVoces(v);
+      setVocesListas(true);
+    };
+    esperarVoces().then(recibir);
+    const dejar = alCambiarVoces(recibir);
     return () => { clearInterval(t); dejar(); };
   }, []);
 
-  const anunciarEnCola = (l: LlamadoPantalla) => {
-    if (!hablar.current) return;
-    cola.current = cola.current.then(() => anunciarLlamado(textoLlamado(l), vozRef.current));
-  };
+  // Solo usan refs: estables, el efecto de los llamados no se reinicia por ellas.
+  const leerEnCola = useCallback((l: Pick<LlamadoPantalla, "paciente" | "expediente" | "codigo" | "destino">) => {
+    cola.current = cola.current.then(() =>
+      anunciarLlamado(aplicarPronunciacion(textoLlamado(l), reglasRef.current), vozRef.current),
+    );
+  }, []);
+
+  const anunciarEnCola = useCallback(
+    (l: LlamadoPantalla) => {
+      if (hablar.current) leerEnCola(l);
+    },
+    [leerEnCola],
+  );
 
   const destellar = () => {
     setDestello(true);
@@ -119,7 +160,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
         setSinConexion(true);
       },
     );
-  }, [demo, fecha]);
+  }, [demo, fecha, anunciarEnCola]);
 
   const simular = () => {
     setSonidoListo(true);
@@ -155,6 +196,17 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     if (nueva) activarSonido();
     else setSonidoListo(true); // el clic ya habilita el sonido en el navegador
     try { localStorage.setItem(CLAVE_VOZ, nueva ? "1" : "0"); } catch { /* sin almacenamiento */ }
+  };
+
+  const cambiarVoz = (nombre: string) => {
+    setVozNombre(nombre);
+    try { localStorage.setItem(CLAVE_VOZ_PANTALLA, nombre); } catch { /* sin almacenamiento */ }
+  };
+
+  // Lee un llamado de ejemplo con la voz elegida (el clic también habilita el sonido).
+  const probarVoz = () => {
+    setSonidoListo(true);
+    leerEnCola({ ...EJEMPLOS[0], destino: destinoEstacion(EJEMPLOS[0].estacionId) });
   };
 
   const [actual, ...anteriores] = llamados;
@@ -260,14 +312,74 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
           {/* Discreto a propósito: se configura una vez por equipo. */}
           <button
             type="button"
-            onClick={alternarVoz}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-cyan-50/60 transition-colors hover:bg-white/10 hover:text-white"
+            onClick={() => setPanelVoz((p) => !p)}
+            aria-expanded={panelVoz}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/10 hover:text-white ${
+              voz && vocesListas && !vozActual ? "text-amber-200" : "text-cyan-50/60"
+            }`}
           >
             {voz ? <Volume2 size={14} aria-hidden="true" /> : <VolumeX size={14} aria-hidden="true" />}
-            {voz ? "Voz activada" : "Sin voz"}
+            {!voz ? "Sin voz" : vozActual ? `Voz: ${nombreCortoVoz(vozActual.name)}` : vocesListas ? "Sin voz en español" : "Voz activada"}
           </button>
         </div>
       </footer>
+
+      {panelVoz && (
+        <div
+          role="dialog"
+          aria-label="Voz de esta pantalla"
+          className="absolute bottom-[calc(3.2vh+2rem)] right-[3vw] z-10 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-[#0d2739]/95 p-4 text-sm shadow-2xl backdrop-blur"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-heading text-base font-bold">Voz de esta pantalla</p>
+            <button type="button" onClick={() => setPanelVoz(false)} className="rounded-lg p-1.5 text-cyan-50/70 hover:bg-white/10 hover:text-white" aria-label="Cerrar">
+              <X size={16} />
+            </button>
+          </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-2.5">
+            <input type="checkbox" checked={voz} onChange={alternarVoz} className="h-4 w-4 accent-cyan-400" />
+            Leer los llamados en voz alta
+          </label>
+          <p className="mt-1 text-xs text-cyan-50/60">
+            Actívela en una sola pantalla por zona: dos que se oyen desde el mismo lugar hacen eco.
+          </p>
+          {voces.length === 0 ? (
+            <p className={`mt-3 text-xs ${vocesListas ? "text-amber-200" : "text-cyan-50/60"}`}>
+              {vocesListas
+                ? "Este navegador no tiene voces en español: el llamado saldría en inglés. Abra la pantalla en Microsoft Edge."
+                : "Buscando voces…"}
+            </p>
+          ) : (
+            <div className="mt-3 flex items-end gap-2">
+              <label className="block min-w-0 flex-1">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-cyan-100/70">Voz</span>
+                <select
+                  value={vozActual?.name ?? ""}
+                  onChange={(e) => cambiarVoz(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/20 bg-[#0d2739] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-300"
+                >
+                  {voces.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {nombreCortoVoz(v.name)}{v.localService ? "" : " · en línea"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={probarVoz}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold transition-colors hover:bg-white/20"
+              >
+                <Play size={14} aria-hidden="true" />
+                Probar
+              </button>
+            </div>
+          )}
+          <p className="mt-3 text-xs text-cyan-50/60">
+            Si un nombre se oye en inglés, agréguelo al diccionario de pronunciación en Consulta Externa → Pantallas.
+          </p>
+        </div>
+      )}
 
       {/* El navegador no deja sonar nada hasta el primer toque en la página. */}
       {voz && !sonidoListo && (
