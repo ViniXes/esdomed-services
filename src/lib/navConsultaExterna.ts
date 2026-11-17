@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, CalendarRange, FileUp, LayoutDashboard, ListOrdered, Megaphone, Settings2, Tv, UserPlus } from "lucide-react";
+import { CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -29,13 +29,9 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     ],
   },
   {
-    titulo: "Citas 2027",
-    icon: CalendarRange,
-    visibleSi: registraCitas2027,
-    entradas: [
-      { href: "/consulta-externa/citas-2027", label: "Registrar citas", icon: CalendarPlus, exact: true },
-      { href: "/consulta-externa/citas-2027/catalogo", label: "Catálogo de agendas", icon: Settings2, visibleSi: gestionaConsultaExterna },
-    ],
+    // Una sola pantalla: formulario arriba y lista abajo, como Control de ingresos.
+    // El catálogo de agendas se abre desde un botón de esa pantalla (solo gestión).
+    entradas: [{ href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 }],
   },
   {
     titulo: "Llamados",
