@@ -3,7 +3,7 @@ import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
 import { construirMenu, type EntradaNav, type SeccionNav } from "@/lib/navRegistro";
-import { esCuentaEstacion, gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
+import { esAgendaCE, esCuentaEstacion, gestionaConsultaExterna, registraCitas2027, veLlamadosCE } from "@/lib/accesoConsultaExterna";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -30,15 +30,16 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
   {
     titulo: "Citas 2027",
     icon: CalendarRange,
-    visibleSi: gestionaConsultaExterna,
+    visibleSi: registraCitas2027,
     entradas: [
       { href: "/consulta-externa/citas-2027", label: "Registrar citas", icon: CalendarPlus, exact: true },
-      { href: "/consulta-externa/citas-2027/catalogo", label: "Catálogo de agendas", icon: Settings2 },
+      { href: "/consulta-externa/citas-2027/catalogo", label: "Catálogo de agendas", icon: Settings2, visibleSi: gestionaConsultaExterna },
     ],
   },
   {
     titulo: "Llamados",
     icon: Megaphone,
+    visibleSi: veLlamadosCE,
     entradas: [
       { href: "/consulta-externa/estacion", label: "Estación de especialidad", icon: ListOrdered },
       { href: "/consulta-externa/pantallas", label: "Pantallas de llamados", icon: Tv, visibleSi: gestionaConsultaExterna },
@@ -59,6 +60,6 @@ export function navItemsConsultaExterna(profile: Perfil): NavItem[] {
 
 /** Salida al panel principal; la cuenta de estación no tiene otro panel. */
 export function regresoConsultaExterna(profile: Perfil): { href: string; label: string } | undefined {
-  if (!profile || esCuentaEstacion(profile)) return undefined;
+  if (!profile || esCuentaEstacion(profile) || esAgendaCE(profile)) return undefined;
   return { href: "/dashboard", label: "Volver al panel" };
 }

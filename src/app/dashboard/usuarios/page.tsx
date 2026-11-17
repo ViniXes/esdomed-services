@@ -117,6 +117,7 @@ const roleColors: Record<UserRole, string> = {
   isbm_supervisor: "bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900",
   isbm_jefe: "bg-fuchsia-50 dark:bg-fuchsia-950 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-900",
   consulta_externa: "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 border-blue-200 dark:border-cyan-900",
+  agenda_ce: "bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-900",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -136,6 +137,7 @@ const roleLabels: Record<UserRole, string> = {
   isbm_supervisor: "Supervisor ISBM",
   isbm_jefe: "Jefe ISBM",
   consulta_externa: "Estación Consulta Externa",
+  agenda_ce: "Agenda de citas Consulta Externa",
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -155,6 +157,8 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "isbm_jefe", label: "Jefe ISBM" },
   // Cuenta compartida de la estación de enfermería de una especialidad.
   { value: "consulta_externa", label: "Estación Consulta Externa" },
+  // Solo registra citas 2027 en Consulta Externa (paso previo a ser ESDOMED).
+  { value: "agenda_ce", label: "Agenda de citas Consulta Externa (solo citas 2027)" },
   { value: "admin", label: "Administrador Superusuario" },
 ];
 

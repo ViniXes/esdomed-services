@@ -15,6 +15,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
 import { CitasProgramadasPdf } from "@/components/consultaExterna/CitasProgramadasPdf";
 import {
   ANIO_PROGRAMACION,
@@ -95,6 +96,7 @@ export default function Citas2027Page() {
     [user, profile],
   );
 
+  const editaCatalogo = gestionaConsultaExterna(profile);
   const [catalogo, setCatalogo] = useState<CatalogoGuardado | null | undefined>(undefined);
   const [errorCatalogo, setErrorCatalogo] = useState("");
 
@@ -382,12 +384,14 @@ export default function Citas2027Page() {
             escritos igual que en el SIS.
           </p>
         </div>
-        <Link
-          href="/consulta-externa/citas-2027/catalogo"
-          className={`${boton} border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800`}
-        >
-          <Settings2 size={16} /> Catálogo
-        </Link>
+        {editaCatalogo && (
+          <Link
+            href="/consulta-externa/citas-2027/catalogo"
+            className={`${boton} border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800`}
+          >
+            <Settings2 size={16} /> Catálogo
+          </Link>
+        )}
       </div>
 
       {errorCatalogo && <p className="text-sm text-rose-600">{errorCatalogo}</p>}
@@ -395,10 +399,16 @@ export default function Citas2027Page() {
       {!catalogo ? (
         <div className={`${tarjeta} text-sm text-slate-600 dark:text-slate-300`}>
           Todavía no hay catálogo de médicos, consultorios y horarios.{" "}
-          <Link href="/consulta-externa/citas-2027/catalogo" className="font-semibold text-blue-600 underline">
-            Créelo desde el libro de agendas
-          </Link>{" "}
-          antes de registrar citas.
+          {editaCatalogo ? (
+            <>
+              <Link href="/consulta-externa/citas-2027/catalogo" className="font-semibold text-blue-600 underline">
+                Créelo desde el libro de agendas
+              </Link>{" "}
+              antes de registrar citas.
+            </>
+          ) : (
+            "Pida al administrador que lo cree para poder registrar citas."
+          )}
         </div>
       ) : (
         <section className={tarjeta}>

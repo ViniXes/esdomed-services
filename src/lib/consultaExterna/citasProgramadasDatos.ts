@@ -117,18 +117,32 @@ export async function buscarPacientePorExpediente(expedienteCrudo: string): Prom
   const expediente = normalizarExpediente(expedienteCrudo);
   if (!expediente) return null;
 
-  const prog = await getDocs(query(collection(db, COL_CITAS_PROGRAMADAS), where("expediente", "==", expediente), limit(1)));
-  if (!prog.empty) {
+  // Cada fuente por separado: si una falla (sin permiso o sin red), se sigue con la siguiente.
+  const intentar = async <T,>(f: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await f();
+    } catch (e) {
+      console.warn("Búsqueda de paciente: una fuente no respondió", e);
+      return null;
+    }
+  };
+
+  const prog = await intentar(() =>
+    getDocs(query(collection(db, COL_CITAS_PROGRAMADAS), where("expediente", "==", expediente), limit(1))),
+  );
+  if (prog && !prog.empty) {
     return { expediente, nombre: String(prog.docs[0].data().paciente ?? ""), fuente: "citas 2027" };
   }
 
-  const ce = await getDocs(query(collection(db, "consulta_externa_citas"), where("expediente", "==", expediente), limit(1)));
-  if (!ce.empty) {
+  const ce = await intentar(() =>
+    getDocs(query(collection(db, "consulta_externa_citas"), where("expediente", "==", expediente), limit(1))),
+  );
+  if (ce && !ce.empty) {
     return { expediente, nombre: String(ce.docs[0].data().paciente ?? ""), fuente: "agenda de consulta externa" };
   }
 
-  const persona = await getDoc(doc(db, "personas", expediente));
-  if (persona.exists()) {
+  const persona = await intentar(() => getDoc(doc(db, "personas", expediente)));
+  if (persona?.exists()) {
     const p = persona.data() as { apellidos?: string; nombres?: string };
     const apellidos = limpiarTexto(p.apellidos ?? "");
     const nombres = limpiarTexto(p.nombres ?? "");
