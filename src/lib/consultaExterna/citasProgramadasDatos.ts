@@ -12,7 +12,8 @@ import {
   updateDoc,
   where,
   writeBatch,
-  type Timestamp,
+  arrayUnion,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -62,6 +63,18 @@ export interface CitaProgramada extends DatosCitaProgramada {
   motivoAnulacion?: string;
   actualizadoPor?: string;
   actualizadoEn?: Timestamp | null;
+  editadaPor?: string;
+  editadaPorNombre?: string;
+  editadaEn?: Timestamp | null;
+  /** Cada corrección guarda cómo estaba la cita antes (quién, cuándo, qué). */
+  historialEdiciones?: EdicionCita[];
+}
+
+export interface EdicionCita {
+  en: Timestamp;
+  por: string;
+  porNombre: string;
+  antes: DatosCitaProgramada & { origenNombre: "services" | "manual" };
 }
 
 export type CitaProgramadaConId = CitaProgramada & { id: string };
@@ -213,6 +226,51 @@ export async function crearCitaProgramada(
     creadaEn: serverTimestamp(),
   });
   return ref.id;
+}
+
+/** Campos de la cita que se pueden corregir (los mismos que se escriben al crearla). */
+const CAMPOS_EDITABLES = [
+  "fecha", "especialidad", "medicoId", "medico", "consultorio", "franjaInicio", "franjaFin",
+  "expediente", "paciente", "tipo", "observaciones",
+] as const satisfies readonly (keyof DatosCitaProgramada)[];
+
+/**
+ * Corrige una cita pendiente (mal digitada). Solo las pendientes: una ya
+ * registrada en el SIS se corrige allá y aquí primero se devuelve a pendiente.
+ * Guarda en historialEdiciones cómo estaba antes, para que quede rastro.
+ */
+export async function editarCitaProgramada(
+  cita: CitaProgramadaConId,
+  datos: DatosCitaProgramada,
+  origenNombre: "services" | "manual",
+  usuario: Usuario,
+): Promise<void> {
+  if (cita.estado !== "pendiente") throw new Error("Solo se pueden corregir citas pendientes de pasar al SIS.");
+  const limpio: DatosCitaProgramada = {
+    ...datos,
+    expediente: normalizarExpediente(datos.expediente),
+    paciente: limpiarTexto(datos.paciente),
+    observaciones: limpiarTexto(datos.observaciones),
+  };
+  const errores = validarCita(limpio);
+  if (errores.length) throw new Error(errores.join(" "));
+  const antes = Object.fromEntries(CAMPOS_EDITABLES.map((k) => [k, cita[k] ?? ""])) as unknown as DatosCitaProgramada;
+  const edicion: EdicionCita = {
+    en: Timestamp.now(),
+    por: usuario.uid,
+    porNombre: usuario.nombre,
+    antes: { ...antes, origenNombre: cita.origenNombre },
+  };
+  await updateDoc(doc(db, COL_CITAS_PROGRAMADAS, cita.id), {
+    ...limpio,
+    origenNombre,
+    editadaPor: usuario.uid,
+    editadaPorNombre: usuario.nombre,
+    editadaEn: serverTimestamp(),
+    historialEdiciones: arrayUnion(edicion),
+    actualizadoPor: usuario.uid,
+    actualizadoEn: serverTimestamp(),
+  });
 }
 
 /** Marca varias citas como ya ingresadas en el SIS (lotes de 400). */
