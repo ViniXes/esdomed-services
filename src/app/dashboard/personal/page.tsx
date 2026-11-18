@@ -7,7 +7,7 @@ import { collection, doc, getDoc, getDocs, query, where } from "@/lib/firestoreM
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import type { PlanTrabajo, UserProfile } from "@/types";
-import { COLOR_GRUPO, PERIODO_ACTUAL, labelPeriodo, ordenGrupo } from "@/lib/esdomed/plan";
+import { COLOR_GRUPO, PERIODO_ACTUAL, compararFilasPlan, labelPeriodo, ordenGrupo } from "@/lib/esdomed/plan";
 import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
 import { esEnMemoria, fechaBajaCorta } from "@/lib/bajaUsuarios";
 
@@ -45,7 +45,8 @@ export default function PersonalTrabajoPage() {
     if (!role || !ROLES_PERMITIDOS.has(role)) return;
     let cancelado = false;
     Promise.all([
-      getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"]))),
+      // agenda_ce: personal ESDOMED destacado en Consulta Externa (está en el plan).
+      getDocs(query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin", "agenda_ce"]))),
       getDoc(doc(db, "planes_trabajo", PERIODO_ACTUAL)),
     ])
       .then(([snap, planSnap]) => {
@@ -85,6 +86,20 @@ export default function PersonalTrabajoPage() {
     return (u: Persona) => porUid.get(u.uid) || porCodigo.get(normalizarCodigoMarcacion(u.codigoMarcacion)) || "";
   }, [plan]);
 
+  // Posición de cada persona en el plan del mes (mismo orden que el editor y la
+  // impresión); quien no tiene fila va al final, por nombre.
+  const posicionEnPlan = useMemo(() => {
+    const porUid = new Map<string, number>();
+    const porCodigo = new Map<string, number>();
+    [...(plan?.filas ?? [])].sort(compararFilasPlan).forEach((f, i) => {
+      if (f.uid) porUid.set(f.uid, i);
+      const c = normalizarCodigoMarcacion(f.codigoMarcacion);
+      if (c) porCodigo.set(c, i);
+    });
+    return (u: Persona) =>
+      porUid.get(u.uid) ?? porCodigo.get(normalizarCodigoMarcacion(u.codigoMarcacion)) ?? Number.MAX_SAFE_INTEGER;
+  }, [plan]);
+
   const enMemoria = useMemo(
     () => personal.filter(esEnMemoria).sort((a, b) => a.nombre.localeCompare(b.nombre)),
     [personal],
@@ -106,9 +121,11 @@ export default function PersonalTrabajoPage() {
       })
       .map(([grupo, personas]) => ({
         grupo,
-        personas: personas.sort((a, b) => a.nombre.localeCompare(b.nombre)),
+        personas: personas.sort(
+          (a, b) => posicionEnPlan(a) - posicionEnPlan(b) || a.nombre.localeCompare(b.nombre),
+        ),
       }));
-  }, [personal, grupoDe]);
+  }, [personal, grupoDe, posicionEnPlan]);
 
   const totalVigentes = personal.length - enMemoria.length;
   const palabrasBusqueda = normalizarBusqueda(busqueda).split(/\s+/).filter(Boolean);
