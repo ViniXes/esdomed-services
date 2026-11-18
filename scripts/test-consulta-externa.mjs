@@ -330,6 +330,15 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
   assert.equal(c.pasoPendienteMensaje("Ana López", { indicacion: "consultorio", especialidadId: "oncologia", numero: "2" }), "");
   assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "estacion", especialidadId: "cirugia_torax" }), "");
   assert.equal(c.destinoMensaje({ ...sin, indicacion: "estacion", especialidadId: "cirugia_torax" }), "Estación Cardiología");
+  // Trabajo Social no lleva especialidad; "Texto libre" hay que elegirlo y no lleva destino.
+  assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "trabajo_social" }), "");
+  assert.equal(c.destinoMensaje({ ...sin, indicacion: "trabajo_social", especialidadId: "oncologia" }), "Trabajo Social");
+  assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "libre" }), "");
+  assert.equal(c.destinoMensaje({ indicacion: "libre", especialidadId: "oncologia", numero: "2" }), "", "texto libre: solo el mensaje");
+  assert.equal(c.pasoPendienteMensaje(" ", { ...sin, indicacion: "libre" }), "texto", "texto libre igual pide el texto");
+  for (const i of ["signos", "consultorio", "estacion"]) assert.equal(c.pideEspecialidad(i), true, i);
+  for (const i of ["", "trabajo_social", "libre"]) assert.equal(c.pideEspecialidad(i), false, i);
+  assert.equal(textoLlamado({ paciente: "Rosa Cruz", destino: c.DESTINO_TRABAJO_SOCIAL }), "Rosa Cruz. Acercarse a trabajo Social.");
   assert.equal(textoLlamado({ paciente: "Rosa Cruz", destino: c.destinoEstacionDe("hematologia") }), "Rosa Cruz. Acercarse a estación Hematología.");
   const m = c.crearMensajePantalla({ texto: "rosa cruz", destino: " Toma de signos vitales de Hematología ", porNombre: "Mensajes CE" }, 1000);
   assert.deepEqual(m, {

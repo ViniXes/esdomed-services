@@ -8,6 +8,7 @@ import {
   Check,
   ClipboardCheck,
   DoorOpen,
+  HeartHandshake,
   Loader2,
   LogOut,
   Megaphone,
@@ -15,6 +16,7 @@ import {
   RotateCcw,
   Send,
   Stethoscope,
+  Type,
   X,
 } from "lucide-react";
 import {
@@ -22,6 +24,7 @@ import {
   MAX_MENSAJE_PANTALLA,
   nombreParaLlamado,
   pasoPendienteMensaje,
+  pideEspecialidad,
   textoParaPantalla,
   type EleccionDestino,
   type LlamadoPantalla,
@@ -42,9 +45,10 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // del día (la carga ESDOMED); al elegir uno, el mensaje lleva su expediente y
 // su nombre. Quien no está citado se escribe a mano, como texto libre. Abajo,
 // se marca a dónde ir: toma de signos vitales, un consultorio o la estación
-// (cuando solo falta despacharlo), siempre con su especialidad. Todos los pasos
-// son obligatorios (pasoPendienteMensaje): mientras falte uno no se envía, y
-// el aviso bajo el botón dice cuál.
+// (cuando solo falta despacharlo), siempre con su especialidad, o Trabajo
+// Social. Si no aplica ninguna se marca "Texto libre" (solo el mensaje). Todos
+// los pasos son obligatorios (pasoPendienteMensaje), también elegir "Texto
+// libre": mientras falte uno no se envía, y el aviso bajo el botón dice cuál.
 //
 // La agenda se lee una vez, al empezar a escribir, y se renueva cada 10
 // minutos. Lo enviado hoy queda en este equipo (localStorage) para repetirlo,
@@ -89,7 +93,7 @@ const destinoDe = destinoMensaje;
 /** Qué falta, dicho como instrucción. */
 function avisoPaso(paso: PasoMensaje, indicacion: Indicacion): string {
   if (paso === "texto") return "Escriba el expediente, el nombre o el mensaje.";
-  if (paso === "destino") return "Elija a dónde debe ir: signos vitales, consultorio o estación.";
+  if (paso === "destino") return "Elija a dónde debe ir, o «Texto libre» si no aplica ninguna.";
   if (paso === "numero") return "Elija el número del consultorio.";
   if (indicacion === "estacion") return "Elija la estación.";
   return indicacion === "signos" ? "Elija la especialidad de los signos vitales." : "Elija la especialidad del consultorio.";
@@ -247,7 +251,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
     if (pasoPendienteMensaje(textoEnviar, eleccionEnviar)) throw new Error("Mensaje incompleto: falta un paso del flujo");
     const fecha = hoyLocalISO();
     const l = await publicarMensajePantalla(fecha, { texto: textoEnviar, destino: destinoDe(eleccionEnviar), expediente }, porNombre);
-    if (eleccionEnviar.indicacion !== "") {
+    if (pideEspecialidad(eleccionEnviar.indicacion) && especialidadPorId(eleccionEnviar.especialidadId)) {
       guardarJSON(CLAVE_CONSULTORIO, { especialidadId: eleccionEnviar.especialidadId, numero: eleccionEnviar.numero });
     }
     const nuevo: Enviado = { ...l, fecha, eleccion: eleccionEnviar };
@@ -492,7 +496,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
               <Paso n={2} hecho={!!eleccion.indicacion} />
               ¿A dónde debe ir?
             </legend>
-            <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
               <OpcionDestino
                 activo={eleccion.indicacion === "signos"}
                 onClick={() => marcar("signos")}
@@ -514,9 +518,27 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
                 titulo="Estación"
                 detalle="Para despachar"
               />
+              <OpcionDestino
+                activo={eleccion.indicacion === "trabajo_social"}
+                onClick={() => marcar("trabajo_social")}
+                icon={HeartHandshake}
+                titulo="Trabajo Social"
+                detalle="Sin especialidad"
+              />
+            </div>
+            {/* Ninguna aplica: se elige a propósito, para que nadie envíe sin destino por olvido. */}
+            <div className="mt-2 sm:mt-2.5">
+              <OpcionDestino
+                fila
+                activo={eleccion.indicacion === "libre"}
+                onClick={() => marcar("libre")}
+                icon={Type}
+                titulo="Texto libre"
+                detalle="Si no aplica ninguna: solo el mensaje"
+              />
             </div>
 
-            {eleccion.indicacion !== "" && (
+            {pideEspecialidad(eleccion.indicacion) && (
               <div className="mt-2.5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <p className={`${rotulo} flex items-center`}>
                   <Paso n={3} hecho={!!esp} />
@@ -656,6 +678,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
             <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
               {enviados.map((r) => {
                 const enCurso = ocupado === r.citaId;
+                const completo = pasoPendienteMensaje(r.paciente ?? "", r.eleccion ?? SIN_ELECCION) === "";
                 return (
                   <li key={r.citaId} className="flex items-center gap-1 py-1.5 pl-1.5 pr-1.5">
                     <button
@@ -673,13 +696,15 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
                       <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
                         {horaCorta(r.enMs)}
                         {r.expediente ? ` · Exp. ${r.expediente}` : ""} ·{" "}
-                        {r.quitado ? "Quitado de la pantalla" : r.destino || "Sin destino"}
+                        {r.quitado
+                          ? "Quitado de la pantalla"
+                          : r.destino || (r.eleccion?.indicacion === "libre" ? "Texto libre" : "Sin destino")}
                       </span>
                     </button>
-                    {/* Sin destino (enviado antes de que fuera obligatorio): se completa arriba en vez de repetirse. */}
+                    {/* Incompleto (enviado antes de que el destino fuera obligatorio): se completa arriba en vez de repetirse. */}
                     <button
                       type="button"
-                      onClick={() => (r.destino ? void repetir(r) : corregir(r))}
+                      onClick={() => (completo ? void repetir(r) : corregir(r))}
                       disabled={enCurso}
                       className={`inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold disabled:opacity-60 ${tactil} ${
                         repetido === r.citaId
@@ -691,12 +716,12 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
                         <Loader2 size={16} className="animate-spin" aria-hidden="true" />
                       ) : repetido === r.citaId ? (
                         <Check size={16} strokeWidth={2.75} aria-hidden="true" />
-                      ) : r.destino ? (
+                      ) : completo ? (
                         <RotateCcw size={16} aria-hidden="true" />
                       ) : (
                         <PencilLine size={16} aria-hidden="true" />
                       )}
-                      {repetido === r.citaId ? "Enviado" : r.destino ? "Repetir" : "Completar"}
+                      {repetido === r.citaId ? "Enviado" : completo ? "Repetir" : "Completar"}
                     </button>
                     {/* Quitado: un hueco del mismo ancho, para que "Repetir" no se corra. */}
                     {r.quitado ? (
@@ -730,27 +755,33 @@ function OpcionDestino({
   icon: Icon,
   titulo,
   detalle,
+  fila = false,
 }: {
   activo: boolean;
   onClick: () => void;
   icon: typeof Stethoscope;
   titulo: string;
   detalle: string;
+  /** A lo ancho y con el detalle siempre visible (la opción "Texto libre"). */
+  fila?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-pressed={activo}
       onClick={onClick}
-      // Tres opciones en fila: el ícono va arriba del título para que quepan en el celular.
-      className={`flex flex-col items-start gap-2 rounded-2xl border p-3 text-left ${tactil} ${
+      // En el celular van de dos en dos, con el ícono a la izquierda; desde sm,
+      // las cuatro en fila con el ícono arriba del título.
+      className={`flex w-full items-center gap-2.5 rounded-2xl border p-2.5 text-left ${
+        fila ? "" : "sm:flex-col sm:items-start sm:gap-2 sm:p-3"
+      } ${tactil} ${
         activo
           ? "border-cyan-600 bg-cyan-50 ring-1 ring-cyan-600 dark:border-cyan-500 dark:bg-cyan-950/50 dark:ring-cyan-500"
-          : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
+          : `${fila ? "border-dashed border-slate-300" : "border-slate-200"} bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600`
       }`}
     >
       <span
-        className={`relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-colors ${
+        className={`relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10 ${
           activo ? "bg-cyan-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
         }`}
       >
@@ -768,7 +799,7 @@ function OpcionDestino({
       <span className="min-w-0">
         <span className="block text-sm font-semibold leading-tight text-slate-900 dark:text-white">{titulo}</span>
         {/* En el celular basta el título; el detalle partido en dos líneas alargaba las tarjetas. */}
-        <span className="hidden text-xs leading-tight text-slate-500 sm:block dark:text-slate-400">{detalle}</span>
+        <span className={`${fila ? "block" : "hidden sm:block"} text-xs leading-tight text-slate-500 dark:text-slate-400`}>{detalle}</span>
       </span>
     </button>
   );

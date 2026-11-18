@@ -319,7 +319,8 @@ export function tituloLlamado(l: Pick<LlamadoPantalla, "paciente" | "codigo">): 
 // del día (la carga ESDOMED), se busca por expediente o nombre y el mensaje
 // lleva su expediente; si no, se escribe el texto libre. Después elige a dónde
 // va (obligatorio): la toma de signos vitales, un consultorio o la estación
-// (para despacharlo), siempre con su especialidad.
+// (para despacharlo), siempre con su especialidad, o Trabajo Social. Si no
+// aplica ninguna, se elige "Texto libre" y la pantalla muestra solo el texto.
 
 /** Largo máximo del mensaje: con más, ya no se lee de lejos en la TV. */
 export const MAX_MENSAJE_PANTALLA = 80;
@@ -370,8 +371,16 @@ export function destinoConsultorioDe(especialidadId: string, numero: string): st
   return esp && n ? `Consultorio ${n} de ${esp.nombre}` : "";
 }
 
-/** A dónde va el mensaje (pedido del usuario, 2026-11-18): solo estas tres. */
-export type IndicacionMensaje = "" | "signos" | "consultorio" | "estacion";
+/** Trabajo Social es un solo lugar para toda Consulta Externa: no lleva especialidad. */
+export const DESTINO_TRABAJO_SOCIAL = "Trabajo Social";
+
+/**
+ * A dónde va el mensaje (pedido del usuario, 2026-11-18): signos vitales,
+ * consultorio, estación o Trabajo Social. Si no aplica ninguna se marca
+ * "libre" (solo el texto, sin "Acercarse a"): también hay que elegirlo, para
+ * que nadie envíe sin destino por olvido. "" = aún no eligió.
+ */
+export type IndicacionMensaje = "" | "signos" | "consultorio" | "estacion" | "trabajo_social" | "libre";
 
 export interface EleccionDestino {
   indicacion: IndicacionMensaje;
@@ -381,11 +390,20 @@ export interface EleccionDestino {
   numero: string;
 }
 
-/** "Toma de signos vitales de Cardiología", "Consultorio 3 de Cardiología" o "Estación Cardiología"; "" si falta algo. */
+/** Las que dicen de qué especialidad (o estación) se trata. */
+export function pideEspecialidad(indicacion: IndicacionMensaje): boolean {
+  return indicacion === "signos" || indicacion === "consultorio" || indicacion === "estacion";
+}
+
+/**
+ * "Toma de signos vitales de Cardiología", "Consultorio 3 de Cardiología",
+ * "Estación Cardiología" o "Trabajo Social"; "" en texto libre o si falta algo.
+ */
 export function destinoMensaje(e: EleccionDestino): string {
   if (e.indicacion === "signos") return destinoSignosVitales(e.especialidadId);
   if (e.indicacion === "consultorio") return destinoConsultorioDe(e.especialidadId, e.numero);
   if (e.indicacion === "estacion") return destinoEstacionDe(e.especialidadId);
+  if (e.indicacion === "trabajo_social") return DESTINO_TRABAJO_SOCIAL;
   return "";
 }
 
@@ -394,11 +412,13 @@ export type PasoMensaje = "texto" | "destino" | "especialidad" | "numero";
 /**
  * Lo primero que falta para poder enviar, en el orden del flujo; "" si está
  * completo. Todo es obligatorio (pedido del usuario, 2026-11-18): el texto, a
- * dónde va, la especialidad (o la estación) y, en consultorio, el número.
+ * dónde va (o "Texto libre", elegido a propósito), la especialidad (o la
+ * estación) y, en consultorio, el número.
  */
 export function pasoPendienteMensaje(texto: string, e: EleccionDestino): PasoMensaje | "" {
   if (textoParaPantalla(texto).length < 2) return "texto";
   if (!e.indicacion) return "destino";
+  if (!pideEspecialidad(e.indicacion)) return "";
   if (!especialidadPorId(e.especialidadId)) return "especialidad";
   if (!destinoMensaje(e)) return "numero";
   return "";

@@ -24,6 +24,7 @@ import {
   destinoDelLlamado,
   destinoEstacion,
   destinoSignosVitales,
+  DESTINO_TRABAJO_SOCIAL,
   MAX_LLAMADOS_PANTALLA,
   tituloLlamado,
   type LlamadoPantalla,
@@ -40,8 +41,8 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // debe acercarse (decisión del usuario, 2026-11-17; antes era un código y el
 // consultorio, para no mostrar nombres). Los llamados anteriores, que solo
 // traen código, se siguen viendo con su código. Los de Mensajes a pantalla
-// (2026-11-18) son texto libre: el destino es opcional y, sin él, no se
-// muestra el recuadro "Acercarse a".
+// (2026-11-18) son texto libre: "Texto libre" (y los mensajes viejos) no
+// llevan destino y, sin él, no se muestra el recuadro "Acercarse a".
 //
 // Escucha un solo documento (consulta_externa_llamados/{hoy}) y anuncia solo
 // los llamados nuevos. La voz se activa y se elige por equipo, desde el botón
@@ -53,7 +54,7 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 
 // Datos inventados, solo para el modo de prueba. Cubren los llamados de la
 // estación (a la estación, a un consultorio elegido, solo por nombre) y los
-// mensajes (a signos vitales, a un consultorio y sin destino).
+// mensajes (a signos vitales, a un consultorio, a Trabajo Social y texto libre).
 type Ejemplo =
   | { expediente?: string; paciente: string; estacionId: EstacionCEId; consultorio?: string }
   | { mensaje: string; destino: string };
@@ -63,6 +64,7 @@ const EJEMPLOS: Ejemplo[] = [
   { expediente: "45210-24", paciente: "Ana Gabriela Rivas Hernández", estacionId: "infectologia", consultorio: "Infectologia - 2" },
   { mensaje: "Carlos Ernesto Pineda Flores", destino: destinoConsultorioDe("oncologia", "2") },
   { paciente: "José Antonio Martínez de León", estacionId: "cardiologia" },
+  { mensaje: "Luis Alberto Gómez Portillo", destino: DESTINO_TRABAJO_SOCIAL },
   { mensaje: "Familiares de Juan Francisco Alvarado Mejía, favor pasar a enfermería", destino: "" },
 ];
 
