@@ -924,7 +924,8 @@ service cloud.firestore {
     // del personal: cualquier miembro de ESDOMED puede consultar su horario; solo
     // el asistente administrativo y admin pueden crear/editar el plan.
     match /planes_trabajo/{periodo} {
-      allow read:   if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      // agenda_ce (administrativas de Consulta Externa) solo lee su horario.
+      allow read:   if isEsdomed() || isAsistenteEsdomed() || isAdmin() || isAgendaCE();
       allow create: if isAsistenteEsdomed() || isAdmin();
       allow update: if isAsistenteEsdomed() || isAdmin();
       allow delete: if isAdmin();
@@ -934,7 +935,7 @@ service cloud.firestore {
     // (doc id = año). La arman el admin y el asistente administrativo; el
     // personal la ve en "Mi horario" y el editor del plan la lee para marcar VAC.
     match /vacaciones_programadas/{anio} {
-      allow read:  if isEsdomed() || isAsistenteEsdomed() || isAdmin();
+      allow read:  if isEsdomed() || isAsistenteEsdomed() || isAdmin() || isAgendaCE();
       allow write: if isAsistenteEsdomed() || isAdmin();
     }
 

@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -33,7 +33,11 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
   {
     // Una sola pantalla: formulario arriba y lista abajo, como Control de ingresos.
     // El catálogo de agendas se abre desde un botón de esa pantalla (solo gestión).
-    entradas: [{ href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 }],
+    entradas: [
+      { href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 },
+      // agenda_ce consulta su horario en el plan de trabajo ESDOMED (solo lectura).
+      { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, visibleSi: esAgendaCE },
+    ],
   },
   {
     titulo: "Llamados",
