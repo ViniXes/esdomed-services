@@ -92,9 +92,13 @@ export function esperarVoces(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]> 
 
 const minusculaInicial = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
+/** Cierra la frase con punto, salvo que ya termine en un signo. */
+const conPunto = (t: string) => (/[.!?…]$/.test(t) ? t : `${t}.`);
+
 /**
  * Texto que se lee (pedido del usuario, 2026-11-17): expediente, nombre y el
  * destino, que es la estación salvo que ella elija el consultorio (2026-11-18).
+ * Un mensaje a pantalla se lee tal cual, con su destino si lo lleva.
  * "Expediente 11431 guion 26, María Pilar López Gonzales. Acercarse a estación
  * Cardiología." / "… Acercarse a consultorio 3 de Cardiología." El guion se
  * dice, para que el número no se lea como una resta. Los llamados anteriores
@@ -102,14 +106,15 @@ const minusculaInicial = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
  * "hache, e, doce").
  */
 export function textoLlamado(l: { paciente?: string; expediente?: string; codigo?: string; destino: string }): string {
-  const destino = `Acercarse a ${minusculaInicial(String(l.destino ?? "").trim())}.`;
+  const lugar = String(l.destino ?? "").trim();
+  const destino = lugar ? ` Acercarse a ${minusculaInicial(lugar)}.` : "";
   if (l.paciente) {
     const expediente = l.expediente ? `Expediente ${l.expediente.replace(/-/g, " guion ")}, ` : "";
-    return `${expediente}${l.paciente}. ${destino}`;
+    return `${expediente}${conPunto(l.paciente.trim())}${destino}`;
   }
   const [letras = "", numero = ""] = String(l.codigo ?? "").split("-");
   const deletreo = letras.split("").join(" ");
-  return `Turno ${deletreo} ${Number(numero) || numero}. ${destino}`;
+  return `Turno ${deletreo} ${Number(numero) || numero}.${destino}`;
 }
 
 // Un solo AudioContext para toda la página: crearlo y cerrarlo en cada llamado
@@ -157,8 +162,8 @@ export async function tocarAviso(): Promise<void> {
   await new Promise((r) => setTimeout(r, 1000));
 }
 
-/** Veces que se lee cada llamado con un solo clic (pedido del usuario: 2). */
-export const REPETICIONES_LLAMADO = 2;
+/** Veces que se lee cada llamado con un solo clic (pedido del usuario: 3, desde el 2026-11-18; antes 2). */
+export const REPETICIONES_LLAMADO = 3;
 const PAUSA_ENTRE_REPETICIONES_MS = 700;
 
 /** Un llamado completo: un "din-don" y el texto leído REPETICIONES_LLAMADO veces. */

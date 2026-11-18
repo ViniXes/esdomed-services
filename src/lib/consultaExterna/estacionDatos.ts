@@ -19,6 +19,7 @@ import { COL_CITAS_CE } from "./agendaDatos";
 import {
   agregarLlamado,
   aplicarAccion,
+  crearMensajePantalla,
   destinoDelLlamado,
   ETIQUETA_ESTADO,
   idLlamadoManual,
@@ -59,7 +60,7 @@ export function escucharCitasEstacion(
   );
 }
 
-/** Todas las citas del día, una sola vez (recepción de primera vez). */
+/** Todas las citas del día, una sola vez (recepción de primera vez y Mensajes a pantalla). */
 export async function leerCitasDelDia(fechaISO: string): Promise<CitaCEConId[]> {
   const snap = await getDocs(query(collection(db, COL_CITAS_CE), where("fecha", "==", fechaISO)));
   return snap.docs.map((d) => aCita(d.id, d.data() as CitaCE));
@@ -237,6 +238,22 @@ export async function publicarLlamadoManual(
 }
 
 /**
+ * Mensaje escrito en Mensajes a pantalla (cuenta general mensajes_ce): texto
+ * libre y, si se eligió, a dónde ir. Como el llamado manual, solo toca el
+ * documento de las pantallas. Mandar el mismo texto otra vez reemplaza su
+ * entrada (idMensajePantalla) y la pantalla lo vuelve a anunciar.
+ */
+export async function publicarMensajePantalla(
+  fechaISO: string,
+  datos: { texto: string; destino: string; expediente?: string },
+  porNombre: string,
+): Promise<LlamadoPantalla> {
+  const nuevo = crearMensajePantalla({ ...datos, porNombre });
+  await cambiarLlamados(fechaISO, (ultimos) => agregarLlamado(ultimos, nuevo));
+  return nuevo;
+}
+
+/**
  * Deja las pantallas en "Esperando llamados" (solo el admin, pedido del
  * usuario 2026-11-18). Solo vacía la lista que muestran las TVs: las citas
  * conservan su estado y su historial, y las pantallas no anuncian nada al
@@ -257,7 +274,7 @@ export async function limpiarPantallas(fechaISO: string, porNombre: string): Pro
   );
 }
 
-/** Saca de las pantallas un llamado manual (p. ej. el nombre se escribió mal). */
+/** Saca de las pantallas un llamado manual o un mensaje (p. ej. el nombre se escribió mal). */
 export async function quitarLlamadoDePantalla(fechaISO: string, citaId: string): Promise<void> {
   await cambiarLlamados(fechaISO, (ultimos) => {
     const quedan = quitarLlamadosDeCita(ultimos, citaId);

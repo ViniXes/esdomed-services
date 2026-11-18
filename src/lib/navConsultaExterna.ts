@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, Tv, UserPlus } from "lucide-react";
+import { CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -13,6 +13,8 @@ type Perfil = UserProfile | null | undefined;
 //
 // La pantalla de llamados (/consulta-externa/pantalla) no está en el menú: va a
 // pantalla completa, sin menú, y se abre desde "Pantallas de llamados".
+// "Mensaje a pantalla" sí está, pero también abre sin menú (es la única página
+// de la cuenta de mensajes, que la usa desde el celular).
 
 export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
   {
@@ -38,6 +40,7 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     icon: Megaphone,
     visibleSi: veLlamadosCE,
     entradas: [
+      { href: "/consulta-externa/mensajes", label: "Mensaje a pantalla", icon: MessageSquareText },
       { href: "/consulta-externa/estacion", label: "Estación de especialidad", icon: ListOrdered },
       { href: "/consulta-externa/pantallas", label: "Pantallas de llamados", icon: Tv, visibleSi: gestionaConsultaExterna },
     ],

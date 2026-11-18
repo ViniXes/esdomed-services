@@ -23,6 +23,12 @@ export interface EspecialidadCE {
   estacion: EstacionCEId;
   /** Otras formas en que el SIS podría escribirla (se comparan sin tildes ni caja). */
   alias?: string[];
+  /**
+   * Consultorios numerados de la especialidad (1..n), para elegirlos con un
+   * toque en Mensajes a pantalla. Sale del catálogo de agendas
+   * (catalogoCitasSemilla.json); la prueba verifica que coincidan.
+   */
+  consultorios: number;
 }
 
 export interface EstacionCE {
@@ -31,16 +37,17 @@ export interface EstacionCE {
 }
 
 export const ESPECIALIDADES_CE: EspecialidadCE[] = [
-  { id: "hematologia", nombre: "Hematología", prefijo: "HE", estacion: "hematologia" },
-  { id: "oncologia", nombre: "Oncología", prefijo: "ON", estacion: "oncologia" },
-  { id: "cardiologia", nombre: "Cardiología", prefijo: "CA", estacion: "cardiologia" },
-  { id: "infectologia", nombre: "Infectología", prefijo: "IN", estacion: "infectologia" },
+  { id: "hematologia", nombre: "Hematología", prefijo: "HE", estacion: "hematologia", consultorios: 5 },
+  { id: "oncologia", nombre: "Oncología", prefijo: "ON", estacion: "oncologia", consultorios: 2 },
+  { id: "cardiologia", nombre: "Cardiología", prefijo: "CA", estacion: "cardiologia", consultorios: 6 },
+  { id: "infectologia", nombre: "Infectología", prefijo: "IN", estacion: "infectologia", consultorios: 2 },
   {
     id: "cirugia_cardiovascular",
     nombre: "Cirugía Cardiovascular",
     prefijo: "CV",
     estacion: "cardiologia",
     alias: ["Cirugía Cardio Vascular", "Cirugía Cardíaca", "Cirugía Cardiaca"],
+    consultorios: 1,
   },
   {
     id: "cirugia_torax",
@@ -48,6 +55,7 @@ export const ESPECIALIDADES_CE: EspecialidadCE[] = [
     prefijo: "CT",
     estacion: "cardiologia",
     alias: ["Cirugía Torácica", "Cirugía Toráxica", "Cirugía Tórax"],
+    consultorios: 1,
   },
 ];
 

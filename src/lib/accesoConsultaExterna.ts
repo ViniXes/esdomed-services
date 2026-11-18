@@ -9,6 +9,9 @@ import type { UserProfile } from "@/types";
 //   pantalla de llamados (las reglas solo le dejan leer los llamados del día),
 //   no se cierra por inactividad y no pide términos: no es una persona. Así no
 //   queda una cuenta con permisos sesionada en un equipo de la sala de espera.
+// - Cuenta de mensajes (`mensajes_ce`): cuenta general que solo escribe lo que
+//   dirán las pantallas (Mensajes a pantalla). Las reglas solo le dejan leer y
+//   escribir los llamados del día.
 // - Gestión (carga de citas del SIS, recepción de primera vez, pantallas):
 //   ESDOMED y admin. Mientras el módulo está en construcción solo lo ve el
 //   admin; para abrirlo a ESDOMED basta con poner EN_CONSTRUCCION = false.
@@ -20,6 +23,8 @@ export const EN_CONSTRUCCION = true;
 export const esCuentaEstacion = (p: Perfil) => p?.role === "consulta_externa";
 
 export const esCuentaPantalla = (p: Perfil) => p?.role === "pantalla_ce";
+
+export const esCuentaMensajes = (p: Perfil) => p?.role === "mensajes_ce";
 
 /** Personal que por ahora solo registra las citas 2027 (rol agenda_ce). Su único portal es este. */
 export const esAgendaCE = (p: Perfil) => p?.role === "agenda_ce";
@@ -48,5 +53,14 @@ export const veLaPantallaCE = (p: Perfil) => gestionaConsultaExterna(p) || esCue
 /** Vaciar lo que muestran todas las pantallas (pedido del usuario: solo el admin). */
 export const limpiaPantallasCE = (p: Perfil) => esAdmin(p);
 
+/**
+ * Escribe mensajes para las pantallas (/consulta-externa/mensajes). No espera
+ * a EN_CONSTRUCCION: la cuenta de mensajes se usa ya (pedido del usuario, 2026-11-18).
+ */
+export const enviaMensajesCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p) || esCuentaMensajes(p);
+
 /** Adónde va la cuenta de pantalla al entrar al sistema. */
 export const RUTA_PANTALLA_CE = "/consulta-externa/pantalla";
+
+/** Adónde va la cuenta de mensajes al entrar al sistema: es su única página. */
+export const RUTA_MENSAJES_CE = "/consulta-externa/mensajes";

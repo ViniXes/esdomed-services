@@ -63,6 +63,15 @@
         ],
         "createdAt": "2026-11-06T20:48:48.563Z",
         "reason": "model triage: pencil icon is gray only at rest on a transparent background; hover switches background and text to blue together, so gray never sits on color"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/components/consultaExterna/MensajesPantalla.tsx"
+        ],
+        "createdAt": "2026-11-18T16:12:00.340Z",
+        "reason": "Claude: the gray X of 'Quitar' sits on the white list row; rose-50 bg only appears on hover together with rose-600 text"
       }
     ]
   }

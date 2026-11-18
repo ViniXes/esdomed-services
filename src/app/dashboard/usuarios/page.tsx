@@ -39,6 +39,16 @@ function CampoEstacionCE({ value, onChange }: { value: EstacionCEId | ""; onChan
   );
 }
 
+function AyudaMensajesCE() {
+  return (
+    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+      Cuenta general (p. ej. «speaker») que comparten todas las estaciones. Solo abre Mensajes a pantalla: busca al
+      paciente en la agenda del día por expediente o nombre, o se escribe el texto libre, y sale en las TVs. No ve nada
+      más del sistema.
+    </p>
+  );
+}
+
 function AyudaPantallaCE() {
   return (
     <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
@@ -128,6 +138,7 @@ const roleColors: Record<UserRole, string> = {
   consulta_externa: "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-cyan-300 border-blue-200 dark:border-cyan-900",
   agenda_ce: "bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-900",
   pantalla_ce: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+  mensajes_ce: "bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -149,6 +160,7 @@ const roleLabels: Record<UserRole, string> = {
   consulta_externa: "Estación Consulta Externa",
   agenda_ce: "Agenda de citas Consulta Externa",
   pantalla_ce: "Pantalla de llamados (TV)",
+  mensajes_ce: "Speaker (mensajes a pantalla)",
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -172,6 +184,8 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "agenda_ce", label: "Agenda de citas Consulta Externa (solo citas 2027)" },
   // La computadora de una TV: solo ve la pantalla de llamados.
   { value: "pantalla_ce", label: "Pantalla de llamados (TV de Consulta Externa)" },
+  // Cuenta general: solo escribe lo que dirán las TVs.
+  { value: "mensajes_ce", label: "Speaker: mensajes a pantalla (Consulta Externa)" },
   { value: "admin", label: "Administrador Superusuario" },
 ];
 
@@ -680,6 +694,7 @@ export default function DashboardUsuariosPage() {
               <CampoEstacionCE value={form.estacionCE} onChange={v => setForm(prev => ({ ...prev, estacionCE: v }))} />
             )}
             {form.userRole === "pantalla_ce" && <AyudaPantallaCE />}
+            {form.userRole === "mensajes_ce" && <AyudaMensajesCE />}
 
             {form.userRole === "medico" && (
               <>
@@ -1017,6 +1032,7 @@ export default function DashboardUsuariosPage() {
               </div>
 
               {editForm.userRole === "pantalla_ce" && <AyudaPantallaCE />}
+              {editForm.userRole === "mensajes_ce" && <AyudaMensajesCE />}
               {editForm.userRole === "consulta_externa" && (
                 <CampoEstacionCE
                   value={editForm.estacionCE}

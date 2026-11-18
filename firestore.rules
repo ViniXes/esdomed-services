@@ -57,6 +57,11 @@ service cloud.firestore {
     // espera, así que solo lee los llamados del día (lo mismo que muestra la
     // TV). Se excluye de lo que se abre a "cualquier usuario real".
     function isPantallaCE() { return isAuth() && getRole() == 'pantalla_ce'; }
+    // Cuenta general de Mensajes a pantalla (rol mensajes_ce, el "speaker" de
+    // todas las estaciones): lee las citas del día para buscar al paciente y
+    // escribe lo que dirán las TVs, nada más. También se excluye de lo abierto
+    // a "cualquier usuario real".
+    function isMensajesCE() { return isAuth() && getRole() == 'mensajes_ce'; }
     // Sesión real (no anónima). El formulario público de transporte usa sesiones
     // anónimas: NO deben poder leer datos internos del portal.
     function isRealUser() {
@@ -90,7 +95,7 @@ service cloud.firestore {
       // Sesiones anónimas: solo pueden intentar leer su propio doc (no existe),
       // necesario para que el AuthContext resuelva "sin perfil" sin error. La
       // cuenta de una pantalla de llamados (TV) solo lee el suyo.
-      allow read:   if (isAuth() && uid() == userId) || (isRealUser() && !isPantallaCE());
+      allow read:   if (isAuth() && uid() == userId) || (isRealUser() && !isPantallaCE() && !isMensajesCE());
       allow create: if isAdmin();
       // El admin puede actualizar cualquier campo. Además, cada usuario puede
       // registrar SOLO su propia aceptación de términos (generales y/o los
@@ -589,7 +594,7 @@ service cloud.firestore {
                   && nuevo.censoNoAplica.porUid == uid()
                   && nuevo.censoNoAplica.en == request.time));
       }
-      allow read:   if isRealUser() && !isPantallaCE();
+      allow read:   if isRealUser() && !isPantallaCE() && !isMensajesCE();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin() || (isMedico() && soloMarcaNoAplicaCenso());
       allow delete: if isAdmin();
@@ -617,7 +622,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /consulta_externa_citas/{id} {
-      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna() || isAgendaCE();
+      // mensajes_ce (speaker): solo lee, para buscar al paciente por expediente o nombre.
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna() || isAgendaCE() || isMensajesCE();
       allow create: if (isEsdomed() || isAdmin())
                     && request.resource.data.cargadaPor == uid()
                     && request.resource.data.estado == 'citado';
@@ -666,8 +672,18 @@ service cloud.firestore {
     // Últimos llamados del día: lo único que escuchan las pantallas (1 documento).
     // La cuenta de pantalla (TV) solo lee.
     match /consulta_externa_llamados/{fecha} {
-      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna() || isPantallaCE();
+      allow read:   if isEsdomed() || isAdmin() || isConsultaExterna() || isPantallaCE() || isMensajesCE();
       allow create, update: if isEsdomed() || isAdmin() || isConsultaExterna();
+      // Mensajes a pantalla: solo la lista de llamados (no la marca de limpieza del admin).
+      allow create: if isMensajesCE()
+                    && request.resource.data.keys().hasOnly(['fecha', 'ultimos', 'actualizadoEn'])
+                    && request.resource.data.fecha == fecha
+                    && request.resource.data.ultimos is list
+                    && request.resource.data.ultimos.size() <= 8;
+      allow update: if isMensajesCE()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimos', 'actualizadoEn'])
+                    && request.resource.data.ultimos is list
+                    && request.resource.data.ultimos.size() <= 8;
       allow delete: if isAdmin();
     }
 

@@ -27,6 +27,7 @@ const VALID_ROLES = new Set<UserRole>([
   "consulta_externa",
   "agenda_ce",
   "pantalla_ce",
+  "mensajes_ce",
 ]);
 
 function esPersonalEsdomed(role: string | undefined) {

@@ -21,6 +21,7 @@ export default function Home() {
     else if (profile?.role === "consulta_externa") router.replace("/consulta-externa");
     else if (profile?.role === "agenda_ce") router.replace("/consulta-externa/citas-2027");
     else if (profile?.role === "pantalla_ce") router.replace("/consulta-externa/pantalla");
+    else if (profile?.role === "mensajes_ce") router.replace("/consulta-externa/mensajes");
     else if (profile) router.replace("/dashboard");
     // Sesión sin perfil (anónima del formulario público de transporte): al login.
     else router.replace("/login");

@@ -295,6 +295,68 @@ assert.ok(acceso.limpiaPantallasCE(conRol("admin")));
 for (const r of ["esdomed", "asistente_esdomed", "consulta_externa", "pantalla_ce", "agenda_ce"]) {
   assert.equal(acceso.limpiaPantallasCE(conRol(r)), false, r);
 }
+// Mensajes a pantalla: la cuenta general, las estaciones y gestión; la cuenta general no entra a nada más.
+for (const r of ["mensajes_ce", "consulta_externa", "admin"]) assert.ok(acceso.enviaMensajesCE(conRol(r)), r);
+for (const r of ["pantalla_ce", "agenda_ce", "medico", "esdomed"]) assert.equal(acceso.enviaMensajesCE(conRol(r)), false, r);
+assert.equal(acceso.entraConsultaExterna(conRol("mensajes_ce")), false, "la cuenta de mensajes no abre el subsistema");
+assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantalla de las TVs");
+
+// ── Mensajes a pantalla (cuenta general mensajes_ce, 2026-11-18) ──
+{
+  const c = cargar("circuito");
+  assert.equal(c.textoParaPantalla("  MARIA   LOPEZ  "), "Maria Lopez", "todo en mayúsculas pasa a nombre propio");
+  assert.equal(c.textoParaPantalla("familiares de jose perez, pasar a la ventanilla"), "Familiares de Jose Perez, Pasar a la Ventanilla");
+  assert.equal(c.textoParaPantalla("María López"), "María López", "lo escrito con mayúsculas y minúsculas no se toca");
+  assert.equal(c.textoParaPantalla("Ana, López"), "Ana, López", "un mensaje no se reordena como el nombre del SIS");
+  assert.equal(c.textoParaPantalla("x".repeat(120)).length, c.MAX_MENSAJE_PANTALLA);
+  assert.equal(c.idMensajePantalla("MARÍA López "), c.idMensajePantalla("maria lopez"), "el mismo texto reemplaza su entrada");
+  assert.notEqual(c.idMensajePantalla("Ana López"), c.idMensajePantalla("Rosa Rivas"));
+  assert.equal(c.destinoConsultorioDe("cardiologia", "3"), "Consultorio 3 de Cardiología");
+  assert.equal(c.destinoConsultorioDe("oncologia", " consultorio 2 "), "Consultorio 2 de Oncología");
+  assert.equal(c.destinoConsultorioDe("cardiologia", ""), "", "sin número no hay destino");
+  assert.equal(c.destinoConsultorioDe("", "3"), "", "sin especialidad no hay destino");
+  assert.equal(c.destinoSignosVitales("cardiologia"), "Toma de signos vitales de Cardiología");
+  assert.equal(c.destinoSignosVitales(""), "", "signos vitales pide la especialidad");
+  const m = c.crearMensajePantalla({ texto: "rosa cruz", destino: " Toma de signos vitales de Hematología ", porNombre: "Mensajes CE" }, 1000);
+  assert.deepEqual(m, {
+    id: `${c.idMensajePantalla("rosa cruz")}#1000`,
+    citaId: c.idMensajePantalla("rosa cruz"),
+    paciente: "Rosa Cruz",
+    destino: "Toma de signos vitales de Hematología",
+    enMs: 1000,
+    manual: true,
+    mensaje: true,
+    porNombre: "Mensajes CE",
+  }, "sin expediente ni estación: Firestore no acepta undefined en el arreglo");
+  // Paciente elegido de la agenda: lleva su expediente y se agrupa por él.
+  const conExp = c.crearMensajePantalla({ texto: "María López", destino: "", porNombre: "speaker", expediente: " 11431 - 26 " }, 5);
+  assert.equal(conExp.expediente, "11431-26");
+  assert.equal(conExp.citaId, "mensaje:exp:11431-26");
+  assert.equal(
+    c.crearMensajePantalla({ texto: "Maria Lopez G.", destino: "", porNombre: "s", expediente: "11431-26" }).citaId,
+    conExp.citaId,
+    "corregir el nombre no duplica al paciente en la pantalla",
+  );
+  assert.equal("expediente" in m, false);
+  assert.equal(textoLlamado(conExp), "Expediente 11431 guion 26, María López.");
+  assert.equal(textoLlamado({ paciente: "Rosa Cruz", destino: "" }), "Rosa Cruz.", "sin destino solo se lee el mensaje");
+  assert.equal(textoLlamado({ paciente: "¿Quién olvidó una sombrilla?", destino: "" }), "¿Quién olvidó una sombrilla?");
+  assert.equal(
+    textoLlamado({ paciente: "Rosa Cruz", destino: c.destinoSignosVitales("oncologia") }),
+    "Rosa Cruz. Acercarse a toma de signos vitales de Oncología.",
+  );
+  // Los consultorios que se eligen con un toque salen del catálogo de agendas.
+  const { ESPECIALIDADES_CE, resolverEspecialidad: resolver } = cargar("especialidades");
+  const semilla = JSON.parse(readFileSync(new URL("../src/lib/consultaExterna/catalogoCitasSemilla.json", import.meta.url), "utf8"));
+  const porEspecialidad = {};
+  for (const k of semilla.consultorios) {
+    const e = resolver(k.especialidad);
+    assert.ok(e, `especialidad del catálogo: ${k.especialidad}`);
+    const n = Number(String(k.nombre).match(/-\s*(\d+)$/)?.[1]);
+    porEspecialidad[e.id] = Math.max(porEspecialidad[e.id] ?? 0, n);
+  }
+  for (const e of ESPECIALIDADES_CE) assert.equal(e.consultorios, porEspecialidad[e.id] ?? 0, `consultorios de ${e.nombre}`);
+}
 
 // ── Búsqueda para marcar llegada ──
 const { coincideCita } = cargar("busqueda");

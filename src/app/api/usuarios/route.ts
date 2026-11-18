@@ -25,6 +25,7 @@ const VALID_ROLES = new Set<UserRole>([
   "consulta_externa",
   "agenda_ce",
   "pantalla_ce",
+  "mensajes_ce",
 ]);
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {

@@ -191,20 +191,29 @@ export interface LlamadoPantalla {
    * idLlamadoManual() si la enfermera escribió los datos a mano.
    */
   citaId: string;
-  /** En orden natural, listo para mostrar y leer (ver nombreParaLlamado). */
+  /**
+   * En orden natural, listo para mostrar y leer (ver nombreParaLlamado). En
+   * un mensaje (`mensaje: true`) es el texto que se escribió para la pantalla.
+   */
   paciente?: string;
   expediente?: string;
   /** Solo en los llamados anteriores al 2026-11-17. */
   codigo?: string;
-  /** "Estación Cardiología", o el consultorio que eligió la estación (ver destinoDelLlamado). */
+  /**
+   * "Estación Cardiología", o el consultorio que eligió la estación (ver
+   * destinoDelLlamado). En un mensaje puede ir vacío: la pantalla solo muestra el texto.
+   */
   destino: string;
-  estacionId: EstacionCEId;
+  /** La estación que llamó; los mensajes no la llevan (la cuenta es de todas). */
+  estacionId?: EstacionCEId;
   /** Milisegundos (Date.now()); en un arreglo no cabe serverTimestamp. */
   enMs: number;
   /** Escrito a mano en la estación: paciente que no está en la agenda del día. */
   manual?: boolean;
   /** Quién lo escribió (solo en los manuales, que no tienen cita con historial). */
   porNombre?: string;
+  /** Texto libre de Mensajes a pantalla (ver crearMensajePantalla). */
+  mensaje?: boolean;
 }
 
 export const MAX_LLAMADOS_PANTALLA = 8;
@@ -234,6 +243,28 @@ const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y", "e", "vda.", "
 const mayusculaInicial = (palabra: string) =>
   palabra.replace(/(^|[-'’])([a-záéíóúüñ])/g, (_, sep: string, letra: string) => sep + letra.toUpperCase());
 
+/** "MARÍA DE LEÓN" → "María de León": cada palabra con mayúscula inicial, salvo las de `enMinuscula`. */
+function aNombrePropio(texto: string, enMinuscula: Set<string>): string {
+  return texto
+    .toLowerCase()
+    .split(" ")
+    .map((p, i) => (i > 0 && enMinuscula.has(p) ? p : mayusculaInicial(p)))
+    .join(" ");
+}
+
+/** Todo en mayúsculas o todo en minúsculas (y con letras). */
+const sinCaja = (t: string) => /[a-záéíóúüñ]/i.test(t) && (t === t.toUpperCase() || t === t.toLowerCase());
+
+/** Texto → clave para un id: sin tildes, minúsculas y guiones ("José Ñandú" → "jose-nandu"). */
+function claveTexto(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 /**
  * Nombre como se muestra y se lee en la pantalla. El SIS lo escribe
  * "Apellidos, Nombres"; aquí va en orden natural ("María Pilar López
@@ -249,14 +280,7 @@ export function nombreParaLlamado(nombre: string): string {
     const nombres = n.slice(coma + 1).replace(/,/g, " ").replace(/\s+/g, " ").trim();
     n = [nombres, apellidos].filter(Boolean).join(" ");
   }
-  if (n === n.toUpperCase() || n === n.toLowerCase()) {
-    n = n
-      .toLowerCase()
-      .split(" ")
-      .map((p, i) => (i > 0 && PARTICULAS.has(p) ? p : mayusculaInicial(p)))
-      .join(" ");
-  }
-  return n;
+  return sinCaja(n) ? aNombrePropio(n, PARTICULAS) : n;
 }
 
 /** Expediente escrito a mano, sin espacios: " 11431 - 26 " → "11431-26". */
@@ -273,13 +297,7 @@ export function limpiarExpediente(expediente: string): string {
 export function idLlamadoManual(estacionId: EstacionCEId, expediente: string, nombre = ""): string {
   const exp = limpiarExpediente(expediente);
   if (exp) return `manual:${estacionId}:${exp}`;
-  const claveNombre = nombreParaLlamado(nombre)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `manual:${estacionId}:nombre:${claveNombre}`;
+  return `manual:${estacionId}:nombre:${claveTexto(nombreParaLlamado(nombre))}`;
 }
 
 /** Destino de todo llamado: la estación de enfermería que llama ("Estación Cardiología"). */
@@ -290,4 +308,78 @@ export function destinoEstacion(estacionId: EstacionCEId): string {
 /** Lo que la pantalla muestra en grande: el nombre, o el código en los llamados anteriores. */
 export function tituloLlamado(l: Pick<LlamadoPantalla, "paciente" | "codigo">): string {
   return l.paciente || l.codigo || "";
+}
+
+// ─── Mensajes a pantalla (texto libre) ──────────────────────────────────────
+//
+// Desde el 2026-11-18 una cuenta general (rol mensajes_ce) escribe lo que debe
+// decir la pantalla, sin agenda ni expediente (decisión del usuario):
+// Hematología y Oncología comparten espacio, y las de Cardiología también, así
+// que cada quien escribe lo que necesita. Si el paciente está en la agenda
+// del día (la carga ESDOMED), se busca por expediente o nombre y el mensaje
+// lleva su expediente; si no, se escribe el texto libre. Si quiere, agrega a
+// dónde ir: la toma de signos vitales o un consultorio, siempre con su especialidad.
+
+/** Largo máximo del mensaje: con más, ya no se lee de lejos en la TV. */
+export const MAX_MENSAJE_PANTALLA = 80;
+
+/** "cardiologia" → "Toma de signos vitales de Cardiología"; "" sin especialidad. */
+export function destinoSignosVitales(especialidadId: string): string {
+  const esp = especialidadPorId(especialidadId);
+  return esp ? `Toma de signos vitales de ${esp.nombre}` : "";
+}
+
+/** Palabras que van en minúscula dentro de un mensaje ("Pasar A La Ventanilla" no). */
+const MINUSCULAS_MENSAJE = new Set([...PARTICULAS, "a", "al", "en", "con", "por", "para", "o", "u"]);
+
+/**
+ * El mensaje como se mostrará: espacios simples y, si viene todo en
+ * mayúsculas o todo en minúsculas, con mayúscula inicial en cada palabra (de
+ * lejos se lee mejor y la voz no deletrea las palabras cortas como siglas).
+ */
+export function textoParaPantalla(texto: string): string {
+  const t = String(texto ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_MENSAJE_PANTALLA).trim();
+  return sinCaja(t) ? aNombrePropio(t, MINUSCULAS_MENSAJE) : t;
+}
+
+/**
+ * Agrupa los envíos del mismo texto: volver a mandarlo (o mandarlo a otro
+ * lugar) reemplaza su entrada en la pantalla en vez de repetirla.
+ */
+export function idMensajePantalla(texto: string): string {
+  return `mensaje:${claveTexto(textoParaPantalla(texto))}`;
+}
+
+/** "cardiologia" + "3" → "Consultorio 3 de Cardiología"; "" si falta algo. */
+export function destinoConsultorioDe(especialidadId: string, numero: string): string {
+  const esp = especialidadPorId(especialidadId);
+  const n = String(numero ?? "")
+    .replace(/^\s*consultorio\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return esp && n ? `Consultorio ${n} de ${esp.nombre}` : "";
+}
+
+/**
+ * El mensaje listo para la lista de las pantallas (sin estación). Si se eligió
+ * al paciente de la agenda del día, lleva su expediente y se agrupa por él.
+ */
+export function crearMensajePantalla(
+  datos: { texto: string; destino: string; porNombre: string; expediente?: string },
+  ahora = Date.now(),
+): LlamadoPantalla {
+  const expediente = limpiarExpediente(datos.expediente ?? "");
+  const citaId = expediente ? `mensaje:exp:${expediente}` : idMensajePantalla(datos.texto);
+  return {
+    id: `${citaId}#${ahora}`,
+    citaId,
+    paciente: textoParaPantalla(datos.texto),
+    // Sin la clave, no vacía ni undefined: Firestore no acepta undefined dentro de un arreglo.
+    ...(expediente ? { expediente } : {}),
+    destino: String(datos.destino ?? "").trim(),
+    enMs: ahora,
+    manual: true,
+    mensaje: true,
+    porNombre: datos.porNombre,
+  };
 }

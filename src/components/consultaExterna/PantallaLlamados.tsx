@@ -19,8 +19,11 @@ import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   agregarLlamado,
+  crearMensajePantalla,
+  destinoConsultorioDe,
   destinoDelLlamado,
   destinoEstacion,
+  destinoSignosVitales,
   MAX_LLAMADOS_PANTALLA,
   tituloLlamado,
   type LlamadoPantalla,
@@ -36,7 +39,9 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // Cada llamado muestra expediente y nombre del paciente y la estación a la que
 // debe acercarse (decisión del usuario, 2026-11-17; antes era un código y el
 // consultorio, para no mostrar nombres). Los llamados anteriores, que solo
-// traen código, se siguen viendo con su código.
+// traen código, se siguen viendo con su código. Los de Mensajes a pantalla
+// (2026-11-18) son texto libre: el destino es opcional y, sin él, no se
+// muestra el recuadro "Acercarse a".
 //
 // Escucha un solo documento (consulta_externa_llamados/{hoy}) y anuncia solo
 // los llamados nuevos. La voz se activa y se elige por equipo, desde el botón
@@ -46,16 +51,46 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // origen inglés no se lean en inglés. Con ?demo=1 no escucha los llamados y
 // ofrece "Simular llamado" para probar el diseño y la voz.
 
-// Datos inventados, solo para el modo de prueba.
-// Cubren los tres casos: a la estación, a un consultorio elegido y solo por nombre.
-const EJEMPLOS: { expediente?: string; paciente: string; estacionId: EstacionCEId; consultorio?: string }[] = [
+// Datos inventados, solo para el modo de prueba. Cubren los llamados de la
+// estación (a la estación, a un consultorio elegido, solo por nombre) y los
+// mensajes (a signos vitales, a un consultorio y sin destino).
+type Ejemplo =
+  | { expediente?: string; paciente: string; estacionId: EstacionCEId; consultorio?: string }
+  | { mensaje: string; destino: string };
+const EJEMPLOS: Ejemplo[] = [
   { expediente: "11431-26", paciente: "María Pilar López Gonzales", estacionId: "hematologia" },
+  { mensaje: "Rosa Elena Cruz Ventura", destino: destinoSignosVitales("hematologia") },
   { expediente: "45210-24", paciente: "Ana Gabriela Rivas Hernández", estacionId: "infectologia", consultorio: "Infectologia - 2" },
+  { mensaje: "Carlos Ernesto Pineda Flores", destino: destinoConsultorioDe("oncologia", "2") },
   { paciente: "José Antonio Martínez de León", estacionId: "cardiologia" },
-  { expediente: "907-21", paciente: "Carlos Ernesto Pineda Flores", estacionId: "oncologia" },
-  { expediente: "33018-25", paciente: "Rosa Elena Cruz Ventura", estacionId: "hematologia" },
-  { expediente: "1502-26", paciente: "Juan Francisco Alvarado Mejía", estacionId: "cardiologia" },
+  { mensaje: "Familiares de Juan Francisco Alvarado Mejía, favor pasar a enfermería", destino: "" },
 ];
+
+/** Un ejemplo del modo de prueba, como llegaría en la lista de las pantallas. */
+function llamadoDeEjemplo(ejemplo: Ejemplo, ms: number): LlamadoPantalla {
+  if ("mensaje" in ejemplo) {
+    return { ...crearMensajePantalla({ texto: ejemplo.mensaje, destino: ejemplo.destino, porNombre: "Prueba" }, ms), id: `demo-${ms}` };
+  }
+  return {
+    id: `demo-${ms}`,
+    citaId: `demo-${ejemplo.expediente ?? ejemplo.paciente}`,
+    ...(ejemplo.expediente ? { expediente: ejemplo.expediente } : {}),
+    paciente: ejemplo.paciente,
+    destino: destinoDelLlamado(ejemplo.estacionId, ejemplo.consultorio),
+    estacionId: ejemplo.estacionId,
+    enMs: ms,
+  };
+}
+
+/**
+ * Tamaño del texto grande según su largo: un nombre se ve enorme; un mensaje
+ * de 80 letras baja de tamaño para caber completo sin cortarse.
+ */
+function tamanoTitulo(titulo: string): string {
+  if (titulo.length <= 34) return "line-clamp-3 text-[clamp(2.5rem,5.6vw,7.5rem)]";
+  if (titulo.length <= 56) return "line-clamp-3 text-[clamp(2.1rem,4.4vw,5.75rem)]";
+  return "line-clamp-4 text-[clamp(1.8rem,3.5vw,4.5rem)]";
+}
 
 const CLAVE_VOZ = "ce:pantalla:voz";
 /** Un llamado más viejo que esto no se anuncia (p. ej. la pantalla estuvo sin red). */
@@ -177,16 +212,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     hablar.current = voz;
     const ejemplo = EJEMPLOS[siguiente.current % EJEMPLOS.length];
     siguiente.current += 1;
-    const ms = Date.now();
-    const nuevo: LlamadoPantalla = {
-      id: `demo-${ms}`,
-      citaId: `demo-${ejemplo.expediente ?? ejemplo.paciente}`,
-      ...(ejemplo.expediente ? { expediente: ejemplo.expediente } : {}),
-      paciente: ejemplo.paciente,
-      destino: destinoDelLlamado(ejemplo.estacionId, ejemplo.consultorio),
-      estacionId: ejemplo.estacionId,
-      enMs: ms,
-    };
+    const nuevo = llamadoDeEjemplo(ejemplo, Date.now());
     setLlamados((prev) => agregarLlamado(prev, nuevo, MAX_LLAMADOS_PANTALLA));
     destellar();
     anunciarEnCola(nuevo);
@@ -216,7 +242,7 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
   // Lee un llamado de ejemplo con la voz elegida (el clic también habilita el sonido).
   const probarVoz = () => {
     setSonidoListo(true);
-    leerEnCola({ ...EJEMPLOS[0], destino: destinoEstacion(EJEMPLOS[0].estacionId) });
+    leerEnCola({ expediente: "11431-26", paciente: "María Pilar López Gonzales", destino: destinoEstacion("hematologia") });
   };
 
   const [actual, ...anteriores] = llamados;
@@ -261,13 +287,20 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
                   {actual.expediente}
                 </p>
               )}
-              <p className="mt-[2.5vh] line-clamp-3 max-w-[92%] font-heading text-[clamp(2.5rem,5.6vw,7.5rem)] font-extrabold leading-[1.05] tracking-tight [text-wrap:balance]">
+              <p
+                className={`mt-[2.5vh] max-w-[92%] font-heading font-extrabold leading-[1.05] tracking-tight [text-wrap:balance] ${tamanoTitulo(
+                  tituloLlamado(actual),
+                )}`}
+              >
                 {tituloLlamado(actual)}
               </p>
-              <div className="mt-[4vh] rounded-[1.2vw] bg-white/10 px-[2.5vw] py-[1.6vh]">
-                <p className="text-[clamp(0.9rem,1.3vw,1.6rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">Acercarse a</p>
-                <p className="font-heading text-[clamp(1.6rem,3.2vw,4rem)] font-bold leading-tight">{actual.destino}</p>
-              </div>
+              {/* Un mensaje puede ir sin destino: entonces solo se muestra el texto. */}
+              {actual.destino && (
+                <div className="mt-[4vh] rounded-[1.2vw] bg-white/10 px-[2.5vw] py-[1.6vh]">
+                  <p className="text-[clamp(0.9rem,1.3vw,1.6rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">Acercarse a</p>
+                  <p className="font-heading text-[clamp(1.6rem,3.2vw,4rem)] font-bold leading-tight">{actual.destino}</p>
+                </div>
+              )}
             </>
           ) : (
             <>
