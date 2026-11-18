@@ -1739,6 +1739,9 @@ export interface PlanTrabajo {
   metaHorasAdmin?: number; // Metas numéricas para validación
   metaHorasOperativas?: number;
   filas: FilaPlanTrabajo[];
+  // Personas del roster quitadas a mano de ESTE mes ("Quitar de este mes"): la
+  // sincronización con el roster no las vuelve a agregar. No pasa a meses nuevos.
+  quitados?: QuitadoPlanTrabajo[];
 
   // Trazabilidad
   creadoEn: Date;
@@ -1747,6 +1750,11 @@ export interface PlanTrabajo {
   actualizadoEn?: Date;
   actualizadoPorId?: string;
   actualizadoPorNombre?: string;
+}
+
+export interface QuitadoPlanTrabajo {
+  uid: string;
+  nombre: string;
 }
 
 // ============================================================================
