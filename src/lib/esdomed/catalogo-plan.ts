@@ -37,6 +37,9 @@ const CATALOGO_POR_CODIGO = new Map(
   CATALOGO_PERSONAL_PLAN.map((item) => [item.codigoMarcacion, item]),
 );
 
+/** Grupo que admite tanto jornada administrativa como operativa. */
+export const GRUPO_CONSULTA_EXTERNA = "Consulta Externa";
+
 export function normalizarCodigoMarcacion(codigo?: string | null): string {
   return (codigo ?? "").trim().toUpperCase();
 }
@@ -66,8 +69,10 @@ export function normalizarMetadatosFilaPlan(fila: FilaPlanTrabajo): FilaPlanTrab
     ...fila,
     codigoMarcacion: normalizarCodigoMarcacion(fila.codigoMarcacion),
     tipoJornada: administrativa ? "Administrativo" : "Operativo",
+    // Un administrativo va en el grupo "Administrativo", salvo el destacado en
+    // Consulta Externa: conserva ese grupo y su jornada de lunes a viernes.
     grupo: administrativa
-      ? "Administrativo"
+      ? (fila.grupo?.trim() === GRUPO_CONSULTA_EXTERNA ? GRUPO_CONSULTA_EXTERNA : "Administrativo")
       : (fila.grupo?.trim() || config?.grupoPredeterminado || ""),
   };
 }
