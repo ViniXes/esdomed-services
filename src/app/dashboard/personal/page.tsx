@@ -21,7 +21,6 @@ import { esEnMemoria, fechaBajaCorta } from "@/lib/bajaUsuarios";
 // homenaje. Queda concentrado en TarjetaMemorial para no contaminar el resto.
 
 const ROLES_PERMITIDOS = new Set(["esdomed", "asistente_esdomed", "admin"]);
-const SIN_GRUPO = "Sin grupo asignado este mes";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto" | "role" | "activo" | "baja">;
 
@@ -109,16 +108,15 @@ export default function PersonalTrabajoPage() {
     const mapa = new Map<string, Persona[]>();
     for (const u of personal) {
       if (esEnMemoria(u)) continue;
-      const g = grupoDe(u) || SIN_GRUPO;
+      // Quien no tiene fila en el plan del mes no es parte del personal de
+      // trabajo de ese mes (p. ej. cuentas genéricas): no se muestra.
+      const g = grupoDe(u);
+      if (!g) continue;
       if (!mapa.has(g)) mapa.set(g, []);
       mapa.get(g)!.push(u);
     }
     return [...mapa.entries()]
-      .sort(([a], [b]) => {
-        if (a === SIN_GRUPO) return 1;
-        if (b === SIN_GRUPO) return -1;
-        return ordenGrupo(a) - ordenGrupo(b) || a.localeCompare(b);
-      })
+      .sort(([a], [b]) => ordenGrupo(a) - ordenGrupo(b) || a.localeCompare(b))
       .map(([grupo, personas]) => ({
         grupo,
         personas: personas.sort(
@@ -127,7 +125,7 @@ export default function PersonalTrabajoPage() {
       }));
   }, [personal, grupoDe, posicionEnPlan]);
 
-  const totalVigentes = personal.length - enMemoria.length;
+  const totalVigentes = secciones.reduce((total, seccion) => total + seccion.personas.length, 0);
   const palabrasBusqueda = normalizarBusqueda(busqueda).split(/\s+/).filter(Boolean);
   const coincide = (persona: Persona, grupo: string) => {
     const texto = normalizarBusqueda([
