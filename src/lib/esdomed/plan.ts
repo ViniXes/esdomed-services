@@ -15,15 +15,18 @@ import {
 
 // ── Grupos de trabajo ────────────────────────────────────────────────────────
 // Cada empleado se asigna a un grupo dentro del mes (puede variar mes a mes).
+// Consulta Externa va justo después de Administrativo: su personal (Kathya y
+// Paola, administrativas destacadas en Consulta Externa) se presenta en la
+// nómina debajo del bloque administrativo (pedido del usuario, 2026-11-18).
 export const GRUPOS_ESDOMED = [
   "Administrativo",
+  "Consulta Externa",
   "Grupo 1",
   "Grupo 2",
   "Grupo 3",
   "Grupo 4",
   "Equipo de emergencia",
   "Equipo de apoyo diurno / emergencia",
-  "Consulta Externa",
 ] as const;
 
 export type GrupoEsdomed = (typeof GRUPOS_ESDOMED)[number];
