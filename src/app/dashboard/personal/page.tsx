@@ -53,7 +53,8 @@ export default function PersonalTrabajoPage() {
         const lista = snap.docs
           .map((d) => ({ uid: d.id, ...d.data() } as Persona))
           // Un admin solo cuenta como personal ESDOMED si tiene código de marcación.
-          .filter((u) => u.role !== "admin" || Boolean(u.codigoMarcacion?.trim()))
+          // Igual el asistente: su cuenta genérica ("admin", sin código) no es una persona.
+          .filter((u) => (u.role !== "admin" && u.role !== "asistente_esdomed") || Boolean(u.codigoMarcacion?.trim()))
           // Vigentes + fallecidos (en memoria). Otras bajas (retiro, traslado)
           // ya no forman parte del equipo y no se muestran.
           .filter((u) => u.activo !== false || esEnMemoria(u));
