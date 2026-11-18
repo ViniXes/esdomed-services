@@ -81,7 +81,11 @@ export function codigoAdministrativoHabitual(asignaciones: string[]): string {
   asignaciones.forEach((valor, indice) => {
     const codigo = valor.trim().toUpperCase();
     const horario = getHorario(codigo);
-    if (!horario || (horario.tipo !== "Administrativo" && horario.tipo !== "Medico Administrativo")) return;
+    // Además de los códigos administrativos se acepta cualquier turno de 8 horas:
+    // no hay código administrativo de 6:00 a 2:00 y el personal destacado en
+    // Consulta Externa con ese horario usa TO5 de lunes a viernes.
+    const esAdministrativo = horario?.tipo === "Administrativo" || horario?.tipo === "Medico Administrativo";
+    if (!horario || (!esAdministrativo && horario.horas !== 8)) return;
     const actual = conteos.get(codigo) ?? { cantidad: 0, ultimoIndice: -1 };
     conteos.set(codigo, { cantidad: actual.cantidad + 1, ultimoIndice: indice });
   });

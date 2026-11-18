@@ -22,6 +22,7 @@ import {
   PERIODO_ACTUAL,
   COLOR_GRUPO,
   ordenGrupo,
+  compararFilasPlan,
 } from "@/lib/esdomed/plan";
 import { Clock, LogIn, LogOut, Users, UsersRound } from "lucide-react";
 
@@ -70,7 +71,8 @@ export default function MiGrupoPage() {
     if (!plan || !grupoSel) return [];
     return plan.filas
       .filter((f) => (f.grupo?.trim() || "") === grupoSel)
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+      // Mismo orden que el editor y la impresión (orden manual del plan).
+      .sort(compararFilasPlan);
   }, [plan, grupoSel]);
 
   const estiloGrupo = grupoSel ? COLOR_GRUPO[grupoSel] : null;
