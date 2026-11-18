@@ -40,6 +40,7 @@ import {
 } from "@/lib/esdomed/plan";
 import {
   configPersonalPlan,
+  GRUPO_CONSULTA_EXTERNA,
   esAdministrativoPlan,
   normalizarCodigoMarcacion,
   normalizarMetadatosFilaPlan,
@@ -539,10 +540,14 @@ export default function EditorPlanPage() {
         ...f,
         grupo,
         // El grupo elegido decide la jornada; "Sin grupo" vuelve al valor del catálogo.
+        // Consulta Externa admite las dos: conserva la jornada que ya tenía la fila
+        // (administrativas de lunes a viernes u operativos con turnos).
         tipoJornada:
-          grupo === "Administrativo" || (!grupo && configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo")
-            ? "Administrativo"
-            : "Operativo",
+          grupo === GRUPO_CONSULTA_EXTERNA
+            ? (f.tipoJornada ?? "Operativo")
+            : grupo === "Administrativo" || (!grupo && configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo")
+              ? "Administrativo"
+              : "Operativo",
       }) : f
     )));
     setGuardado(false);
