@@ -5,6 +5,7 @@ import {
   esAdministrativoPlan,
   normalizarCodigoMarcacion,
   normalizarMetadatosFilaPlan,
+  GRUPO_CONSULTA_EXTERNA,
 } from "@/lib/esdomed/catalogo-plan";
 import {
   esDiaNoLaboralAdministrativo,
@@ -194,11 +195,14 @@ export function esPersonalPlan(role: string, codigoMarcacion?: string): boolean 
   return false;
 }
 
+/** Datos de un usuario del roster que necesita el plan (el rol decide el grupo por defecto). */
+type UsuarioRosterPlan = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto"> & { role?: UserProfile["role"] };
+
 /**
  * Construye una fila en blanco para un usuario, con `n` días sin asignar.
  * Si ya existía una fila previa (otro mes), se reutilizan nombre/puesto.
  */
-export function filaDesdeUsuario(u: Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">, dias: number): FilaPlanTrabajo {
+export function filaDesdeUsuario(u: UsuarioRosterPlan, dias: number): FilaPlanTrabajo {
   return normalizarMetadatosFilaPlan({
     uid: u.uid,
     codigoMarcacion: u.codigoMarcacion?.trim() || "",
@@ -206,6 +210,9 @@ export function filaDesdeUsuario(u: Pick<UserProfile, "uid" | "nombre" | "codigo
     puesto: u.puesto?.trim() || "",
     asignaciones: Array(dias).fill(""),
     observaciones: "",
+    // El personal de agenda de Consulta Externa (agenda_ce) entra solo en su
+    // grupo, como administrativo, justo debajo del bloque Administrativo.
+    ...(u.role === "agenda_ce" ? { grupo: GRUPO_CONSULTA_EXTERNA, tipoJornada: "Administrativo" as const } : {}),
   });
 }
 
@@ -234,7 +241,7 @@ function ajustarAsignaciones(asignaciones: string[] | undefined, dias: number): 
  * Empareja por uid, y como respaldo por código de marcación.
  */
 export function sincronizarFilas(
-  usuarios: Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">[],
+  usuarios: UsuarioRosterPlan[],
   filasPrevias: FilaPlanTrabajo[],
   dias: number,
   opciones: OpcionesSincronizarFilas = {},
@@ -276,7 +283,6 @@ export function sincronizarFilas(
   return [...filas, ...sinUsuario];
 }
 
-type UsuarioRosterPlan = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;
 
 function filaCoincidente(
   filas: FilaPlanTrabajo[],

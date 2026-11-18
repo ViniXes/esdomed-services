@@ -77,7 +77,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-type RosterUser = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto">;
+type RosterUser = Pick<UserProfile, "uid" | "nombre" | "codigoMarcacion" | "puesto" | "role">;
 
 // Personal ESDOMED dado de baja (UserProfile.activo === false). No entra al
 // roster, pero sus filas ya guardadas se conservan y se etiquetan en el editor.
@@ -258,6 +258,7 @@ export default function EditorPlanPage() {
           nombre: data.nombre ?? "",
           codigoMarcacion: data.codigoMarcacion ?? "",
           puesto: data.puesto ?? "",
+          role: data.role,
         } as RosterUser;
       })
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
