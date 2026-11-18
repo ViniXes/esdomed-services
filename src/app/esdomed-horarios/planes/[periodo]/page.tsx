@@ -232,9 +232,12 @@ export default function EditorPlanPage() {
     const snap = await getDocs(
       query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin", "agenda_ce"])),
     );
+    // Lo mismo con asistente_esdomed: la cuenta genérica del asistente (nombre
+    // "admin", sin código) no es una persona del plan.
     const personal = snap.docs.filter((d) => {
       const data = d.data();
-      return data.role !== "admin" || Boolean(data.codigoMarcacion);
+      const requiereCodigo = data.role === "admin" || data.role === "asistente_esdomed";
+      return !requiereCodigo || Boolean(String(data.codigoMarcacion ?? "").trim());
     });
     // Los dados de baja (activo === false) no forman parte del roster: no se
     // agregan a ningún mes ni se heredan a meses nuevos. Sus filas ya
