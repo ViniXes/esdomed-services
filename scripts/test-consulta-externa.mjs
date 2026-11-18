@@ -320,6 +320,16 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
   assert.equal(c.destinoEstacionDe("oncologia"), "Estación Oncología");
   assert.equal(c.destinoEstacionDe("cirugia_torax"), "Estación Cardiología", "Cirugía de Tórax la atiende la estación de Cardiología");
   assert.equal(c.destinoEstacionDe(""), "");
+  // Flujo obligatorio: no se envía hasta tener todos los pasos.
+  const sin = { indicacion: "", especialidadId: "", numero: "" };
+  assert.equal(c.pasoPendienteMensaje(" ", sin), "texto");
+  assert.equal(c.pasoPendienteMensaje("Ana López", sin), "destino");
+  assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "signos" }), "especialidad");
+  assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "signos", especialidadId: "oncologia" }), "");
+  assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "consultorio", especialidadId: "oncologia" }), "numero");
+  assert.equal(c.pasoPendienteMensaje("Ana López", { indicacion: "consultorio", especialidadId: "oncologia", numero: "2" }), "");
+  assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "estacion", especialidadId: "cirugia_torax" }), "");
+  assert.equal(c.destinoMensaje({ ...sin, indicacion: "estacion", especialidadId: "cirugia_torax" }), "Estación Cardiología");
   assert.equal(textoLlamado({ paciente: "Rosa Cruz", destino: c.destinoEstacionDe("hematologia") }), "Rosa Cruz. Acercarse a estación Hematología.");
   const m = c.crearMensajePantalla({ texto: "rosa cruz", destino: " Toma de signos vitales de Hematología ", porNombre: "Mensajes CE" }, 1000);
   assert.deepEqual(m, {

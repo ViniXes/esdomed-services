@@ -317,9 +317,9 @@ export function tituloLlamado(l: Pick<LlamadoPantalla, "paciente" | "codigo">): 
 // Hematología y Oncología comparten espacio, y las de Cardiología también, así
 // que cada quien escribe lo que necesita. Si el paciente está en la agenda
 // del día (la carga ESDOMED), se busca por expediente o nombre y el mensaje
-// lleva su expediente; si no, se escribe el texto libre. Si quiere, agrega a
-// dónde ir: la toma de signos vitales, un consultorio o la estación (para
-// despacharlo), siempre con su especialidad.
+// lleva su expediente; si no, se escribe el texto libre. Después elige a dónde
+// va (obligatorio): la toma de signos vitales, un consultorio o la estación
+// (para despacharlo), siempre con su especialidad.
 
 /** Largo máximo del mensaje: con más, ya no se lee de lejos en la TV. */
 export const MAX_MENSAJE_PANTALLA = 80;
@@ -368,6 +368,40 @@ export function destinoConsultorioDe(especialidadId: string, numero: string): st
     .replace(/\s+/g, " ")
     .trim();
   return esp && n ? `Consultorio ${n} de ${esp.nombre}` : "";
+}
+
+/** A dónde va el mensaje (pedido del usuario, 2026-11-18): solo estas tres. */
+export type IndicacionMensaje = "" | "signos" | "consultorio" | "estacion";
+
+export interface EleccionDestino {
+  indicacion: IndicacionMensaje;
+  /** La especialidad; en "estacion", la estación (sus ids coinciden con los de su especialidad). */
+  especialidadId: string;
+  /** Solo en "consultorio". */
+  numero: string;
+}
+
+/** "Toma de signos vitales de Cardiología", "Consultorio 3 de Cardiología" o "Estación Cardiología"; "" si falta algo. */
+export function destinoMensaje(e: EleccionDestino): string {
+  if (e.indicacion === "signos") return destinoSignosVitales(e.especialidadId);
+  if (e.indicacion === "consultorio") return destinoConsultorioDe(e.especialidadId, e.numero);
+  if (e.indicacion === "estacion") return destinoEstacionDe(e.especialidadId);
+  return "";
+}
+
+export type PasoMensaje = "texto" | "destino" | "especialidad" | "numero";
+
+/**
+ * Lo primero que falta para poder enviar, en el orden del flujo; "" si está
+ * completo. Todo es obligatorio (pedido del usuario, 2026-11-18): el texto, a
+ * dónde va, la especialidad (o la estación) y, en consultorio, el número.
+ */
+export function pasoPendienteMensaje(texto: string, e: EleccionDestino): PasoMensaje | "" {
+  if (textoParaPantalla(texto).length < 2) return "texto";
+  if (!e.indicacion) return "destino";
+  if (!especialidadPorId(e.especialidadId)) return "especialidad";
+  if (!destinoMensaje(e)) return "numero";
+  return "";
 }
 
 /**
