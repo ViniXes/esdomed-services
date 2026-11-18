@@ -138,6 +138,10 @@ Un permiso aprobado que el empleado al final no tomó lo anula el admin desde su
 
 El admin arma una vez al año la programación de vacaciones del personal operativo en `/esdomed-horarios/vacaciones` (colección `vacaciones_programadas/{año}`, importable desde el Excel de la jefatura). Reglas: 15 días exactos dentro del mes (1ra quincena 1–15, 2da 16–30; nunca cruza de mes), máximo 2 por quincena, bloqueadas la 2da de febrero, Semana Santa (calculada con `domingoPascua`), la 1ra de agosto y la 2da de diciembre. El editor del mes la pinta como VAC al abrir (mismo patrón idempotente que los permisos: registro en `fila.vacaciones` con el turno que había, para devolverlo si la vacación se mueve) y al guardar la programación se propaga a los planes ya guardados de meses no terminados; los meses pasados no se tocan. "Copiar mes anterior" nunca copia VAC. Lógica en `src/lib/esdomed/vacaciones.ts`.
 
+### Jornada del plan — de la persona, no del grupo
+
+En el plan de trabajo, `tipoJornada` (Administrativo/Operativo) decide la meta de horas (`metaHorasAdmin` / `metaHorasOperativas`), la guía de turnos y los días no laborales. Es de la persona: un administrativo destacado en Emergencia, Consulta Externa u otro grupo sigue con jornada y meta administrativas (pedido del usuario, 2026-11-18, caso Boris en Emergencia). Cambiar el grupo no la cambia, salvo elegir el grupo "Administrativo"; se cambia con el selector "Jornada" de la fila. La fila de totales de Emergencia, como la de apoyo diurno y Consulta Externa, cuenta cualquier código (también los MA del administrativo destacado).
+
 ### Creating Users
 
 Los usuarios no se registran solos — los crea el administrador directamente en Firebase Auth y luego se crea su documento en `usuarios/{uid}` con el rol correspondiente. No hay flujo de registro público.
