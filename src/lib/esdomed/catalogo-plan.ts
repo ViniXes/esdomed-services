@@ -69,10 +69,12 @@ export function normalizarMetadatosFilaPlan(fila: FilaPlanTrabajo): FilaPlanTrab
     ...fila,
     codigoMarcacion: normalizarCodigoMarcacion(fila.codigoMarcacion),
     tipoJornada: administrativa ? "Administrativo" : "Operativo",
-    // Un administrativo va en el grupo "Administrativo", salvo el destacado en
-    // Consulta Externa: conserva ese grupo y su jornada de lunes a viernes.
+    // Un administrativo puede estar destacado en otro grupo (Consulta Externa,
+    // Emergencia…) y sigue siendo administrativo: conserva ese grupo, su jornada
+    // de lunes a viernes y la meta de horas administrativa. Sin grupo va al
+    // grupo "Administrativo".
     grupo: administrativa
-      ? (fila.grupo?.trim() === GRUPO_CONSULTA_EXTERNA ? GRUPO_CONSULTA_EXTERNA : "Administrativo")
+      ? (fila.grupo?.trim() || "Administrativo")
       : (fila.grupo?.trim() || config?.grupoPredeterminado || ""),
   };
 }

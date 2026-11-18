@@ -143,3 +143,21 @@ assert.equal(m.fechaEscritaAISO("13/13/2027"), null);
 assert.equal(m.fechaEscritaAISO("18 de diciembre"), null);
 assert.equal(m.isoADdMmAaaa("2027-01-06"), "06/01/2027");
 console.log("OK: fecha en números");
+
+// ── Nombres escritos a mano (nombres.ts) ──
+{
+  const fuenteN = readFileSync(new URL("../src/lib/consultaExterna/nombres.ts", import.meta.url), "utf8");
+  const jsN = ts.transpileModule(fuenteN, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  const modN = { exports: {} };
+  new Function("exports", "module", jsN)(modN.exports, modN);
+  const n = modN.exports;
+  const dic = JSON.parse(readFileSync(new URL("../src/lib/consultaExterna/diccionarioNombres.json", import.meta.url), "utf8"));
+  assert.equal(n.nombrePropio("  alrjandro   JOSE pineda hurtado "), "Alrjandro Jose Pineda Hurtado");
+  assert.equal(n.nombrePropio("HERNANDEZ DE RODRIGUEZ ,MATILDE DE LOS ANGELES"), "Hernandez de Rodriguez, Matilde de los Angeles");
+  assert.equal(n.nombrePropio("de la cruz, ana maría"), "De la Cruz, Ana María");
+  assert.equal(n.nombrePropio("peña lópez-garcía"), "Peña López-García");
+  assert.deepEqual(n.palabrasDudosas("Alejndro Lopez", dic), [{ palabra: "Alejndro", sugerencia: "Alejandro" }]);
+  assert.deepEqual(n.palabrasDudosas("Hernandez Sanchez, Edwin Alexander", dic), []);
+  assert.equal(n.aplicarSugerencias("alejndro lopez", [{ palabra: "alejndro", sugerencia: "Alejandro" }]), "Alejandro Lopez");
+}
+console.log("nombres: ok");

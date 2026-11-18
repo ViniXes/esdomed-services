@@ -60,6 +60,7 @@ import {
   type CitaProgramadaConId,
   type PacienteEncontrado,
 } from "@/lib/consultaExterna/citasProgramadasDatos";
+import { aplicarSugerencias, nombrePropio, palabrasDudosas, type DiccionarioNombres } from "@/lib/consultaExterna/nombres";
 
 // Programación de citas 2027. Todo lo que irá al SIS sale de listas cerradas
 // (especialidad, médico, franja y consultorio del catálogo), para que al pasar
@@ -116,6 +117,16 @@ export default function Citas2027Page() {
   const [franjaId, setFranjaId] = useState("");
   const [expediente, setExpediente] = useState("");
   const [paciente, setPaciente] = useState("");
+  // Diccionario de nombres que services conoce: se carga aparte, solo para avisar
+  // de una palabra posiblemente mal escrita en un nombre escrito a mano.
+  const [diccionario, setDiccionario] = useState<DiccionarioNombres | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    import("@/lib/consultaExterna/diccionarioNombres.json")
+      .then((m) => { if (vivo) setDiccionario(m.default as DiccionarioNombres); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
   const [encontrado, setEncontrado] = useState<PacienteEncontrado | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [buscado, setBuscado] = useState("");
@@ -126,6 +137,11 @@ export default function Citas2027Page() {
   const [mensaje, setMensaje] = useState<{ tono: "ok" | "error"; texto: string } | null>(null);
   // Cita que se está corrigiendo (null = el formulario registra una nueva).
   const [editando, setEditando] = useState<CitaProgramadaConId | null>(null);
+  const nombreEscritoAMano = !encontrado && !(editando && editando.paciente === paciente && editando.origenNombre === "services");
+  const dudosas = useMemo(
+    () => (diccionario && nombreEscritoAMano && paciente.trim() ? palabrasDudosas(paciente, diccionario) : []),
+    [diccionario, nombreEscritoAMano, paciente],
+  );
 
   // ── Lista ──
   const [mes, setMes] = useState(RECIENTES);
@@ -259,6 +275,14 @@ export default function Citas2027Page() {
     setGuardando(true);
     setMensaje(null);
     try {
+      const origen: "services" | "manual" =
+        encontrado && encontrado.nombre === paciente
+          ? "services"
+          : editando && editando.paciente === paciente
+            ? editando.origenNombre
+            : "manual";
+      // Escrito a mano: se guarda con mayúscula inicial ("alejandro LOPEZ" → "Alejandro Lopez").
+      const nombreAGuardar = origen === "manual" ? nombrePropio(paciente) : paciente;
       const datos = {
           fecha,
           especialidad: medico.especialidad,
@@ -268,16 +292,10 @@ export default function Citas2027Page() {
           franjaInicio: franja?.inicio ?? "",
           franjaFin: franja?.fin ?? "",
           expediente: expNormal,
-          paciente,
+          paciente: nombreAGuardar,
           tipo,
           observaciones,
         };
-      const origen: "services" | "manual" =
-        encontrado && encontrado.nombre === paciente
-          ? "services"
-          : editando && editando.paciente === paciente
-            ? editando.origenNombre
-            : "manual";
       if (editando) {
         await editarCitaProgramada(editando, datos, origen, usuario);
         setEditando(null);
@@ -638,12 +656,36 @@ export default function Citas2027Page() {
               <label className={etiqueta} htmlFor="pac">Nombre del paciente (Apellidos, Nombres)</label>
               <input
                 id="pac"
-                className={campo}
+                className={`${campo} ${dudosas.length > 0 ? "!border-amber-400 !bg-amber-50 dark:!border-amber-600 dark:!bg-amber-950/40" : ""}`}
                 value={paciente}
                 disabled={!expNormal || buscado !== expNormal || !!encontrado}
                 placeholder={buscado === expNormal && !encontrado ? "No está en services: escríbalo como en el SIS" : ""}
                 onChange={(e) => setPaciente(e.target.value)}
+                onBlur={() => { if (nombreEscritoAMano && paciente.trim()) setPaciente(nombrePropio(paciente)); }}
+                aria-invalid={dudosas.length > 0 || undefined}
+                aria-describedby={dudosas.length > 0 ? "pac-aviso" : undefined}
               />
+              {dudosas.length > 0 && (
+                <div id="pac-aviso" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-800 dark:text-amber-200">
+                  <AlertTriangle size={13} className="flex-shrink-0" />
+                  <span>
+                    Revise el nombre:{" "}
+                    {dudosas.map((d, i) => (
+                      <span key={d.palabra}>
+                        {i > 0 && ", "}“{d.palabra}” ¿quiso decir <strong>{d.sugerencia}</strong>?
+                      </span>
+                    ))}
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-md border border-amber-300 bg-white px-2 py-0.5 font-medium hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:hover:bg-amber-900"
+                    onClick={() => setPaciente(aplicarSugerencias(paciente, dudosas))}
+                  >
+                    Corregir
+                  </button>
+                  <span className="text-amber-700/80 dark:text-amber-300/80">Si está bien escrito, puede guardar así.</span>
+                </div>
+              )}
               {encontrado && (
                 <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
                   Encontrado en services ({encontrado.fuente}).{" "}

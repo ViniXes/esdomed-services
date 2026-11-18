@@ -40,7 +40,6 @@ import {
 } from "@/lib/esdomed/plan";
 import {
   configPersonalPlan,
-  GRUPO_CONSULTA_EXTERNA,
   esAdministrativoPlan,
   normalizarCodigoMarcacion,
   normalizarMetadatosFilaPlan,
@@ -571,17 +570,27 @@ export default function EditorPlanPage() {
       i === filaIdx ? normalizarMetadatosFilaPlan({
         ...f,
         grupo,
-        // El grupo elegido decide la jornada; "Sin grupo" vuelve al valor del catálogo.
-        // Consulta Externa admite las dos: conserva la jornada que ya tenía la fila
-        // (administrativas de lunes a viernes u operativos con turnos).
+        // La jornada es de la persona, no del grupo: un administrativo destacado
+        // en Emergencia o Consulta Externa sigue con la meta administrativa. Solo
+        // el grupo "Administrativo" la fija; para cambiarla está "Jornada".
         tipoJornada:
-          grupo === GRUPO_CONSULTA_EXTERNA
-            ? (f.tipoJornada ?? "Operativo")
-            : grupo === "Administrativo" || (!grupo && configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo")
-              ? "Administrativo"
-              : "Operativo",
+          grupo === "Administrativo"
+            ? "Administrativo"
+            : (f.tipoJornada
+              ?? (configPersonalPlan(f.codigoMarcacion)?.tipoJornada === "Administrativo" ? "Administrativo" : "Operativo")),
       }) : f
     )));
+    setGuardado(false);
+  };
+
+  const setJornada = (filaIdx: number, tipoJornada: "Administrativo" | "Operativo") => {
+    registrarUndo();
+    setFilas((prev) => prev.map((f, i) => {
+      if (i !== filaIdx) return f;
+      // Un operativo no va en el grupo "Administrativo": queda sin grupo para elegirle uno.
+      const grupo = tipoJornada === "Operativo" && f.grupo?.trim() === "Administrativo" ? "" : f.grupo;
+      return normalizarMetadatosFilaPlan({ ...f, grupo, tipoJornada });
+    }));
     setGuardado(false);
   };
 
@@ -964,9 +973,9 @@ export default function EditorPlanPage() {
   // de la fila. El de operativos cubre a los grupos regulares (y filas sin
   // grupo); emergencia, apoyo diurno y consulta externa llevan cada uno su
   // propia fila de totales y no cuentan para el mínimo de 2 operativos.
-  // Consulta externa y apoyo diurno cuentan cualquier jornada (son de día y
-  // pueden llevar un código administrativo, p. ej. un administrativo que pasa
-  // a apoyo); los demás, solo turnos operativos/hospitalarios.
+  // Consulta externa, apoyo diurno y emergencia cuentan cualquier jornada
+  // (pueden llevar un administrativo destacado con su código MA/TO); los
+  // demás, solo turnos operativos/hospitalarios.
   const conteoOperativosPorDia = new Array(dias.length).fill(0);
   const conteoEmergenciaPorDia = new Array(dias.length).fill(0);
   const conteoApoyoDiurnoPorDia = new Array(dias.length).fill(0);
@@ -979,12 +988,11 @@ export default function EditorPlanPage() {
         conteoConsultaExternaPorDia[diaIdx]++;
       } else if (horario && grupo === "Equipo de apoyo diurno / emergencia") {
         conteoApoyoDiurnoPorDia[diaIdx]++;
+      } else if (horario && grupo === "Equipo de emergencia") {
+        // También cuenta al administrativo destacado en emergencia (código MA…).
+        conteoEmergenciaPorDia[diaIdx]++;
       } else if (horario && (horario.tipo === "Turno Operativo" || horario.tipo === "Turno Hospitalario")) {
-        if (grupo === "Equipo de emergencia") {
-          conteoEmergenciaPorDia[diaIdx]++;
-        } else {
-          conteoOperativosPorDia[diaIdx]++;
-        }
+        conteoOperativosPorDia[diaIdx]++;
       }
     });
   });
@@ -1341,6 +1349,16 @@ export default function EditorPlanPage() {
                               {GRUPOS_ESDOMED.map((g) => (
                                 <option key={g} value={g}>{g}</option>
                               ))}
+                            </select>
+                            <select
+                              value={isAdministrativo ? "Administrativo" : "Operativo"}
+                              onChange={(e) => setJornada(filaIdx, e.target.value as "Administrativo" | "Operativo")}
+                              title="Jornada de la persona: decide su meta de horas, aunque esté destacada en otro grupo"
+                              aria-label={`Jornada de ${fila.nombre}`}
+                              className="mt-1 w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-1.5 py-1 text-[10px] text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#c9a892]"
+                            >
+                              <option value="Administrativo">Jornada administrativa</option>
+                              <option value="Operativo">Jornada operativa</option>
                             </select>
                           </td>
                           {dias.map((d, diaIdx) => {
