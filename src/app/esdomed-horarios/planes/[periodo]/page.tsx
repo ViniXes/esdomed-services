@@ -14,7 +14,7 @@ import {
 } from "@/lib/firestoreMeter";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import type { FilaPlanTrabajo, PlanTrabajo, UserProfile, VacacionProgramada } from "@/types";
+import type { FilaPlanTrabajo, PlanTrabajo, QuitadoPlanTrabajo, UserProfile, VacacionProgramada } from "@/types";
 import {
   contarMarca,
   esMarcaEspecial,
@@ -98,6 +98,7 @@ interface BorradorPlanLocal {
   numeroHoras: string;
   metaHorasAdmin: number | "";
   metaHorasOperativas: number | "";
+  quitados?: QuitadoPlanTrabajo[];
 }
 
 function parsearBloqueCodigos(texto: string): string[][] {
@@ -111,6 +112,15 @@ function parsearBloqueCodigos(texto: string): string[][] {
 }
 
 /** Versión del plan guardado: ms de su última actualización (0 si no existe). */
+/**
+ * Quitados que siguen fuera del plan. Si se deshizo un "Quitar de este mes"
+ * (la fila volvió), la persona deja de contar como quitada.
+ */
+function quitadosVigentes(quitados: QuitadoPlanTrabajo[], filas: FilaPlanTrabajo[]): QuitadoPlanTrabajo[] {
+  const enPlan = new Set(filas.map((f) => f.uid).filter(Boolean));
+  return quitados.filter((q) => !enPlan.has(q.uid));
+}
+
 function versionPlan(plan: Partial<PlanTrabajo> | null | undefined): number {
   const fecha = (plan?.actualizadoEn ?? plan?.creadoEn) as unknown;
   if (fecha instanceof Date) return fecha.getTime();
@@ -146,6 +156,8 @@ export default function EditorPlanPage() {
   // cuya persona ya no está vigente y ofrecer "Quitar del plan").
   const [rosterVigente, setRosterVigente] = useState<RosterUser[]>([]);
   const [bajas, setBajas] = useState<BajaRoster[]>([]);
+  // Personas del roster quitadas a mano de este mes (no vuelven al sincronizar).
+  const [quitados, setQuitados] = useState<QuitadoPlanTrabajo[]>([]);
   const [picker, setPicker] = useState<{ filaIdx: number; diaIdx: number } | null>(null);
   const [modalState, setModalState] = useState<{ tipo: "exito"|"error"|"alerta"; titulo: string; mensaje: string } | null>(null);
   const [confirmState, setConfirmState] = useState<{ tipo: "peligro"|"alerta"; titulo: string; mensaje: string; textoConfirmar: string; onConfirm: () => void; textoCancelar?: string; onCancel?: () => void } | null>(null);
@@ -317,6 +329,7 @@ export default function EditorPlanPage() {
         }
 
         let filasBase: FilaPlanTrabajo[];
+        let quitadosBase: QuitadoPlanTrabajo[] = [];
         let numeroHorasBase = "";
         let metaAdminBase: number | "" = "";
         let metaOperativaBase: number | "" = "";
@@ -332,7 +345,11 @@ export default function EditorPlanPage() {
           });
           // Mezcla con el roster para incluir personal nuevo, conservando lo guardado
           // — incluidas las filas de quien ya no está vigente (baja): son historial.
-          filasBase = sincronizarFilas(lista, plan.filas ?? [], dias.length, { conservarFilasSinUsuario: true });
+          quitadosBase = plan.quitados ?? [];
+          filasBase = sincronizarFilas(lista, plan.filas ?? [], dias.length, {
+            conservarFilasSinUsuario: true,
+            excluirUids: quitadosBase.map((q) => q.uid),
+          });
         } else {
           setCreadoMeta(null);
           const planAnterior = prevSnap.exists() ? prevSnap.data() as PlanTrabajo : null;
@@ -365,7 +382,11 @@ export default function EditorPlanPage() {
             if (obsoleto) {
               borradorObsoleto = borrador;
             } else {
-              filasBase = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
+              quitadosBase = borrador.quitados ?? quitadosBase;
+              filasBase = sincronizarFilas(lista, borrador.filas, dias.length, {
+                conservarFilasSinUsuario: true,
+                excluirUids: quitadosBase.map((q) => q.uid),
+              });
               numeroHorasBase = borrador.numeroHoras ?? numeroHorasBase;
               metaAdminBase = borrador.metaHorasAdmin ?? metaAdminBase;
               metaOperativaBase = borrador.metaHorasOperativas ?? metaOperativaBase;
@@ -406,6 +427,7 @@ export default function EditorPlanPage() {
 
         filasRef.current = filasBase;
         setFilas(filasBase);
+        setQuitados(quitadosBase);
         setNumeroHoras(numeroHorasBase);
         setMetaHorasAdmin(metaAdminBase);
         setMetaHorasOperativas(metaOperativaBase);
@@ -440,7 +462,12 @@ export default function EditorPlanPage() {
             textoConfirmar: "Recuperar mis cambios",
             onConfirm: () => {
               registrarUndo();
-              let filasBorrador = sincronizarFilas(lista, borrador.filas, dias.length, { conservarFilasSinUsuario: true });
+              const quitadosBorrador = borrador.quitados ?? [];
+              let filasBorrador = sincronizarFilas(lista, borrador.filas, dias.length, {
+                conservarFilasSinUsuario: true,
+                excluirUids: quitadosBorrador.map((q) => q.uid),
+              });
+              setQuitados(quitadosBorrador);
               if (vacaciones) filasBorrador = sincronizarVacacionesEnFilas(filasBorrador, vacaciones, mes).filas;
               filasBorrador = aplicarPermisosAprobados(filasBorrador, aprobados, anio, mes).filas;
               filasRef.current = filasBorrador;
@@ -472,11 +499,12 @@ export default function EditorPlanPage() {
         numeroHoras,
         metaHorasAdmin,
         metaHorasOperativas,
+        quitados: quitadosVigentes(quitados, filas),
       };
       window.localStorage.setItem(borradorKey, JSON.stringify(borrador));
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [borradorKey, filas, guardado, loading, metaHorasAdmin, metaHorasOperativas, numeroHoras, periodo]);
+  }, [borradorKey, filas, guardado, loading, metaHorasAdmin, metaHorasOperativas, numeroHoras, periodo, quitados]);
 
   const setCelda = (filaIdx: number, diaIdx: number, valor: string, guardarUndo = true): boolean => {
     const filaActual = filasRef.current[filaIdx];
@@ -567,10 +595,17 @@ export default function EditorPlanPage() {
     setGuardado(false);
   };
 
-  // Quita la fila de ESTE mes (solo se ofrece para personas sin usuario vigente:
-  // dadas de baja o eliminadas). Los demás meses no se tocan; hay que guardar.
+  // Quita la fila de ESTE mes. Sirve para cualquier fila: dados de baja,
+  // cuentas que no son personas o quien no trabaja ese mes. Si la persona sigue
+  // en el roster, se anota en `quitados` para que la sincronización no la
+  // vuelva a agregar. Los demás meses no se tocan; hay que guardar.
   const quitarFila = (filaIdx: number) => {
+    const fila = filas[filaIdx];
     registrarUndo();
+    if (fila?.uid && !filaSinUsuarioVigente(fila)) {
+      const uid = fila.uid;
+      setQuitados((prev) => (prev.some((q) => q.uid === uid) ? prev : [...prev, { uid, nombre: fila.nombre }]));
+    }
     setFilas((prev) => prev.filter((_, i) => i !== filaIdx));
     setPicker(null);
     setGuardado(false);
@@ -622,12 +657,28 @@ export default function EditorPlanPage() {
     );
   };
 
+  // Devuelve al plan del mes a alguien que se había quitado con "Quitar de este mes".
+  const volverAAgregar = (uid: string) => {
+    registrarUndo();
+    const restantes = quitadosVigentes(quitados, filas).filter((q) => q.uid !== uid);
+    setQuitados(restantes);
+    setFilas((prev) => sincronizarFilas(rosterVigente, prev, dias.length, {
+      conservarFilasSinUsuario: true,
+      excluirUids: restantes.map((q) => q.uid),
+    }));
+    setGuardado(false);
+  };
+
   const sincronizar = async () => {
     const lista = await cargarRoster();
     registrarUndo();
     // Agrega personal nuevo y conserva las filas ya existentes; a quien fue
-    // dado de baja se le quita con "Quitar del plan", nunca por sincronizar.
-    setFilas((prev) => sincronizarFilas(lista, prev, dias.length, { conservarFilasSinUsuario: true }));
+    // dado de baja se le quita con "Quitar de este mes", nunca por sincronizar.
+    // Quien se quitó a mano de este mes no se vuelve a agregar.
+    setFilas((prev) => sincronizarFilas(lista, prev, dias.length, {
+      conservarFilasSinUsuario: true,
+      excluirUids: quitadosVigentes(quitados, prev).map((q) => q.uid),
+    }));
     setModalState({ tipo: "exito", titulo: "Sincronización Completa", mensaje: "El listado de personal se ha actualizado con los usuarios ESDOMED vigentes. Las filas de personal dado de baja se conservan; puedes quitarlas con el botón de cada fila." });
     setGuardado(false);
   };
@@ -753,6 +804,7 @@ export default function EditorPlanPage() {
         numeroHoras: numeroHoras.trim(),
         ...(metaHorasAdmin === "" ? {} : { metaHorasAdmin: Number(metaHorasAdmin) }),
         ...(metaHorasOperativas === "" ? {} : { metaHorasOperativas: Number(metaHorasOperativas) }),
+        ...(quitadosVigentes(quitados, filas).length ? { quitados: quitadosVigentes(quitados, filas) } : {}),
         filas: filas.map((f) => ({
           uid: f.uid,
           codigoMarcacion: f.codigoMarcacion ?? "",
@@ -1068,6 +1120,25 @@ export default function EditorPlanPage() {
         </div>
       </div>
 
+      {quitadosVigentes(quitados, filas).length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Quitados de este mes:</span>
+          {quitadosVigentes(quitados, filas).map((q) => (
+            <span key={q.uid} className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+              {q.nombre}
+              <button
+                type="button"
+                onClick={() => volverAAgregar(q.uid)}
+                className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                title={`Volver a agregar a ${q.nombre} a ${labelPeriodo(periodo)}`}
+              >
+                Volver a agregar
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Metas de horas */}
       <div className="mb-4 flex flex-wrap items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm">
         <div className="flex items-center gap-2">
@@ -1238,21 +1309,23 @@ export default function EditorPlanPage() {
                                 >
                                   <Trash2 size={13} />
                                 </button>
-                                {sinUsuarioVigente && (
-                                  <button
-                                    onClick={() => setConfirmState({
-                                      tipo: "peligro",
-                                      titulo: "Quitar del plan",
-                                      mensaje: `${fila.nombre} ${baja ? `fue dado de baja${fechaBaja ? ` el ${fechaBaja}` : ""}` : "ya no tiene usuario vigente"}.\n\nSe quitará su fila de ${labelPeriodo(periodo)} únicamente; los demás meses no cambian. Deberás guardar el plan para que el cambio sea permanente. ¿Continuar?`,
-                                      textoConfirmar: "Sí, quitar",
-                                      onConfirm: () => quitarFila(filaIdx),
-                                    })}
-                                    title={`Quitar a ${fila.nombre} del plan de ${labelPeriodo(periodo)}`}
-                                    className="p-1 rounded-md text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/40 transition-colors"
-                                  >
-                                    <UserMinus size={13} />
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => setConfirmState({
+                                    tipo: "peligro",
+                                    titulo: "Quitar de este mes",
+                                    mensaje: `${sinUsuarioVigente ? `${fila.nombre} ${baja ? `fue dado de baja${fechaBaja ? ` el ${fechaBaja}` : ""}` : "ya no tiene usuario vigente"}.\n\n` : ""}Se quitará la fila de ${fila.nombre} de ${labelPeriodo(periodo)} únicamente; los demás meses no cambian${sinUsuarioVigente ? "" : " y al sincronizar no se volverá a agregar (se puede devolver con \"Volver a agregar\")"}. Deberás guardar el plan para que el cambio sea permanente. ¿Continuar?`,
+                                    textoConfirmar: "Sí, quitar",
+                                    onConfirm: () => quitarFila(filaIdx),
+                                  })}
+                                  title={`Quitar a ${fila.nombre} del plan de ${labelPeriodo(periodo)}`}
+                                  className={`p-1 rounded-md transition-colors ${
+                                    sinUsuarioVigente
+                                      ? "text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/40"
+                                      : "text-slate-300 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-600 dark:hover:text-rose-400 dark:hover:bg-rose-950/40"
+                                  }`}
+                                >
+                                  <UserMinus size={13} />
+                                </button>
                               </span>
                             </p>
                             <p className="text-[10px] text-slate-400 truncate" title={fila.puesto}>

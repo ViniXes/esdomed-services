@@ -218,6 +218,11 @@ export function filaDesdeUsuario(u: UsuarioRosterPlan, dias: number): FilaPlanTr
 
 export interface OpcionesSincronizarFilas {
   /**
+   * Usuarios del roster que se quitaron a mano de este mes ("Quitar de este
+   * mes"): no se vuelven a agregar al sincronizar.
+   */
+  excluirUids?: Iterable<string>;
+  /**
    * Conserva las filas del plan cuyo usuario ya no está en el roster (dado de
    * baja, rol cambiado o usuario eliminado). Es lo correcto al abrir un mes que
    * YA existe: la persona trabajó ese mes y su fila es historial para RH; sin
@@ -253,8 +258,9 @@ export function sincronizarFilas(
       .map((f) => [normalizarCodigoMarcacion(f.codigoMarcacion), f]),
   );
   const emparejadas = new Set<FilaPlanTrabajo>();
+  const excluidos = new Set(opciones.excluirUids ?? []);
 
-  const filas = usuarios.map((u) => {
+  const filas = usuarios.filter((u) => !excluidos.has(u.uid)).map((u) => {
     const previa =
       (u.uid && porUid.get(u.uid)) ||
       (u.codigoMarcacion && porCodigo.get(normalizarCodigoMarcacion(u.codigoMarcacion))) ||
