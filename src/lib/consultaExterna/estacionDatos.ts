@@ -9,6 +9,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   Timestamp,
   where,
   type Unsubscribe,
@@ -67,12 +68,15 @@ export async function leerCitasDelDia(fechaISO: string): Promise<CitaCEConId[]> 
 /** Últimos llamados del día: un solo documento, lo único que escuchan las pantallas. */
 export function escucharLlamados(
   fechaISO: string,
-  alCambiar: (ultimos: LlamadoPantalla[]) => void,
+  alCambiar: (ultimos: LlamadoPantalla[], datos: LlamadosCE | null) => void,
   alFallar: (e: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
     doc(db, COL_LLAMADOS_CE, fechaISO),
-    (snap) => alCambiar(snap.exists() ? ((snap.data() as LlamadosCE).ultimos ?? []) : []),
+    (snap) => {
+      const datos = snap.exists() ? (snap.data() as LlamadosCE) : null;
+      alCambiar(datos?.ultimos ?? [], datos);
+    },
     alFallar,
   );
 }
@@ -230,6 +234,27 @@ export async function publicarLlamadoManual(
   };
   await cambiarLlamados(fechaISO, (ultimos) => agregarLlamado(ultimos, nuevo));
   return nuevo;
+}
+
+/**
+ * Deja las pantallas en "Esperando llamados" (solo el admin, pedido del
+ * usuario 2026-11-18). Solo vacía la lista que muestran las TVs: las citas
+ * conservan su estado y su historial, y las pantallas no anuncian nada al
+ * vaciarse. Si una estación llama justo en ese momento, su transacción se
+ * repite sobre la lista ya vacía.
+ */
+export async function limpiarPantallas(fechaISO: string, porNombre: string): Promise<void> {
+  await setDoc(
+    doc(db, COL_LLAMADOS_CE, fechaISO),
+    {
+      fecha: fechaISO,
+      ultimos: [],
+      actualizadoEn: serverTimestamp(),
+      limpiadoEn: serverTimestamp(),
+      limpiadoPorNombre: porNombre,
+    },
+    { merge: true },
+  );
 }
 
 /** Saca de las pantallas un llamado manual (p. ej. el nombre se escribió mal). */

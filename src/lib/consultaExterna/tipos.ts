@@ -83,4 +83,7 @@ export interface LlamadosCE {
   fecha: string;
   /** El más reciente primero; máximo MAX_LLAMADOS_PANTALLA. */
   ultimos: LlamadoPantalla[];
+  /** Última vez que el admin limpió las pantallas (ver limpiarPantallas). */
+  limpiadoEn?: Timestamp | null;
+  limpiadoPorNombre?: string;
 }

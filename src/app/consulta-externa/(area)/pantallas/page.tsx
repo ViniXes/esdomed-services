@@ -15,6 +15,8 @@ import {
 import { aplicarPronunciacion, type ReglaPronunciacion } from "@/lib/consultaExterna/pronunciacion";
 import { escucharPronunciacion } from "@/lib/consultaExterna/pronunciacionDatos";
 import { DiccionarioPronunciacion } from "@/components/consultaExterna/DiccionarioPronunciacion";
+import { LimpiarPantallas } from "@/components/consultaExterna/LimpiarPantallas";
+import { limpiaPantallasCE } from "@/lib/accesoConsultaExterna";
 
 const TEXTO_EJEMPLO = textoLlamado({ expediente: "11431-26", paciente: "María Pilar López Gonzales", destino: "Estación Hematología" });
 
@@ -105,6 +107,12 @@ export default function PantallasPage() {
           </a>
         </div>
       </section>
+
+      {limpiaPantallasCE(profile) && (
+        <section>
+          <LimpiarPantallas porNombre={profile?.nombre ?? ""} />
+        </section>
+      )}
 
       <section>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">

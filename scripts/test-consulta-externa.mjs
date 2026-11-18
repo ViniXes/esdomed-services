@@ -290,6 +290,11 @@ assert.ok(acceso.veLaPantallaCE(conRol("admin")));
 assert.equal(acceso.veLaPantallaCE(conRol("medico")), false);
 assert.equal(acceso.veLaPantallaCE(conRol("agenda_ce")), false, "agenda_ce no lee los llamados");
 assert.equal(acceso.veLaPantallaCE(null), false);
+// Limpiar las pantallas: solo el admin (pedido del usuario, 2026-11-18).
+assert.ok(acceso.limpiaPantallasCE(conRol("admin")));
+for (const r of ["esdomed", "asistente_esdomed", "consulta_externa", "pantalla_ce", "agenda_ce"]) {
+  assert.equal(acceso.limpiaPantallasCE(conRol(r)), false, r);
+}
 
 // ── Búsqueda para marcar llegada ──
 const { coincideCita } = cargar("busqueda");

@@ -45,5 +45,8 @@ export const entraConsultaExterna = (p: Perfil) => gestionaConsultaExterna(p) ||
  */
 export const veLaPantallaCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p) || esCuentaPantalla(p);
 
+/** Vaciar lo que muestran todas las pantallas (pedido del usuario: solo el admin). */
+export const limpiaPantallasCE = (p: Perfil) => esAdmin(p);
+
 /** Adónde va la cuenta de pantalla al entrar al sistema. */
 export const RUTA_PANTALLA_CE = "/consulta-externa/pantalla";
