@@ -10,6 +10,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Pencil,
   RotateCcw,
   Search,
   Settings2,
@@ -51,6 +52,7 @@ import {
   ultimasCitasRegistradas,
   MAX_RECIENTES,
   crearCitaProgramada,
+  editarCitaProgramada,
   leerCatalogoCitas,
   marcarRegistradasSis,
   volverAPendiente,
@@ -122,6 +124,8 @@ export default function Citas2027Page() {
   const [observaciones, setObservaciones] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tono: "ok" | "error"; texto: string } | null>(null);
+  // Cita que se está corrigiendo (null = el formulario registra una nueva).
+  const [editando, setEditando] = useState<CitaProgramadaConId | null>(null);
 
   // ── Lista ──
   const [mes, setMes] = useState(RECIENTES);
@@ -220,16 +224,42 @@ export default function Citas2027Page() {
     setObservaciones("");
   };
 
+  const empezarEdicion = (c: CitaProgramadaConId) => {
+    if (!catalogo) return;
+    setEditando(c);
+    setEspecialidad(c.especialidad);
+    setMedicoId(c.medicoId);
+    setFecha(c.fecha);
+    const enCatalogo = c.franjaInicio ? franjasDelDia(catalogo, c.medicoId, c.fecha).find((f) => f.inicio === c.franjaInicio) : undefined;
+    setFranjaId(enCatalogo?.id ?? "");
+    setExpediente(c.expediente);
+    setBuscado(normalizarExpediente(c.expediente));
+    setPaciente(c.paciente);
+    setEncontrado(null);
+    setOtrasCitas([]);
+    setTipo(c.tipo);
+    setObservaciones(c.observaciones ?? "");
+    setMensaje(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelarEdicion = () => {
+    setEditando(null);
+    limpiarPaciente();
+    setMensaje(null);
+  };
+
   const guardar = async () => {
     if (!listo || !medico || !usuario || !tipo) return;
-    if (franja && cupoLleno && !window.confirm(`La franja ${textoFranja(franja.inicio, franja.fin)} ya tiene su cupo de ${franja.cupo}. ¿Agregar la cita como sobrecupo?`)) {
+    // Al corregir sin mover la cita, el cupo ya la cuenta a ella misma.
+    const mismaFranja = !!editando && editando.medicoId === medico.id && editando.fecha === fecha && editando.franjaInicio === (franja?.inicio ?? "");
+    if (franja && cupoLleno && !mismaFranja && !window.confirm(`La franja ${textoFranja(franja.inicio, franja.fin)} ya tiene su cupo de ${franja.cupo}. ¿Agregar la cita como sobrecupo?`)) {
       return;
     }
     setGuardando(true);
     setMensaje(null);
     try {
-      await crearCitaProgramada(
-        {
+      const datos = {
           fecha,
           especialidad: medico.especialidad,
           medicoId: medico.id,
@@ -241,14 +271,23 @@ export default function Citas2027Page() {
           paciente,
           tipo,
           observaciones,
-        },
-        encontrado && encontrado.nombre === paciente ? "services" : "manual",
-        usuario,
-      );
-      setMensaje({ tono: "ok", texto: `Cita registrada: ${expNormal}, ${fechaCorta(fecha)} ${franja ? textoFranja(franja.inicio, franja.fin) : "sin horario"} con ${medico.nombre}.` });
+        };
+      const origen: "services" | "manual" =
+        encontrado && encontrado.nombre === paciente
+          ? "services"
+          : editando && editando.paciente === paciente
+            ? editando.origenNombre
+            : "manual";
+      if (editando) {
+        await editarCitaProgramada(editando, datos, origen, usuario);
+        setEditando(null);
+      } else {
+        await crearCitaProgramada(datos, origen, usuario);
+      }
+      setMensaje({ tono: "ok", texto: `${editando ? "Cita corregida" : "Cita registrada"}: ${expNormal}, ${fechaCorta(fecha)} ${franja ? textoFranja(franja.inicio, franja.fin) : "sin horario"} con ${medico.nombre}.` });
       limpiarPaciente();
       setVersionOcupacion((v) => v + 1);
-      if (citas && (mes === RECIENTES || fecha.slice(0, 7) === mes)) void cargarLista(mes);
+      if (citas && (editando || mes === RECIENTES || fecha.slice(0, 7) === mes)) void cargarLista(mes);
     } catch (e) {
       console.error("No se pudo guardar la cita", e);
       setMensaje({ tono: "error", texto: e instanceof Error ? e.message : "No se pudo guardar la cita." });
@@ -328,7 +367,7 @@ export default function Citas2027Page() {
 
   const anular = async (c: CitaProgramadaConId) => {
     if (!usuario) return;
-    const motivo = window.prompt(`Motivo para anular la cita de ${c.paciente} (${fechaCorta(c.fecha)}):`);
+    const motivo = window.prompt(`Motivo para anular la cita de ${c.paciente || c.expediente} (${fechaCorta(c.fecha)}):`);
     if (!motivo?.trim()) return;
     setAccionando(true);
     try {
@@ -359,7 +398,7 @@ export default function Citas2027Page() {
 
   const reabrir = async (c: CitaProgramadaConId) => {
     if (!usuario) return;
-    if (!window.confirm(`¿Devolver la cita de ${c.paciente} a "Pendiente de pasar al SIS"?`)) return;
+    if (!window.confirm(`¿Devolver la cita de ${c.paciente || c.expediente} a "Pendiente de pasar al SIS"?`)) return;
     setAccionando(true);
     try {
       await volverAPendiente(c.id, usuario);
@@ -451,8 +490,22 @@ export default function Citas2027Page() {
       ) : (
         <section className={tarjeta}>
           <h2 className="mb-4 flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
-            <CalendarPlus size={18} className="text-blue-600" /> Registrar cita
+            {editando ? (
+              <>
+                <Pencil size={18} className="text-amber-600" /> Corregir cita de {editando.expediente}
+              </>
+            ) : (
+              <>
+                <CalendarPlus size={18} className="text-blue-600" /> Registrar cita
+              </>
+            )}
           </h2>
+          {editando && (
+            <p className="-mt-2 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              Está corrigiendo una cita ya registrada ({fechaCorta(editando.fecha)}, {editando.medico}). Al guardar se reemplazan sus datos y queda
+              anotado quién la corrigió.
+            </p>
+          )}
 
           <div className="grid gap-4 md:grid-cols-3">
             <div>
@@ -643,10 +696,15 @@ export default function Citas2027Page() {
             </p>
           )}
 
-          <div className="mt-5 flex justify-end">
+          <div className="mt-5 flex justify-end gap-2">
+            {editando && (
+              <button type="button" onClick={cancelarEdicion} disabled={guardando} className={`${boton} border border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200`}>
+                Cancelar corrección
+              </button>
+            )}
             <button type="button" onClick={() => void guardar()} disabled={!listo || guardando} className={`${boton} bg-blue-600 text-white hover:bg-blue-700`}>
               {guardando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              {cupoLleno ? "Guardar como sobrecupo" : "Guardar cita"}
+              {editando ? "Guardar cambios" : cupoLleno ? "Guardar como sobrecupo" : "Guardar cita"}
             </button>
           </div>
         </section>
@@ -775,11 +833,13 @@ export default function Citas2027Page() {
                     </td>
                     <td className={`${td} whitespace-nowrap`}>{textoFranja(c.franjaInicio, c.franjaFin)}</td>
                     <td className={td}>
-                      <span className="font-medium">{c.expediente}</span> {c.paciente}
+                      <span className="font-medium">{c.expediente}</span>{" "}
+                      {c.paciente || <span className="text-amber-700 dark:text-amber-300">Sin nombre</span>}
                       {c.observaciones && <span className="block text-xs text-slate-500">{c.observaciones}</span>}
                       <span className="block text-xs text-slate-400">
                         Registrada {c.creadaEn ? c.creadaEn.toDate().toLocaleString("es-SV", { dateStyle: "short", timeStyle: "short" }) : "ahora"} por {c.creadaPorNombre}
                         {c.origenNombre === "manual" ? " · nombre escrito a mano" : ""}
+                        {c.editadaPorNombre ? ` · corregida por ${c.editadaPorNombre}` : ""}
                       </span>
                       {c.estado === "anulada" && c.motivoAnulacion && (
                         <span className="block text-xs text-slate-500">Anulada: {c.motivoAnulacion}</span>
@@ -792,6 +852,18 @@ export default function Citas2027Page() {
                       </span>
                     </td>
                     <td className={`${td} whitespace-nowrap text-right`}>
+                      {c.estado === "pendiente" && (
+                        <button
+                          type="button"
+                          disabled={accionando || guardando}
+                          onClick={() => empezarEdicion(c)}
+                          className="mr-3 text-slate-500 hover:text-blue-600"
+                          title="Corregir cita"
+                          aria-label={`Corregir la cita de ${c.expediente}`}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
                       {c.estado === "pendiente" ? (
                         <button type="button" disabled={accionando} onClick={() => void anular(c)} className="text-slate-500 hover:text-rose-600" title="Anular">
                           <Ban size={16} />
@@ -805,7 +877,7 @@ export default function Citas2027Page() {
                         <button
                           type="button"
                           disabled={accionando}
-                          onClick={() => void eliminar([c.id], `la cita de ${c.paciente} (${fechaCorta(c.fecha)})`)}
+                          onClick={() => void eliminar([c.id], `la cita de ${c.paciente || c.expediente} (${fechaCorta(c.fecha)})`)}
                           className="ml-3 text-slate-500 hover:text-rose-600"
                           title="Eliminar (solo admin)"
                         >
