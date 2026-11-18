@@ -225,8 +225,11 @@ export default function EditorPlanPage() {
     // Incluimos admin además del personal ESDOMED: un superusuario que también es
     // personal de ESDOMED debe aparecer en el plan. Para no traer admins de TI
     // (sin relación con el plan), el admin solo cuenta si tiene código de marcación.
+    // agenda_ce (digitadoras de citas de Consulta Externa) es personal ESDOMED de
+    // la nómina MINSAL destacado en Consulta Externa: va en el plan aunque aún no
+    // tenga código de marcación (se empareja por uid).
     const snap = await getDocs(
-      query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin"])),
+      query(collection(db, "usuarios"), where("role", "in", ["esdomed", "asistente_esdomed", "admin", "agenda_ce"])),
     );
     const personal = snap.docs.filter((d) => {
       const data = d.data();
