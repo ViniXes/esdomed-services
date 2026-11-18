@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CalendarCheck, Loader2, Megaphone, PencilLine } from "lucide-react";
 import {
+  destinoDelLlamado,
   destinoEstacion,
   ETIQUETA_ESTADO,
   limpiarExpediente,
@@ -12,9 +13,11 @@ import {
 import type { EstacionCEId } from "@/lib/consultaExterna/especialidades";
 import { publicarLlamadoManual, quitarLlamadoDePantalla } from "@/lib/consultaExterna/estacionDatos";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
+import { SelectorConsultorio } from "@/components/consultaExterna/SelectorConsultorio";
 
-// Llamado escrito a mano en la estación: la enfermera escribe expediente y
-// nombre y lo manda a las pantallas, que lo llaman a esta estación. Sirve para
+// Llamado escrito a mano en la estación: la enfermera escribe el nombre (y el
+// expediente, que es opcional) y lo manda a las pantallas, que lo llaman a
+// esta estación (o al consultorio que ella elija). Sirve para
 // el paciente que no está en la agenda del día (o un día sin agenda cargada).
 // No mueve ninguna cita: quien sí tiene cita se llama desde su tarjeta, para
 // que su atención quede registrada.
@@ -24,9 +27,12 @@ import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
 
 const MAX_RECIENTES = 15;
 
+/** Lo que se guarda en este navegador: el llamado y el consultorio elegido, para "Volver a llamar". */
+type Reciente = LlamadoPantalla & { consultorioElegido?: string };
+
 const claveRecientes = (estacionId: EstacionCEId, fechaISO: string) => `ce:llamados-manuales:${estacionId}:${fechaISO}`;
 
-function leerRecientes(clave: string): LlamadoPantalla[] {
+function leerRecientes(clave: string): Reciente[] {
   try {
     const v = JSON.parse(localStorage.getItem(clave) ?? "[]");
     return Array.isArray(v) ? v : [];
@@ -35,7 +41,7 @@ function leerRecientes(clave: string): LlamadoPantalla[] {
   }
 }
 
-function guardarRecientes(clave: string, lista: LlamadoPantalla[]) {
+function guardarRecientes(clave: string, lista: Reciente[]) {
   try { localStorage.setItem(clave, JSON.stringify(lista)); } catch { /* sin almacenamiento */ }
 }
 
@@ -56,17 +62,21 @@ interface Props {
   estacionId: EstacionCEId;
   /** Citas del día de la estación: avisan si el paciente sí tiene cita. */
   citas: CitaCEConId[];
+  /** Consultorios de la agenda de hoy, para "Llamar a". */
+  consultorios: string[];
   /** Quién atiende la estación; queda en el llamado. */
   porNombre: string;
 }
 
-export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props) {
+export function LlamadoManual({ fechaISO, estacionId, citas, consultorios, porNombre }: Props) {
   const clave = claveRecientes(estacionId, fechaISO);
   const [expediente, setExpediente] = useState("");
   const [nombre, setNombre] = useState("");
+  // Se conserva entre llamados: un día sin agenda, todos los de un médico van al mismo.
+  const [consultorio, setConsultorio] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
-  const [recientes, setRecientes] = useState<LlamadoPantalla[]>([]);
+  const [recientes, setRecientes] = useState<Reciente[]>([]);
   const [ocupados, setOcupados] = useState<Set<string>>(new Set());
   const refExpediente = useRef<HTMLInputElement>(null);
 
@@ -76,7 +86,7 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
     setRecientes(leerRecientes(clave));
   }, [clave]);
 
-  const cambiarRecientes = (cambiar: (prev: LlamadoPantalla[]) => LlamadoPantalla[]) =>
+  const cambiarRecientes = (cambiar: (prev: Reciente[]) => Reciente[]) =>
     setRecientes((prev) => {
       const lista = cambiar(prev).slice(0, MAX_RECIENTES);
       guardarRecientes(clave, lista);
@@ -85,9 +95,12 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
 
   // "Estación Cardiología" → "estación Cardiología", para usarlo dentro de una frase.
   const aLaEstacion = destinoEstacion(estacionId).replace(/^E/, "e");
+  const destino = destinoDelLlamado(estacionId, consultorio);
   const expLimpio = limpiarExpediente(expediente);
   const nombreVista = nombreParaLlamado(nombre);
-  const listo = /\d/.test(expLimpio) && nombreVista.length >= 3;
+  // El expediente es opcional; si se escribe, debe llevar números.
+  const expedienteMal = expLimpio !== "" && !/\d/.test(expLimpio);
+  const listo = nombreVista.length >= 3 && !expedienteMal;
   const enAgenda = expLimpio.length >= 3 ? citas.find((c) => limpiarExpediente(c.expediente) === expLimpio) : undefined;
 
   const marcar = (citaId: string, si: boolean) =>
@@ -98,9 +111,10 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
       return n;
     });
 
-  const llamar = async (datos: { expediente: string; paciente: string }) => {
+  const llamar = async (datos: { expediente: string; paciente: string; consultorio: string }) => {
     const l = await publicarLlamadoManual(fechaISO, { ...datos, estacionId }, porNombre);
-    cambiarRecientes((prev) => [l, ...prev.filter((r) => r.citaId !== l.citaId)]);
+    const reciente: Reciente = datos.consultorio.trim() ? { ...l, consultorioElegido: datos.consultorio } : l;
+    cambiarRecientes((prev) => [reciente, ...prev.filter((r) => r.citaId !== l.citaId)]);
   };
 
   const enviar = async (e: React.FormEvent) => {
@@ -109,7 +123,7 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
     setError("");
     setEnviando(true);
     try {
-      await llamar({ expediente: expLimpio, paciente: nombre });
+      await llamar({ expediente: expLimpio, paciente: nombre, consultorio });
       setExpediente("");
       setNombre("");
       refExpediente.current?.focus();
@@ -121,11 +135,12 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
     }
   };
 
-  const volverALlamar = async (r: LlamadoPantalla) => {
+  // Al mismo lugar que la vez anterior.
+  const volverALlamar = async (r: Reciente) => {
     setError("");
     marcar(r.citaId, true);
     try {
-      await llamar({ expediente: r.expediente ?? "", paciente: r.paciente ?? "" });
+      await llamar({ expediente: r.expediente ?? "", paciente: r.paciente ?? "", consultorio: r.consultorioElegido ?? "" });
     } catch (err) {
       console.error("No se pudo volver a llamar", err);
       setError("No se pudo volver a llamar. Revise la conexión e intente de nuevo.");
@@ -134,7 +149,7 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
     }
   };
 
-  const quitar = async (r: LlamadoPantalla) => {
+  const quitar = async (r: Reciente) => {
     setError("");
     marcar(r.citaId, true);
     try {
@@ -155,15 +170,18 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Llamar escribiendo los datos</p>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Para un paciente que no está en la agenda de hoy. La pantalla lo llama a la {aLaEstacion}.
+            Para un paciente que no está en la agenda de hoy. La pantalla lo llama a la {aLaEstacion}, o al consultorio que elija.
+            El expediente es opcional: sin él, se llama solo por el nombre.
           </p>
         </div>
       </div>
 
       <form onSubmit={enviar} className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-[10rem_1fr_auto] sm:items-end">
+        <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
           <label className="block">
-            <span className={etiqueta}>Expediente</span>
+            <span className={etiqueta}>
+              Expediente <span className="font-normal text-slate-400 dark:text-slate-500">(opcional)</span>
+            </span>
             <input
               ref={refExpediente}
               value={expediente}
@@ -185,6 +203,16 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
               className={campo}
             />
           </label>
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1 basis-60">
+            <SelectorConsultorio
+              valor={consultorio}
+              onCambiar={setConsultorio}
+              opciones={consultorios}
+              estacion={destinoEstacion(estacionId)}
+            />
+          </div>
           <button type="submit" disabled={!listo || enviando} className={btnPrincipal}>
             {enviando ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Megaphone size={16} aria-hidden="true" />}
             Llamar
@@ -215,9 +243,22 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
 
         {(nombre.trim() || expediente.trim()) && (
           <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-            En pantalla: Exp. <span className="font-mono font-semibold text-slate-900 dark:text-white">{expLimpio || "—"}</span>
-            {" · "}<strong className="text-slate-900 dark:text-white">{nombreVista || "—"}</strong>
-            {" · "}Acercarse a {aLaEstacion}
+            En pantalla:{" "}
+            {expLimpio && !expedienteMal && (
+              <>
+                Exp. <span className="font-mono font-semibold text-slate-900 dark:text-white">{expLimpio}</span>
+                {" · "}
+              </>
+            )}
+            <strong className="text-slate-900 dark:text-white">{nombreVista || "—"}</strong>
+            {!expLimpio && nombreVista && " (solo por nombre)"}
+            {" · "}Acercarse a {destino.replace(/^[EC]/, (l) => l.toLowerCase())}
+          </p>
+        )}
+
+        {expedienteMal && (
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            El expediente lleva números. Déjelo vacío para llamar solo por el nombre.
           </p>
         )}
 
@@ -240,7 +281,14 @@ export function LlamadoManual({ fechaISO, estacionId, citas, porNombre }: Props)
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{r.paciente}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Exp. <span className="font-mono">{r.expediente}</span> · {horaCorta(r.enMs)}
+                      {r.expediente ? (
+                        <>
+                          Exp. <span className="font-mono">{r.expediente}</span>
+                        </>
+                      ) : (
+                        "Solo por nombre"
+                      )}
+                      {" · "}{horaCorta(r.enMs)} · {r.destino}
                     </p>
                   </div>
                   <button type="button" disabled={ocupado} onClick={() => volverALlamar(r)} className={btnSecundario}>

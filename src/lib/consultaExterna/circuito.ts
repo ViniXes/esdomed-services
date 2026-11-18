@@ -142,12 +142,46 @@ export function nombreConsultorio(consultorio: string, especialidadId?: string):
   return `Consultorio ${m[2]} de ${esp?.nombre ?? m[1]}`;
 }
 
+/**
+ * Consultorio que eligió la estación, como se muestra y se lee. Acepta el del
+ * SIS ("Cardiologia - 3" → "Consultorio 3 de Cardiología") o lo que escriba la
+ * enfermera ("7" → "Consultorio 7", "consultorio 7b" → "Consultorio 7b").
+ */
+export function destinoConsultorio(consultorio: string): string {
+  const t = String(consultorio ?? "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const yaDice = t.match(/^consultorio\s*(.*)$/i);
+  if (yaDice) return yaDice[1] ? `Consultorio ${yaDice[1]}` : "Consultorio";
+  if (/^(.*?)\s*-\s*(\d+)$/.test(t)) return nombreConsultorio(t);
+  return `Consultorio ${t}`;
+}
+
+/**
+ * A dónde se llama (decisión del usuario, 2026-11-18): a la estación, como
+ * siempre, salvo que la estación elija el consultorio. La agenda del SIS dice
+ * un consultorio, pero el médico a veces atiende en otro: lo sabe la estación
+ * ese día, así que el de la agenda nunca se usa solo.
+ */
+export function destinoDelLlamado(estacionId: EstacionCEId, consultorio?: string): string {
+  return destinoConsultorio(consultorio ?? "") || destinoEstacion(estacionId);
+}
+
+/** Una cola por médico (y su consultorio en la agenda). */
+export const claveColaMedico = (c: { medico: string; consultorio: string }) => `${c.medico}|${c.consultorio}`;
+
+/** Consultorios de la agenda del día (como los escribe el SIS), sin repetir y en orden. */
+export function consultoriosDeCitas(citas: { consultorio: string }[]): string[] {
+  const unicos = new Set(citas.map((c) => String(c.consultorio ?? "").trim()).filter(Boolean));
+  return [...unicos].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+}
+
 // ─── Documento de llamados (lo que escuchan las pantallas) ──────────────────
 //
 // Desde el 2026-11-17 se llama por expediente y nombre, a la estación de
 // enfermería (decisión del usuario); antes, por código ("HE-12", para no
-// mostrar nombres) y al consultorio. Los llamados anteriores solo traen
-// `codigo` y la pantalla los sigue mostrando así.
+// mostrar nombres) y al consultorio. Desde el 2026-11-18 la estación puede
+// elegir el consultorio (destinoDelLlamado). Los llamados anteriores solo
+// traen `codigo` y la pantalla los sigue mostrando así.
 
 export interface LlamadoPantalla {
   /** Identifica cada anuncio; un "Volver a llamar" genera uno nuevo. */
@@ -162,7 +196,7 @@ export interface LlamadoPantalla {
   expediente?: string;
   /** Solo en los llamados anteriores al 2026-11-17. */
   codigo?: string;
-  /** "Estación Cardiología" (ver destinoEstacion); antes, el consultorio. */
+  /** "Estación Cardiología", o el consultorio que eligió la estación (ver destinoDelLlamado). */
   destino: string;
   estacionId: EstacionCEId;
   /** Milisegundos (Date.now()); en un arreglo no cabe serverTimestamp. */
@@ -232,10 +266,20 @@ export function limpiarExpediente(expediente: string): string {
 
 /**
  * citaId de un llamado manual. Volver a llamar al mismo expediente desde la
- * misma estación reemplaza su entrada en la pantalla en vez de repetirla.
+ * misma estación reemplaza su entrada en la pantalla en vez de repetirla. El
+ * expediente es opcional (pedido del usuario, 2026-11-18): sin él, se
+ * identifica por el nombre, para que dos llamados solo por nombre no se pisen.
  */
-export function idLlamadoManual(estacionId: EstacionCEId, expediente: string): string {
-  return `manual:${estacionId}:${limpiarExpediente(expediente)}`;
+export function idLlamadoManual(estacionId: EstacionCEId, expediente: string, nombre = ""): string {
+  const exp = limpiarExpediente(expediente);
+  if (exp) return `manual:${estacionId}:${exp}`;
+  const claveNombre = nombreParaLlamado(nombre)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `manual:${estacionId}:nombre:${claveNombre}`;
 }
 
 /** Destino de todo llamado: la estación de enfermería que llama ("Estación Cardiología"). */

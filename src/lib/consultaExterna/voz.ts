@@ -93,11 +93,13 @@ export function esperarVoces(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]> 
 const minusculaInicial = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 /**
- * Texto que se lee (pedido del usuario, 2026-11-17): expediente, nombre y la
- * estación, sin consultorio. "Expediente 11431 guion 26, María Pilar López
- * Gonzales. Acercarse a estación Cardiología." El guion se dice, para que el
- * número no se lea como una resta. Los llamados anteriores solo traen código:
- * sus letras se separan para que se deletreen ("HE-12" → "hache, e, doce").
+ * Texto que se lee (pedido del usuario, 2026-11-17): expediente, nombre y el
+ * destino, que es la estación salvo que ella elija el consultorio (2026-11-18).
+ * "Expediente 11431 guion 26, María Pilar López Gonzales. Acercarse a estación
+ * Cardiología." / "… Acercarse a consultorio 3 de Cardiología." El guion se
+ * dice, para que el número no se lea como una resta. Los llamados anteriores
+ * solo traen código: sus letras se separan para que se deletreen ("HE-12" →
+ * "hache, e, doce").
  */
 export function textoLlamado(l: { paciente?: string; expediente?: string; codigo?: string; destino: string }): string {
   const destino = `Acercarse a ${minusculaInicial(String(l.destino ?? "").trim())}.`;

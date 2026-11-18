@@ -7,7 +7,14 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 import { esCuentaEstacion } from "@/lib/accesoConsultaExterna";
 import { ESTACIONES_CE, especialidadesDeEstacion, estacionPorId, esEstacionCE, type EstacionCEId } from "@/lib/consultaExterna/especialidades";
 import { AccionNoAplica, ejecutarAccion, escucharCitasEstacion } from "@/lib/consultaExterna/estacionDatos";
-import { aplicarAccion, type AccionCE, type EstadoCitaCE } from "@/lib/consultaExterna/circuito";
+import {
+  aplicarAccion,
+  claveColaMedico,
+  consultoriosDeCitas,
+  destinoEstacion,
+  type AccionCE,
+  type EstadoCitaCE,
+} from "@/lib/consultaExterna/circuito";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
 import { BuscadorLlegada, EstacionVista } from "@/components/consultaExterna/EstacionVista";
 import { LlamadoManual } from "@/components/consultaExterna/LlamadoManual";
@@ -17,9 +24,20 @@ import { PedirQuienAtiende, useQuienAtiende } from "@/components/consultaExterna
 // ESDOMED y admin eligen cuál ver (y pueden operar en ella, p. ej. para probar).
 // Arriba van "Marcar llegada" (citas de la agenda) y "Llamar escribiendo los
 // datos" (paciente fuera de la agenda); este último funciona aunque no haya
-// agenda cargada.
+// agenda cargada. El consultorio elegido en cada columna ("Llamar a") se
+// guarda en este navegador para ese día y esa estación.
 
 const CLAVE_ESTACION = "ce:estacion-elegida";
+const claveConsultorios = (estacionId: string, fechaISO: string) => `ce:consultorios-elegidos:${estacionId}:${fechaISO}`;
+
+function leerConsultorios(clave: string): Record<string, string> {
+  try {
+    const v = JSON.parse(localStorage.getItem(clave) ?? "{}");
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+}
 
 export default function EstacionEspecialidadPage() {
   const { user, profile } = useAuth();
@@ -58,6 +76,25 @@ export default function EstacionEspecialidadPage() {
   // adelantado como una escritura normal). Se descarta cuando llega la cita
   // con ese estado, o se revierte si la acción falla.
   const [optimistas, setOptimistas] = useState<Record<string, EstadoCitaCE>>({});
+  const [elegidos, setElegidos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!estacionId) return;
+    // Consultorios elegidos hoy en este navegador (no existe en SSR).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setElegidos(leerConsultorios(claveConsultorios(estacionId, hoy)));
+  }, [estacionId, hoy]);
+
+  const elegirConsultorio = (claveCola: string, consultorio: string) => {
+    if (!estacionId) return;
+    setElegidos((prev) => {
+      const n = { ...prev };
+      if (consultorio.trim()) n[claveCola] = consultorio;
+      else delete n[claveCola];
+      try { localStorage.setItem(claveConsultorios(estacionId, hoy), JSON.stringify(n)); } catch { /* sin almacenamiento */ }
+      return n;
+    });
+  };
 
   useEffect(() => {
     const t = setInterval(() => setAhoraMs(Date.now()), 30_000);
@@ -95,7 +132,8 @@ export default function EstacionEspecialidadPage() {
     if (t) setOptimistas((prev) => ({ ...prev, [cita.id]: t.estado }));
     if (a === "llego") setRecienId(cita.id);
     try {
-      await ejecutarAccion(cita.id, a, { uid: user.uid, nombre: nombreQuien || profile?.nombre || "" });
+      const consultorio = a === "llamar" || a === "volver_a_llamar" ? elegidos[claveColaMedico(cita)] : undefined;
+      await ejecutarAccion(cita.id, a, { uid: user.uid, nombre: nombreQuien || profile?.nombre || "" }, { consultorio });
     } catch (e) {
       setOptimistas((prev) => {
         const n = { ...prev };
@@ -136,6 +174,7 @@ export default function EstacionEspecialidadPage() {
   const citasVista = citas?.map((c) => (optimistas[c.id] ? { ...c, estado: optimistas[c.id] } : c)) ?? null;
   const recien = recienId ? citasVista?.find((c) => c.id === recienId) ?? null : null;
   const hayCitas = !errorCarga && !!citasVista?.length;
+  const consultorios = consultoriosDeCitas(citas ?? []);
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
@@ -198,6 +237,7 @@ export default function EstacionEspecialidadPage() {
             fechaISO={hoy}
             estacionId={estacionId}
             citas={citas ?? []}
+            consultorios={consultorios}
             porNombre={nombreQuien || profile?.nombre || ""}
           />
         </div>
@@ -222,6 +262,10 @@ export default function EstacionEspecialidadPage() {
           recienLlegada={recien}
           onAccion={accion}
           onCerrarRecien={() => setRecienId(null)}
+          estacion={destinoEstacion(estacion.id)}
+          consultorios={consultorios}
+          elegidos={elegidos}
+          onElegirConsultorio={elegirConsultorio}
         />
       ) : null}
     </div>

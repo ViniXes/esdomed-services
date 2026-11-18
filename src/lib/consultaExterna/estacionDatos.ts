@@ -18,7 +18,7 @@ import { COL_CITAS_CE } from "./agendaDatos";
 import {
   agregarLlamado,
   aplicarAccion,
-  destinoEstacion,
+  destinoDelLlamado,
   ETIQUETA_ESTADO,
   idLlamadoManual,
   limpiarExpediente,
@@ -89,12 +89,14 @@ export class AccionNoAplica extends Error {
  * Aplica una acción de la estación (o de la recepción) a una cita. Va en una
  * transacción: verifica el estado actual, así dos computadoras no llaman dos
  * veces al mismo paciente, y si es un llamado lo publica (expediente, nombre y
- * su estación como destino) en el documento de las pantallas en el mismo paso.
+ * destino: su estación, o el consultorio que eligió la estación) en el
+ * documento de las pantallas en el mismo paso.
  */
 export async function ejecutarAccion(
   citaId: string,
   accion: AccionCE,
   por: { uid: string; nombre: string },
+  opciones: { consultorio?: string } = {},
 ): Promise<void> {
   // El id de la cita empieza con su fecha ("2026-11-13_cardiologia_360-23"):
   // así el documento de llamados se lee a la vez que la cita, en un solo viaje
@@ -120,9 +122,17 @@ export async function ejecutarAccion(
       tocaPantalla && cita.fecha === fechaDelId ? snapLlamadosAnticipado : tocaPantalla ? await tx.get(refLlamados) : null;
     const ultimos: LlamadoPantalla[] = snapLlamados?.exists() ? ((snapLlamados.data() as LlamadosCE).ultimos ?? []) : [];
 
+    const destino = destinoDelLlamado(cita.estacionId, opciones.consultorio);
     const update: Record<string, unknown> = {
       estado: t.estado,
-      historial: arrayUnion({ accion, en: Timestamp.now(), por: por.nombre, porUid: por.uid }),
+      historial: arrayUnion({
+        accion,
+        en: Timestamp.now(),
+        por: por.nombre,
+        porUid: por.uid,
+        // Dentro del paso del historial: no hace falta otro campo permitido en las reglas.
+        ...(t.anuncia ? { destino } : {}),
+      }),
       actualizadoEn: serverTimestamp(),
       actualizadoPor: por.uid,
       actualizadoPorNombre: por.nombre,
@@ -150,7 +160,7 @@ export async function ejecutarAccion(
         citaId,
         paciente: nombreParaLlamado(cita.paciente),
         expediente: cita.expediente,
-        destino: destinoEstacion(cita.estacionId),
+        destino,
         estacionId: cita.estacionId,
         enMs: ahora,
       };
@@ -169,9 +179,12 @@ export async function ejecutarAccion(
 // ─── Llamado manual ─────────────────────────────────────────────────────────
 
 export interface DatosLlamadoManual {
+  /** Opcional: vacío, se llama solo por el nombre. */
   expediente: string;
   paciente: string;
   estacionId: EstacionCEId;
+  /** Vacío: a la estación (ver destinoDelLlamado). */
+  consultorio?: string;
 }
 
 /** Lee la lista de la pantalla del día y la reemplaza con lo que devuelva `cambiar`. */
@@ -189,10 +202,11 @@ async function cambiarLlamados(
 }
 
 /**
- * Llamado que la enfermera escribe a mano (expediente y nombre): un
- * paciente que no está en la agenda del día, o un día sin agenda cargada. Solo
- * toca el documento de las pantallas; no hay cita que mover. Volver a llamar
- * al mismo expediente reemplaza su entrada en la lista.
+ * Llamado que la enfermera escribe a mano (nombre y, si lo tiene, expediente):
+ * un paciente que no está en la agenda del día, o un día sin agenda cargada.
+ * Solo toca el documento de las pantallas; no hay cita que mover. Volver a
+ * llamar al mismo expediente (o al mismo nombre, si no tiene) reemplaza su
+ * entrada en la lista.
  */
 export async function publicarLlamadoManual(
   fechaISO: string,
@@ -200,13 +214,15 @@ export async function publicarLlamadoManual(
   porNombre: string,
 ): Promise<LlamadoPantalla> {
   const ahora = Date.now();
-  const citaId = idLlamadoManual(datos.estacionId, datos.expediente);
+  const citaId = idLlamadoManual(datos.estacionId, datos.expediente, datos.paciente);
+  const expediente = limpiarExpediente(datos.expediente);
   const nuevo: LlamadoPantalla = {
     id: `${citaId}#${ahora}`,
     citaId,
     paciente: nombreParaLlamado(datos.paciente),
-    expediente: limpiarExpediente(datos.expediente),
-    destino: destinoEstacion(datos.estacionId),
+    // Sin la clave, no vacía ni undefined: Firestore no acepta undefined dentro de un arreglo.
+    ...(expediente ? { expediente } : {}),
+    destino: destinoDelLlamado(datos.estacionId, datos.consultorio),
     estacionId: datos.estacionId,
     enMs: ahora,
     manual: true,

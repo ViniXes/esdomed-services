@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, ChevronDown, Clock, Loader2, Megaphone, Search, X } from "lucide-react";
 import {
   accionesDe,
+  claveColaMedico,
   compararCola,
   ETIQUETA_ACCION,
   ETIQUETA_ESTADO,
@@ -13,13 +14,16 @@ import {
 } from "@/lib/consultaExterna/circuito";
 import { buscarCitas } from "@/lib/consultaExterna/busqueda";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
+import { SelectorConsultorio } from "@/components/consultaExterna/SelectorConsultorio";
 
 // Pantalla de trabajo de la enfermera de una estación: las colas por médico.
 // La enfermera llama a cada paciente a su estación (la pantalla dice expediente
 // y nombre) y de ahí lo pasa al consultorio de su médico; la preconsulta se
-// coordina de palabra. Solo presenta: los datos y las acciones los pone la
-// página, así se puede probar sin Firestore. El buscador de llegada
-// (BuscadorLlegada) lo monta la página, junto al llamado manual.
+// coordina de palabra. Si ese día sabe en qué consultorio está el médico, lo
+// elige en su columna ("Llamar a") y los llamados de esa cola van ahí. Solo
+// presenta: los datos y las acciones los pone la página, así se puede probar
+// sin Firestore. El buscador de llegada (BuscadorLlegada) lo monta la página,
+// junto al llamado manual.
 
 const llegadaMs = (c: CitaCEConId) => c.llegadaEn?.toMillis?.() ?? null;
 const ordenCola = (a: CitaCEConId, b: CitaCEConId) =>
@@ -44,9 +48,18 @@ interface Props {
   recienLlegada: CitaCEConId | null;
   onAccion: (cita: CitaCEConId, accion: AccionCE) => void;
   onCerrarRecien: () => void;
+  /** "Estación Cardiología": a donde se llama si no se elige consultorio. */
+  estacion: string;
+  /** Consultorios de la agenda de hoy, para elegir en cada columna. */
+  consultorios: string[];
+  /** Consultorio elegido por cola (claveColaMedico); sin entrada = a la estación. */
+  elegidos: Record<string, string>;
+  onElegirConsultorio: (claveCola: string, consultorio: string) => void;
 }
 
-export function EstacionVista({ citas, ocupadas, ahoraMs, recienLlegada, onAccion, onCerrarRecien }: Props) {
+export function EstacionVista({
+  citas, ocupadas, ahoraMs, recienLlegada, onAccion, onCerrarRecien, estacion, consultorios, elegidos, onElegirConsultorio,
+}: Props) {
   const cuenta = (e: EstadoCitaCE) => citas.filter((c) => c.estado === e).length;
   const sinLlegar = citas.filter((c) => c.estado === "citado").sort(ordenCola);
   const noRespondieron = citas.filter((c) => c.estado === "no_respondio").sort(ordenCola);
@@ -57,15 +70,16 @@ export function EstacionVista({ citas, ocupadas, ahoraMs, recienLlegada, onAccio
   const medicos = useMemo(() => {
     const mapa = new Map<string, CitaCEConId[]>();
     for (const c of citas) {
-      const k = `${c.medico}|${c.consultorio}`;
+      const k = claveColaMedico(c);
       mapa.set(k, [...(mapa.get(k) ?? []), c]);
     }
     return [...mapa.values()]
       .map((grupo) => {
         const ordenadas = [...grupo].sort(ordenCola);
         return {
-          clave: `${grupo[0].medico}|${grupo[0].consultorio}`,
+          clave: claveColaMedico(grupo[0]),
           medico: grupo[0].medico,
+          consultorioAgenda: grupo[0].consultorio,
           consultorio: nombreConsultorio(grupo[0].consultorio, grupo[0].especialidadId),
           llamados: ordenadas.filter((c) => c.estado === "llamado"),
           espera: ordenadas.filter((c) => c.estado === "espera"),
@@ -120,10 +134,19 @@ export function EstacionVista({ citas, ocupadas, ahoraMs, recienLlegada, onAccio
               <header className="mb-3 border-b border-slate-200 pb-2 dark:border-slate-800">
                 <h2 className="font-heading text-base font-bold text-slate-900 dark:text-slate-100">{m.medico}</h2>
                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  {m.consultorio}
+                  Agenda: {m.consultorio}
                   {m.sinLlegar ? ` · ${m.sinLlegar} sin llegar` : ""}
                   {m.atendidos ? ` · ${m.atendidos} ${m.atendidos === 1 ? "ya pasó" : "ya pasaron"}` : ""}
                 </p>
+                <div className="mt-2">
+                  <SelectorConsultorio
+                    valor={elegidos[m.clave] ?? ""}
+                    onCambiar={(v) => onElegirConsultorio(m.clave, v)}
+                    opciones={consultorios}
+                    estacion={estacion}
+                    segunAgenda={m.consultorioAgenda}
+                  />
+                </div>
               </header>
               <div className="space-y-2">
                 {vacio ? (

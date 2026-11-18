@@ -184,6 +184,11 @@ assert.equal(nombreParaLlamado("RUIZ-LÓPEZ, ANA"), "Ana Ruiz-López", "apellido
 assert.equal(nombreParaLlamado(nombreParaLlamado("PÉREZ, JUAN")), "Juan Pérez", "idempotente");
 assert.equal(limpiarExpediente(" 11431 - 26 "), "11431-26");
 assert.equal(idLlamadoManual("cardiologia", "11431 -26"), "manual:cardiologia:11431-26");
+// Solo por nombre (expediente opcional, 2026-11-18): se identifica por el nombre, sin tildes ni mayúsculas.
+assert.equal(idLlamadoManual("cardiologia", "", "PÉREZ, José Ñandú"), "manual:cardiologia:nombre:jose-nandu-perez");
+assert.equal(idLlamadoManual("cardiologia", "  ", "José Ñandú Pérez"), idLlamadoManual("cardiologia", "", "jose ñandu perez"));
+assert.notEqual(idLlamadoManual("cardiologia", "", "Ana López"), idLlamadoManual("cardiologia", "", "Rosa Rivas"));
+assert.equal(idLlamadoManual("cardiologia", "778-26", "Ana López"), "manual:cardiologia:778-26", "con expediente manda el expediente");
 assert.equal(destinoEstacion("cardiologia"), "Estación Cardiología");
 assert.equal(destinoEstacion("infectologia"), "Estación Infectología");
 assert.equal(tituloLlamado({ paciente: "Ana Pérez", codigo: "CA-01" }), "Ana Pérez");
@@ -246,6 +251,34 @@ lista = agregarLlamado(lista, ll("l10", "c5"));
 assert.equal(lista[0].id, "l10");
 assert.equal(lista.filter((l) => l.citaId === "c5").length, 1);
 assert.equal(quitarLlamadosDeCita(lista, "c5").some((l) => l.citaId === "c5"), false);
+
+// ── Consultorio elegido por la estación (2026-11-18) ──
+{
+  const { destinoConsultorio, destinoDelLlamado, consultoriosDeCitas, claveColaMedico } = cargar("circuito");
+  assert.equal(destinoConsultorio("Cardiologia - 3"), "Consultorio 3 de Cardiología", "el del SIS");
+  assert.equal(destinoConsultorio("7"), "Consultorio 7", "escrito: solo el número");
+  assert.equal(destinoConsultorio("  consultorio   7b "), "Consultorio 7b");
+  assert.equal(destinoConsultorio("Sala de procedimientos"), "Consultorio Sala de procedimientos");
+  assert.equal(destinoConsultorio("   "), "");
+  assert.equal(destinoDelLlamado("cardiologia"), "Estación Cardiología", "sin elegir: a la estación");
+  assert.equal(destinoDelLlamado("cardiologia", ""), "Estación Cardiología");
+  assert.equal(destinoDelLlamado("hematologia", "Hematologia - 5"), "Consultorio 5 de Hematología");
+  assert.deepEqual(
+    consultoriosDeCitas([{ consultorio: "Hematologia - 10" }, { consultorio: "Hematologia - 2" }, { consultorio: "Hematologia - 2" }, { consultorio: "" }]),
+    ["Hematologia - 2", "Hematologia - 10"],
+  );
+  assert.equal(claveColaMedico({ medico: "Ana", consultorio: "Cardiologia - 1" }), "Ana|Cardiologia - 1");
+  assert.equal(
+    textoLlamado({ expediente: "11431-26", paciente: "María López", destino: destinoDelLlamado("cardiologia", "Cardiologia - 3") }),
+    "Expediente 11431 guion 26, María López. Acercarse a consultorio 3 de Cardiología.",
+  );
+}
+
+assert.equal(
+  textoLlamado({ paciente: "Ana López", destino: "Estación Cardiología" }),
+  "Ana López. Acercarse a estación Cardiología.",
+  "solo por nombre: no dice expediente",
+);
 
 // ── Quién abre la pantalla de llamados ──
 const acceso = cargar("../accesoConsultaExterna");

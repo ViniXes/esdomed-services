@@ -18,6 +18,8 @@ export interface PasoHistorialCE {
   en: Timestamp;
   por: string;
   porUid: string;
+  /** En los llamados: a dónde se le llamó ("Estación Cardiología", "Consultorio 3 de Cardiología"). */
+  destino?: string;
 }
 
 export interface CitaCE {

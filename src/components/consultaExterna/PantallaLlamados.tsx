@@ -17,7 +17,14 @@ import { aplicarPronunciacion, type ReglaPronunciacion } from "@/lib/consultaExt
 import { escucharPronunciacion } from "@/lib/consultaExterna/pronunciacionDatos";
 import { escucharLlamados } from "@/lib/consultaExterna/estacionDatos";
 import { useAuth } from "@/contexts/AuthContext";
-import { agregarLlamado, destinoEstacion, MAX_LLAMADOS_PANTALLA, tituloLlamado, type LlamadoPantalla } from "@/lib/consultaExterna/circuito";
+import {
+  agregarLlamado,
+  destinoDelLlamado,
+  destinoEstacion,
+  MAX_LLAMADOS_PANTALLA,
+  tituloLlamado,
+  type LlamadoPantalla,
+} from "@/lib/consultaExterna/circuito";
 import type { EstacionCEId } from "@/lib/consultaExterna/especialidades";
 import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 
@@ -40,10 +47,11 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // ofrece "Simular llamado" para probar el diseño y la voz.
 
 // Datos inventados, solo para el modo de prueba.
-const EJEMPLOS: { expediente: string; paciente: string; estacionId: EstacionCEId }[] = [
+// Cubren los tres casos: a la estación, a un consultorio elegido y solo por nombre.
+const EJEMPLOS: { expediente?: string; paciente: string; estacionId: EstacionCEId; consultorio?: string }[] = [
   { expediente: "11431-26", paciente: "María Pilar López Gonzales", estacionId: "hematologia" },
-  { expediente: "2087-19", paciente: "José Antonio Martínez de León", estacionId: "cardiologia" },
-  { expediente: "45210-24", paciente: "Ana Gabriela Rivas Hernández", estacionId: "infectologia" },
+  { expediente: "45210-24", paciente: "Ana Gabriela Rivas Hernández", estacionId: "infectologia", consultorio: "Infectologia - 2" },
+  { paciente: "José Antonio Martínez de León", estacionId: "cardiologia" },
   { expediente: "907-21", paciente: "Carlos Ernesto Pineda Flores", estacionId: "oncologia" },
   { expediente: "33018-25", paciente: "Rosa Elena Cruz Ventura", estacionId: "hematologia" },
   { expediente: "1502-26", paciente: "Juan Francisco Alvarado Mejía", estacionId: "cardiologia" },
@@ -172,10 +180,10 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     const ms = Date.now();
     const nuevo: LlamadoPantalla = {
       id: `demo-${ms}`,
-      citaId: `demo-${ejemplo.expediente}`,
-      expediente: ejemplo.expediente,
+      citaId: `demo-${ejemplo.expediente ?? ejemplo.paciente}`,
+      ...(ejemplo.expediente ? { expediente: ejemplo.expediente } : {}),
       paciente: ejemplo.paciente,
-      destino: destinoEstacion(ejemplo.estacionId),
+      destino: destinoDelLlamado(ejemplo.estacionId, ejemplo.consultorio),
       estacionId: ejemplo.estacionId,
       enMs: ms,
     };
@@ -242,9 +250,12 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
         >
           {actual ? (
             <>
-              <p className="text-[clamp(1rem,1.6vw,2rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">
-                {actual.expediente ? "Expediente" : "Turno"}
-              </p>
+              {/* Sin expediente (llamado manual solo por nombre) no lleva etiqueta; "Turno" es de los llamados viejos por código. */}
+              {(actual.expediente || !actual.paciente) && (
+                <p className="text-[clamp(1rem,1.6vw,2rem)] font-semibold uppercase tracking-[0.25em] text-cyan-100/80">
+                  {actual.expediente ? "Expediente" : "Turno"}
+                </p>
+              )}
               {actual.expediente && (
                 <p className="font-heading text-[clamp(2.5rem,5.5vw,7rem)] font-bold leading-none tracking-tight">
                   {actual.expediente}
