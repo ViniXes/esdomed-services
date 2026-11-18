@@ -2,16 +2,17 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Check, DoorOpen, Loader2, LogOut, Megaphone, RotateCcw, Send, Stethoscope, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, ClipboardCheck, DoorOpen, Loader2, LogOut, Megaphone, RotateCcw, Send, Stethoscope, X } from "lucide-react";
 import {
   destinoConsultorioDe,
+  destinoEstacionDe,
   destinoSignosVitales,
   MAX_MENSAJE_PANTALLA,
   nombreParaLlamado,
   textoParaPantalla,
   type LlamadoPantalla,
 } from "@/lib/consultaExterna/circuito";
-import { ESPECIALIDADES_CE, especialidadPorId } from "@/lib/consultaExterna/especialidades";
+import { ESPECIALIDADES_CE, ESTACIONES_CE, especialidadPorId } from "@/lib/consultaExterna/especialidades";
 import { buscarCitas } from "@/lib/consultaExterna/busqueda";
 import { leerCitasDelDia, publicarMensajePantalla, quitarLlamadoDePantalla } from "@/lib/consultaExterna/estacionDatos";
 import type { CitaCEConId } from "@/lib/consultaExterna/tipos";
@@ -25,14 +26,14 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // Al escribir un expediente o un nombre aparecen los pacientes de la agenda
 // del día (la carga ESDOMED); al elegir uno, el mensaje lleva su expediente y
 // su nombre. Quien no está citado se escribe a mano, como texto libre. Abajo,
-// si hace falta, se marca a dónde ir: toma de signos vitales o un consultorio,
-// los dos con su especialidad.
+// si hace falta, se marca a dónde ir: toma de signos vitales, un consultorio
+// o la estación (cuando solo falta despacharlo), siempre con su especialidad.
 //
 // La agenda se lee una vez, al empezar a escribir, y se renueva cada 10
 // minutos. Lo enviado hoy queda en este equipo (localStorage) para repetirlo,
 // corregirlo o quitarlo de las pantallas.
 
-type Indicacion = "" | "signos" | "consultorio";
+type Indicacion = "" | "signos" | "consultorio" | "estacion";
 
 interface Eleccion {
   indicacion: Indicacion;
@@ -74,6 +75,7 @@ function guardarJSON(clave: string, valor: unknown) {
 function destinoDe(e: Eleccion): string {
   if (e.indicacion === "signos") return destinoSignosVitales(e.especialidadId);
   if (e.indicacion === "consultorio") return destinoConsultorioDe(e.especialidadId, e.numero);
+  if (e.indicacion === "estacion") return destinoEstacionDe(e.especialidadId);
   return "";
 }
 
@@ -169,7 +171,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
   const enPantalla = textoParaPantalla(texto);
   // Todo en mayúsculas o minúsculas se muestra con mayúscula inicial: se avisa cómo saldrá.
   const cambiaAlMostrar = enPantalla !== "" && enPantalla !== texto.replace(/\s+/g, " ").trim();
-  // Signos vitales y consultorio piden la especialidad (y el consultorio, su número).
+  // Cada destino pide la especialidad (o la estación); el consultorio, además, su número.
   const faltaDestino = eleccion.indicacion !== "" && !destino;
   const listo = enPantalla.length >= 2 && !faltaDestino;
   const restantes = MAX_MENSAJE_PANTALLA - texto.length;
@@ -451,7 +453,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
             <legend className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
               ¿A dónde debe ir? <span className="font-normal text-slate-400 dark:text-slate-500">(opcional)</span>
             </legend>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
               <OpcionDestino
                 activo={eleccion.indicacion === "signos"}
                 onClick={() => marcar("signos")}
@@ -466,14 +468,25 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
                 titulo="Consultorio"
                 detalle="De especialidad"
               />
+              <OpcionDestino
+                activo={eleccion.indicacion === "estacion"}
+                onClick={() => marcar("estacion")}
+                icon={ClipboardCheck}
+                titulo="Estación"
+                detalle="Para despachar"
+              />
             </div>
 
             {eleccion.indicacion !== "" && (
               <div className="mt-2.5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p className={rotulo}>{eleccion.indicacion === "signos" ? "Signos vitales de" : "Especialidad"}</p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {ESPECIALIDADES_CE.map((e) => {
-                    const activa = e.id === eleccion.especialidadId;
+                <p className={rotulo}>
+                  {eleccion.indicacion === "signos" ? "Signos vitales de" : eleccion.indicacion === "estacion" ? "Estación de" : "Especialidad"}
+                </p>
+                <div className={`grid grid-cols-2 gap-2 ${eleccion.indicacion === "estacion" ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+                  {/* Estación: las cuatro de enfermería (Cirugía Cardiovascular y de Tórax van a la de Cardiología). */}
+                  {(eleccion.indicacion === "estacion" ? ESTACIONES_CE : ESPECIALIDADES_CE).map((e) => {
+                    const activa =
+                      eleccion.indicacion === "estacion" ? esp?.estacion === e.id : e.id === eleccion.especialidadId;
                     return (
                       <button
                         key={e.id}
@@ -565,11 +578,13 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
 
           {faltaDestino && texto.trim() !== "" && (
             <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
-              {!esp
-                ? eleccion.indicacion === "signos"
-                  ? "Elija la especialidad."
-                  : "Elija la especialidad y el consultorio."
-                : "Elija el número del consultorio."}
+              {esp
+                ? "Elija el número del consultorio."
+                : eleccion.indicacion === "estacion"
+                  ? "Elija la estación."
+                  : eleccion.indicacion === "signos"
+                    ? "Elija la especialidad."
+                    : "Elija la especialidad y el consultorio."}
             </p>
           )}
           {error && (
@@ -680,8 +695,8 @@ function OpcionDestino({
       type="button"
       aria-pressed={activo}
       onClick={onClick}
-      // En celulares angostos (< 380 px) el ícono va arriba, para que el título no se parta.
-      className={`flex min-h-[4.25rem] flex-col items-start gap-2 rounded-2xl border px-3 py-3 text-left min-[380px]:flex-row min-[380px]:items-center min-[380px]:gap-3 ${tactil} ${
+      // Tres opciones en fila: el ícono va arriba del título para que quepan en el celular.
+      className={`flex flex-col items-start gap-2 rounded-2xl border p-3 text-left ${tactil} ${
         activo
           ? "border-cyan-600 bg-cyan-50 ring-1 ring-cyan-600 dark:border-cyan-500 dark:bg-cyan-950/50 dark:ring-cyan-500"
           : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
@@ -705,7 +720,8 @@ function OpcionDestino({
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold leading-tight text-slate-900 dark:text-white">{titulo}</span>
-        <span className="block text-xs leading-tight text-slate-500 dark:text-slate-400">{detalle}</span>
+        {/* En el celular basta el título; el detalle partido en dos líneas alargaba las tarjetas. */}
+        <span className="hidden text-xs leading-tight text-slate-500 sm:block dark:text-slate-400">{detalle}</span>
       </span>
     </button>
   );

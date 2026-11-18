@@ -317,6 +317,10 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
   assert.equal(c.destinoConsultorioDe("", "3"), "", "sin especialidad no hay destino");
   assert.equal(c.destinoSignosVitales("cardiologia"), "Toma de signos vitales de Cardiología");
   assert.equal(c.destinoSignosVitales(""), "", "signos vitales pide la especialidad");
+  assert.equal(c.destinoEstacionDe("oncologia"), "Estación Oncología");
+  assert.equal(c.destinoEstacionDe("cirugia_torax"), "Estación Cardiología", "Cirugía de Tórax la atiende la estación de Cardiología");
+  assert.equal(c.destinoEstacionDe(""), "");
+  assert.equal(textoLlamado({ paciente: "Rosa Cruz", destino: c.destinoEstacionDe("hematologia") }), "Rosa Cruz. Acercarse a estación Hematología.");
   const m = c.crearMensajePantalla({ texto: "rosa cruz", destino: " Toma de signos vitales de Hematología ", porNombre: "Mensajes CE" }, 1000);
   assert.deepEqual(m, {
     id: `${c.idMensajePantalla("rosa cruz")}#1000`,

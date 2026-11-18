@@ -318,10 +318,20 @@ export function tituloLlamado(l: Pick<LlamadoPantalla, "paciente" | "codigo">): 
 // que cada quien escribe lo que necesita. Si el paciente está en la agenda
 // del día (la carga ESDOMED), se busca por expediente o nombre y el mensaje
 // lleva su expediente; si no, se escribe el texto libre. Si quiere, agrega a
-// dónde ir: la toma de signos vitales o un consultorio, siempre con su especialidad.
+// dónde ir: la toma de signos vitales, un consultorio o la estación (para
+// despacharlo), siempre con su especialidad.
 
 /** Largo máximo del mensaje: con más, ya no se lee de lejos en la TV. */
 export const MAX_MENSAJE_PANTALLA = 80;
+
+/**
+ * "cirugia_torax" → "Estación Cardiología": la estación de enfermería que
+ * atiende esa especialidad (para despachar al paciente). "" sin especialidad.
+ */
+export function destinoEstacionDe(especialidadId: string): string {
+  const esp = especialidadPorId(especialidadId);
+  return esp ? destinoEstacion(esp.estacion) : "";
+}
 
 /** "cardiologia" → "Toma de signos vitales de Cardiología"; "" sin especialidad. */
 export function destinoSignosVitales(especialidadId: string): string {
