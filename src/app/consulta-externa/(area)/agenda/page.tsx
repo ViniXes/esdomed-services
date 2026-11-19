@@ -7,6 +7,7 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 import { leerProgramacionCitas, type ProgramacionLeida } from "@/lib/consultaExterna/programacion";
 import { prepararCarga, type CargaPreparada, type CitaNumerada } from "@/lib/consultaExterna/agenda";
 import { guardarAgendaCE, leerAgendaCE, type ResultadoCargaCE } from "@/lib/consultaExterna/agendaDatos";
+import { actualizarCatalogoTarjetas } from "@/lib/consultaExterna/tarjetasDatos";
 import { ESPECIALIDADES_CE, estacionPorId } from "@/lib/consultaExterna/especialidades";
 import type { AgendaCE } from "@/lib/consultaExterna/tipos";
 
@@ -14,6 +15,10 @@ import type { AgendaCE } from "@/lib/consultaExterna/tipos";
 // navegador, se muestra un resumen y al guardar cada cita recibe su número
 // interno (orden de la cola; ya no se anuncia: se llama por expediente y
 // nombre). Lecturas: 1 (resumen del día) + 1 por cita al guardar.
+//
+// Después de guardar, los pacientes con DUI pasan al Catálogo de tarjetas
+// (a lo más 20 lecturas). Si eso falla, las citas ya quedaron: se avisa, y
+// volver a subir el mismo archivo completa el catálogo sin repetir citas.
 
 async function leerLibro(file: File): Promise<unknown[][][]> {
   const XLSX = await import("xlsx");
@@ -44,6 +49,9 @@ const tarjeta = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark
 const th = "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400";
 const td = "px-3 py-2 text-slate-700 dark:text-slate-200";
 
+/** null: no se pudo actualizar el catálogo de tarjetas. */
+type ResultadoPantalla = ResultadoCargaCE & { fechaISO: string; tarjetasNuevas: number | null };
+
 interface Lectura {
   archivo: string;
   programacion: ProgramacionLeida;
@@ -63,7 +71,7 @@ export default function CargarCitasPage() {
   const [error, setError] = useState("");
   const [lectura, setLectura] = useState<Lectura | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const [resultado, setResultado] = useState<(ResultadoCargaCE & { fechaISO: string }) | null>(null);
+  const [resultado, setResultado] = useState<ResultadoPantalla | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -120,7 +128,12 @@ export default function CargarCitasPage() {
     setError("");
     try {
       const r = await guardarAgendaCE(lectura.carga, { uid: user.uid, nombre: profile?.nombre ?? "" }, lectura.archivo);
-      setResultado({ ...r, fechaISO: lectura.carga.fechaISO });
+      // Todas las citas del reporte, también las ya cargadas: completa lo que una carga anterior no alcanzó.
+      const tarjetas = await actualizarCatalogoTarjetas(lectura.carga.fechaISO, lectura.carga.citas).catch((e) => {
+        console.error("Las citas se guardaron, pero no se actualizó el catálogo de tarjetas", e);
+        return null;
+      });
+      setResultado({ ...r, fechaISO: lectura.carga.fechaISO, tarjetasNuevas: tarjetas ? tarjetas.nuevas : null });
       setLectura(null);
       if (lectura.carga.fechaISO === hoy) setAgendaHoy(await leerAgendaCE(hoy));
     } catch (e) {
@@ -388,10 +401,10 @@ function VistaPrevia({
 function ResultadoCarga({
   resultado, onOtra,
 }: {
-  resultado: ResultadoCargaCE & { fechaISO: string };
+  resultado: ResultadoPantalla;
   onOtra: () => void;
 }) {
-  const { nuevas, yaCargadas, fechaISO } = resultado;
+  const { nuevas, yaCargadas, fechaISO, tarjetasNuevas } = resultado;
   const porEspecialidad = ESPECIALIDADES_CE.map((e) => ({
     esp: e,
     citas: nuevas.filter((c) => c.especialidadId === e.id).sort((a, b) => a.numero - b.numero),
@@ -409,6 +422,7 @@ function ResultadoCarga({
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {fechaLarga(fechaISO)}
               {yaCargadas ? ` · ${yaCargadas} ya estaban cargadas` : ""}
+              {tarjetasNuevas ? ` · ${tarjetasNuevas} ${tarjetasNuevas === 1 ? "paciente nuevo" : "pacientes nuevos"} en el Catálogo de tarjetas` : ""}
             </p>
           </div>
         </div>
@@ -421,6 +435,13 @@ function ResultadoCarga({
           Cargar otro archivo
         </button>
       </div>
+
+      {tarjetasNuevas === null && (
+        <Aviso>
+          Las citas quedaron cargadas, pero no se actualizó el <strong>Catálogo de tarjetas</strong>. Vuelva a subir el mismo
+          archivo: las citas no se repiten y el catálogo se completa.
+        </Aviso>
+      )}
 
       {porEspecialidad.map(({ esp, citas }) => (
         <div key={esp.id}>

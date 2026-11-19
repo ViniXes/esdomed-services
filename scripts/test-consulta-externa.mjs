@@ -430,6 +430,53 @@ assert.equal(coincideCita(ana, "m"), false, "una letra no busca");
 
 console.log("✓ test-consulta-externa: lector, catálogo, numeración, circuito y búsqueda OK");
 
+// ── Catálogo de tarjetas (pacientes con DUI en cualquier agenda, 2026-11-19) ──
+{
+  const t = cargar("tarjetas");
+  assert.equal(t.fragmentoTarjeta("11431-26"), "f11");
+  assert.equal(t.fragmentoTarjeta("11440-26"), "f00");
+  assert.equal(t.fragmentoTarjeta("11431-25"), t.fragmentoTarjeta("11431-26"), "el año no cambia el documento");
+  assert.equal(t.fragmentoTarjeta(""), "f00");
+  assert.match(t.fragmentoTarjeta("987654321-20"), /^f\d{2}$/);
+
+  const cita = (fecha, exp, dui, paciente, especialidadId) => ({ fecha, expediente: exp, dui, paciente, especialidadId });
+  const a = t.fusionarTarjeta(undefined, cita("2026-11-17", "100-26", "00000001-1", "Ruiz, Juan", "cardiologia"));
+  assert.deepEqual(a, { dui: "00000001-1", paciente: "Ruiz, Juan", primera: "2026-11-17", ultima: "2026-11-17", especialidades: ["cardiologia"] });
+  assert.deepEqual(t.fusionarTarjeta(a, cita("2026-11-17", "100-26", "00000001-1", "Ruiz, Juan", "cardiologia")), a, "la misma cita no cambia nada");
+  const b = t.fusionarTarjeta(a, cita("2026-11-20", "100-26", "00000001-1", "Ruiz Paz, Juan", "hematologia"));
+  assert.equal(b.paciente, "Ruiz Paz, Juan", "manda el nombre de la cita más reciente");
+  assert.deepEqual([b.primera, b.ultima], ["2026-11-17", "2026-11-20"]);
+  assert.deepEqual(b.especialidades, ["cardiologia", "hematologia"]);
+  const c = t.fusionarTarjeta(b, cita("2026-11-10", "100-26", "", "Ruiz, J.", "cardiologia"));
+  assert.deepEqual([c.paciente, c.dui, c.primera, c.ultima], ["Ruiz Paz, Juan", "00000001-1", "2026-11-10", "2026-11-20"], "una cita vieja solo mueve la primera");
+
+  // Cambios: sin DUI no entra; solo se escribe lo nuevo o distinto.
+  const citas = [
+    cita("2026-11-19", "100-26", "00000001-1", "Ruiz, Juan", "cardiologia"),
+    cita("2026-11-19", "100-26", "00000001-1", "Ruiz, Juan", "oncologia"),
+    cita("2026-11-19", "101-26", "", "Paz, Eva", "cardiologia"),
+    cita("2026-11-19", "120-26", "00000003-3", "Luna, Sol", "hematologia"),
+  ];
+  assert.deepEqual(t.fragmentosDeCitas(citas), ["f00"]);
+  const primera = t.cambiosTarjetas(citas, () => undefined);
+  assert.equal(primera.nuevas, 2, "dos pacientes con DUI; Paz no tiene");
+  const guardado = primera.cambios.get("f00");
+  assert.deepEqual(Object.keys(guardado).sort(), ["100-26", "120-26"]);
+  assert.deepEqual(guardado["100-26"].especialidades, ["cardiologia", "oncologia"], "dos citas el mismo día se juntan");
+  const otraVez = t.cambiosTarjetas(citas, (f) => (f === "f00" ? guardado : undefined));
+  assert.equal(otraVez.cambios.size, 0, "volver a subir el mismo archivo no escribe nada");
+  assert.equal(otraVez.nuevas, 0);
+
+  const lista = t.aplanarTarjetas([guardado, { "7-25": { dui: "00000009-9", paciente: "Álvarez, Ana", primera: "2026-11-13", ultima: "2026-11-13", especialidades: ["oncologia"] } }]);
+  assert.deepEqual(t.filtrarTarjetas(lista, "").map((x) => x.expediente), ["7-25", "120-26", "100-26"], "por apellido, sin tildes");
+  assert.deepEqual(t.filtrarTarjetas(lista, "", { orden: "reciente" }).map((x) => x.expediente), ["120-26", "100-26", "7-25"]);
+  assert.deepEqual(t.filtrarTarjetas(lista, "alvarez").map((x) => x.expediente), ["7-25"]);
+  assert.deepEqual(t.filtrarTarjetas(lista, "sol luna").map((x) => x.expediente), ["120-26"], "palabras en cualquier orden");
+  assert.deepEqual(t.filtrarTarjetas(lista, "1202").map((x) => x.expediente), ["120-26"], "expediente sin guion");
+  assert.deepEqual(t.filtrarTarjetas(lista, "00000009").map((x) => x.expediente), ["7-25"], "por DUI");
+  assert.deepEqual(t.filtrarTarjetas(lista, "", { especialidadId: "oncologia" }).map((x) => x.expediente), ["7-25", "100-26"]);
+}
+
 // ── Opcional: resumen de un .xls real del SIS ──
 const ruta = process.argv[2];
 if (ruta) {

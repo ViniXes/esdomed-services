@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarPlus, FileUp, IdCard, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -35,6 +35,8 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     // El catálogo de agendas se abre desde un botón de esa pantalla (solo gestión).
     entradas: [
       { href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 },
+      // Pacientes con DUI en cualquier agenda cargada del SIS (con DUI = ya tiene tarjeta).
+      { href: "/consulta-externa/tarjetas", label: "Catálogo de tarjetas", icon: IdCard, visibleSi: gestionaConsultaExterna },
       // agenda_ce consulta su horario en el plan de trabajo ESDOMED (solo lectura).
       { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, visibleSi: esAgendaCE },
     ],
