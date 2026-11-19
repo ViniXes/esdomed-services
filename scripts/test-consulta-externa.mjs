@@ -359,6 +359,15 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
   assert.equal(c.pasoPendienteMensaje("Ana López", { ...sin, indicacion: "libre" }), "");
   assert.equal(c.destinoMensaje({ indicacion: "libre", especialidadId: "oncologia", numero: "2" }), "", "texto libre: solo el mensaje");
   assert.equal(c.pasoPendienteMensaje(" ", { ...sin, indicacion: "libre" }), "texto", "texto libre igual pide el texto");
+  // Solo números (un expediente sin elegir al paciente): falta el nombre, aun con destino completo.
+  const completo = { indicacion: "estacion", especialidadId: "oncologia", numero: "" };
+  for (const t of ["11431-26", "11431 26", "1143126", "12", " 11431/26 "]) {
+    assert.equal(c.pasoPendienteMensaje(t, completo), "nombre", t);
+    assert.equal(c.pasoPendienteMensaje(t, { ...sin, indicacion: "libre" }), "nombre", `${t} (texto libre)`);
+  }
+  assert.equal(c.pasoPendienteMensaje("11431-26 Ana López", completo), "", "con el nombre, el número puede ir");
+  assert.equal(c.pasoPendienteMensaje("Ñ1", completo), "", "una letra con tilde o eñe cuenta");
+  assert.equal(c.pasoPendienteMensaje("12", sin), "nombre", "el nombre se pide antes que el destino");
   for (const i of ["signos", "consultorio", "estacion"]) assert.equal(c.pideEspecialidad(i), true, i);
   for (const i of ["", "trabajo_social", "libre"]) assert.equal(c.pideEspecialidad(i), false, i);
   assert.equal(textoLlamado({ paciente: "Rosa Cruz", destino: c.DESTINO_TRABAJO_SOCIAL }), "Rosa Cruz. Acercarse a trabajo Social.");

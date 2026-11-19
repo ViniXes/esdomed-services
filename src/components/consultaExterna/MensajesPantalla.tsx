@@ -93,6 +93,7 @@ const destinoDe = destinoMensaje;
 /** Qué falta, dicho como instrucción. */
 function avisoPaso(paso: PasoMensaje, indicacion: Indicacion): string {
   if (paso === "texto") return "Escriba el expediente, el nombre o el mensaje.";
+  if (paso === "nombre") return "Solo hay números: elija al paciente de la agenda o escriba su nombre.";
   if (paso === "destino") return "Elija a dónde debe ir, o «Texto libre» si no aplica ninguna.";
   if (paso === "numero") return "Elija el número del consultorio.";
   if (indicacion === "estacion") return "Elija la estación.";
@@ -198,12 +199,14 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
   const pendiente = pasoPendienteMensaje(texto, eleccion);
   const listo = pendiente === "";
   const insistir = insistirEn !== "" && insistirEn === pendiente;
+  // Los dos primeros se corrigen en el cuadro de la TV (paso 1).
+  const faltaTexto = pendiente === "texto" || pendiente === "nombre";
 
   // Intentó enviar con un paso sin completar: se señala cuál y, si es de los de
   // abajo, se cierra el teclado del celular y se lleva la vista hasta ahí.
   const irAPendiente = () => {
     setInsistirEn(pendiente);
-    if (pendiente === "texto") {
+    if (faltaTexto) {
       refTexto.current?.focus();
       return;
     }
@@ -373,7 +376,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
           {/* La "TV": se escribe directo en ella. */}
           <div className="relative rounded-3xl bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] px-5 pb-5 pt-4 text-white shadow-lg shadow-slate-900/10 ring-cyan-300/60 transition-shadow focus-within:ring-4 sm:px-7 sm:pb-7 sm:pt-6">
             <label htmlFor="mensaje-pantalla" className="flex items-center pr-10 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-100/75">
-              <Paso n={1} hecho={pendiente !== "texto"} enTv />
+              <Paso n={1} hecho={!faltaTexto} enTv />
               Lo que dirá la pantalla
             </label>
             {paciente && (
@@ -482,7 +485,11 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
               </div>
             )}
             {sinEnAgenda && (
-              <p className="mt-2 px-1 text-sm text-slate-500 dark:text-slate-400">
+              <p
+                className={`mt-2 px-1 text-sm ${
+                  insistir && pendiente === "nombre" ? "font-semibold text-amber-700 dark:text-amber-300" : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
                 {agenda?.citas.length
                   ? "Ese expediente no está en la agenda de hoy. Escriba el nombre del paciente."
                   : "La agenda de hoy aún no está cargada. Escriba el nombre del paciente."}
@@ -701,7 +708,7 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
                           : r.destino || (r.eleccion?.indicacion === "libre" ? "Texto libre" : "Sin destino")}
                       </span>
                     </button>
-                    {/* Incompleto (enviado antes de que el destino fuera obligatorio): se completa arriba en vez de repetirse. */}
+                    {/* Incompleto (enviado antes de que el destino o el nombre fueran obligatorios): se completa arriba en vez de repetirse. */}
                     <button
                       type="button"
                       onClick={() => (completo ? void repetir(r) : corregir(r))}

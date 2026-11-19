@@ -423,16 +423,22 @@ export function destinoMensaje(e: EleccionDestino): string {
   return "";
 }
 
-export type PasoMensaje = "texto" | "destino" | "especialidad" | "numero";
+export type PasoMensaje = "texto" | "nombre" | "destino" | "especialidad" | "numero";
 
 /**
  * Lo primero que falta para poder enviar, en el orden del flujo; "" si está
  * completo. Todo es obligatorio (pedido del usuario, 2026-11-18): el texto, a
  * dónde va (o "Texto libre", elegido a propósito), la especialidad (o la
  * estación) y, en consultorio, el número.
+ *
+ * El texto necesita al menos una letra (pedido del usuario, 2026-11-19): solo
+ * números es un expediente sin elegir al paciente de la agenda ni escribir su
+ * nombre, y la pantalla mostraría "11431-26" sin decir a quién llaman.
  */
 export function pasoPendienteMensaje(texto: string, e: EleccionDestino): PasoMensaje | "" {
-  if (textoParaPantalla(texto).length < 2) return "texto";
+  const t = textoParaPantalla(texto);
+  if (t.length < 2) return "texto";
+  if (!/\p{L}/u.test(t)) return "nombre";
   if (!e.indicacion) return "destino";
   if (!pideEspecialidad(e.indicacion)) return "";
   if (!especialidadPorId(e.especialidadId)) return "especialidad";
