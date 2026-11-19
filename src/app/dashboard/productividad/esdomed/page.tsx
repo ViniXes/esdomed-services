@@ -17,6 +17,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProductividadTabs, type GrupoProductividad } from "../_components/ProductividadTabs";
 import { ProductividadAdministrativa } from "../_components/ProductividadAdministrativa";
+import { ProductividadConsultaExterna } from "../_components/ProductividadConsultaExterna";
+import { ROLES_VEN_PRODUCTIVIDAD_CE } from "@/lib/consultaExterna/expedientesCreados";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
 import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
 import { configPersonalPlan } from "@/lib/esdomed/catalogo-plan";
@@ -471,7 +473,13 @@ export default function ProductividadEsdomedPage() {
         <p className="text-xs text-slate-500 mt-0.5">Producción del personal de ESDOMED por periodo.</p>
       </div>
 
-      <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin" || profile.role === "asistente_esdomed"} />
+      <ProductividadTabs grupo={grupo} onChange={setGrupo} puedeVerAdministrativos={profile.role === "admin" || profile.role === "asistente_esdomed"} puedeVerConsultaExterna={ROLES_VEN_PRODUCTIVIDAD_CE.includes(profile.role)} />
+
+      {ROLES_VEN_PRODUCTIVIDAD_CE.includes(profile.role) && (
+        <div className={grupo === "consultaExterna" ? "" : "hidden"}>
+          <ProductividadConsultaExterna activa={grupo === "consultaExterna"} />
+        </div>
+      )}
 
       <div className={grupo === "administrativos" ? "" : "hidden"}>
         <ProductividadAdministrativa resumenEsdomed={resumenAdministrativoEsdomed} personalAdministrativo={personalAdministrativo} activa={grupo === "administrativos"} />
