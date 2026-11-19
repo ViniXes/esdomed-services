@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue, Timestamp, type DocumentReference } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import {
-  COLECCION_EXPEDIENTES_CE, MAX_FILAS_POR_CARGA, ORIGEN_PERSONA_CE,
+  COLECCION_EXPEDIENTES_CE, MAX_FILAS_POR_CARGA, ORIGEN_PERSONA_CE, ROLES_SUBEN_EXPEDIENTES_CE,
   emparejarCreador, sanearFilaRecibida, type ExpedienteCreado,
 } from "@/lib/consultaExterna/expedientesCreados";
 
@@ -20,7 +20,6 @@ import {
 //
 // Todo pasa por el servidor (Admin SDK), así no hay que abrir reglas al navegador.
 
-const ROLES_CARGA = ["esdomed", "asistente_esdomed", "admin"];
 const LOTE = 100;
 const YA_EXISTE = 6; // gRPC ALREADY_EXISTS
 
@@ -89,7 +88,7 @@ export async function POST(req: NextRequest) {
   try {
     const perfilSnap = await adminDb.collection("usuarios").doc(uid).get();
     const perfil = perfilSnap.data();
-    if (!perfil || perfil.activo === false || !ROLES_CARGA.includes(perfil.role)) {
+    if (!perfil || perfil.activo === false || !ROLES_SUBEN_EXPEDIENTES_CE.includes(perfil.role)) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
@@ -232,5 +231,55 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("No se pudo procesar el reporte de expedientes creados", error);
     return NextResponse.json({ error: "No se pudo procesar el reporte. Intenta de nuevo: lo ya guardado no se duplica." }, { status: 500 });
+  }
+}
+
+/**
+ * Lista de expedientes creados en Consulta Externa entre dos fechas de creación
+ * (YYYY-MM-DD, máximo 93 días). La ven los mismos que suben el reporte.
+ */
+export async function GET(req: NextRequest) {
+  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  try {
+    const { uid } = await adminAuth.verifyIdToken(token);
+    const perfil = (await adminDb.collection("usuarios").doc(uid).get()).data();
+    if (!perfil || perfil.activo === false || !ROLES_SUBEN_EXPEDIENTES_CE.includes(perfil.role)) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
+  }
+
+  const params = new URL(req.url).searchParams;
+  const desde = params.get("desde") ?? "";
+  const hasta = params.get("hasta") ?? "";
+  const iniTs = medianocheSV(desde);
+  const finTs = medianocheSV(hasta);
+  if (!iniTs || !finTs || desde > hasta) return NextResponse.json({ error: "Rango de fechas inválido." }, { status: 400 });
+  if ((finTs.toMillis() - iniTs.toMillis()) / 86400000 > 93) {
+    return NextResponse.json({ error: "Elige un rango de hasta 3 meses." }, { status: 400 });
+  }
+
+  try {
+    const snap = await adminDb
+      .collection(COLECCION_EXPEDIENTES_CE)
+      .where("fechaCreacion", ">=", desde)
+      .where("fechaCreacion", "<=", hasta)
+      .get();
+    const registros = snap.docs.map((d) => {
+      const x = d.data();
+      return {
+        expediente: d.id,
+        pacienteNombre: String(x.pacienteNombre ?? ""),
+        creadoPor: (x.creadoPorNombre as string | null) ?? String(x.creadoPorSis ?? ""),
+        fechaCreacion: String(x.fechaCreacion ?? ""),
+        personaNueva: x.personaNueva === true,
+      };
+    });
+    return NextResponse.json({ registros }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    console.error("No se pudo leer la lista de expedientes creados", error);
+    return NextResponse.json({ error: "No se pudo cargar la lista." }, { status: 500 });
   }
 }

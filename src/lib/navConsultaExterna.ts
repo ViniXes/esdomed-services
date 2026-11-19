@@ -1,9 +1,9 @@
-import { CalendarClock, CalendarDays, CalendarPlus, FileUp, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileUp, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
 import { construirMenu, type EntradaNav, type SeccionNav } from "@/lib/navRegistro";
-import { esAgendaCE, esCuentaEstacion, gestionaConsultaExterna, registraCitas2027, veLlamadosCE } from "@/lib/accesoConsultaExterna";
+import { esAgendaCE, esCuentaEstacion, gestionaConsultaExterna, registraCitas2027, subeExpedientesCreadosCE, veLlamadosCE } from "@/lib/accesoConsultaExterna";
 
 type Perfil = UserProfile | null | undefined;
 
@@ -35,6 +35,8 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     // El catálogo de agendas se abre desde un botón de esa pantalla (solo gestión).
     entradas: [
       { href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 },
+      // Reporte SIS "Expedientes creados": lo suben las digitadoras de Consulta Externa.
+      { href: "/consulta-externa/expedientes-creados", label: "Expedientes creados", icon: ClipboardCheck, visibleSi: subeExpedientesCreadosCE },
       // agenda_ce consulta su horario en el plan de trabajo ESDOMED (solo lectura).
       { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, visibleSi: esAgendaCE },
     ],
