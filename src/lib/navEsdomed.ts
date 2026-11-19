@@ -50,6 +50,8 @@ const MENU_ESDOMED: SeccionNav[] = [
       { href: "/dashboard/control-ingresos", label: "Control de ingresos", icon: FileInput },
       { href: "/dashboard/pacientes", label: "Pacientes", icon: BedDouble },
       { href: "/dashboard/hospital-dia", label: "Hospital Día", icon: Syringe },
+      // Reporte SIS "Expedientes creados" (Consulta Externa): productividad + padrón.
+      { href: "/dashboard/pacientes/expedientes-creados", label: "Expedientes creados CE", icon: ClipboardCheck },
       // Subsistema con menú propio (turnero de llamados); en construcción, solo admin.
       { href: "/consulta-externa", label: "Consulta Externa", icon: CalendarCheck2, visibleSi: entraConsultaExterna },
       { href: "/dashboard/busqueda-telefono", label: "Búsqueda de teléfono", icon: Phone, visibleSi: esAdmin },

@@ -1094,6 +1094,12 @@ export interface Persona {
   // Responsable
   responsable?: ResponsablePaciente;
 
+  // Del reporte SIS "Expedientes creados" (Consulta Externa). No es un campo del
+  // formulario de ingreso: la importación de ingresados no lo toca.
+  nombreMadre?: string;
+  // "sis_expedientes_creados_ce" si la persona entró al padrón por ese reporte.
+  origen?: string;
+
   // Metadata
   creadoEn?: Date;
   actualizadoEn?: Date;

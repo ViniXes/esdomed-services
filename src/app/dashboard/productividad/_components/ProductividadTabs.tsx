@@ -1,20 +1,22 @@
 "use client";
 
-import { ShieldCheck, Stethoscope } from "lucide-react";
+import { CalendarCheck2, ShieldCheck, Stethoscope } from "lucide-react";
 
-export type GrupoProductividad = "operativos" | "administrativos";
+export type GrupoProductividad = "operativos" | "administrativos" | "consultaExterna";
 
 type Props = {
   grupo: GrupoProductividad;
   onChange: (grupo: GrupoProductividad) => void;
   puedeVerAdministrativos: boolean;
+  puedeVerConsultaExterna?: boolean;
 };
 
 /** Selector interno del único módulo de Productividad; no crea rutas adicionales. */
-export function ProductividadTabs({ grupo, onChange, puedeVerAdministrativos }: Props) {
+export function ProductividadTabs({ grupo, onChange, puedeVerAdministrativos, puedeVerConsultaExterna = false }: Props) {
   const opciones = [
     { id: "operativos" as const, label: "Operativos", icon: Stethoscope },
     ...(puedeVerAdministrativos ? [{ id: "administrativos" as const, label: "Administrativos", icon: ShieldCheck }] : []),
+    ...(puedeVerConsultaExterna ? [{ id: "consultaExterna" as const, label: "Consulta Externa", icon: CalendarCheck2 }] : []),
   ];
 
   return (
