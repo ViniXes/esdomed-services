@@ -42,6 +42,8 @@ export const AREA_CONSULTA_EXTERNA = "Consulta Externa";
 export const ORIGEN_PERSONA_CE = "sis_expedientes_creados_ce";
 export const COLECCION_EXPEDIENTES_CE = "consulta_externa_expedientes_creados";
 export const MAX_FILAS_POR_CARGA = 5000;
+/** Quién sube el reporte: ESDOMED, admin y las digitadoras de Consulta Externa (agenda_ce). */
+export const ROLES_SUBEN_EXPEDIENTES_CE: readonly string[] = ["esdomed", "asistente_esdomed", "admin", "agenda_ce"];
 /** Quién ve la pestaña Consulta Externa de Productividad. Pendiente de diseñar con el usuario; por ahora, admin. */
 export const ROLES_VEN_PRODUCTIVIDAD_CE: readonly string[] = ["admin"];
 
