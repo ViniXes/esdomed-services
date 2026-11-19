@@ -41,6 +41,12 @@ export const registraCitas2027 = (p: Perfil) => gestionaConsultaExterna(p) || es
 /** Sube el reporte SIS "Expedientes creados" (productividad + padrón). Mismos roles que la API. */
 export const subeExpedientesCreadosCE = (p: Perfil) => registraCitas2027(p) || esEsdomed(p);
 
+/**
+ * Catálogo de tarjetas (solo lectura). Además de la gestión, las digitadoras
+ * de Consulta Externa (agenda_ce: Paola y Kathya; pedido del usuario, 2026-11-19).
+ */
+export const veCatalogoTarjetas = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
+
 /** Llamados: estación de especialidad y pantallas. */
 export const veLlamadosCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p);
 
