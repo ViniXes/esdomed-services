@@ -38,6 +38,9 @@ export const gestionaConsultaExterna = (p: Perfil) => esAdmin(p) || (!EN_CONSTRU
 /** Registra citas 2027 (sin editar el catálogo de agendas, que es de gestión). */
 export const registraCitas2027 = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
 
+/** Sube el reporte SIS "Expedientes creados" (productividad + padrón). Mismos roles que la API. */
+export const subeExpedientesCreadosCE = (p: Perfil) => registraCitas2027(p) || esEsdomed(p);
+
 /** Llamados: estación de especialidad y pantallas. */
 export const veLlamadosCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p);
 
