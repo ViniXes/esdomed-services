@@ -7,9 +7,11 @@ import {
   alCambiarVoces,
   anunciarLlamado,
   CLAVE_VOZ_PANTALLA,
+  duracionLlamadoMs,
   elegirVoz,
   esperarVoces,
   nombreCortoVoz,
+  pausa,
   prepararSonido,
   textoLlamado,
 } from "@/lib/consultaExterna/voz";
@@ -26,6 +28,7 @@ import {
   destinoSignosVitales,
   DESTINO_TRABAJO_SOCIAL,
   MAX_LLAMADOS_PANTALLA,
+  quitadoDeLaLista,
   tituloLlamado,
   type LlamadoPantalla,
 } from "@/lib/consultaExterna/circuito";
@@ -45,7 +48,13 @@ import { hoyLocalISO } from "@/lib/esdomed/expedientesProgramados";
 // llevan destino y, sin él, no se muestra el recuadro "Acercarse a".
 //
 // Escucha un solo documento (consulta_externa_llamados/{hoy}) y anuncia solo
-// los llamados nuevos. La voz se activa y se elige por equipo, desde el botón
+// los llamados nuevos, por turnos (pedido del usuario, 2026-11-19): si llega
+// uno mientras se lee otro, espera en cola y la sección principal no cambia
+// hasta que termine la lectura; mientras espera tampoco sale en "Últimos
+// llamados". Sin voz, cada turno dura lo que tardaría leerse
+// (duracionLlamadoMs), así dos pantallas de la misma sala cambian juntas. Lo
+// que se quita de la pantalla (Quitar, Limpiar, Volver a llamar) deja la cola
+// y, si se estaba leyendo, se calla. La voz se activa y se elige por equipo, desde el botón
 // del pie (queda en este navegador): dos pantallas que se oyen desde el mismo
 // lugar harían eco. Antes de leer, cada llamado pasa por el diccionario de
 // pronunciación (configuracion/pronunciacion_ce), para que los nombres de
@@ -97,6 +106,8 @@ function tamanoTitulo(titulo: string): string {
 const CLAVE_VOZ = "ce:pantalla:voz";
 /** Un llamado más viejo que esto no se anuncia (p. ej. la pantalla estuvo sin red). */
 const ANUNCIAR_HASTA_MS = 2 * 60_000;
+/** Ningún llamado se queda en grande menos que esto, aunque la voz falle. */
+const MIN_TURNO_MS = 6000;
 
 function horaCorta(ms: number) {
   return new Date(ms).toLocaleTimeString("es-SV", { hour: "numeric", minute: "2-digit" });
@@ -116,13 +127,25 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
   const [vozNombre, setVozNombre] = useState("");
   const [panelVoz, setPanelVoz] = useState(false);
 
+  // El llamado en grande. Null: el más reciente de la lista (al abrir la pantalla).
+  const [principal, setPrincipal] = useState<LlamadoPantalla | null>(null);
+  // Los que esperan su turno: no se muestran todavía.
+  const [esperando, setEsperando] = useState<ReadonlySet<string>>(() => new Set());
+
   const vozRef = useRef<SpeechSynthesisVoice | null>(null);
   const reglasRef = useRef<ReglaPronunciacion[]>([]);
   const hablar = useRef(false);
   const vistos = useRef<Set<string> | null>(null);
   const siguiente = useRef(0);
-  // Cola de anuncios: si llegan dos llamados juntos, se leen uno tras otro.
-  const cola = useRef<Promise<void>>(Promise.resolve());
+  // Todo lo que suena va en fila (llamados, "Probar", "Sonido activado"), para no encimarse.
+  const sonido = useRef<Promise<void>>(Promise.resolve());
+  // Turnos de la sección principal: los que esperan, en orden de llegada, y el que está en curso.
+  const cola = useRef<LlamadoPantalla[]>([]);
+  const turno = useRef<{ id: string; ctrl: AbortController } | null>(null);
+  const principalRef = useRef<LlamadoPantalla | null>(null);
+  const listaRef = useRef<LlamadoPantalla[]>([]);
+  // Al terminar un turno se pasa al siguiente (ref: la función no puede llamarse a sí misma en el hook).
+  const avanzarRef = useRef<() => void>(() => {});
   const destelloT = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -162,52 +185,115 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     return () => { clearInterval(t); dejar(); };
   }, []);
 
-  // Solo usan refs: estables, el efecto de los llamados no se reinicia por ellas.
-  const leerEnCola = useCallback((l: Pick<LlamadoPantalla, "paciente" | "expediente" | "codigo" | "destino">) => {
-    cola.current = cola.current.then(() =>
-      anunciarLlamado(aplicarPronunciacion(textoLlamado(l), reglasRef.current), vozRef.current),
-    );
+  // Todo lo de abajo usa solo refs y setters: estable, el efecto de los
+  // llamados no se reinicia por ello.
+  const enSonido = useCallback((fn: () => Promise<void>) => {
+    const trabajo = sonido.current.then(fn).catch((e) => console.error("Pantalla: falló un anuncio", e));
+    sonido.current = trabajo;
+    return trabajo;
   }, []);
 
-  const anunciarEnCola = useCallback(
-    (l: LlamadoPantalla) => {
-      if (hablar.current) leerEnCola(l);
-    },
-    [leerEnCola],
-  );
-
-  const destellar = () => {
+  const destellar = useCallback(() => {
     setDestello(true);
     if (destelloT.current) clearTimeout(destelloT.current);
     destelloT.current = setTimeout(() => setDestello(false), 2400);
-  };
+  }, []);
+
+  const mostrar = useCallback((l: LlamadoPantalla | null) => {
+    principalRef.current = l;
+    setPrincipal(l);
+  }, []);
+
+  // Un turno: el llamado queda en grande mientras se lee (o, sin voz, lo que
+  // tardaría leerse). El tope evita que una voz trabada congele la pantalla.
+  const correrTurno = useCallback(
+    async (l: LlamadoPantalla, ctrl: AbortController) => {
+      const texto = aplicarPronunciacion(textoLlamado(l), reglasRef.current);
+      const duracion = duracionLlamadoMs(texto);
+      const lectura = hablar.current
+        ? enSonido(() => anunciarLlamado(texto, vozRef.current, undefined, ctrl.signal))
+        : pausa(duracion, ctrl.signal);
+      // Si la voz falla al instante, el llamado igual se alcanza a leer en pantalla.
+      const conMinimo = Promise.all([lectura, pausa(MIN_TURNO_MS, ctrl.signal)]);
+      await Promise.race([conMinimo, pausa(duracion * 2 + 15_000, ctrl.signal)]);
+      ctrl.abort(); // si ganó el tope, calla la voz; si no, solo limpia el temporizador
+    },
+    [enSonido],
+  );
+
+  const avanzar = useCallback(() => {
+    if (turno.current) return;
+    const l = cola.current.shift();
+    setEsperando(new Set(cola.current.map((c) => c.id)));
+    if (!l) return;
+    const ctrl = new AbortController();
+    turno.current = { id: l.id, ctrl };
+    mostrar(l);
+    destellar();
+    void correrTurno(l, ctrl).finally(() => {
+      // Si lo cortaron (lo quitaron de la pantalla), quien lo cortó ya siguió con el próximo.
+      if (turno.current?.ctrl !== ctrl) return;
+      turno.current = null;
+      avanzarRef.current();
+    });
+  }, [correrTurno, destellar, mostrar]);
+  useEffect(() => {
+    avanzarRef.current = avanzar;
+  }, [avanzar]);
+
+  // La lista de la pantalla cambió: `nuevos` son los que deben esperar su turno.
+  const recibir = useCallback(
+    (ultimos: LlamadoPantalla[], nuevos: LlamadoPantalla[]) => {
+      listaRef.current = ultimos;
+      cola.current = cola.current.filter((l) => !quitadoDeLaLista(l, ultimos));
+      const p = principalRef.current;
+      if (p && quitadoDeLaLista(p, ultimos)) {
+        if (turno.current?.id === p.id) {
+          turno.current.ctrl.abort();
+          turno.current = null;
+        }
+        mostrar(null);
+      }
+      cola.current.push(...nuevos);
+      setLlamados(ultimos);
+      setEsperando(new Set(cola.current.map((c) => c.id)));
+      avanzar();
+    },
+    [avanzar, mostrar],
+  );
 
   // Llamados reales: un solo documento por día.
   useEffect(() => {
     if (demo) return;
     vistos.current = null;
-    return escucharLlamados(
+    const dejar = escucharLlamados(
       fecha,
       (ultimos) => {
         setSinConexion(false);
-        setLlamados(ultimos);
-        // Al abrir la pantalla, lo que ya estaba no se anuncia.
+        // Al abrir la pantalla (o al cambiar de día), lo que ya estaba no se anuncia.
         if (vistos.current === null) {
           vistos.current = new Set(ultimos.map((l) => l.id));
+          recibir(ultimos, []);
           return;
         }
         const nuevos = ultimos.filter((l) => !vistos.current!.has(l.id)).reverse();
         nuevos.forEach((l) => vistos.current!.add(l.id));
-        if (!nuevos.length) return;
-        destellar();
-        nuevos.filter((l) => Date.now() - l.enMs < ANUNCIAR_HASTA_MS).forEach(anunciarEnCola);
+        // Uno viejo (la pantalla estuvo sin red) no hace turno: entra directo a la lista.
+        recibir(ultimos, nuevos.filter((l) => Date.now() - l.enMs < ANUNCIAR_HASTA_MS));
       },
       (e) => {
         console.error("Pantalla sin acceso a los llamados", e);
         setSinConexion(true);
       },
     );
-  }, [demo, fecha, anunciarEnCola]);
+    return () => {
+      dejar();
+      // Lo del día anterior (o de una pantalla que se cierra) no sigue sonando.
+      turno.current?.ctrl.abort();
+      turno.current = null;
+      cola.current = [];
+    };
+  }, [demo, fecha, recibir]);
 
   const simular = () => {
     setSonidoListo(true);
@@ -215,17 +301,15 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     const ejemplo = EJEMPLOS[siguiente.current % EJEMPLOS.length];
     siguiente.current += 1;
     const nuevo = llamadoDeEjemplo(ejemplo, Date.now());
-    setLlamados((prev) => agregarLlamado(prev, nuevo, MAX_LLAMADOS_PANTALLA));
-    destellar();
-    anunciarEnCola(nuevo);
+    recibir(agregarLlamado(listaRef.current, nuevo, MAX_LLAMADOS_PANTALLA), [nuevo]);
   };
 
   // Dentro del clic: habilita el audio y despierta la voz ("Sonido activado"),
-  // así el primer llamado real sale sin demora. Va por la cola para no
-  // encimarse con un anuncio.
+  // así el primer llamado real sale sin demora. Va en la fila del sonido para
+  // no encimarse con un anuncio.
   const activarSonido = () => {
     setSonidoListo(true);
-    cola.current = cola.current.then(() => prepararSonido(vozRef.current));
+    void enSonido(() => prepararSonido(vozRef.current));
   };
 
   const alternarVoz = () => {
@@ -241,13 +325,18 @@ export function PantallaLlamados({ demo = false }: { demo?: boolean }) {
     try { localStorage.setItem(CLAVE_VOZ_PANTALLA, nombre); } catch { /* sin almacenamiento */ }
   };
 
-  // Lee un llamado de ejemplo con la voz elegida (el clic también habilita el sonido).
+  // Lee un llamado de ejemplo con la voz elegida (el clic también habilita el
+  // sonido). No cambia lo que muestra la pantalla.
   const probarVoz = () => {
     setSonidoListo(true);
-    leerEnCola({ expediente: "11431-26", paciente: "María Pilar López Gonzales", destino: destinoEstacion("hematologia") });
+    const texto = textoLlamado({ expediente: "11431-26", paciente: "María Pilar López Gonzales", destino: destinoEstacion("hematologia") });
+    void enSonido(() => anunciarLlamado(aplicarPronunciacion(texto, reglasRef.current), vozRef.current));
   };
 
-  const [actual, ...anteriores] = llamados;
+  // Lo que espera turno no se ve todavía, ni en grande ni en "Últimos llamados".
+  const visibles = llamados.filter((l) => !esperando.has(l.id));
+  const actual = principal ?? visibles[0];
+  const anteriores = visibles.filter((l) => l.id !== actual?.id);
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-gradient-to-br from-[#0d2739] via-[#1a4e70] to-[#2b8ca8] text-white">

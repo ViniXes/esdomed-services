@@ -230,6 +230,22 @@ export function agregarLlamado(
   return [nuevo, ...ultimos.filter((l) => l.citaId !== nuevo.citaId)].slice(0, max);
 }
 
+/**
+ * ¿Sacaron este llamado de la pantalla a propósito ("Quitar de la pantalla",
+ * "Limpiar pantallas", un "Volver a llamar" que lo reemplaza)? Si la lista
+ * está llena y él es más viejo que todos, no: lo empujaron los llamados nuevos
+ * (tope de `max`) y debe seguir su turno en la pantalla.
+ */
+export function quitadoDeLaLista(
+  llamado: Pick<LlamadoPantalla, "id" | "enMs">,
+  ultimos: LlamadoPantalla[],
+  max = MAX_LLAMADOS_PANTALLA,
+): boolean {
+  if (ultimos.some((l) => l.id === llamado.id)) return false;
+  if (ultimos.length < max) return true;
+  return ultimos.some((l) => l.enMs <= llamado.enMs);
+}
+
 /** Quita de la pantalla los llamados de una cita (al devolverla a la espera por error). */
 export function quitarLlamadosDeCita(ultimos: LlamadoPantalla[], citaId: string): LlamadoPantalla[] {
   return ultimos.filter((l) => l.citaId !== citaId);

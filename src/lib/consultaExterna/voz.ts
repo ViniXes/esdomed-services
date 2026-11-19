@@ -140,11 +140,26 @@ export async function prepararSonido(voz?: SpeechSynthesisVoice | null): Promise
   await anunciar("Sonido activado.", voz);
 }
 
+/** Espera `ms`; termina antes si se aborta `signal`. */
+export function pausa(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const fin = () => {
+      clearTimeout(t);
+      signal?.removeEventListener("abort", fin);
+      resolve();
+    };
+    const t = setTimeout(fin, ms);
+    signal?.addEventListener("abort", fin, { once: true });
+  });
+}
+
 /** "Din-don" corto antes del anuncio, generado con Web Audio (sin archivo). */
 export async function tocarAviso(): Promise<void> {
   const ctx = contextoAudio();
   if (!ctx) return;
-  if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+  // Sin un clic previo, resume() puede no resolver nunca: no trabar la cola por eso.
+  if (ctx.state === "suspended") await Promise.race([ctx.resume().catch(() => {}), pausa(1500)]);
   const nota = (frecuencia: number, inicio: number, duracion: number) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -165,30 +180,78 @@ export async function tocarAviso(): Promise<void> {
 /** Veces que se lee cada llamado con un solo clic (pedido del usuario: 3, desde el 2026-11-18; antes 2). */
 export const REPETICIONES_LLAMADO = 3;
 const PAUSA_ENTRE_REPETICIONES_MS = 700;
+/** Lo que dura el "din-don" (tocarAviso). */
+const DURACION_AVISO_MS = 1000;
+/** Velocidad de lectura de las pantallas. */
+export const VELOCIDAD_VOZ = 0.9;
+/** Una voz en español a velocidad 1 lee unas 14 letras por segundo. */
+const MS_POR_LETRA = 70;
 
-/** Un llamado completo: un "din-don" y el texto leído REPETICIONES_LLAMADO veces. */
+/** Lo que tarda, más o menos, en leerse el texto una vez. */
+function lecturaMs(texto: string, velocidad = VELOCIDAD_VOZ): number {
+  return (texto.length * MS_POR_LETRA) / (velocidad || 1);
+}
+
+/**
+ * Lo que dura, más o menos, un llamado completo (aviso y las lecturas). La
+ * pantalla sin voz deja cada llamado este tiempo en grande, para cambiar al
+ * mismo ritmo que la que lo lee en la misma sala.
+ */
+export function duracionLlamadoMs(texto: string, velocidad = VELOCIDAD_VOZ): number {
+  return (
+    DURACION_AVISO_MS +
+    REPETICIONES_LLAMADO * lecturaMs(texto, velocidad) +
+    (REPETICIONES_LLAMADO - 1) * PAUSA_ENTRE_REPETICIONES_MS
+  );
+}
+
+/**
+ * Un llamado completo: un "din-don" y el texto leído REPETICIONES_LLAMADO
+ * veces. Con `signal` se puede cortar a medias (se calla la voz al instante):
+ * la pantalla lo usa cuando quitan de la pantalla el llamado que se está leyendo.
+ */
 export async function anunciarLlamado(
   texto: string,
   voz?: SpeechSynthesisVoice | null,
   velocidad?: number,
+  signal?: AbortSignal,
 ): Promise<void> {
-  await tocarAviso();
-  for (let i = 0; i < REPETICIONES_LLAMADO; i++) {
-    if (i > 0) await new Promise((r) => setTimeout(r, PAUSA_ENTRE_REPETICIONES_MS));
-    await anunciar(texto, voz, velocidad);
+  if (signal?.aborted) return;
+  const callar = () => {
+    if (vozDisponible()) window.speechSynthesis.cancel();
+  };
+  signal?.addEventListener("abort", callar, { once: true });
+  try {
+    await tocarAviso();
+    for (let i = 0; i < REPETICIONES_LLAMADO; i++) {
+      if (i > 0) await pausa(PAUSA_ENTRE_REPETICIONES_MS, signal);
+      // Se revisa después de cada espera: si no, una lectura cortada podría
+      // seguir y encimarse con el llamado siguiente.
+      if (signal?.aborted) return;
+      await anunciar(texto, voz, velocidad);
+    }
+  } finally {
+    signal?.removeEventListener("abort", callar);
   }
 }
 
 /** Lee el texto y resuelve al terminar (o si falla, para no trabar la cola). */
-export function anunciar(texto: string, voz?: SpeechSynthesisVoice | null, velocidad = 0.9): Promise<void> {
+export function anunciar(texto: string, voz?: SpeechSynthesisVoice | null, velocidad = VELOCIDAD_VOZ): Promise<void> {
   if (!vozDisponible()) return Promise.resolve();
   return new Promise((resolve) => {
     const u = new SpeechSynthesisUtterance(texto);
     u.lang = voz?.lang ?? "es-MX";
     if (voz) u.voice = voz;
     u.rate = velocidad;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    // Algunas voces en línea a veces no avisan que terminaron: sin este tope,
+    // la cola de anuncios (y la pantalla, que espera a la voz) quedaría trabada.
+    const tope = setTimeout(() => resolve(), lecturaMs(texto, velocidad) * 3 + 8000);
+    const fin = () => {
+      clearTimeout(tope);
+      resolve();
+    };
+    u.onend = fin;
+    u.onerror = fin;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   });

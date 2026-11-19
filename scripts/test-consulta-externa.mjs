@@ -201,6 +201,13 @@ assert.equal(
 );
 assert.equal(textoLlamado({ paciente: "Ana Pérez", destino: "Estación Cardiología" }), "Ana Pérez. Acercarse a estación Cardiología.");
 assert.equal(textoLlamado({ codigo: "HE-12", destino: "Consultorio 4 de Hematología" }), "Turno H E 12. Acercarse a consultorio 4 de Hematología.");
+{
+  // Una pantalla sin voz deja cada llamado en grande lo que tardaría leerse (aviso + 3 lecturas).
+  const { duracionLlamadoMs } = cargar("voz");
+  const d = duracionLlamadoMs("Expediente 11431 guion 26, María Pilar López Gonzales. Acercarse a estación Cardiología.");
+  assert.ok(d > 15_000 && d < 35_000, `duración razonable: ${d} ms`);
+  assert.ok(duracionLlamadoMs("Ana.") < d, "un texto corto dura menos");
+}
 
 // ── Voz: El Salvador primero, nunca una voz que no sea en español ──
 const { ordenarVoces, elegirVoz, nombreCortoVoz } = cargar("voz");
@@ -251,6 +258,22 @@ lista = agregarLlamado(lista, ll("l10", "c5"));
 assert.equal(lista[0].id, "l10");
 assert.equal(lista.filter((l) => l.citaId === "c5").length, 1);
 assert.equal(quitarLlamadosDeCita(lista, "c5").some((l) => l.citaId === "c5"), false);
+
+// Turnos de la pantalla (2026-11-19): lo quitado a propósito deja su turno; lo
+// que solo salió por el tope de 8 lo conserva.
+{
+  const { quitadoDeLaLista } = cargar("circuito");
+  const t = (id, citaId, enMs) => ({ ...ll(id, citaId), enMs });
+  let l8 = [];
+  for (let i = 1; i <= 8; i++) l8 = agregarLlamado(l8, t(`t${i}`, `c${i}`, i * 1000));
+  assert.equal(quitadoDeLaLista(t("t5", "c5", 5000), l8), false, "sigue en la lista");
+  assert.equal(quitadoDeLaLista(t("t5", "c5", 5000), quitarLlamadosDeCita(l8, "c5")), true, "Quitar de la pantalla");
+  assert.equal(quitadoDeLaLista(t("t5", "c5", 5000), []), true, "Limpiar pantallas");
+  assert.equal(quitadoDeLaLista(t("t5", "c5", 5000), agregarLlamado(l8, t("t9", "c5", 9000))), true, "Volver a llamar lo reemplaza");
+  const empujada = agregarLlamado(l8, t("t9", "c9", 9000));
+  assert.equal(empujada.some((l) => l.id === "t1"), false);
+  assert.equal(quitadoDeLaLista(t("t1", "c1", 1000), empujada), false, "lo empujó el tope: conserva su turno");
+}
 
 // ── Consultorio elegido por la estación (2026-11-18) ──
 {
