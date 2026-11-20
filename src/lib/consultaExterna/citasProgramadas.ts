@@ -136,6 +136,24 @@ export function normalizarExpediente(s: string): string {
   return String(s ?? "").replace(/\s+/g, "").replace(/[‐-―]/g, "-").toUpperCase();
 }
 
+/** ¿Lo escrito en el buscador de la lista parece un expediente? ("15193", "15193-2"). */
+export function pareceExpediente(texto: string): boolean {
+  return /^\d[\d-]*$/.test(normalizarExpediente(texto));
+}
+
+/**
+ * Buscador de la lista de citas: por expediente (lo escrito está dentro del
+ * expediente) o por nombre (cada palabra escrita está en el nombre, en
+ * cualquier orden y sin importar tildes ni mayúsculas: "pineda alejandro").
+ */
+export function coincideBusqueda(c: { expediente: string; paciente: string }, texto: string): boolean {
+  const t = clave(texto);
+  if (!t) return true;
+  if (pareceExpediente(texto)) return normalizarExpediente(c.expediente).includes(normalizarExpediente(texto));
+  const nombre = clave(c.paciente);
+  return t.split(" ").every((p) => nombre.includes(p) || clave(c.expediente).includes(p));
+}
+
 /** Forma usual del SIS: número, guion y dos dígitos del año ("7886-21"). Solo avisa. */
 export function expedienteConFormaUsual(exp: string): boolean {
   return /^\d{1,6}-\d{2}$/.test(exp);
