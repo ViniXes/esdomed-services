@@ -13,6 +13,7 @@ type Registro = {
   expediente: string; pacienteNombre: string; creadoPorSis: string;
   creadoPorNombre: string | null; fechaCreacion: string; personaNueva: boolean;
 };
+type Actualizacion = { hechoPor: string; hechoPorNombre: string; fecha: string; tipos: string[] };
 
 const selectCls = "appearance-none rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 const mesActual = () => { const f = new Date(); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}`; };
@@ -21,6 +22,7 @@ export function ProductividadConsultaExterna({ activa }: { activa: boolean }) {
   const { user } = useAuth();
   const [mes, setMes] = useState(mesActual);
   const [registros, setRegistros] = useState<Registro[]>([]);
+  const [actualizaciones, setActualizaciones] = useState<Actualizacion[]>([]);
   const [mesCargado, setMesCargado] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
@@ -33,9 +35,11 @@ export function ProductividadConsultaExterna({ activa }: { activa: boolean }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "No se pudo cargar la productividad de Consulta Externa.");
       setRegistros(data.registros ?? []);
+      setActualizaciones(data.actualizaciones ?? []);
       setMesCargado(mes);
     } catch (e) {
       setRegistros([]);
+      setActualizaciones([]);
       setError(e instanceof Error ? e.message : "No se pudo cargar la productividad de Consulta Externa.");
     } finally { setCargando(false); }
   };
@@ -47,15 +51,20 @@ export function ProductividadConsultaExterna({ activa }: { activa: boolean }) {
   }, [activa, user, mes, mesCargado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const porPersona = useMemo(() => {
-    const m = new Map<string, { nombre: string; sinUsuario: boolean; total: number; nuevosPadron: number }>();
-    for (const r of registros) {
-      const nombre = r.creadoPorNombre ?? r.creadoPorSis;
-      const f = m.get(nombre) ?? { nombre, sinUsuario: !r.creadoPorNombre, total: 0, nuevosPadron: 0 };
-      f.total++; if (r.personaNueva) f.nuevosPadron++;
+    type Fila = { nombre: string; sinUsuario: boolean; total: number; nuevosPadron: number; actualizaciones: number };
+    const m = new Map<string, Fila>();
+    const fila = (nombre: string, sinUsuario: boolean) => {
+      const f = m.get(nombre) ?? { nombre, sinUsuario, total: 0, nuevosPadron: 0, actualizaciones: 0 };
       m.set(nombre, f);
+      return f;
+    };
+    for (const r of registros) {
+      const f = fila(r.creadoPorNombre ?? r.creadoPorSis, !r.creadoPorNombre);
+      f.total++; if (r.personaNueva) f.nuevosPadron++;
     }
-    return Array.from(m.values()).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
-  }, [registros]);
+    for (const a of actualizaciones) fila(a.hechoPorNombre || "Sin nombre", false).actualizaciones++;
+    return Array.from(m.values()).sort((a, b) => b.total + b.actualizaciones - (a.total + a.actualizaciones) || a.nombre.localeCompare(b.nombre));
+  }, [registros, actualizaciones]);
 
   return (
     <div className="space-y-4">
@@ -67,20 +76,20 @@ export function ProductividadConsultaExterna({ activa }: { activa: boolean }) {
         </button>
       </div>
       <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-        Vista provisional: los expedientes creados en Consulta Externa se van guardando con cada carga del reporte del SIS. La vista con listas y gráficos está pendiente de diseño.
+        Vista provisional: los expedientes creados en Consulta Externa se van guardando con cada carga del reporte del SIS, y las actualizaciones de datos con cada registro. La vista con listas y gráficos está pendiente de diseño.
       </p>
       {error && <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">{error}</p>}
       {cargando ? <p className="py-16 text-center text-sm text-slate-400">Cargando...</p> : (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Expedientes creados por persona</p>
-            <span className="text-xs font-semibold text-slate-500">{registros.length} expedientes</span>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Productividad por persona</p>
+            <span className="text-xs font-semibold text-slate-500">{registros.length} expedientes · {actualizaciones.length} actualizaciones</span>
           </div>
-          {porPersona.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No hay expedientes cargados para este mes.</p> : (
+          {porPersona.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No hay expedientes ni actualizaciones registradas en este mes.</p> : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-[11px] uppercase text-slate-500 dark:border-slate-800">
-                  <th className="px-4 py-2">Nombre</th><th className="px-4 py-2 text-center">Expedientes creados</th><th className="px-4 py-2 text-center">Nuevos en el padrón</th>
+                  <th className="px-4 py-2">Nombre</th><th className="px-4 py-2 text-center">Expedientes creados</th><th className="px-4 py-2 text-center">Nuevos en el padrón</th><th className="px-4 py-2 text-center">Actualizaciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -91,6 +100,7 @@ export function ProductividadConsultaExterna({ activa }: { activa: boolean }) {
                     </td>
                     <td className="px-4 py-2 text-center tabular-nums">{p.total}</td>
                     <td className="px-4 py-2 text-center tabular-nums text-slate-500">{p.nuevosPadron}</td>
+                    <td className="px-4 py-2 text-center tabular-nums">{p.actualizaciones}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileUp, IdCard, LayoutDashboard, ListOrdered, Megaphone, MessageSquareText, Tv, UserPlus } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileUp, IdCard, LayoutDashboard, ListOrdered, Megaphone, UserPen, MessageSquareText, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -45,6 +45,8 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
       { href: "/consulta-externa/citas-2027", label: "Citas 2027", icon: CalendarPlus, visibleSi: registraCitas2027 },
       // Reporte SIS "Expedientes creados": lo suben las digitadoras de Consulta Externa.
       { href: "/consulta-externa/expedientes-creados", label: "Expedientes creados", icon: ClipboardCheck, visibleSi: subeExpedientesCreadosCE },
+      // Actualizaciones de datos hechas en el SIS (solo el registro, para productividad).
+      { href: "/consulta-externa/actualizaciones", label: "Actualizaciones", icon: UserPen, visibleSi: subeExpedientesCreadosCE },
       // Pacientes con DUI en cualquier agenda cargada del SIS (con DUI = ya tiene tarjeta). También agenda_ce.
       { href: "/consulta-externa/tarjetas", label: "Catálogo de tarjetas", icon: IdCard, visibleSi: veCatalogoTarjetas },
       // agenda_ce consulta su horario en el plan de trabajo ESDOMED (solo lectura).
