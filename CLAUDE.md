@@ -246,6 +246,16 @@ El reporte del SIS "Expedientes creados" (.xlsx, de un día o un rango) se sube 
 - La colección nueva no tiene reglas: el navegador no la lee ni escribe (todo por API). `configuracion/sincronizacion_expedientes_ce` guarda solo la hora y el rango de la última carga (configuración es de lectura pública: sin nombres).
 - **Prueba.** `node scripts/test-expedientes-creados.mjs [reporte.xlsx]`.
 
+### Consulta Externa — actualizaciones de datos en el SIS
+
+`/consulta-externa/actualizaciones` ("Actualizaciones" en el menú de las digitadoras `agenda_ce`, también ESDOMED/admin: `subeExpedientesCreadosCE`) registra cada paciente al que se le actualizaron datos **en el SIS** (pedido del usuario, 2026-11-20). Services **no cambia** los datos del paciente: solo guarda quién, cuándo y qué, para la productividad. Se busca por día (citados en `consulta_externa_citas` ese día + expedientes creados ese día, unidos por expediente con `unirPool()`) o por expediente (padrón `personas`, y si no, sus citas).
+
+- **Tipos.** Por ahora dos (`TIPOS_ACTUALIZACION` en `src/lib/consultaExterna/actualizaciones.ts`): datos personales (documento de identificación) y datos del responsable. Vendrán más: se agregan a esa lista.
+- **Datos.** `consulta_externa_actualizaciones/{fecha}_{uid}_{expediente}`: un registro por persona, paciente y día; marcarlo otra vez el mismo día corrige los tipos y no cuenta doble. La fecha es la del registro (hoy, El Salvador), no la del día que se consulta.
+- **Tope.** `TOPE_ACTUALIZACIONES_DIA = 100` por persona y día (pedido del usuario; quiere afinarlo después). Lo hace cumplir `POST /api/consulta-externa/actualizaciones` en una transacción con el contador `consulta_externa_actualizaciones_dia/{fecha}_{uid}` (responde 429 al llegar). "Deshacer" (`DELETE`) solo existe para lo de hoy y descuenta.
+- **Productividad.** `GET /api/productividad/expedientes-ce` devuelve también las actualizaciones del mes; la pestaña provisional las muestra por persona.
+- Sin reglas: todo por API con Admin SDK.
+
 ### Navegación (menú lateral) — registro declarativo
 
 Los menús de médico, comité de lesiones, Psicología, Trabajo Social y el dashboard de ESDOMED/admin (más DIMES y el jefe UCI que entra ahí) se declaran en `src/lib/navRegistro.ts` (tipos `EntradaNav`/`SeccionNav`, `construirMenu`, `rutaVetada`); cada portal tiene su archivo (`navMedico`, `navPsicologia`, `navTrabajoSocial`, `navEsdomed`) y las vistas del comité se definen UNA vez en `navComiteLesiones` (las reusan los tres). Reglas para código nuevo:
