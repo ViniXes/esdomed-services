@@ -537,7 +537,7 @@ export const esDiplomaSgas = (x: { tipo?: string; notas?: string; archivos?: { n
 
 /**
  * Archivero de la persona en una sola lectura: evaluaciones y amonestaciones
- * del periodo (sin diplomas) y si tiene subido el diploma SGAS.
+ * del periodo (sin diplomas ni documentos de trabajo) y si tiene subido el diploma SGAS.
  */
 export async function cargarArchivero(
   empleadoId: string,
@@ -556,8 +556,8 @@ export async function cargarArchivero(
     diploma: diplomas.length ? { fecha: aIso(diplomas[0].fecha), detalle: diplomas[0].notas || diplomas[0].tipo || "Diploma SGAS" } : null,
   };
   const entradas = snap.docs
-    // Los diplomas/certificados viven en la misma colección pero no son parte de este respaldo.
-    .filter((d) => d.data().categoria !== "diploma")
+    // Los diplomas/certificados y los documentos de trabajo viven en la misma colección pero no son parte de este respaldo.
+    .filter((d) => d.data().categoria !== "diploma" && d.data().categoria !== "documento")
     .map((d) => {
       const x = d.data() as { tipo?: string; fecha?: unknown; notas?: string; nota?: number; notaPorRevisar?: boolean };
       return {

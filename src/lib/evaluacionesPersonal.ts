@@ -13,6 +13,8 @@ export const CATEGORIAS_ARCHIVO_PERSONAL: Record<CategoriaArchivoPersonal, {
   vacio: string;
   vacioAdmin: string;
   vacioEmpleado: string;
+  /** Acepta Word y Excel además de PDF e imagen (solo Documentos de trabajo). */
+  aceptaOffice?: boolean;
 }> = {
   evaluacion: {
     pestana: "Evaluaciones",
@@ -41,7 +43,26 @@ export const CATEGORIAS_ARCHIVO_PERSONAL: Record<CategoriaArchivoPersonal, {
     vacioAdmin: "Los diplomas y certificados que subas aquí quedan permanentes en el expediente.",
     vacioEmpleado: "Aquí verás los diplomas y certificados que ESDOMED suba a tu expediente.",
   },
+  documento: {
+    pestana: "Documentos de trabajo",
+    tipos: ["Acta", "Lista de asistencia", "Memorándum", "Informe", "Procedimiento"],
+    ejemploTipo: "Ej. Acta de implementación",
+    conNota: false,
+    vacio: "Sin documentos de trabajo",
+    vacioAdmin: "Actas, listas, memorándums y demás documentos de trabajo (Word, Excel, PDF o imagen).",
+    vacioEmpleado: "Aquí verás los documentos de trabajo que ESDOMED suba a tu expediente.",
+    aceptaOffice: true,
+  },
 };
+
+/**
+ * Fichas con la pestaña "Documentos de trabajo" (Word, Excel, PDF): por ahora
+ * solo la de Lic. Alfonso Montes Gutierrez, Supervisor de ESDOMED. Para darla a
+ * otra persona, agregar su uid aquí y en storage.rules (evaluaciones_personal).
+ */
+export const UIDS_CON_DOCUMENTOS_TRABAJO: ReadonlySet<string> = new Set([
+  "B42a1rJzJ5SX92x7DJ6Iee9TiD22", // Alfonso Montes Gutierrez
+]);
 
 /**
  * Pestaña de una entrada. Las registradas antes de las pestañas no traen
