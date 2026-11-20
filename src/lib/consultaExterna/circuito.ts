@@ -360,13 +360,51 @@ export function destinoSignosVitales(especialidadId: string): string {
 const MINUSCULAS_MENSAJE = new Set([...PARTICULAS, "a", "al", "en", "con", "por", "para", "o", "u"]);
 
 /**
- * El mensaje como se mostrará: espacios simples y, si viene todo en
- * mayúsculas o todo en minúsculas, con mayúscula inicial en cada palabra (de
- * lejos se lee mejor y la voz no deletrea las palabras cortas como siglas).
+ * Mayúscula inicial en cada palabra, como se escribe un nombre: en el speaker,
+ * el nombre de quien no está en la agenda se escribe a mano y se corrige
+ * mientras se escribe (pedido del usuario, 2026-11-20). Las palabras de
+ * MINUSCULAS_MENSAJE van en minúscula salvo al inicio ("María de la Cruz",
+ * "Pasar a la Ventanilla"); el inicio es la primera palabra con letras, así
+ * "11431-26 de León" empieza en "De".
+ *
+ * Solo cambia mayúsculas y minúsculas, nunca el largo (el cursor queda donde
+ * estaba), y no toca el resto de cada palabra: las siglas ("UCI") quedan
+ * como se escribieron.
+ *
+ * `cursor`: dónde está el cursor mientras se escribe. La palabra que termina
+ * ahí todavía se está escribiendo y no se pasa a minúscula aunque ya diga
+ * "de" (puede ser "Delmy"). Sin cursor, todas las palabras están terminadas.
+ */
+export function mayusculaEnCadaPalabra(texto: string, cursor = -1): string {
+  let alInicio = true;
+  return String(texto ?? "").replace(/\S+/g, (palabra: string, inicio: number) => {
+    if (!/\p{L}/u.test(palabra)) return palabra;
+    const primera = alInicio;
+    alInicio = false;
+    const resto = palabra.slice(1);
+    const min = palabra.toLocaleLowerCase("es");
+    const enMinuscula =
+      !primera &&
+      inicio + palabra.length !== cursor &&
+      MINUSCULAS_MENSAJE.has(min.replace(/[,;:]+$/, "")) &&
+      resto === resto.toLocaleLowerCase("es"); // "DE" escrito con bloqueo de mayúsculas no se toca
+    if (enMinuscula) return min.length === palabra.length ? min : palabra;
+    return palabra.replace(/(^[^\p{L}\p{N}]*|[-'’])(\p{Ll})/gu, (todo: string, antes: string, letra: string) => {
+      const mayuscula = letra.toLocaleUpperCase("es");
+      return mayuscula.length === 1 ? antes + mayuscula : todo;
+    });
+  });
+}
+
+/**
+ * El mensaje como se mostrará: espacios simples y mayúscula inicial en cada
+ * palabra (`mayusculaEnCadaPalabra`). Si viene todo en mayúsculas, primero se
+ * pasa a minúsculas: de lejos se lee mejor y la voz no deletrea las palabras
+ * cortas como siglas.
  */
 export function textoParaPantalla(texto: string): string {
   const t = String(texto ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_MENSAJE_PANTALLA).trim();
-  return sinCaja(t) ? aNombrePropio(t, MINUSCULAS_MENSAJE) : t;
+  return mayusculaEnCadaPalabra(sinCaja(t) ? t.toLocaleLowerCase("es") : t);
 }
 
 /**

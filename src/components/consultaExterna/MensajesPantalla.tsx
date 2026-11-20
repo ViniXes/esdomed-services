@@ -22,6 +22,7 @@ import {
 import {
   destinoMensaje,
   MAX_MENSAJE_PANTALLA,
+  mayusculaEnCadaPalabra,
   nombreParaLlamado,
   pasoPendienteMensaje,
   pideEspecialidad,
@@ -193,8 +194,9 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
   const esp = especialidadPorId(eleccion.especialidadId);
   const destino = destinoDe(eleccion);
   const enPantalla = textoParaPantalla(texto);
-  // Todo en mayúsculas o minúsculas se muestra con mayúscula inicial: se avisa cómo saldrá.
-  const cambiaAlMostrar = enPantalla !== "" && enPantalla !== texto.replace(/\s+/g, " ").trim();
+  // La mayúscula de cada palabra ya se pone al escribir; lo que cambia al
+  // mostrar es lo escrito todo en mayúsculas, y se avisa cómo saldrá.
+  const cambiaAlMostrar = enPantalla !== "" && enPantalla !== mayusculaEnCadaPalabra(texto.replace(/\s+/g, " ").trim());
   // Todo el flujo es obligatorio: texto, a dónde va, especialidad (o estación) y, en consultorio, el número.
   const pendiente = pasoPendienteMensaje(texto, eleccion);
   const listo = pendiente === "";
@@ -223,6 +225,28 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
     setError("");
     setTexto(valor);
     if (!valor.trim()) setPaciente(null);
+  };
+
+  // Mayúscula inicial en cada palabra mientras se escribe (pedido del usuario,
+  // 2026-11-20): el nombre de quien no está en la agenda sale bien escrito sin
+  // depender del teclado. Se corrige en el cuadro mismo, así lo que se ve es lo
+  // que dirá la pantalla, y el cursor se deja donde estaba (el largo no cambia).
+  // Mientras el teclado compone una letra (tildes, sugerencias del celular) no
+  // se toca: cambiarle el texto en ese momento duplica letras en Android.
+  const escribir = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const el = e.currentTarget;
+    const crudo = el.value.replace(/[\r\n]+/g, " ");
+    if ((e.nativeEvent as InputEvent).isComposing) {
+      cambiarTexto(crudo);
+      return;
+    }
+    const valor = mayusculaEnCadaPalabra(crudo, el.selectionStart);
+    if (valor !== el.value) {
+      const { selectionStart, selectionEnd } = el;
+      el.value = valor;
+      el.setSelectionRange(selectionStart, selectionEnd);
+    }
+    cambiarTexto(valor);
   };
 
   const elegirPaciente = (c: CitaCEConId) => {
@@ -400,7 +424,9 @@ export function MensajesPantalla({ porNombre, regreso, onSalir, leerAgenda = lee
               id="mensaje-pantalla"
               ref={refTexto}
               value={texto}
-              onChange={(e) => cambiarTexto(e.target.value.replace(/[\r\n]+/g, " "))}
+              onChange={escribir}
+              // Al salir del cuadro, la palabra que se estaba escribiendo ya terminó ("De" → "de").
+              onBlur={() => setTexto((t) => mayusculaEnCadaPalabra(t))}
               onKeyDown={(e) => {
                 if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
                 e.preventDefault();

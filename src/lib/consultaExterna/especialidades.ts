@@ -25,8 +25,9 @@ export interface EspecialidadCE {
   alias?: string[];
   /**
    * Consultorios numerados de la especialidad (1..n), para elegirlos con un
-   * toque en Mensajes a pantalla. Sale del catálogo de agendas
-   * (catalogoCitasSemilla.json); la prueba verifica que coincidan.
+   * toque en Mensajes a pantalla. Al menos los del catálogo de agendas
+   * (catalogoCitasSemilla.json; la prueba lo verifica), y más si el usuario
+   * lo pide: Hematología tiene 7 aunque el catálogo trae 5 (2026-11-19).
    */
   consultorios: number;
 }
@@ -37,7 +38,7 @@ export interface EstacionCE {
 }
 
 export const ESPECIALIDADES_CE: EspecialidadCE[] = [
-  { id: "hematologia", nombre: "Hematología", prefijo: "HE", estacion: "hematologia", consultorios: 5 },
+  { id: "hematologia", nombre: "Hematología", prefijo: "HE", estacion: "hematologia", consultorios: 7 },
   { id: "oncologia", nombre: "Oncología", prefijo: "ON", estacion: "oncologia", consultorios: 2 },
   { id: "cardiologia", nombre: "Cardiología", prefijo: "CA", estacion: "cardiologia", consultorios: 6 },
   { id: "infectologia", nombre: "Infectología", prefijo: "IN", estacion: "infectologia", consultorios: 2 },

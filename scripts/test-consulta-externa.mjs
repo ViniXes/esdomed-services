@@ -329,7 +329,27 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
   const c = cargar("circuito");
   assert.equal(c.textoParaPantalla("  MARIA   LOPEZ  "), "Maria Lopez", "todo en mayúsculas pasa a nombre propio");
   assert.equal(c.textoParaPantalla("familiares de jose perez, pasar a la ventanilla"), "Familiares de Jose Perez, Pasar a la Ventanilla");
-  assert.equal(c.textoParaPantalla("María López"), "María López", "lo escrito con mayúsculas y minúsculas no se toca");
+  assert.equal(c.textoParaPantalla("María López"), "María López", "un nombre bien escrito no se toca");
+  // Mayúscula en cada palabra al escribir el nombre a mano (pedido del usuario, 2026-11-20).
+  const may = c.mayusculaEnCadaPalabra;
+  assert.equal(may("maria jose lópez"), "Maria Jose López");
+  assert.equal(may("María De La Cruz"), "María de la Cruz", "de, la… van en minúscula");
+  assert.equal(may("de la cruz ana"), "De la Cruz Ana", "salvo al inicio");
+  assert.equal(may("11431-26 de león"), "11431-26 De León", "el inicio es la primera palabra con letras");
+  assert.equal(may("o'neil lópez-garcía"), "O'Neil López-García");
+  assert.equal(may("pasar a UCI"), "Pasar a UCI", "las siglas quedan como se escribieron");
+  assert.equal(may("JOSE DE LEON"), "JOSE DE LEON", "con bloqueo de mayúsculas no se tocan (lo corrige textoParaPantalla)");
+  assert.equal(may("Maria de", 8), "Maria De", "la palabra que se está escribiendo no se pasa a minúscula (puede ser Delmy)");
+  assert.equal(may("Maria de lopez", 8), "Maria De Lopez", "tampoco en medio del texto");
+  assert.equal(may("Maria De"), "Maria de", "terminada, sí");
+  assert.equal(may("Maria Delmy"), "Maria Delmy");
+  for (const t of ["ñandú ßeta", "  dos  espacios ", "çà-ïî 12 «ana»", "İstanbul"]) {
+    assert.equal(may(t).length, t.length, `el largo no cambia: ${t}`);
+  }
+  assert.equal(may("«ana» (rosa)"), "«Ana» (Rosa)");
+  assert.equal(c.textoParaPantalla("Maria lopez"), "Maria Lopez", "mezclado también sale con mayúscula en cada palabra");
+  assert.equal(c.textoParaPantalla("Maria De León"), "Maria de León");
+  assert.equal(c.textoParaPantalla("PASAR A UCI"), "Pasar a Uci", "todo en mayúsculas sigue pasando a nombre propio");
   assert.equal(c.textoParaPantalla("Ana, López"), "Ana, López", "un mensaje no se reordena como el nombre del SIS");
   assert.equal(c.textoParaPantalla("x".repeat(120)).length, c.MAX_MENSAJE_PANTALLA);
   assert.equal(c.idMensajePantalla("MARÍA López "), c.idMensajePantalla("maria lopez"), "el mismo texto reemplaza su entrada");
@@ -400,7 +420,8 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
     textoLlamado({ paciente: "Rosa Cruz", destino: c.destinoSignosVitales("oncologia") }),
     "Rosa Cruz. Acercarse a toma de signos vitales de Oncología.",
   );
-  // Los consultorios que se eligen con un toque salen del catálogo de agendas.
+  // Los consultorios que se eligen con un toque: al menos los del catálogo de
+  // agendas; Hematología tiene 7 por pedido del usuario (2026-11-19), el catálogo trae 5.
   const { ESPECIALIDADES_CE, resolverEspecialidad: resolver } = cargar("especialidades");
   const semilla = JSON.parse(readFileSync(new URL("../src/lib/consultaExterna/catalogoCitasSemilla.json", import.meta.url), "utf8"));
   const porEspecialidad = {};
@@ -410,7 +431,11 @@ assert.equal(acceso.veLaPantallaCE(conRol("mensajes_ce")), false, "ni la pantall
     const n = Number(String(k.nombre).match(/-\s*(\d+)$/)?.[1]);
     porEspecialidad[e.id] = Math.max(porEspecialidad[e.id] ?? 0, n);
   }
-  for (const e of ESPECIALIDADES_CE) assert.equal(e.consultorios, porEspecialidad[e.id] ?? 0, `consultorios de ${e.nombre}`);
+  const MAS_QUE_EL_CATALOGO = { hematologia: 7 };
+  for (const e of ESPECIALIDADES_CE) {
+    assert.equal(e.consultorios, MAS_QUE_EL_CATALOGO[e.id] ?? porEspecialidad[e.id] ?? 0, `consultorios de ${e.nombre}`);
+    assert.ok(e.consultorios >= (porEspecialidad[e.id] ?? 0), `${e.nombre} no puede tener menos que el catálogo de agendas`);
+  }
 }
 
 // ── Búsqueda para marcar llegada ──
