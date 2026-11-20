@@ -642,7 +642,7 @@ export interface UbicacionCertificado {
 export interface AdjuntoBitacora {
   url: string;
   nombre: string;          // nombre original del archivo
-  tipo: "pdf" | "imagen";
+  tipo: "pdf" | "imagen" | "archivo"; // "archivo": Word/Excel (solo Documentos de trabajo del personal)
   tamano: number;          // bytes
   storagePath: string;     // ruta en Storage, para retirar el objeto al borrar la entrada
 }
@@ -1848,13 +1848,13 @@ export interface TramitePersonal {
 // (ej. Norma Técnica de Hechos Vitales) y amonestaciones por algún
 // procedimiento. Solo el admin registra/elimina; cada empleado consulta
 // únicamente las suyas (ver firestore.rules, colección evaluaciones_personal).
-export type CategoriaArchivoPersonal = "evaluacion" | "amonestacion" | "diploma";
+export type CategoriaArchivoPersonal = "evaluacion" | "amonestacion" | "diploma" | "documento";
 
 export interface EvaluacionPersonal {
   id?: string;
   empleadoId: string;
   empleadoNombre: string;
-  // Pestaña de la ficha donde se muestra (evaluacion | amonestacion | diploma). Las entradas anteriores no lo traen:
+  // Pestaña de la ficha donde se muestra (evaluacion | amonestacion | diploma | documento). Las entradas anteriores no lo traen:
   // se deduce con categoriaDeEntrada() en src/lib/evaluacionesPersonal.ts.
   categoria?: CategoriaArchivoPersonal;
   tipo: string; // catálogo abierto, ver CATEGORIAS_ARCHIVO_PERSONAL en src/lib/evaluacionesPersonal.ts

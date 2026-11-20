@@ -69,7 +69,9 @@ service firebase.storage {
     }
 
     // Adjuntos del archivero de evaluaciones/amonestaciones de personal
-    // (evaluaciones_personal en Firestore). A diferencia de las rutas de
+    // (evaluaciones_personal en Firestore). Word y Excel solo en la carpeta de las
+    // fichas con pestaña Documentos de trabajo (UIDS_CON_DOCUMENTOS_TRABAJO en
+    // src/lib/evaluacionesPersonal.ts; hoy solo Alfonso Montes). A diferencia de las rutas de
     // arriba, aquí quien SUBE (admin) no es dueño de la carpeta — el dueño es
     // el empleado evaluado — así que no se exige request.auth.uid == userId.
     // El control real vive en Firestore: solo el admin puede crear el
@@ -78,7 +80,9 @@ service firebase.storage {
       allow read:  if request.auth != null;
       allow create, update: if request.auth != null
                    && tamanoValido()
-                   && request.resource.contentType.matches('application/pdf|image/.*');
+                   && (request.resource.contentType.matches('application/pdf|image/.*')
+                       || (empleadoUid in ['B42a1rJzJ5SX92x7DJ6Iee9TiD22']
+                           && request.resource.contentType.matches('application/msword|application/vnd[.]ms-excel|application/vnd[.]openxmlformats-officedocument[.](wordprocessingml[.]document|spreadsheetml[.]sheet)')));
       allow delete: if request.auth != null;
     }
 

@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { AdjuntoBitacora, CategoriaArchivoPersonal, EvaluacionPersonal } from "@/types";
 import { CATEGORIAS_ARCHIVO_PERSONAL, NOTA_MINIMA_EVALUACION, aproboEvaluacion, categoriaDeEntrada, leerNota } from "@/lib/evaluacionesPersonal";
 import {
-  Paperclip, FilePlus2, Trash2, FileText, Loader2, X, ExternalLink, ImageOff, ClipboardCheck, Download, RefreshCw, Pencil, Check,
+  Paperclip, FilePlus2, Trash2, FileText, FileSpreadsheet, Loader2, X, ExternalLink, ImageOff, ClipboardCheck, Download, RefreshCw, Pencil, Check,
 } from "lucide-react";
 
 // Archivero permanente de evaluaciones/amonestaciones de un empleado ESDOMED
@@ -29,11 +29,25 @@ const MAX_BYTES = 20 * 1024 * 1024;
 
 const nombreSeguro = (nombre: string) => nombre.replace(/[^\w.-]+/g, "_").slice(-120);
 
-const tipoDeArchivo = (file: File): AdjuntoBitacora["tipo"] | null => {
+// Word y Excel: solo en la pestaña Documentos de trabajo (aceptaOffice).
+const MIME_OFFICE: Record<string, string> = {
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+const extension = (nombre: string) => nombre.split(".").pop()?.toLowerCase() ?? "";
+const esOffice = (file: File) => extension(file.name) in MIME_OFFICE;
+
+const tipoDeArchivo = (file: File, aceptaOffice = false): AdjuntoBitacora["tipo"] | null => {
   if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) return "pdf";
   if (file.type.startsWith("image/")) return "imagen";
+  if (aceptaOffice && esOffice(file)) return "archivo";
   return null;
 };
+
+const ACCEPT_BASE = "application/pdf,image/*";
+const ACCEPT_OFFICE = `${ACCEPT_BASE},.doc,.docx,.xls,.xlsx`;
 
 const formatTamano = (bytes: number) =>
   bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -52,11 +66,13 @@ const hoyInput = () => {
   return d.toISOString().slice(0, 10);
 };
 
-const subirAdjunto = (empleadoId: string, file: File, onBytes: (bytes: number) => void) => {
+const subirAdjunto = (empleadoId: string, file: File, onBytes: (bytes: number) => void, aceptaOffice = false) => {
   const storagePath = `evaluaciones_personal/${empleadoId}/${Date.now()}_${nombreSeguro(file.name)}`;
-  const tarea = uploadBytesResumable(storageRef(storage, storagePath), file, {
-    contentType: file.type || (tipoDeArchivo(file) === "pdf" ? "application/pdf" : undefined),
-  });
+  // Windows a veces no da tipo a los .docx/.xlsx: se toma de la extensión.
+  const contentType = esOffice(file)
+    ? MIME_OFFICE[extension(file.name)]
+    : file.type || (tipoDeArchivo(file) === "pdf" ? "application/pdf" : undefined);
+  const tarea = uploadBytesResumable(storageRef(storage, storagePath), file, { contentType });
   return new Promise<AdjuntoBitacora>((resolve, reject) => {
     tarea.on("state_changed",
       (snap) => onBytes(snap.bytesTransferred),
@@ -66,7 +82,7 @@ const subirAdjunto = (empleadoId: string, file: File, onBytes: (bytes: number) =
           resolve({
             url: await getDownloadURL(tarea.snapshot.ref),
             nombre: file.name,
-            tipo: tipoDeArchivo(file) ?? "imagen",
+            tipo: tipoDeArchivo(file, aceptaOffice) ?? "imagen",
             tamano: file.size,
             storagePath,
           });
@@ -87,6 +103,8 @@ interface Props {
 export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestionar, categoria }: Props) {
   const { user, profile } = useAuth();
   const cfg = CATEGORIAS_ARCHIVO_PERSONAL[categoria];
+  const aceptaOffice = !!cfg.aceptaOffice;
+  const textoFormatos = aceptaOffice ? "PDF, imagen, Word o Excel" : "PDF o imagen";
 
   const [entradas, setEntradas] = useState<EvaluacionPersonal[] | null>(null);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
@@ -145,7 +163,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
 
     const rechazados: string[] = [];
     const validos = nuevos.filter((f) => {
-      if (!tipoDeArchivo(f)) { rechazados.push(`${f.name} (solo PDF o imagen)`); return false; }
+      if (!tipoDeArchivo(f, aceptaOffice)) { rechazados.push(`${f.name} (solo ${textoFormatos})`); return false; }
       if (f.size >= MAX_BYTES) { rechazados.push(`${f.name} (supera 20 MB)`); return false; }
       return true;
     });
@@ -172,7 +190,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
       let acumulado = 0;
       for (const file of archivos) {
         subidos.push(await subirAdjunto(empleadoId, file,
-          (bytes) => setProgreso(Math.round(((acumulado + bytes) / totalBytes) * 100))));
+          (bytes) => setProgreso(Math.round(((acumulado + bytes) / totalBytes) * 100)), aceptaOffice));
         acumulado += file.size;
       }
 
@@ -230,12 +248,12 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
     if (!entrada.id || !entrada.archivos) return;
     const viejo = entrada.archivos[idx];
     if (nuevo) {
-      if (!tipoDeArchivo(nuevo)) throw new Error(`${nuevo.name}: solo PDF o imagen.`);
+      if (!tipoDeArchivo(nuevo, aceptaOffice)) throw new Error(`${nuevo.name}: solo ${textoFormatos}.`);
       if (nuevo.size >= MAX_BYTES) throw new Error(`${nuevo.name}: supera 20 MB.`);
     }
     let subido: AdjuntoBitacora | null = null;
     try {
-      if (nuevo) subido = await subirAdjunto(empleadoId, nuevo, () => {});
+      if (nuevo) subido = await subirAdjunto(empleadoId, nuevo, () => {}, aceptaOffice);
       const archivosNuevos = entrada.archivos.flatMap((a, i) => (i !== idx ? [a] : subido ? [subido] : []));
       // Si ya tenía nota y se sube otro archivo (p. ej. la reevaluación), la nota
       // puede haber cambiado: queda marcada para que el admin la confirme o corrija.
@@ -311,7 +329,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
               {archivos.map((f, i) => (
                 <li key={`${f.name}-${i}`}
                   className="flex items-center gap-1.5 max-w-full pl-2 pr-1 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
-                  {tipoDeArchivo(f) === "pdf" ? <FileText size={12} className="shrink-0 text-blue-600 dark:text-blue-400" /> : <Paperclip size={12} className="shrink-0 text-blue-600 dark:text-blue-400" />}
+                  {tipoDeArchivo(f, aceptaOffice) === "pdf" ? <FileText size={12} className="shrink-0 text-blue-600 dark:text-blue-400" /> : <Paperclip size={12} className="shrink-0 text-blue-600 dark:text-blue-400" />}
                   <span className="truncate max-w-[200px]">{f.name}</span>
                   <span className="text-slate-400 shrink-0">{formatTamano(f.size)}</span>
                   <button type="button" onClick={() => quitarArchivo(i)} disabled={subiendo}
@@ -331,14 +349,14 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
 
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <input ref={fileRef} type="file" multiple accept="application/pdf,image/*" onChange={agregarArchivos} className="hidden" />
+              <input ref={fileRef} type="file" multiple accept={aceptaOffice ? ACCEPT_OFFICE : ACCEPT_BASE} onChange={agregarArchivos} className="hidden" />
               <button type="button" onClick={() => fileRef.current?.click()}
                 disabled={subiendo || archivos.length >= MAX_ADJUNTOS}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 <Paperclip size={13} /> Adjuntar
                 <span className="font-normal text-slate-400">{archivos.length}/{MAX_ADJUNTOS}</span>
               </button>
-              <span className="text-[11px] text-slate-400 hidden sm:inline">PDF o imagen · máx. 20 MB c/u</span>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">{textoFormatos} · máx. 20 MB c/u</span>
             </div>
             <button type="button" onClick={registrar} disabled={!puedeRegistrar}
               className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
@@ -410,7 +428,7 @@ export function EvaluacionesPersonal({ empleadoId, empleadoNombre, puedeGestiona
                 <ul className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {e.archivos.map((a, i) => (
                     <AdjuntoCard key={`${a.url}-${i}`} adjunto={a} entradaId={e.id!} indice={i}
-                      puedeGestionar={puedeGestionar}
+                      puedeGestionar={puedeGestionar} aceptaOffice={aceptaOffice}
                       onReemplazar={(f) => cambiarAdjunto(e, i, f)}
                       onQuitar={() => cambiarAdjunto(e, i, null)} />
                   ))}
@@ -447,11 +465,12 @@ interface AdjuntoCardProps {
   entradaId: string;
   indice: number;
   puedeGestionar: boolean;
+  aceptaOffice: boolean;
   onReemplazar: (file: File) => Promise<void>;
   onQuitar: () => Promise<void>;
 }
 
-function AdjuntoCard({ adjunto, entradaId, indice, puedeGestionar, onReemplazar, onQuitar }: AdjuntoCardProps) {
+function AdjuntoCard({ adjunto, entradaId, indice, puedeGestionar, aceptaOffice, onReemplazar, onQuitar }: AdjuntoCardProps) {
   const [imgError, setImgError] = useState(false);
   const [ocupado, setOcupado] = useState<null | "descargar" | "reemplazar" | "quitar">(null);
   const [confirmarQuitar, setConfirmarQuitar] = useState(false);
@@ -492,6 +511,12 @@ function AdjuntoCard({ adjunto, entradaId, indice, puedeGestionar, onReemplazar,
             <iframe src={urlMiniaturaPdf(adjunto.url)} title={adjunto.nombre} loading="lazy" tabIndex={-1}
               className="relative h-full w-[calc(100%+20px)] pointer-events-none border-0" />
           </div>
+        ) : adjunto.tipo === "archivo" ? (
+          // Word/Excel: el navegador no los muestra; "Ver" y "Descargar" bajan el archivo.
+          <div className={`w-full h-40 flex flex-col items-center justify-center gap-1.5 ${/\.xlsx?$/i.test(adjunto.nombre) ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"}`}>
+            {/\.xlsx?$/i.test(adjunto.nombre) ? <FileSpreadsheet size={32} /> : <FileText size={32} />}
+            <span className="text-[11px] font-semibold uppercase tracking-wider">{/\.xlsx?$/i.test(adjunto.nombre) ? "Excel" : "Word"}</span>
+          </div>
         ) : (
           <div className="w-full h-40 flex items-center justify-center text-blue-600 dark:text-blue-400">
             <ImageOff size={28} />
@@ -517,7 +542,7 @@ function AdjuntoCard({ adjunto, entradaId, indice, puedeGestionar, onReemplazar,
 
       {puedeGestionar && (
         <div className="flex gap-1 px-1.5 pb-1.5">
-          <input ref={reemplazoRef} type="file" accept="application/pdf,image/*" onChange={elegirReemplazo} className="hidden" />
+          <input ref={reemplazoRef} type="file" accept={aceptaOffice ? ACCEPT_OFFICE : ACCEPT_BASE} onChange={elegirReemplazo} className="hidden" />
           {confirmarQuitar ? (
             <>
               <span className="flex-1 self-center text-[11px] text-slate-500 text-center">¿Quitar archivo?</span>

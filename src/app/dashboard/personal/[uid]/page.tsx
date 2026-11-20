@@ -8,17 +8,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/types";
 import { esEnMemoria, fechaBajaCorta } from "@/lib/bajaUsuarios";
 import { EvaluacionesPersonal } from "@/components/personal/EvaluacionesPersonal";
-import { ArrowLeft, Award, ClipboardCheck, IdCard, TriangleAlert, UserRound } from "lucide-react";
+import { UIDS_CON_DOCUMENTOS_TRABAJO } from "@/lib/evaluacionesPersonal";
+import { ArrowLeft, Award, ClipboardCheck, FolderOpen, IdCard, TriangleAlert, UserRound } from "lucide-react";
 
 // Ficha de un empleado ESDOMED, con el archivero repartido en pestañas:
-// evaluaciones, amonestaciones y diplomas/certificados (ver EvaluacionesPersonal). El admin puede abrir la ficha de cualquiera; el
+// evaluaciones, amonestaciones, diplomas/certificados y documentos de trabajo (ver EvaluacionesPersonal). El admin puede abrir la ficha de cualquiera; el
 // resto del personal ESDOMED solo la suya — no es ético que vean las notas de
 // un compañero (ver firestore.rules: evaluaciones_personal).
 
 const ROLES_PERMITIDOS = new Set(["esdomed", "asistente_esdomed", "admin"]);
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "email" | "codigoMarcacion" | "puesto" | "role" | "activo" | "baja">;
-type Tab = "datos" | "evaluaciones" | "amonestaciones" | "diplomas";
+type Tab = "datos" | "evaluaciones" | "amonestaciones" | "diplomas" | "documentos";
 
 export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = use(params);
@@ -32,6 +33,8 @@ export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: s
   const esAdmin = profile?.role === "admin";
   const esPropia = profile?.uid === uid;
   const puedeVer = rolPermitido && (esAdmin || esPropia);
+  // Pestaña "Documentos de trabajo": solo en las fichas de UIDS_CON_DOCUMENTOS_TRABAJO.
+  const conDocumentos = UIDS_CON_DOCUMENTOS_TRABAJO.has(uid);
 
   useEffect(() => {
     // Sin permiso no se lee nada: el render muestra el aviso de acceso antes
@@ -98,6 +101,7 @@ export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: s
           { id: "evaluaciones", label: "Evaluaciones", icon: ClipboardCheck },
           { id: "amonestaciones", label: "Amonestaciones", icon: TriangleAlert },
           { id: "diplomas", label: "Diplomas y certificados", icon: Award },
+          ...(conDocumentos ? [{ id: "documentos", label: "Documentos de trabajo", icon: FolderOpen }] : []),
         ] as { id: Tab; label: string; icon: typeof UserRound }[]).map((t) => (
           <button
             key={t.id}
@@ -131,6 +135,9 @@ export default function FichaEmpleadoPage({ params }: { params: Promise<{ uid: s
       )}
       {tab === "diplomas" && (
         <EvaluacionesPersonal key="diploma" categoria="diploma" empleadoId={persona.uid} empleadoNombre={persona.nombre} puedeGestionar={esAdmin} />
+      )}
+      {tab === "documentos" && conDocumentos && (
+        <EvaluacionesPersonal key="documento" categoria="documento" empleadoId={persona.uid} empleadoNombre={persona.nombre} puedeGestionar={esAdmin} />
       )}
     </div>
   );
