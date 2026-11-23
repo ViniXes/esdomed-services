@@ -60,3 +60,79 @@ export function unirPool(citados: PacientePool[], creados: PacientePool[]): Paci
   }
   return Array.from(mapa.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
+
+// ── Vista del equipo (admin) ──────────────────────────────────────────────────
+
+/** Quién ve lo que registró cada persona (pedido del usuario, 2026-11-23). */
+export const ROLES_VEN_ACTUALIZACIONES_EQUIPO: readonly string[] = ["admin"];
+/** Rango máximo de la vista del equipo, en días. */
+export const MAX_DIAS_EQUIPO = 93;
+
+export interface RegistroActualizacionEquipo {
+  fecha: string;
+  hechoPor: string;
+  hechoPorNombre: string;
+  expediente: string;
+  pacienteNombre: string;
+  tipos: TipoActualizacion[];
+  /** Milisegundos; null si aún no se resolvió la hora del servidor. */
+  hechoEn: number | null;
+}
+
+export interface PersonaActualizaciones {
+  uid: string;
+  nombre: string;
+  total: number;
+  identificacion: number;
+  responsable: number;
+  /** Días del rango en que registró al menos una. */
+  dias: number;
+  ultimaEn: number | null;
+}
+
+export interface DiaActualizaciones {
+  fecha: string;
+  total: number;
+  porPersona: Record<string, number>;
+}
+
+/** Días entre dos fechas YYYY-MM-DD, contando ambas (0 si el rango no es válido). */
+export function diasDelRango(desde: string, hasta: string): number {
+  if (!esFechaISO(desde) || !esFechaISO(hasta) || desde > hasta) return 0;
+  const ms = (iso: string) => { const [a, m, d] = iso.split("-").map(Number); return Date.UTC(a, m - 1, d); };
+  return Math.round((ms(hasta) - ms(desde)) / 86400000) + 1;
+}
+
+/** Por persona (más registros primero) y por día (más reciente primero). */
+export function resumenActualizacionesEquipo(registros: RegistroActualizacionEquipo[]): {
+  personas: PersonaActualizaciones[];
+  dias: DiaActualizaciones[];
+} {
+  const personas = new Map<string, PersonaActualizaciones & { fechas: Set<string> }>();
+  const dias = new Map<string, DiaActualizaciones>();
+  for (const r of registros) {
+    if (!r.hechoPor) continue;
+    let p = personas.get(r.hechoPor);
+    if (!p) {
+      p = { uid: r.hechoPor, nombre: r.hechoPorNombre || "Sin nombre", total: 0, identificacion: 0, responsable: 0, dias: 0, ultimaEn: null, fechas: new Set() };
+      personas.set(r.hechoPor, p);
+    }
+    p.total += 1;
+    if (r.tipos.includes("identificacion")) p.identificacion += 1;
+    if (r.tipos.includes("responsable")) p.responsable += 1;
+    p.fechas.add(r.fecha);
+    if (r.hechoEn !== null && (p.ultimaEn === null || r.hechoEn > p.ultimaEn)) p.ultimaEn = r.hechoEn;
+    if (!p.nombre || p.nombre === "Sin nombre") p.nombre = r.hechoPorNombre || p.nombre;
+
+    let d = dias.get(r.fecha);
+    if (!d) { d = { fecha: r.fecha, total: 0, porPersona: {} }; dias.set(r.fecha, d); }
+    d.total += 1;
+    d.porPersona[r.hechoPor] = (d.porPersona[r.hechoPor] ?? 0) + 1;
+  }
+  return {
+    personas: Array.from(personas.values())
+      .map(({ fechas, ...p }) => ({ ...p, dias: fechas.size }))
+      .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, "es")),
+    dias: Array.from(dias.values()).sort((a, b) => b.fecha.localeCompare(a.fecha)),
+  };
+}

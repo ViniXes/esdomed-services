@@ -83,6 +83,12 @@ export const veLaPantallaCE = (p: Perfil) => gestionaConsultaExterna(p) || esCue
 export const limpiaPantallasCE = (p: Perfil) => esAdmin(p);
 
 /**
+ * Ve en Actualizaciones lo que registró cada persona, por día o rango (pedido
+ * del usuario, 2026-11-23: solo el admin). = ROLES_VEN_ACTUALIZACIONES_EQUIPO en la API.
+ */
+export const veActualizacionesEquipoCE = (p: Perfil) => esAdmin(p);
+
+/**
  * Escribe mensajes para las pantallas (/consulta-externa/mensajes). No espera
  * a EN_CONSTRUCCION: la cuenta de mensajes se usa ya (pedido del usuario, 2026-11-18).
  */

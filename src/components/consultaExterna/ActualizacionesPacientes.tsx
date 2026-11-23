@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Search, Undo2, UserPen, X } from "lucide-react";
+import { Check, Loader2, Search, Undo2, UserPen, Users, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { veActualizacionesEquipoCE } from "@/lib/accesoConsultaExterna";
+import { ActualizacionesEquipo } from "@/components/consultaExterna/ActualizacionesEquipo";
 import { claveTexto } from "@/lib/consultaExterna/expedientesCreados";
 import { TIPOS_ACTUALIZACION, type PacientePool, type TipoActualizacion } from "@/lib/consultaExterna/actualizaciones";
 
@@ -19,7 +21,11 @@ const corto = (t: TipoActualizacion) => TIPOS_ACTUALIZACION.find((x) => x.id ===
 const hora = (ms: number | null) => (ms ? new Date(ms).toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" }) : "");
 
 export function ActualizacionesPacientes() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  // El admin abre en lo que registró cada persona; las demás cuentas solo registran.
+  const veEquipo = veActualizacionesEquipoCE(profile);
+  const [vistaElegida, setVistaElegida] = useState<"equipo" | "registrar" | null>(null);
+  const vista = veEquipo ? vistaElegida ?? "equipo" : "registrar";
   const [fecha, setFecha] = useState(hoyISO);
   const [texto, setTexto] = useState("");
   const [pacientes, setPacientes] = useState<PacientePool[]>([]);
@@ -147,17 +153,33 @@ export function ActualizacionesPacientes() {
         <div>
           <h1 className="font-heading text-xl font-bold text-slate-900 dark:text-slate-100">Actualizaciones de datos en el SIS</h1>
           <p className="mt-0.5 max-w-2xl text-xs text-slate-500">
-            Registra aquí cada paciente al que le actualizaste datos en el SIS. Services no cambia los datos del
-            paciente: solo guarda quién, cuándo y qué se actualizó, para la productividad. Busca por día (citados y
-            expedientes creados ese día) o por número de expediente.
+            {vista === "equipo"
+              ? "Cuántos pacientes registró cada persona como actualizados en el SIS: hoy, otro día o en un rango de fechas."
+              : "Registra aquí cada paciente al que le actualizaste datos en el SIS. Services no cambia los datos del paciente: solo guarda quién, cuándo y qué se actualizó, para la productividad. Busca por día (citados y expedientes creados ese día) o por número de expediente."}
           </p>
         </div>
-        <div className={`rounded-xl border px-4 py-2 text-right ${lleno ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
-          <p className="text-[11px] font-medium uppercase text-slate-500">Mis registros de hoy</p>
-          <p className="font-heading text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{usadas}<span className="text-sm font-medium text-slate-400"> / {tope}</span></p>
-        </div>
+        {vista === "registrar" && (
+          <div className={`rounded-xl border px-4 py-2 text-right ${lleno ? "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
+            <p className="text-[11px] font-medium uppercase text-slate-500">Mis registros de hoy</p>
+            <p className="font-heading text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{usadas}<span className="text-sm font-medium text-slate-400"> / {tope}</span></p>
+          </div>
+        )}
       </div>
 
+      {veEquipo && (
+        <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800" role="tablist">
+          {([["equipo", "Del equipo", Users], ["registrar", "Registrar", UserPen]] as const).map(([id, label, Icono]) => (
+            <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => setVistaElegida(id)}
+              className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-semibold ${vista === id
+                ? "border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-300"
+                : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
+              <Icono size={15} />{label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {vista === "equipo" ? <ActualizacionesEquipo /> : (<>
       {lleno && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
           Llegaste al máximo de {tope} actualizaciones por día. Puedes corregir o deshacer las de hoy.
@@ -275,6 +297,7 @@ export function ActualizacionesPacientes() {
           </ul>
         </section>
       )}
+      </>)}
     </div>
   );
 }

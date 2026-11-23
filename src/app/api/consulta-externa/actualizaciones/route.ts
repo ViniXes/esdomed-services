@@ -5,8 +5,9 @@ import {
   COLECCION_EXPEDIENTES_CE, ROLES_SUBEN_EXPEDIENTES_CE, normalizarExpediente,
 } from "@/lib/consultaExterna/expedientesCreados";
 import {
-  COLECCION_ACTUALIZACIONES_CE, COLECCION_ACTUALIZACIONES_DIA_CE, TOPE_ACTUALIZACIONES_DIA,
-  esFechaISO, hoySV, idActualizacion, idContadorDia, sanearTipos, unirPool, type PacientePool,
+  COLECCION_ACTUALIZACIONES_CE, COLECCION_ACTUALIZACIONES_DIA_CE, MAX_DIAS_EQUIPO, ROLES_VEN_ACTUALIZACIONES_EQUIPO,
+  TOPE_ACTUALIZACIONES_DIA, diasDelRango, esFechaISO, hoySV, idActualizacion, idContadorDia, sanearTipos, unirPool,
+  type PacientePool, type RegistroActualizacionEquipo,
 } from "@/lib/consultaExterna/actualizaciones";
 
 // Registro de actualizaciones de datos que las digitadoras de Consulta Externa
@@ -16,13 +17,14 @@ import {
 // - GET ?fecha=YYYY-MM-DD → pacientes de ese día (citados en consulta_externa_citas
 //   + expedientes creados ese día) y lo que yo registré hoy, con el tope.
 // - GET ?expediente=X → busca el paciente en el padrón (o en sus citas).
+// - GET ?equipo=1&desde=&hasta= → lo que registró cada persona en el rango (solo admin).
 // - POST { expediente, nombre, tipos } → registra hoy (tope de 100 por persona y día,
 //   en una transacción; el mismo paciente el mismo día no cuenta dos veces).
 // - DELETE ?expediente=X → deshace un registro de hoy.
 //
 // Las colecciones no tienen reglas: el navegador no las lee ni escribe.
 
-async function autenticar(req: NextRequest): Promise<{ uid: string; nombre: string } | NextResponse> {
+async function autenticar(req: NextRequest): Promise<{ uid: string; nombre: string; role: string } | NextResponse> {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   let uid: string;
@@ -35,7 +37,24 @@ async function autenticar(req: NextRequest): Promise<{ uid: string; nombre: stri
   if (!perfil || perfil.activo === false || !ROLES_SUBEN_EXPEDIENTES_CE.includes(perfil.role)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
-  return { uid, nombre: String(perfil.nombre ?? "") };
+  return { uid, nombre: String(perfil.nombre ?? ""), role: String(perfil.role ?? "") };
+}
+
+/** Lo que registró cada persona entre dos fechas (vista del equipo, solo admin). */
+async function delEquipo(desde: string, hasta: string): Promise<RegistroActualizacionEquipo[]> {
+  const snap = await adminDb.collection(COLECCION_ACTUALIZACIONES_CE).where("fecha", ">=", desde).where("fecha", "<=", hasta).get();
+  return snap.docs
+    .map((d) => d.data())
+    .map((x) => ({
+      fecha: String(x.fecha ?? ""),
+      hechoPor: String(x.hechoPor ?? ""),
+      hechoPorNombre: String(x.hechoPorNombre ?? ""),
+      expediente: String(x.expediente ?? ""),
+      pacienteNombre: String(x.pacienteNombre ?? ""),
+      tipos: sanearTipos(x.tipos),
+      hechoEn: x.hechoEn?.toMillis?.() ?? null,
+    }))
+    .sort((a, b) => (b.hechoEn ?? 0) - (a.hechoEn ?? 0));
 }
 
 const SIN_CACHE = { "Cache-Control": "private, no-store" };
@@ -68,7 +87,19 @@ export async function GET(req: NextRequest) {
   const hoy = hoySV();
 
   try {
-    const expedienteBuscado = normalizarExpediente(params.get("expediente") ?? "");
+    if (params.get("equipo") === "1") {
+      if (!ROLES_VEN_ACTUALIZACIONES_EQUIPO.includes(quien.role)) {
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      }
+      const desde = params.get("desde") ?? "";
+      const hasta = params.get("hasta") ?? "";
+      const dias = diasDelRango(desde, hasta);
+      if (dias === 0) return NextResponse.json({ error: "Rango de fechas inválido." }, { status: 400 });
+      if (dias > MAX_DIAS_EQUIPO) return NextResponse.json({ error: "Elige un rango de hasta 3 meses." }, { status: 400 });
+      return NextResponse.json({ hoy, tope: TOPE_ACTUALIZACIONES_DIA, registros: await delEquipo(desde, hasta) }, { headers: SIN_CACHE });
+    }
+
+    const expedienteBuscado =normalizarExpediente(params.get("expediente") ?? "");
     if (expedienteBuscado) {
       if (expedienteBuscado.includes("/") || expedienteBuscado.length > 30) {
         return NextResponse.json({ error: "Expediente inválido." }, { status: 400 });
