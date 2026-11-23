@@ -329,14 +329,6 @@ export default function PacientesPage() {
             Importar reporte
           </Link>
           <Link prefetch={false}
-            href="/dashboard/pacientes/expedientes-creados"
-            title="Reporte SIS de expedientes creados en Consulta Externa"
-            className="flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-          >
-            <Upload size={15} />
-            Expedientes creados CE
-          </Link>
-          <Link prefetch={false}
             href="/dashboard/pacientes/nuevo"
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
           >
