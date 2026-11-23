@@ -2,13 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { COLECCION_ACTUALIZACIONES_CE } from "@/lib/consultaExterna/actualizaciones";
 import { COLECCION_EXPEDIENTES_CE, ROLES_LEEN_PRODUCTIVIDAD_CE, rangoMesISO } from "@/lib/consultaExterna/expedientesCreados";
-import type { ActualizacionCE, RegistroExpedienteCE } from "@/lib/consultaExterna/productividad";
+import { Timestamp } from "firebase-admin/firestore";
+import type { ActualizacionCE, CitaRegistradaCE, RegistroExpedienteCE } from "@/lib/consultaExterna/productividad";
 
 // Productividad de Consulta Externa: expedientes creados del mes (por fecha de
-// creación del SIS) y actualizaciones de datos registradas en el mes. Solo desde
-// el servidor. La usan la pestaña Consulta Externa (admin) y la de
+// creación del SIS), actualizaciones de datos y citas 2027 registradas en el mes
+// (por el día en que se registraron). Solo desde el servidor. La usan la pestaña Consulta Externa (admin) y la de
 // Administrativos (admin y asistente): ROLES_LEEN_PRODUCTIVIDAD_CE. Devuelve
 // solo quién y cuándo, sin expediente ni nombre del paciente.
+
+/** = COL_CITAS_PROGRAMADAS (citasProgramadasDatos.ts usa el SDK del navegador; aquí va el Admin SDK). */
+const COLECCION_CITAS_PROGRAMADAS = "consulta_externa_citas_programadas";
+
+/** Medianoche de El Salvador (UTC-6) del día YYYY-MM-DD. */
+const medianocheSV = (iso: string) => {
+  const [a, m, d] = iso.split("-").map(Number);
+  return Timestamp.fromDate(new Date(Date.UTC(a, m - 1, d, 6)));
+};
+
+/** YYYY-MM-DD del instante en hora de El Salvador. */
+const fechaSV = (ts: unknown): string => {
+  const f = (ts as { toDate?: () => Date } | null)?.toDate?.();
+  return f ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/El_Salvador" }).format(f) : "";
+};
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
@@ -27,12 +43,26 @@ export async function GET(req: NextRequest) {
   if (!rango) return NextResponse.json({ error: "Mes inválido" }, { status: 400 });
 
   try {
-    const [snap, actSnap] = await Promise.all([
+    // Fin exclusivo: medianoche del día siguiente al último del mes.
+    const finCitas = new Date(medianocheSV(rango[1]).toMillis() + 86400000);
+    const [snap, actSnap, citasSnap] = await Promise.all([
       adminDb.collection(COLECCION_EXPEDIENTES_CE).where("fechaCreacion", ">=", rango[0]).where("fechaCreacion", "<=", rango[1])
         .select("creadoPorUid", "creadoPorNombre", "creadoPorSis", "fechaCreacion", "personaNueva").get(),
       adminDb.collection(COLECCION_ACTUALIZACIONES_CE).where("fecha", ">=", rango[0]).where("fecha", "<=", rango[1])
         .select("hechoPor", "hechoPorNombre", "fecha", "tipos").get(),
+      adminDb.collection(COLECCION_CITAS_PROGRAMADAS)
+        .where("creadaEn", ">=", medianocheSV(rango[0])).where("creadaEn", "<", Timestamp.fromDate(finCitas))
+        .select("creadaPor", "creadaPorNombre", "creadaEn", "estado").get(),
     ]);
+    const citas: CitaRegistradaCE[] = citasSnap.docs.map((d) => {
+      const x = d.data();
+      return {
+        creadaPor: String(x.creadaPor ?? ""),
+        creadaPorNombre: String(x.creadaPorNombre ?? ""),
+        fecha: fechaSV(x.creadaEn),
+        anulada: x.estado === "anulada",
+      };
+    });
     const actualizaciones: ActualizacionCE[] = actSnap.docs.map((d) => {
       const x = d.data();
       return {
@@ -52,7 +82,7 @@ export async function GET(req: NextRequest) {
         personaNueva: x.personaNueva === true,
       };
     });
-    return NextResponse.json({ registros, actualizaciones }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ registros, actualizaciones, citas }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("No se pudo leer la productividad de Consulta Externa", error);
     return NextResponse.json({ error: "No se pudo cargar la productividad de Consulta Externa." }, { status: 500 });

@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import { BarChart3, CalendarDays, Download, PieChart as IconoPastel, RefreshCw, Users } from "lucide-react";
 import { esPersonalEvaluable } from "@/lib/productividad/personasNoEvaluables";
 import {
-  claveNombre, conteoPorDia, productividadPorPersona, totalFilaCE, type FilaProductividadCE,
+  citaCuenta, claveNombre, conteoPorDia, productividadPorPersona, totalFilaCE, type FilaProductividadCE,
 } from "@/lib/consultaExterna/productividad";
 import { GraficoBarras, GraficoBarrasHorizontalCorto, GraficoPastel, type PuntoDato } from "./GraficosProductividad";
 import { useProductividadCE } from "./useProductividadCE";
 
-// Productividad de Consulta Externa: expedientes creados (reporte del SIS) y
-// actualizaciones de datos en el SIS, por persona. Aquí va el personal
+// Productividad de Consulta Externa: expedientes creados (reporte del SIS),
+// actualizaciones de datos en el SIS y citas 2027 registradas, por persona. Aquí va el personal
 // evaluable con producción en Consulta Externa (hoy, las digitadoras); lo que
 // hicieron los administrativos sale en su pestaña, y los creadores del SIS sin
 // usuario en services (p. ej. "SIS Referencia Retorno") no se evalúan.
@@ -27,9 +27,11 @@ const COLUMNAS = [
   ["actualizaciones", "Actualizaciones"],
   ["identificacion", "Identificación"],
   ["responsable", "Responsable"],
+  ["citas", "Citas registradas"],
 ] as const satisfies readonly (readonly [keyof FilaProductividadCE, string])[];
 const COLOR_EXPEDIENTES = "#3b82f6";
 const COLOR_ACTUALIZACIONES = "#06b6d4";
+const COLOR_CITAS = "#1A4E70";
 
 const selectCls = "appearance-none rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
 const botonCls = "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
@@ -39,29 +41,30 @@ export function ProductividadConsultaExterna({ activa, personalAdministrativo }:
   const [mes, setMes] = useState(mesActual);
   const [vista, setVista] = useState<Vista>("resumen");
   const [persona, setPersona] = useState("todas");
-  const { registros, actualizaciones, cargando, error, recargar } = useProductividadCE(mes, activa);
+  const { registros, actualizaciones, citas, cargando, error, recargar } = useProductividadCE(mes, activa);
 
   const { filas, fuera, sinUsuario } = useMemo(() => {
-    const prod = productividadPorPersona(registros, actualizaciones);
+    const prod = productividadPorPersona(registros, actualizaciones, citas);
     const administrativos = new Set(personalAdministrativo.map(claveNombre));
     const filasCE = prod.filas.filter((f) => esPersonalEvaluable(f.nombre) && !administrativos.has(claveNombre(f.nombre)));
     const otras = prod.filas.filter((f) => !filasCE.includes(f));
     return {
       filas: filasCE,
-      fuera: { expedientes: otras.reduce((s, f) => s + f.expedientes, 0), actualizaciones: otras.reduce((s, f) => s + f.actualizaciones, 0) },
+      fuera: { expedientes: otras.reduce((s, f) => s + f.expedientes, 0), actualizaciones: otras.reduce((s, f) => s + f.actualizaciones, 0), citas: otras.reduce((s, f) => s + f.citas, 0) },
       sinUsuario: prod.sinUsuario,
     };
-  }, [registros, actualizaciones, personalAdministrativo]);
+  }, [registros, actualizaciones, citas, personalAdministrativo]);
 
   const claves = useMemo(() => new Set(filas.map((f) => f.clave)), [filas]);
   const elegidas = persona === "todas" ? claves : new Set([persona]);
   const fechasExpedientes = registros.filter((r) => r.creadoPorUid && elegidas.has(r.creadoPorUid)).map((r) => r.fechaCreacion);
   const fechasActualizaciones = actualizaciones.filter((a) => elegidas.has(a.hechoPor)).map((a) => a.fecha);
+  const fechasCitas = citas.filter((c) => citaCuenta(c) && elegidas.has(c.creadaPor)).map((c) => c.fecha);
   const aPuntos = (d: { dia: number; valor: number }[]): PuntoDato[] => d.map(({ dia, valor }) => ({ nombre: String(dia), valor }));
 
   const totales = filas.reduce(
-    (t, f) => ({ expedientes: t.expedientes + f.expedientes, nuevosPadron: t.nuevosPadron + f.nuevosPadron, actualizaciones: t.actualizaciones + f.actualizaciones, identificacion: t.identificacion + f.identificacion, responsable: t.responsable + f.responsable }),
-    { expedientes: 0, nuevosPadron: 0, actualizaciones: 0, identificacion: 0, responsable: 0 },
+    (t, f) => ({ expedientes: t.expedientes + f.expedientes, nuevosPadron: t.nuevosPadron + f.nuevosPadron, actualizaciones: t.actualizaciones + f.actualizaciones, identificacion: t.identificacion + f.identificacion, responsable: t.responsable + f.responsable, citas: t.citas + f.citas }),
+    { expedientes: 0, nuevosPadron: 0, actualizaciones: 0, identificacion: 0, responsable: 0, citas: 0 },
   );
 
   const exportar = async () => {
@@ -104,12 +107,13 @@ export function ProductividadConsultaExterna({ activa, personalAdministrativo }:
 
           {vista === "resumen" && (
             <>
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
                 <Tarjeta label="Expedientes creados" valor={totales.expedientes} barra="bg-blue-500" />
                 <Tarjeta label="Nuevos en el padrón" valor={totales.nuevosPadron} barra="bg-blue-300" />
                 <Tarjeta label="Actualizaciones" valor={totales.actualizaciones} barra="bg-cyan-500" />
                 <Tarjeta label="Con identificación" valor={totales.identificacion} barra="bg-cyan-400" />
                 <Tarjeta label="Con responsable" valor={totales.responsable} barra="bg-cyan-300" />
+                <Tarjeta label="Citas registradas" valor={totales.citas} barra="bg-blue-700" />
               </div>
               <TablaResumen filas={filas} />
             </>
@@ -119,8 +123,9 @@ export function ProductividadConsultaExterna({ activa, personalAdministrativo }:
             <div className="grid gap-4 xl:grid-cols-2">
               <GraficoPastel titulo="Expedientes creados por persona" datos={filas.map((f) => ({ nombre: f.nombre, valor: f.expedientes }))} />
               <GraficoBarras titulo="Actualizaciones por persona" datos={filas.map((f) => ({ nombre: f.nombre, valor: f.actualizaciones }))} color={COLOR_ACTUALIZACIONES} />
+              <GraficoBarras titulo="Citas registradas por persona" datos={filas.map((f) => ({ nombre: f.nombre, valor: f.citas }))} color={COLOR_CITAS} />
               <GraficoPastel titulo="Actualizaciones por tipo" datos={[{ nombre: "Identificación", valor: totales.identificacion }, { nombre: "Responsable", valor: totales.responsable }]} />
-              <GraficoBarras titulo="Total por persona (expedientes + actualizaciones)" datos={filas.map((f) => ({ nombre: f.nombre, valor: totalFilaCE(f) }))} color={COLOR_EXPEDIENTES} />
+              <GraficoBarras titulo="Total por persona (expedientes + actualizaciones + citas)" datos={filas.map((f) => ({ nombre: f.nombre, valor: totalFilaCE(f) }))} color={COLOR_EXPEDIENTES} />
             </div>
           )}
 
@@ -136,14 +141,15 @@ export function ProductividadConsultaExterna({ activa, personalAdministrativo }:
               <div className="grid gap-4 xl:grid-cols-2">
                 <GraficoBarrasHorizontalCorto titulo="Expedientes creados por día" datos={aPuntos(conteoPorDia(fechasExpedientes, mes))} color={COLOR_EXPEDIENTES} />
                 <GraficoBarrasHorizontalCorto titulo="Actualizaciones por día" datos={aPuntos(conteoPorDia(fechasActualizaciones, mes))} color={COLOR_ACTUALIZACIONES} />
+                <GraficoBarrasHorizontalCorto titulo="Citas registradas por día" datos={aPuntos(conteoPorDia(fechasCitas, mes))} color={COLOR_CITAS} />
               </div>
             </>
           )}
 
           <div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
-            <p>Una actualización cuenta una vez por paciente y día, aunque se hayan actualizado los dos tipos; las columnas por tipo dicen qué se actualizó. Expedientes por fecha de creación del SIS.</p>
-            {(fuera.expedientes > 0 || fuera.actualizaciones > 0) && (
-              <p>Aparte: {fuera.expedientes} expedientes y {fuera.actualizaciones} actualizaciones de administrativos y jefatura (los de administrativos salen en su pestaña).</p>
+            <p>Una actualización cuenta una vez por paciente y día, aunque se hayan actualizado los dos tipos; las columnas por tipo dicen qué se actualizó. Expedientes por fecha de creación del SIS; citas 2027 por el día en que se registraron, sin las anuladas ni las migradas desde Excel.</p>
+            {(fuera.expedientes > 0 || fuera.actualizaciones > 0 || fuera.citas > 0) && (
+              <p>Aparte: {fuera.expedientes} expedientes, {fuera.actualizaciones} actualizaciones y {fuera.citas} citas de administrativos y jefatura (los de administrativos salen en su pestaña).</p>
             )}
             {sinUsuario.length > 0 && (
               <p>Sin evaluar: {sinUsuario.map((s) => `${s.nombre} (${s.expedientes})`).join(", ")}, creadores del SIS sin usuario en services.</p>
@@ -171,7 +177,7 @@ function TablaResumen({ filas }: { filas: FilaProductividadCE[] }) {
       <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Resumen por persona</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Expedientes creados en Consulta Externa y actualizaciones de datos en el SIS.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Expedientes creados en Consulta Externa, actualizaciones de datos en el SIS y citas 2027 registradas.</p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
           <Users size={14} />{filas.length} personas
@@ -179,7 +185,7 @@ function TablaResumen({ filas }: { filas: FilaProductividadCE[] }) {
       </div>
       {filas.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No hay producción de Consulta Externa en este mes.</p> : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
+          <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800">
                 <th className="sticky left-0 z-10 bg-white px-4 py-3 text-left text-[11px] font-bold uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">Nombre</th>

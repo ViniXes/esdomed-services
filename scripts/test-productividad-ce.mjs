@@ -47,6 +47,24 @@ assert.equal(m.totalFilaCE(paola), 3);
 assert.deepEqual(p.filas.map((f) => f.clave), ["k", "p"]);
 assert.deepEqual(p.sinUsuario, [{ nombre: "SIS Referencia Retorno", expedientes: 2 }]);
 
+// Citas 2027: cuentan las registradas por una persona; no las anuladas ni las migradas.
+const cita = (uid, nombre, fecha, anulada = false) => ({ creadaPor: uid, creadaPorNombre: nombre, fecha, anulada });
+const conCitas = m.productividadPorPersona(
+  [exp("k", "Kathya Andrea de Orellana Martínez", "KATHYA ANDREA DE ORELLANA MARTINEZ", "2026-11-16")],
+  [],
+  [
+    cita("k", "Kathya Andrea de Orellana Martínez", "2026-11-18"),
+    cita("k", "Kathya Andrea de Orellana Martínez", "2026-11-18", true),
+    cita("p", "Paola Alejandra Coreas Flores", "2026-11-19"),
+    cita("p", "Paola Alejandra Coreas Flores", "2026-11-19"),
+    cita("migracion", "Migración", "2026-11-17"),
+  ],
+);
+assert.deepEqual(conCitas.filas.map((f) => [f.clave, f.citas, m.totalFilaCE(f)]), [["k", 1, 2], ["p", 2, 2]]);
+assert.equal(m.citaCuenta(cita("migracion", "", "2026-11-17")), false);
+assert.equal(m.citaCuenta(cita("p", "", "2026-11-17", true)), false);
+assert.equal(m.citaCuenta(cita("", "", "2026-11-17")), false);
+
 // Nombres: sin tildes, mayúsculas ni espacios de más.
 assert.equal(m.claveNombre("  Denys  Ricardo Álvarez Sorto "), "DENYS RICARDO ALVAREZ SORTO");
 

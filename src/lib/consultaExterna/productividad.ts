@@ -2,11 +2,14 @@
 // por la pestaña Consulta Externa, la pestaña Administrativos y la prueba
 // (node scripts/test-productividad-ce.mjs).
 //
-// Dos fuentes, ya guardadas por sus pantallas:
+// Tres fuentes, ya guardadas por sus pantallas:
 // - Expedientes creados (reporte del SIS): uno por expediente, acreditado a quien
 //   lo creó en el SIS. Se agrupa por su usuario de services (creadoPorUid).
 // - Actualizaciones de datos en el SIS: una por persona, paciente y día, aunque
 //   se hayan actualizado varios tipos (hechoPor).
+// - Citas 2027 registradas en services (creadaPor), por el día en que se
+//   registraron. No cuentan las anuladas (anular es deshacer, como en
+//   Actualizaciones) ni las migradas por script desde Excel (no son de nadie).
 //
 // Quién va en cada pestaña lo decide la página: los administrativos del plan
 // salen en Administrativos; en Consulta Externa, el resto del personal evaluable
@@ -31,6 +34,17 @@ export interface ActualizacionCE {
   tipos: string[];
 }
 
+export interface CitaRegistradaCE {
+  creadaPor: string;
+  creadaPorNombre: string;
+  /** YYYY-MM-DD (día en que se registró, hora de El Salvador). */
+  fecha: string;
+  anulada: boolean;
+}
+
+/** Las citas migradas por script llevan este creadaPor (ver CLAUDE.md, Citas 2027). */
+export const CREADA_POR_MIGRACION = "migracion";
+
 export interface FilaProductividadCE {
   /** uid de services. */
   clave: string;
@@ -40,6 +54,7 @@ export interface FilaProductividadCE {
   actualizaciones: number;
   identificacion: number;
   responsable: number;
+  citas: number;
 }
 
 export interface ProductividadCE {
@@ -48,17 +63,20 @@ export interface ProductividadCE {
   sinUsuario: { nombre: string; expedientes: number }[];
 }
 
-export const totalFilaCE = (f: Pick<FilaProductividadCE, "expedientes" | "actualizaciones">) => f.expedientes + f.actualizaciones;
+export const totalFilaCE = (f: Pick<FilaProductividadCE, "expedientes" | "actualizaciones" | "citas">) => f.expedientes + f.actualizaciones + f.citas;
+
+/** Cita que cuenta como productividad: registrada por una persona y no anulada. */
+export const citaCuenta = (c: CitaRegistradaCE) => Boolean(c.creadaPor) && c.creadaPor !== CREADA_POR_MIGRACION && !c.anulada;
 
 /** Mayúsculas, sin tildes y con un solo espacio: para comparar nombres. */
 export function claveNombre(nombre: string): string {
   return nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
 }
 
-export function productividadPorPersona(registros: RegistroExpedienteCE[], actualizaciones: ActualizacionCE[]): ProductividadCE {
+export function productividadPorPersona(registros: RegistroExpedienteCE[], actualizaciones: ActualizacionCE[], citas: CitaRegistradaCE[] = []): ProductividadCE {
   const filas = new Map<string, FilaProductividadCE>();
   const fila = (clave: string, nombre: string) => {
-    const f = filas.get(clave) ?? { clave, nombre, expedientes: 0, nuevosPadron: 0, actualizaciones: 0, identificacion: 0, responsable: 0 };
+    const f = filas.get(clave) ?? { clave, nombre, expedientes: 0, nuevosPadron: 0, actualizaciones: 0, identificacion: 0, responsable: 0, citas: 0 };
     if (!f.nombre && nombre) f.nombre = nombre;
     filas.set(clave, f);
     return f;
@@ -81,6 +99,10 @@ export function productividadPorPersona(registros: RegistroExpedienteCE[], actua
     f.actualizaciones++;
     if (a.tipos.includes("identificacion")) f.identificacion++;
     if (a.tipos.includes("responsable")) f.responsable++;
+  }
+  for (const c of citas) {
+    if (!citaCuenta(c)) continue;
+    fila(c.creadaPor, c.creadaPorNombre).citas++;
   }
 
   return {
