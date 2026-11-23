@@ -13,8 +13,8 @@ import type { UserProfile } from "@/types";
 //   dirán las pantallas (Mensajes a pantalla). Las reglas solo le dejan leer y
 //   escribir los llamados del día.
 // - Gestión (carga de citas del SIS, recepción de primera vez, pantallas):
-//   ESDOMED y admin. Mientras el módulo está en construcción solo lo ve el
-//   admin; para abrirlo a ESDOMED basta con poner EN_CONSTRUCCION = false.
+//   ESDOMED y admin. Mientras el módulo está en construcción solo lo ven el
+//   admin y el asistente administrativo (asistente_esdomed); para abrirlo a ESDOMED basta con poner EN_CONSTRUCCION = false.
 
 type Perfil = UserProfile | null | undefined;
 
@@ -32,8 +32,16 @@ export const esAgendaCE = (p: Perfil) => p?.role === "agenda_ce";
 const esEsdomed = (p: Perfil) => p?.role === "esdomed" || p?.role === "asistente_esdomed";
 const esAdmin = (p: Perfil) => p?.role === "admin";
 
+/**
+ * El asistente administrativo (asistente_esdomed: Denys Álvarez y la cuenta
+ * "admin" con su mismo rol, para ver el sistema como él) entra a la gestión
+ * aunque el módulo siga en construcción (pedido del usuario, 2026-11-23). Las
+ * reglas de Firestore ya dejan a asistente_esdomed en todo Consulta Externa.
+ */
+const esAsistenteEsdomed = (p: Perfil) => p?.role === "asistente_esdomed";
+
 /** Carga de citas, recepción de primera vez y configuración de pantallas. */
-export const gestionaConsultaExterna = (p: Perfil) => esAdmin(p) || (!EN_CONSTRUCCION && esEsdomed(p));
+export const gestionaConsultaExterna = (p: Perfil) => esAdmin(p) || esAsistenteEsdomed(p) || (!EN_CONSTRUCCION && esEsdomed(p));
 
 /** Registra citas 2027 (sin editar el catálogo de agendas, que es de gestión). */
 export const registraCitas2027 = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
