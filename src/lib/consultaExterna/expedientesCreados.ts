@@ -44,8 +44,15 @@ export const COLECCION_EXPEDIENTES_CE = "consulta_externa_expedientes_creados";
 export const MAX_FILAS_POR_CARGA = 5000;
 /** Quién sube el reporte: ESDOMED, admin y las digitadoras de Consulta Externa (agenda_ce). */
 export const ROLES_SUBEN_EXPEDIENTES_CE: readonly string[] = ["esdomed", "asistente_esdomed", "admin", "agenda_ce"];
-/** Quién ve la pestaña Consulta Externa de Productividad. Pendiente de diseñar con el usuario; por ahora, admin. */
+/** Quién ve la pestaña Consulta Externa de Productividad. Por ahora, admin. */
 export const ROLES_VEN_PRODUCTIVIDAD_CE: readonly string[] = ["admin"];
+/**
+ * Quién lee GET /api/productividad/expedientes-ce: los que ven la pestaña y el
+ * asistente administrativo, que la usa en la pestaña Administrativos (lo que los
+ * administrativos produjeron en Consulta Externa). Solo devuelve conteos por
+ * persona y fecha, sin datos de pacientes.
+ */
+export const ROLES_LEEN_PRODUCTIVIDAD_CE: readonly string[] = ["admin", "asistente_esdomed"];
 
 /** Mayúsculas, sin tildes y con un solo espacio: para comparar textos del SIS. */
 export function claveTexto(s: unknown): string {
