@@ -21,26 +21,12 @@ import { ProductividadConsultaExterna } from "../_components/ProductividadConsul
 import { ROLES_VEN_PRODUCTIVIDAD_CE } from "@/lib/consultaExterna/expedientesCreados";
 import { GraficoBarras, GraficoPastel, TarjetaMonitoreoHorario, type PuntoDato, type RegistroMonitoreo } from "../_components/GraficosProductividad";
 import { emparejarNombre } from "@/lib/productividad/coincidenciaNombres";
+import { esPersonalEvaluable } from "@/lib/productividad/personasNoEvaluables";
 import { configPersonalPlan } from "@/lib/esdomed/catalogo-plan";
 import type { NotificacionAltaVivo, NotificacionFallecido, SolicitudImpresion, SolicitudTraslado } from "@/types";
 
 const HOJAS_DRIVE = ["carpetas", "actualizaciones", "consentimientos", "emergenciasSimmow"] as const;
 type HojaDrive = (typeof HOJAS_DRIVE)[number];
-
-// Cuentas que pueden existir en ESDOMED, pero no forman parte de la evaluación de productividad.
-const PERSONAS_NO_EVALUABLES = [
-  ["admin"],
-  ["alfonso", "montes", "gutierrez"],
-  ["alfonso", "montes", "gutierres"],
-  ["heber", "benjamin", "cardoza"],
-  ["jose", "daniel", "hernandez"],
-  ["vinicio", "hernandez"],
-  ["vicinio", "hernandez"],
-  ["juan", "marroquin"],
-  ["denys", "ricardo", "alvarez"],
-  ["super", "su"],
-  ["supersu"],
-] as const;
 
 // Boris pertenece a la jornada operativa aunque tenga un código que antes fue
 // incluido de forma histórica en el catálogo administrativo.
@@ -149,18 +135,6 @@ function sumarMapas(...mapas: Map<string, number>[]): Map<string, number> {
 
 function contarFranjas(fechas: Date[]): number[] {
   return FRANJAS.map(({ desde, hasta }) => fechas.filter(f => f.getHours() >= desde && f.getHours() < hasta).length);
-}
-
-function esPersonalEvaluable(nombre: string): boolean {
-  const tokens = nombre
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es-SV")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .split(" ");
-
-  return !PERSONAS_NO_EVALUABLES.some(exclusion => exclusion.every(parte => tokens.includes(parte)));
 }
 
 function mapaAArray(mapa: Map<string, number>): PuntoDato[] {
@@ -477,7 +451,7 @@ export default function ProductividadEsdomedPage() {
 
       {ROLES_VEN_PRODUCTIVIDAD_CE.includes(profile.role) && (
         <div className={grupo === "consultaExterna" ? "" : "hidden"}>
-          <ProductividadConsultaExterna activa={grupo === "consultaExterna"} />
+          <ProductividadConsultaExterna activa={grupo === "consultaExterna"} personalAdministrativo={personalAdministrativo} />
         </div>
       )}
 

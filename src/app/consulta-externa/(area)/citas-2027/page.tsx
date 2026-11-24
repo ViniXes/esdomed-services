@@ -15,6 +15,7 @@ import {
   Search,
   Settings2,
   Trash2,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { gestionaConsultaExterna } from "@/lib/accesoConsultaExterna";
@@ -37,6 +38,8 @@ import {
   textoFranja,
   agruparPorEspecialidad,
   nombrePestana,
+  coincideBusqueda,
+  pareceExpediente,
   type EstadoCitaProgramada,
   type FranjaCatalogo,
   type TipoCitaProgramada,
@@ -48,6 +51,8 @@ import {
   catalogoSemilla,
   citasDeMedicoEnFecha,
   citasDelExpediente,
+  citasPorInicioDeExpediente,
+  todasLasCitasProgramadas,
   citasDelMes,
   ultimasCitasRegistradas,
   MAX_RECIENTES,
@@ -150,6 +155,12 @@ export default function Citas2027Page() {
   const [filtroEsp, setFiltroEsp] = useState("");
   const [filtroMedico, setFiltroMedico] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoCitaProgramada | "">("pendiente");
+  // Buscador de pacientes: filtra la lista a la vista y, si se pide (o es un
+  // expediente), busca en todas las citas 2027 sin importar mes, filtros ni estado.
+  const [busqueda, setBusqueda] = useState("");
+  const [enTodas, setEnTodas] = useState<{ texto: string; citas: CitaProgramadaConId[] } | null>(null);
+  const [buscandoTodas, setBuscandoTodas] = useState(false);
+  const [cacheTodas, setCacheTodas] = useState<CitaProgramadaConId[] | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [accionando, setAccionando] = useState(false);
   const [verPdf, setVerPdf] = useState(false);
@@ -230,6 +241,14 @@ export default function Citas2027Page() {
   const listo =
     !!usuario && !!medico && fechaValida && !!expNormal && buscado === expNormal && !!paciente.trim() && !!tipo;
 
+  const limpiarFormulario = () => {
+    setEspecialidad("");
+    setMedicoId("");
+    setFecha("");
+    setFranjaId("");
+    limpiarPaciente();
+  };
+
   const limpiarPaciente = () => {
     setExpediente("");
     setPaciente("");
@@ -261,7 +280,7 @@ export default function Citas2027Page() {
 
   const cancelarEdicion = () => {
     setEditando(null);
-    limpiarPaciente();
+    limpiarFormulario();
     setMensaje(null);
   };
 
@@ -303,7 +322,10 @@ export default function Citas2027Page() {
         await crearCitaProgramada(datos, origen, usuario);
       }
       setMensaje({ tono: "ok", texto: `${editando ? "Cita corregida" : "Cita registrada"}: ${expNormal}, ${fechaCorta(fecha)} ${franja ? textoFranja(franja.inicio, franja.fin) : "sin horario"} con ${medico.nombre}.` });
-      limpiarPaciente();
+      // Formulario en blanco para la siguiente cita (pedido del usuario, 2026-11-20).
+      limpiarFormulario();
+      setCacheTodas(null);
+      if (enTodas) setEnTodas(null);
       setVersionOcupacion((v) => v + 1);
       if (citas && (editando || mes === RECIENTES || fecha.slice(0, 7) === mes)) void cargarLista(mes);
     } catch (e) {
@@ -341,14 +363,52 @@ export default function Citas2027Page() {
 
   const visibles = useMemo(
     () =>
-      (citas ?? []).filter(
-        (c) =>
-          (!filtroEsp || c.especialidad === filtroEsp) &&
-          (!filtroMedico || c.medicoId === filtroMedico) &&
-          (!filtroEstado || c.estado === filtroEstado),
-      ),
-    [citas, filtroEsp, filtroMedico, filtroEstado],
+      enTodas
+        ? enTodas.citas.filter((c) => coincideBusqueda(c, busqueda))
+        : (citas ?? []).filter(
+            (c) =>
+              (!filtroEsp || c.especialidad === filtroEsp) &&
+              (!filtroMedico || c.medicoId === filtroMedico) &&
+              (!filtroEstado || c.estado === filtroEstado) &&
+              coincideBusqueda(c, busqueda),
+          ),
+    [citas, filtroEsp, filtroMedico, filtroEstado, busqueda, enTodas],
   );
+
+  const buscarEnTodas = async (texto = busqueda, forzar = false) => {
+    const t = texto.trim();
+    if (!t) return;
+    setBuscandoTodas(true);
+    try {
+      let lista: CitaProgramadaConId[];
+      if (pareceExpediente(t)) {
+        lista = await citasPorInicioDeExpediente(t);
+      } else {
+        const cache = forzar ? null : cacheTodas;
+        lista = cache ?? (await todasLasCitasProgramadas());
+        if (!cache) setCacheTodas(lista);
+      }
+      setEnTodas({ texto: t, citas: lista });
+      setSeleccion(new Set());
+    } catch (e) {
+      console.error("No se pudo buscar en todas las citas", e);
+      setMensaje({ tono: "error", texto: "No se pudo buscar en todas las citas 2027." });
+    } finally {
+      setBuscandoTodas(false);
+    }
+  };
+
+  // Tras anular, marcar o eliminar: se relee la vista y, si se buscaba en todas, la búsqueda.
+  const refrescar = async () => {
+    await cargarLista(mes);
+    if (enTodas) await buscarEnTodas(enTodas.texto, true);
+  };
+
+  const cambiarBusqueda = (v: string) => {
+    setBusqueda(v);
+    if (!v.trim()) setEnTodas(null);
+  };
+
   const medicosFiltro = useMemo(
     () => (catalogo && filtroEsp ? medicosDeEspecialidad(catalogo, filtroEsp, true) : []),
     [catalogo, filtroEsp],
@@ -374,7 +434,7 @@ export default function Citas2027Page() {
     setAccionando(true);
     try {
       await marcarRegistradasSis([...seleccion], usuario);
-      await cargarLista(mes);
+      await refrescar();
     } catch (e) {
       console.error("No se pudieron marcar las citas", e);
       window.alert("No se pudieron marcar las citas. Intente de nuevo.");
@@ -390,7 +450,7 @@ export default function Citas2027Page() {
     setAccionando(true);
     try {
       await anularCitaProgramada(c.id, motivo, usuario);
-      await cargarLista(mes);
+      await refrescar();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "No se pudo anular la cita.");
     } finally {
@@ -405,7 +465,7 @@ export default function Citas2027Page() {
     try {
       await eliminarCitasProgramadas(ids);
       setSeleccion(new Set());
-      await cargarLista(mes);
+      await refrescar();
     } catch (e) {
       console.error("No se pudieron eliminar las citas", e);
       window.alert("No se pudieron eliminar las citas. Intente de nuevo.");
@@ -420,7 +480,7 @@ export default function Citas2027Page() {
     setAccionando(true);
     try {
       await volverAPendiente(c.id, usuario);
-      await cargarLista(mes);
+      await refrescar();
     } finally {
       setAccionando(false);
     }
@@ -753,6 +813,53 @@ export default function Citas2027Page() {
       )}
 
       <section className={tarjeta}>
+        <form
+          className="mb-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void buscarEnTodas();
+          }}
+        >
+          <label className={etiqueta} htmlFor="buscar-paciente">Buscar paciente</label>
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[16rem] flex-1">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="buscar-paciente"
+                type="search"
+                autoComplete="off"
+                className={`${campo} pl-9 pr-9`}
+                placeholder="Expediente o nombre (p. ej. 15193 o pineda alejandro)"
+                value={busqueda}
+                onChange={(e) => cambiarBusqueda(e.target.value)}
+              />
+              {busqueda && (
+                <button
+                  type="button"
+                  aria-label="Borrar búsqueda"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600"
+                  onClick={() => cambiarBusqueda("")}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={!busqueda.trim() || buscandoTodas}
+              className={`${boton} border border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-200`}
+              title="Busca en todas las citas 2027, de cualquier mes, especialidad o estado"
+            >
+              {buscandoTodas ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Buscar en todas las citas 2027
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {enTodas
+              ? <>Resultados en <strong>todas</strong> las citas 2027 (cualquier mes, especialidad y estado). <button type="button" className="underline" onClick={() => cambiarBusqueda("")}>Volver a la lista</button></>
+              : "Al escribir se filtra la lista de abajo. Si no aparece, presione Enter o “Buscar en todas las citas 2027”."}
+          </p>
+        </form>
+
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className={etiqueta} htmlFor="mes">Ver</label>
@@ -835,7 +942,14 @@ export default function Citas2027Page() {
           {cargandoLista || citas === null ? (
             <div className="flex h-24 items-center justify-center"><Loader2 className="animate-spin text-blue-500" /></div>
           ) : !visibles.length ? (
-            <p className="py-6 text-center text-sm text-slate-500">No hay citas con estos filtros.</p>
+            <div className="py-6 text-center text-sm text-slate-500">
+              {busqueda.trim() ? `Ninguna cita coincide con “${busqueda.trim()}”${enTodas ? " en todas las citas 2027" : " en esta lista"}.` : "No hay citas con estos filtros."}
+              {busqueda.trim() && !enTodas && (
+                <button type="button" className="ml-1 font-medium text-blue-700 underline dark:text-blue-300" onClick={() => void buscarEnTodas()}>
+                  Buscar en todas las citas 2027
+                </button>
+              )}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="border-b border-slate-200 dark:border-slate-800">

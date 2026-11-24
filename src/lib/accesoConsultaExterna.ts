@@ -16,8 +16,9 @@ import type { UserProfile } from "@/types";
 //   gestiones y consulta la bitácora y la productividad. No ve nada más: ni lo
 //   de hospitalización (rol trabajo_social) ni el resto de este subsistema.
 // - Gestión (carga de citas del SIS, recepción de primera vez, pantallas):
-//   ESDOMED y admin. Mientras el módulo está en construcción solo lo ve el
-//   admin; para abrirlo a ESDOMED basta con poner EN_CONSTRUCCION = false.
+//   ESDOMED y admin. Mientras el módulo está en construcción solo lo ven el
+//   admin, el asistente administrativo (asistente_esdomed) y tres personas de
+//   ESDOMED (USUARIOS_ESDOMED_CE); para abrirlo a ESDOMED basta con poner EN_CONSTRUCCION = false.
 
 type Perfil = UserProfile | null | undefined;
 
@@ -38,8 +39,27 @@ export const esTrabajoSocialCE = (p: Perfil) => p?.role === "trabajo_social_ce";
 const esEsdomed = (p: Perfil) => p?.role === "esdomed" || p?.role === "asistente_esdomed";
 const esAdmin = (p: Perfil) => p?.role === "admin";
 
+/**
+ * El asistente administrativo (asistente_esdomed: Denys Álvarez y la cuenta
+ * "admin" con su mismo rol, para ver el sistema como él) entra a la gestión
+ * aunque el módulo siga en construcción (pedido del usuario, 2026-11-23). Las
+ * reglas de Firestore ya dejan a asistente_esdomed en todo Consulta Externa.
+ */
+const esAsistenteEsdomed = (p: Perfil) => p?.role === "asistente_esdomed";
+
+/**
+ * Personal ESDOMED que también entra mientras el módulo sigue en construcción
+ * (pedido del usuario, 2026-11-23): Diego Iván López, Luis Fernando Amaya Grande
+ * y Fernando Javier Gálvez Sampson. Va por usuario de inicio de sesión, que es
+ * único y no cambia si se corrige el nombre. El resto de ESDOMED sigue sin verlo.
+ */
+const USUARIOS_ESDOMED_CE = ["dlopez", "lamaya", "fgalvez"];
+const esEsdomedHabilitadoCE = (p: Perfil) =>
+  p?.role === "esdomed" && USUARIOS_ESDOMED_CE.includes((p.username ?? "").trim().toLowerCase());
+
 /** Carga de citas, recepción de primera vez y configuración de pantallas. */
-export const gestionaConsultaExterna = (p: Perfil) => esAdmin(p) || (!EN_CONSTRUCCION && esEsdomed(p));
+export const gestionaConsultaExterna = (p: Perfil) =>
+  esAdmin(p) || esAsistenteEsdomed(p) || esEsdomedHabilitadoCE(p) || (!EN_CONSTRUCCION && esEsdomed(p));
 
 /** Registra citas 2027 (sin editar el catálogo de agendas, que es de gestión). */
 export const registraCitas2027 = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
@@ -80,6 +100,12 @@ export const veLaPantallaCE = (p: Perfil) => gestionaConsultaExterna(p) || esCue
 
 /** Vaciar lo que muestran todas las pantallas (pedido del usuario: solo el admin). */
 export const limpiaPantallasCE = (p: Perfil) => esAdmin(p);
+
+/**
+ * Ve en Actualizaciones lo que registró cada persona, por día o rango (pedido
+ * del usuario, 2026-11-23: solo el admin). = ROLES_VEN_ACTUALIZACIONES_EQUIPO en la API.
+ */
+export const veActualizacionesEquipoCE = (p: Perfil) => esAdmin(p);
 
 /**
  * Escribe mensajes para las pantallas (/consulta-externa/mensajes). No espera

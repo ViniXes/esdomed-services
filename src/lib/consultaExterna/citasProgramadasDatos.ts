@@ -204,6 +204,22 @@ export async function citasDelExpediente(expediente: string): Promise<CitaProgra
     .sort(compararCitas);
 }
 
+/** Citas cuyo expediente empieza con lo escrito ("15193" → 15193-26), de todo 2027. */
+export async function citasPorInicioDeExpediente(prefijo: string, n = 50): Promise<CitaProgramadaConId[]> {
+  const p = normalizarExpediente(prefijo);
+  if (!p) return [];
+  const snap = await getDocs(
+    query(collection(db, COL_CITAS_PROGRAMADAS), where("expediente", ">=", p), where("expediente", "<", p + "\uf8ff"), limit(n)),
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as CitaProgramada) })).sort(compararCitas);
+}
+
+/** Todas las citas 2027 (para buscar un nombre fuera de la vista; se lee una vez y se reutiliza). */
+export async function todasLasCitasProgramadas(): Promise<CitaProgramadaConId[]> {
+  const snap = await getDocs(collection(db, COL_CITAS_PROGRAMADAS));
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as CitaProgramada) })).sort(compararCitas);
+}
+
 export async function crearCitaProgramada(
   datos: DatosCitaProgramada,
   origenNombre: "services" | "manual",

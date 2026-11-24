@@ -144,6 +144,21 @@ assert.equal(m.fechaEscritaAISO("18 de diciembre"), null);
 assert.equal(m.isoADdMmAaaa("2027-01-06"), "06/01/2027");
 console.log("OK: fecha en números");
 
+// ── Buscador de la lista ──
+{
+  const c = { expediente: "15193-26", paciente: "Pineda Hurtado, Alejandro José" };
+  assert.equal(m.coincideBusqueda(c, ""), true);
+  assert.equal(m.coincideBusqueda(c, "15193"), true);
+  assert.equal(m.coincideBusqueda(c, " 15193 - 26 "), true);
+  assert.equal(m.coincideBusqueda(c, "1520"), false);
+  assert.equal(m.coincideBusqueda(c, "alejandro pineda"), true);
+  assert.equal(m.coincideBusqueda(c, "JOSE hurtado"), true);
+  assert.equal(m.coincideBusqueda(c, "pineda lopez"), false);
+  assert.equal(m.pareceExpediente("15193-2"), true);
+  assert.equal(m.pareceExpediente("pineda"), false);
+}
+console.log("buscador: ok");
+
 // ── Nombres escritos a mano (nombres.ts) ──
 {
   const fuenteN = readFileSync(new URL("../src/lib/consultaExterna/nombres.ts", import.meta.url), "utf8");
