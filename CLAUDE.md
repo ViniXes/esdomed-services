@@ -219,6 +219,22 @@ Reglas:
 - **Se llena al cargar la agenda.** Después de `guardarAgendaCE()`, la pantalla de carga llama `actualizarCatalogoTarjetas()` con **todas** las citas del reporte, también las ya cargadas. Es idempotente (`fusionarTarjeta()`: manda el nombre y el DUI de la cita más reciente) y va en su propia transacción. Si falla, las citas ya quedaron y se avisa: volver a subir el mismo archivo completa el catálogo. Regla para código nuevo: toda forma nueva de crear citas en `consulta_externa_citas` debe pasar también por `actualizarCatalogoTarjetas()`.
 - **Reconstruir.** `node scripts/reconstruir-catalogo-tarjetas.mjs [--dry-run]` lo rehace desde todas las citas (llenado inicial y reparación).
 
+### Consulta Externa — pacientes sin DUI y fecha genérica (PROVISIONAL)
+
+`/consulta-externa/fecha-generica` (menú "Fecha genérica"; la ven y marcan las digitadoras `agenda_ce` y la gestión: `veFechaGenericaCE()`, pedido del usuario 2026-11-24). Es como el Catálogo de tarjetas, pero para los pacientes que en las agendas del SIS vienen **sin DUI**. La mayoría se crearon con la fecha de nacimiento genérica **10/10/2000**, porque el reporte que se recibió en su momento solo traía nombres, así que su edad en el SIS es falsa. La pantalla muestra arriba los que tienen **cita hoy**: que tengan datos faltantes no quiere decir que no vengan. El objetivo es que nadie les cree otro expediente ni los atrase. Al corregirlos en el SIS se marcan "Datos corregidos" o "Unificado con X". Marcar **no** cuenta como actualización para la productividad (decisión del usuario).
+
+- **De dónde sale la lista** (`armarListaFG()` en `src/lib/consultaExterna/fechaGenerica.ts`, lógica pura):
+  - Los expedientes con citas cargadas sin DUI (`consulta_externa_citas` con `dui == ""`).
+  - Los del reporte del SIS de fecha genérica, si se cargó. El reporte solo marca quién tiene la 10/10/2000, con sus citas y si ya estaba corregido o unificado. No se guardan teléfonos, madre ni responsable (pedido del usuario: no hacen falta).
+- **Estado**, en este orden de prioridad:
+  - Lo marcado en services.
+  - "Ya tiene DUI": cuando el paciente aparece en el Catálogo de tarjetas, porque una agenda nueva lo trae con DUI. Sale solo de los pendientes.
+  - Lo que diga el reporte del SIS.
+- **Datos**: un documento, `consulta_externa_fecha_generica/lista`, con `reporte` (por expediente) y `marcas` (por expediente). Todo pasa por `GET`/`POST /api/consulta-externa/fecha-generica` con Admin SDK, sin reglas. El `POST` escribe solo la marca de ese expediente.
+- **Cargar el reporte**: `node scripts/cargar-fecha-generica.mjs "<reporte.xlsx>" [--dry-run]`, que usa las hojas "Sin unificar" y "Unificados o ya actualizados". Solo toca `reporte` y conserva las marcas.
+- **Prueba**: `node scripts/test-fecha-generica.mjs`.
+- **Quitarlo** cuando ya no queden pendientes: borrar la entrada del menú en `navConsultaExterna.ts`, `veFechaGenericaCE`, la página, `FechaGenerica.tsx`, la API, `fechaGenerica.ts` y los dos scripts. La colección se puede dejar o borrar.
+
 ### Consulta Externa — programación de citas 2027
 
 `/consulta-externa/citas-2027` es donde ESDOMED registra las citas de 2027 mientras el SIS no abre las agendas; cuando se abran, se pasan al SIS desde esa lista. La lista abre en "Últimas registradas" (orden de registro en services, la más nueva arriba, como la cola de ingresos; `ultimasCitasRegistradas()`, 300) y por mes de la cita se ordena para pasarlas al SIS (fecha, especialidad, médico, horario); ambas con filtros de especialidad, médico y estado. Descargas de lo filtrado: Excel con una pestaña por especialidad y PDF (`CitasProgramadasPdf`, carta horizontal, una hoja por especialidad, `window.print()`), las dos en el orden de la lista y con las especialidades en `ORDEN_ESPECIALIDADES` y se marcan "Registrada en SIS" en lote. Objetivo del usuario: datos ordenados para que la migración al SIS no cueste, así que **todo lo que irá al SIS sale de listas cerradas** (especialidad, médico, franja y consultorio). Solo se escriben el expediente y, si services no lo conoce, el nombre.

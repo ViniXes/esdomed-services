@@ -73,6 +73,13 @@ export const subeExpedientesCreadosCE = (p: Perfil) => registraCitas2027(p) || e
  */
 export const veCatalogoTarjetas = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
 
+/**
+ * PROVISIONAL. Pacientes con fecha de nacimiento genérica (10/10/2000): los ven
+ * y los marcan las digitadoras (agenda_ce) y la gestión (pedido del usuario,
+ * 2026-11-24). La API usa este mismo predicado.
+ */
+export const veFechaGenericaCE = (p: Perfil) => gestionaConsultaExterna(p) || esAgendaCE(p);
+
 /** Llamados: estación de especialidad y pantallas. */
 export const veLlamadosCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p);
 
