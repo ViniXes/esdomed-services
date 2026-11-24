@@ -38,6 +38,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         profile.role === "isbm_jefe" ||
         profile.role === "consulta_externa" ||
         profile.role === "agenda_ce" ||
+        profile.role === "trabajo_social_ce" ||
         profile.role === "pantalla_ce" ||
         profile.role === "mensajes_ce")
     ) {

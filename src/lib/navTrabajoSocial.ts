@@ -1,12 +1,14 @@
 import {
   BarChart3, CheckCheck, ClipboardCheck, Clock, Contact, DoorOpen, FileClock, FileStack, HandHeart, HeartCrack,
-  HeartPulse, Inbox, LayoutDashboard, ListChecks, LogIn, NotebookPen, Radar, UserCheck, UserSearch, UsersRound,
+  HeartPulse, Inbox, LayoutDashboard, ListChecks, LogIn, NotebookPen, Radar, Stethoscope, UserCheck,
+  UserSearch, UsersRound,
 } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
 import type { UserProfile } from "@/types";
 import { construirMenu, type SeccionNav } from "@/lib/navRegistro";
 import { SECCION_LESIONES } from "@/lib/navComiteLesiones";
+import { supervisaTSCE } from "@/lib/accesoConsultaExterna";
 
 // Menú de Trabajo Social por tarea, en acordeón como el portal médico. Las
 // gestiones del día van primero; las altas juntan la prealta y confirmación
@@ -56,6 +58,17 @@ const MENU_TRABAJO_SOCIAL: SeccionNav[] = [
       { href: "/dashboard/cola-expedientes", label: "Cola de expedientes", icon: FileStack },
       { href: "/dashboard/gestiones/bitacora", label: "Bitácora del paciente", icon: FileClock },
       { href: "/dashboard/visitas", label: "Visitas", icon: UsersRound },
+    ],
+  },
+  {
+    // Solo la jefatura (marca por persona): consulta lo que registran las
+    // trabajadoras sociales de Consulta Externa, sin escribir.
+    titulo: "Consulta Externa",
+    icon: Stethoscope,
+    visibleSi: supervisaTSCE,
+    entradas: [
+      { href: "/dashboard/ts-consulta-externa", label: "Productividad CE", icon: BarChart3 },
+      { href: "/dashboard/ts-consulta-externa/bitacora", label: "Bitácora CE", icon: FileClock },
     ],
   },
   // Avisos, ingresos por lesión y solicitudes a médicos (el resto lo filtra la

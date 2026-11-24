@@ -59,6 +59,7 @@ export default function LoginPage() {
     else if (profile.role === "isbm_tecnico" || profile.role === "isbm_supervisor" || profile.role === "isbm_jefe") router.replace("/isbm");
     else if (profile.role === "consulta_externa") router.replace("/consulta-externa");
     else if (profile.role === "agenda_ce") router.replace("/consulta-externa/citas-2027");
+    else if (profile.role === "trabajo_social_ce") router.replace("/consulta-externa/trabajo-social");
     else if (profile.role === "pantalla_ce") router.replace("/consulta-externa/pantalla");
     else if (profile.role === "mensajes_ce") router.replace("/consulta-externa/mensajes");
     else router.replace("/dashboard");

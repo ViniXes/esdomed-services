@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { normalizarUsername, usernameValido } from "@/lib/username";
 import { esEstacionCE } from "@/lib/consultaExterna/especialidades";
+import { esAreaDeCuenta } from "@/lib/consultaExterna/trabajoSocial";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const VALID_ROLES = new Set<UserRole>([
@@ -26,6 +27,7 @@ const VALID_ROLES = new Set<UserRole>([
   "agenda_ce",
   "pantalla_ce",
   "mensajes_ce",
+  "trabajo_social_ce",
 ]);
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
@@ -46,7 +48,7 @@ function puedeTenerCodigoPlan(role: UserRole) {
 // Roles colegiados que llevan número de junta (JVPM): médicos, psicología y
 // trabajo social (también están colegiados y firman/sellan documentos).
 function puedeTenerJvpm(role: UserRole) {
-  return role === "medico" || role === "psicologia" || role === "trabajo_social";
+  return role === "medico" || role === "psicologia" || role === "trabajo_social" || role === "trabajo_social_ce";
 }
 
 async function getCallerRole(req: NextRequest): Promise<string | null> {
@@ -94,7 +96,7 @@ export async function POST(req: NextRequest) {
   const role = await getCallerRole(req);
   if (!isSuperAdmin(role)) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, apoyaComiteLesiones, codigoMarcacion, puesto, estacionCE, username: usernameRaw } = await req.json();
+  const { nombre, email, password, userRole, servicios, jvpm, tipoMedico, apoyaComiteLesiones, codigoMarcacion, puesto, estacionCE, areaTSCE, supervisaTSCE, username: usernameRaw } = await req.json();
 
   if (!nombre || !email || !password || !userRole) {
     return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 });
@@ -105,6 +107,9 @@ export async function POST(req: NextRequest) {
   // La cuenta de estación de Consulta Externa no sirve sin su estación.
   if (userRole === "consulta_externa" && !esEstacionCE(estacionCE)) {
     return NextResponse.json({ error: "Elija la estación de Consulta Externa" }, { status: 400 });
+  }
+  if (userRole === "trabajo_social_ce" && !esAreaDeCuenta(areaTSCE)) {
+    return NextResponse.json({ error: "Elija el área de la trabajadora social" }, { status: 400 });
   }
 
   // Username opcional (alias de login). Si viene, se valida formato y unicidad.
@@ -166,6 +171,9 @@ export async function POST(req: NextRequest) {
     ...(conCodigoPlan && puesto ? { puesto: String(puesto).trim() } : {}),
     // Cuenta compartida por las enfermeras de la estación.
     ...(userRole === "consulta_externa" ? { estacionCE, generico: true } : {}),
+    // Trabajo Social de Consulta Externa, y la jefatura que lo consulta.
+    ...(userRole === "trabajo_social_ce" ? { areaTSCE } : {}),
+    ...(userRole === "trabajo_social" && supervisaTSCE === true ? { supervisaTSCE: true } : {}),
     createdAt: FieldValue.serverTimestamp(),
   });
 

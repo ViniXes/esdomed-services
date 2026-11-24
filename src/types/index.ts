@@ -1,4 +1,4 @@
-export type UserRole = "medico" | "medico_licenciado_dimes" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe" | "consulta_externa" | "agenda_ce" | "pantalla_ce" | "mensajes_ce";
+export type UserRole = "medico" | "medico_licenciado_dimes" | "esdomed" | "asistente_esdomed" | "trabajo_social" | "psicologia" | "comite_lesiones" | "admin" | "enfermeria" | "rrhh" | "transporte" | "motorista" | "isbm_tecnico" | "isbm_supervisor" | "isbm_jefe" | "consulta_externa" | "agenda_ce" | "pantalla_ce" | "mensajes_ce" | "trabajo_social_ce";
 
 // Roles del módulo Convenio ISBM (los datos del módulo viven en Supabase;
 // ver src/lib/isbm/). El jefe tiene todos los permisos del módulo.
@@ -31,6 +31,12 @@ export interface UserProfile {
   // Solo rol consulta_externa: estación de enfermería que atiende la cuenta
   // ("hematologia" | "oncologia" | "cardiologia" | "infectologia"; ver lib/consultaExterna/especialidades).
   estacionCE?: "hematologia" | "oncologia" | "cardiologia" | "infectologia";
+  // Solo rol trabajo_social_ce: área de la trabajadora social de Consulta Externa.
+  // Decide qué gestiones se le ofrecen primero; no bloquea las demás (se cubren entre sí).
+  areaTSCE?: "cardiologia" | "hemato_onco";
+  // Solo rol trabajo_social: consulta (sin registrar) lo de Trabajo Social de
+  // Consulta Externa. Se marca POR PERSONA desde /dashboard/usuarios (lo escribe la API).
+  supervisaTSCE?: boolean;
   // Aceptación de los términos y condiciones de uso. Si la versión no coincide con
   // la vigente (TERMINOS_VERSION), se vuelve a pedir la aceptación al ingresar.
   terminosAceptados?: { version: string; fecha: Date };

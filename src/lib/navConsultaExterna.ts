@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileUp, IdCard, LayoutDashboard, ListOrdered, Megaphone, UserPen, MessageSquareText, Tv, UserPlus } from "lucide-react";
+import { BarChart3, CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileClock, FileUp, HandHeart, IdCard, LayoutDashboard, ListOrdered, Megaphone, UserPen, MessageSquareText, NotebookPen, Tv, UserPlus } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -6,8 +6,10 @@ import { construirMenu, type EntradaNav, type SeccionNav } from "@/lib/navRegist
 import {
   esAgendaCE,
   esCuentaEstacion,
+  esTrabajoSocialCE,
   gestionaConsultaExterna,
   registraCitas2027,
+  registraGestionesTSCE,
   subeExpedientesCreadosCE,
   veCatalogoTarjetas,
   veLlamadosCE,
@@ -26,8 +28,8 @@ type Perfil = UserProfile | null | undefined;
 
 export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
   {
-    // agenda_ce solo ve la pestaña de citas 2027.
-    entradas: [{ href: "/consulta-externa", label: "Inicio", icon: LayoutDashboard, exact: true, visibleSi: (p) => !esAgendaCE(p) }],
+    // agenda_ce solo ve la pestaña de citas 2027; Trabajo Social, solo lo suyo.
+    entradas: [{ href: "/consulta-externa", label: "Inicio", icon: LayoutDashboard, exact: true, visibleSi: (p) => !esAgendaCE(p) && !esTrabajoSocialCE(p) }],
   },
   {
     titulo: "Agenda del día",
@@ -51,6 +53,18 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
       { href: "/consulta-externa/tarjetas", label: "Catálogo de tarjetas", icon: IdCard, visibleSi: veCatalogoTarjetas },
       // agenda_ce consulta su horario en el plan de trabajo ESDOMED (solo lectura).
       { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, visibleSi: esAgendaCE },
+    ],
+  },
+  {
+    // Trabajo Social de Consulta Externa. La jefatura lo consulta desde su propio
+    // menú (navTrabajoSocial), no desde aquí.
+    titulo: "Trabajo Social",
+    icon: HandHeart,
+    visibleSi: registraGestionesTSCE,
+    entradas: [
+      { href: "/consulta-externa/trabajo-social", label: "Registro de gestiones", icon: NotebookPen },
+      { href: "/consulta-externa/trabajo-social/bitacora", label: "Bitácora del paciente", icon: FileClock },
+      { href: "/consulta-externa/trabajo-social/productividad", label: "Productividad", icon: BarChart3 },
     ],
   },
   {
@@ -78,6 +92,6 @@ export function navItemsConsultaExterna(profile: Perfil): NavItem[] {
 
 /** Salida al panel principal; la cuenta de estación no tiene otro panel. */
 export function regresoConsultaExterna(profile: Perfil): { href: string; label: string } | undefined {
-  if (!profile || esCuentaEstacion(profile) || esAgendaCE(profile)) return undefined;
+  if (!profile || esCuentaEstacion(profile) || esAgendaCE(profile) || esTrabajoSocialCE(profile)) return undefined;
   return { href: "/dashboard", label: "Volver al panel" };
 }

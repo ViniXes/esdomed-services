@@ -10,8 +10,10 @@ import {
   esAgendaCE,
   esCuentaMensajes,
   esCuentaPantalla,
+  esTrabajoSocialCE,
   RUTA_MENSAJES_CE,
   RUTA_PANTALLA_CE,
+  RUTA_TRABAJO_SOCIAL_CE,
 } from "@/lib/accesoConsultaExterna";
 import {
   ENTRADAS_CONSULTA_EXTERNA,
@@ -35,15 +37,21 @@ export default function ConsultaExternaLayout({ children }: { children: React.Re
     if (esCuentaPantalla(profile)) router.replace(RUTA_PANTALLA_CE);
     else if (esCuentaMensajes(profile)) router.replace(RUTA_MENSAJES_CE);
     else if (!permitido) router.replace("/login");
-    // agenda_ce no tiene Inicio: su página es la de citas 2027.
-    else if (vetada) router.replace(esAgendaCE(profile) ? "/consulta-externa/citas-2027" : "/consulta-externa");
+    // agenda_ce y Trabajo Social no tienen Inicio: van a su página.
+    else if (vetada) {
+      router.replace(
+        esAgendaCE(profile) ? "/consulta-externa/citas-2027"
+          : esTrabajoSocialCE(profile) ? RUTA_TRABAJO_SOCIAL_CE
+            : "/consulta-externa",
+      );
+    }
   }, [loading, permitido, vetada, router, profile]);
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
       <Sidebar
         navItems={navItemsConsultaExterna(profile)}
-        roleLabel="Consulta Externa"
+        roleLabel={esTrabajoSocialCE(profile) ? "Trabajo Social" : "Consulta Externa"}
         variant="portal"
         regreso={regresoConsultaExterna(profile)}
       />

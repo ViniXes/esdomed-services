@@ -5,6 +5,7 @@ import { serviciosPorTipoMedico } from "@/lib/cuidadosCriticos";
 import { normalizarUsername, usernameValido } from "@/lib/username";
 import { esTipoBaja } from "@/lib/bajaUsuarios";
 import { esEstacionCE } from "@/lib/consultaExterna/especialidades";
+import { esAreaDeCuenta } from "@/lib/consultaExterna/trabajoSocial";
 import type { TipoMedicoCuidadosCriticos, UserRole } from "@/types";
 
 const DEFAULT_TEST_PASSWORD = "123456";
@@ -28,6 +29,7 @@ const VALID_ROLES = new Set<UserRole>([
   "agenda_ce",
   "pantalla_ce",
   "mensajes_ce",
+  "trabajo_social_ce",
 ]);
 
 function esPersonalEsdomed(role: string | undefined) {
@@ -42,7 +44,7 @@ function puedeTenerCodigoPlan(role: string | undefined) {
 
 // Roles colegiados con número de junta (JVPM): médicos, psicología y trabajo social.
 function puedeTenerJvpm(role: string | undefined) {
-  return role === "medico" || role === "psicologia" || role === "trabajo_social";
+  return role === "medico" || role === "psicologia" || role === "trabajo_social" || role === "trabajo_social_ce";
 }
 
 function esTipoMedicoValido(value: unknown): value is TipoMedicoCuidadosCriticos {
@@ -227,6 +229,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ui
     } else if (targetData?.estacionCE) {
       update.estacionCE = FieldValue.delete();
     }
+  }
+
+  // Área de la trabajadora social de Consulta Externa: obligatoria para ese rol.
+  if ("areaTSCE" in body || nextRole) {
+    if (targetRole === "trabajo_social_ce") {
+      const area = "areaTSCE" in body ? body.areaTSCE : targetData?.areaTSCE;
+      if (!esAreaDeCuenta(area)) {
+        return NextResponse.json({ error: "Elija el área de la trabajadora social" }, { status: 400 });
+      }
+      update.areaTSCE = area;
+    } else if (targetData?.areaTSCE) {
+      update.areaTSCE = FieldValue.delete();
+    }
+  }
+
+  // Consulta de Trabajo Social de Consulta Externa: marca por persona, solo para
+  // trabajo_social. Si deja de serlo, se borra aunque no venga en el cuerpo.
+  if ("supervisaTSCE" in body || (nextRole && nextRole !== "trabajo_social")) {
+    update.supervisaTSCE = targetRole === "trabajo_social" && body.supervisaTSCE === true
+      ? true
+      : FieldValue.delete();
   }
 
   if (Object.keys(update).length === 0) {

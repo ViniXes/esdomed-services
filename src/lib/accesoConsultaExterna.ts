@@ -12,6 +12,9 @@ import type { UserProfile } from "@/types";
 // - Cuenta de mensajes (`mensajes_ce`): cuenta general que solo escribe lo que
 //   dirán las pantallas (Mensajes a pantalla). Las reglas solo le dejan leer y
 //   escribir los llamados del día.
+// - Trabajo Social de Consulta Externa (`trabajo_social_ce`): registra sus
+//   gestiones y consulta la bitácora y la productividad. No ve nada más: ni lo
+//   de hospitalización (rol trabajo_social) ni el resto de este subsistema.
 // - Gestión (carga de citas del SIS, recepción de primera vez, pantallas):
 //   ESDOMED y admin. Mientras el módulo está en construcción solo lo ve el
 //   admin; para abrirlo a ESDOMED basta con poner EN_CONSTRUCCION = false.
@@ -28,6 +31,9 @@ export const esCuentaMensajes = (p: Perfil) => p?.role === "mensajes_ce";
 
 /** Personal que por ahora solo registra las citas 2027 (rol agenda_ce). Su único portal es este. */
 export const esAgendaCE = (p: Perfil) => p?.role === "agenda_ce";
+
+/** Trabajadora social de Consulta Externa. Su único portal es este. */
+export const esTrabajoSocialCE = (p: Perfil) => p?.role === "trabajo_social_ce";
 
 const esEsdomed = (p: Perfil) => p?.role === "esdomed" || p?.role === "asistente_esdomed";
 const esAdmin = (p: Perfil) => p?.role === "admin";
@@ -51,7 +57,20 @@ export const veCatalogoTarjetas = (p: Perfil) => gestionaConsultaExterna(p) || e
 export const veLlamadosCE = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p);
 
 /** Puede entrar al subsistema (también decide si ve la entrada en el panel de ESDOMED). */
-export const entraConsultaExterna = (p: Perfil) => gestionaConsultaExterna(p) || esCuentaEstacion(p) || esAgendaCE(p);
+export const entraConsultaExterna = (p: Perfil) =>
+  gestionaConsultaExterna(p) || esCuentaEstacion(p) || esAgendaCE(p) || esTrabajoSocialCE(p);
+
+/** Registra gestiones de Trabajo Social de Consulta Externa. */
+export const registraGestionesTSCE = (p: Perfil) => esTrabajoSocialCE(p) || esAdmin(p);
+
+/**
+ * Supervisa Trabajo Social de Consulta Externa: una trabajadora social del
+ * hospital marcada por persona (la jefatura). Solo consulta, desde su menú.
+ */
+export const supervisaTSCE = (p: Perfil) => p?.role === "trabajo_social" && p.supervisaTSCE === true;
+
+/** Consulta la bitácora y la productividad. */
+export const consultaGestionesTSCE = (p: Perfil) => registraGestionesTSCE(p) || supervisaTSCE(p);
 
 /**
  * Puede abrir la pantalla de llamados (/consulta-externa/pantalla). Sin
@@ -70,6 +89,9 @@ export const enviaMensajesCE = (p: Perfil) => gestionaConsultaExterna(p) || esCu
 
 /** Adónde va la cuenta de pantalla al entrar al sistema. */
 export const RUTA_PANTALLA_CE = "/consulta-externa/pantalla";
+
+/** Adónde va Trabajo Social de Consulta Externa al entrar al sistema. */
+export const RUTA_TRABAJO_SOCIAL_CE = "/consulta-externa/trabajo-social";
 
 /** Adónde va la cuenta de mensajes al entrar al sistema: es su única página. */
 export const RUTA_MENSAJES_CE = "/consulta-externa/mensajes";

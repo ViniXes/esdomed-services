@@ -15,6 +15,7 @@ import {
 import { DateField } from "@/components/ui/DateField";
 import { TIPOS_BAJA, TIPO_BAJA_LABEL } from "@/lib/bajaUsuarios";
 import { ESTACIONES_CE, especialidadesDeEstacion, type EstacionCEId } from "@/lib/consultaExterna/especialidades";
+import { AREAS_DE_CUENTA, nombreArea } from "@/lib/consultaExterna/trabajoSocial";
 
 // Selector de estación para las cuentas de Consulta Externa (crear y editar).
 function CampoEstacionCE({ value, onChange }: { value: EstacionCEId | ""; onChange: (v: EstacionCEId | "") => void }) {
@@ -36,6 +37,34 @@ function CampoEstacionCE({ value, onChange }: { value: EstacionCEId | ""; onChan
       </select>
       <p className="mt-1 text-[11px] text-slate-400">Cuenta compartida: al entrar se pide el nombre de quien atiende.</p>
     </div>
+  );
+}
+
+function CampoAreaTSCE({ value, onChange }: { value: NuevoUsuario["areaTSCE"]; onChange: (v: NuevoUsuario["areaTSCE"]) => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1.5">Área</label>
+      <select value={value} onChange={e => onChange(e.target.value as NuevoUsuario["areaTSCE"])} required className={inputCls}>
+        <option value="">Elija el área…</option>
+        {AREAS_DE_CUENTA.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+      </select>
+      <p className="mt-1 text-[11px] text-slate-400">
+        Decide qué gestiones se le ofrecen primero. Puede registrar las de la otra área y buscar a cualquier paciente citado.
+      </p>
+    </div>
+  );
+}
+
+function CampoSupervisaTSCE({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="sm:col-span-2 flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 cursor-pointer hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/50">
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 accent-blue-600" />
+      <span>
+        Consulta Trabajo Social de Consulta Externa
+        <span className="block text-xs text-slate-500">Jefatura: ve la productividad y la bitácora de Consulta Externa en su menú, sin registrar.</span>
+      </span>
+    </label>
   );
 }
 
@@ -83,6 +112,10 @@ interface NuevoUsuario {
   puesto: string;
   // Solo cuentas de estación de Consulta Externa: qué estación atiende.
   estacionCE: EstacionCEId | "";
+  // Solo Trabajo Social de Consulta Externa: su área.
+  areaTSCE: "cardiologia" | "hemato_onco" | "";
+  // Solo Trabajo Social: además consulta lo de Consulta Externa (jefatura).
+  supervisaTSCE: boolean;
 }
 
 type EditableUsuario = Omit<NuevoUsuario, "password">;
@@ -115,6 +148,8 @@ const EMPTY_FORM: NuevoUsuario = {
   codigoMarcacion: "",
   puesto: "",
   estacionCE: "",
+  areaTSCE: "",
+  supervisaTSCE: false,
 };
 
 const inputCls = "w-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -139,6 +174,7 @@ const roleColors: Record<UserRole, string> = {
   agenda_ce: "bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-900",
   pantalla_ce: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   mensajes_ce: "bg-cyan-50 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900",
+  trabajo_social_ce: "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900",
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -161,6 +197,7 @@ const roleLabels: Record<UserRole, string> = {
   agenda_ce: "Agenda de citas Consulta Externa",
   pantalla_ce: "Pantalla de llamados (TV)",
   mensajes_ce: "Speaker (mensajes a pantalla)",
+  trabajo_social_ce: "Trabajo Social Consulta Externa",
 };
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -169,6 +206,8 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: "esdomed", label: "Personal ESDOMED" },
   { value: "asistente_esdomed", label: "Asistente Administrativo ESDOMED" },
   { value: "trabajo_social", label: "Trabajo Social" },
+  // Solo sus gestiones de Consulta Externa; nada de hospitalización.
+  { value: "trabajo_social_ce", label: "Trabajo Social Consulta Externa" },
   { value: "psicologia", label: "Psicologia" },
   { value: "comite_lesiones", label: "Lesiones intencionales/Adolescentes" },
   { value: "enfermeria", label: "Enfermeria" },
@@ -478,6 +517,8 @@ export default function DashboardUsuariosPage() {
       codigoMarcacion: u.codigoMarcacion ?? "",
       puesto: u.puesto ?? "",
       estacionCE: u.estacionCE ?? "",
+      areaTSCE: u.areaTSCE ?? "",
+      supervisaTSCE: u.supervisaTSCE === true,
     });
     setEditServiciosOpen(false);
     setError("");
@@ -521,6 +562,8 @@ export default function DashboardUsuariosPage() {
       const est = ESTACIONES_CE.find(e => e.id === u.estacionCE);
       return est ? `${base} · ${est.nombre}` : `${base} · sin estación`;
     }
+    if (u.role === "trabajo_social_ce") return `${base} · ${u.areaTSCE ? nombreArea(u.areaTSCE) : "sin área"}`;
+    if (u.role === "trabajo_social" && u.supervisaTSCE) return `${base} · Consulta CE`;
     return u.role === "medico" && u.apoyaComiteLesiones ? `${base} · Comité de Lesiones` : base;
   };
 
@@ -693,6 +736,9 @@ export default function DashboardUsuariosPage() {
             {form.userRole === "consulta_externa" && (
               <CampoEstacionCE value={form.estacionCE} onChange={v => setForm(prev => ({ ...prev, estacionCE: v }))} />
             )}
+            {form.userRole === "trabajo_social_ce" && (
+              <CampoAreaTSCE value={form.areaTSCE} onChange={v => setForm(prev => ({ ...prev, areaTSCE: v }))} />
+            )}
             {form.userRole === "pantalla_ce" && <AyudaPantallaCE />}
             {form.userRole === "mensajes_ce" && <AyudaMensajesCE />}
 
@@ -756,7 +802,10 @@ export default function DashboardUsuariosPage() {
               </>
             )}
 
-            {(form.userRole === "psicologia" || form.userRole === "trabajo_social") && (
+            {form.userRole === "trabajo_social" && (
+              <CampoSupervisaTSCE value={form.supervisaTSCE} onChange={v => setForm(prev => ({ ...prev, supervisaTSCE: v }))} />
+            )}
+            {(form.userRole === "psicologia" || form.userRole === "trabajo_social" || form.userRole === "trabajo_social_ce") && (
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Número de junta (JVPM)</label>
                 <input type="text" value={form.jvpm} onChange={setField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />
@@ -1039,6 +1088,18 @@ export default function DashboardUsuariosPage() {
                   onChange={v => setEditForm(prev => prev ? { ...prev, estacionCE: v } : prev)}
                 />
               )}
+              {editForm.userRole === "trabajo_social_ce" && (
+                <CampoAreaTSCE
+                  value={editForm.areaTSCE}
+                  onChange={v => setEditForm(prev => prev ? { ...prev, areaTSCE: v } : prev)}
+                />
+              )}
+              {editForm.userRole === "trabajo_social" && (
+                <CampoSupervisaTSCE
+                  value={editForm.supervisaTSCE}
+                  onChange={v => setEditForm(prev => prev ? { ...prev, supervisaTSCE: v } : prev)}
+                />
+              )}
 
               {editForm.userRole === "medico" && (
                 <>
@@ -1099,7 +1160,7 @@ export default function DashboardUsuariosPage() {
                 </>
               )}
 
-              {(editForm.userRole === "psicologia" || editForm.userRole === "trabajo_social") && (
+              {(editForm.userRole === "psicologia" || editForm.userRole === "trabajo_social" || editForm.userRole === "trabajo_social_ce") && (
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">Número de junta (JVPM)</label>
                   <input type="text" value={editForm.jvpm} onChange={setEditField("jvpm")} placeholder="Ej: ABCD-1234" className={inputCls} />

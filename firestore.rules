@@ -62,6 +62,11 @@ service cloud.firestore {
     // escribe lo que dirán las TVs, nada más. También se excluye de lo abierto
     // a "cualquier usuario real".
     function isMensajesCE() { return isAuth() && getRole() == 'mensajes_ce'; }
+    // Trabajo Social de Consulta Externa: no es isTrabajoSocial() ni isStaff(), y
+    // no lee nada directo (todo va por /api/consulta-externa/trabajo-social). Se
+    // excluye de lo abierto a "cualquier usuario real" para que no vea
+    // hospitalización.
+    function isTrabajoSocialCE() { return isAuth() && getRole() == 'trabajo_social_ce'; }
     // Sesión real (no anónima). El formulario público de transporte usa sesiones
     // anónimas: NO deben poder leer datos internos del portal.
     function isRealUser() {
@@ -95,7 +100,7 @@ service cloud.firestore {
       // Sesiones anónimas: solo pueden intentar leer su propio doc (no existe),
       // necesario para que el AuthContext resuelva "sin perfil" sin error. La
       // cuenta de una pantalla de llamados (TV) solo lee el suyo.
-      allow read:   if (isAuth() && uid() == userId) || (isRealUser() && !isPantallaCE() && !isMensajesCE());
+      allow read:   if (isAuth() && uid() == userId) || (isRealUser() && !isPantallaCE() && !isMensajesCE() && !isTrabajoSocialCE());
       allow create: if isAdmin();
       // El admin puede actualizar cualquier campo. Además, cada usuario puede
       // registrar SOLO su propia aceptación de términos (generales y/o los
@@ -594,7 +599,7 @@ service cloud.firestore {
                   && nuevo.censoNoAplica.porUid == uid()
                   && nuevo.censoNoAplica.en == request.time));
       }
-      allow read:   if isRealUser() && !isPantallaCE() && !isMensajesCE();
+      allow read:   if isRealUser() && !isPantallaCE() && !isMensajesCE() && !isTrabajoSocialCE();
       allow create: if isEsdomed() || isAdmin();
       allow update: if isEsdomed() || isAdmin() || (isMedico() && soloMarcaNoAplicaCenso());
       allow delete: if isAdmin();
