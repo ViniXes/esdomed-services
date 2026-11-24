@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useState } from "react";
-import { AlertTriangle, CalendarClock, CalendarX, Check, ChevronDown, GitMerge, Loader2, RefreshCw, RotateCcw, Search, X } from "lucide-react";
+import { AlertTriangle, CalendarX, Check, ChevronDown, GitMerge, Loader2, RefreshCw, RotateCcw, Search, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ESPECIALIDADES_CE } from "@/lib/consultaExterna/especialidades";
 import { ETIQUETA_ESTADO, normalizarEstado } from "@/lib/consultaExterna/circuito";
@@ -10,6 +10,7 @@ import {
   FECHA_GENERICA_TEXTO,
   NOMBRE_ESTADO_FG,
   citaDeHoyFG,
+  coincideFiltroEstadoFG,
   edadEnAnios,
   filtrarFechaGenerica,
   proximaCitaFG,
@@ -24,9 +25,10 @@ import {
 
 // PROVISIONAL (pedido del usuario, 2026-11-24). Como el Catálogo de tarjetas,
 // pero para los pacientes que en las agendas del SIS vienen sin DUI, la mayoría
-// con la fecha de nacimiento genérica 10/10/2000 (edad falsa). Arriba, los que
-// tienen cita hoy: que tengan datos faltantes no quiere decir que no vengan, y
-// así nadie les crea otro expediente ni los atrasa. Al corregirlos en el SIS se
+// con la fecha de nacimiento genérica 10/10/2000 (edad falsa). Una sola lista
+// (pedido del usuario: dos tablas confundían); el filtro "Cita hoy" deja solo a
+// los pendientes que vienen hoy: que tengan datos faltantes no quiere decir que
+// no vengan, y así nadie les crea otro expediente ni los atrasa. Al corregirlos en el SIS se
 // marcan aquí y salen de los pendientes; también salen solos cuando vuelven a
 // aparecer con DUI en una agenda cargada. Cuando no queden, se quita (ver CLAUDE.md).
 
@@ -48,9 +50,6 @@ const TONO_ESTADO: Record<EstadoFechaGenerica, string> = {
   unificado: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
   con_dui: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
 };
-
-const coincideEstado = (p: PacienteFechaGenerica, filtro: FiltroEstadoFG) =>
-  filtro === "todos" || (filtro === "resueltos" ? p.estado !== "pendiente" : p.estado === filtro);
 
 export function FechaGenerica() {
   const { user } = useAuth();
@@ -122,7 +121,11 @@ export function FechaGenerica() {
   // Cita hoy: la agenda cargada en services manda; si aún no se cargó, la del reporte.
   const conCitaHoy = pacientes.filter((p) => p.estado === "pendiente" && citaDeHoyFG(p, hoy));
   const conteoEspecialidad = (id: string) =>
-    pacientes.filter((p) => p.citas.some((c) => c.especialidadId === id) && coincideEstado(p, estado)).length;
+    pacientes.filter((p) => p.citas.some((c) => c.especialidadId === id) && coincideFiltroEstadoFG(p, estado, hoy)).length;
+  // Si la búsqueda no encuentra nada con el filtro elegido, cuántos hay en toda la lista.
+  const enTodos = q.trim().length >= 2 && resultados.length === 0 && datos
+    ? filtrarFechaGenerica(pacientes, q, { estado: "todos", especialidadId: "", orden, hoyISO: hoy }).length
+    : 0;
   const reiniciar = () => setLimite(PAGINA);
   const avance = resumen.total ? Math.round((resueltos / resumen.total) * 100) : 0;
 
@@ -199,22 +202,6 @@ export function FechaGenerica() {
             </div>
           </section>
 
-          {conCitaHoy.length > 0 && (
-            <section>
-              <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
-                <CalendarClock size={15} className="text-blue-600 dark:text-cyan-300" aria-hidden="true" />
-                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Tienen cita hoy · {conCitaHoy.length}</h2>
-                <span className="text-xs text-slate-500 dark:text-slate-400">Actualícelos en el SIS cuando lleguen</span>
-              </div>
-              <ul className={`${tarjeta} divide-y divide-slate-100 overflow-hidden dark:divide-slate-800`}>
-                {conCitaHoy.map((p) => (
-                  <FilaPaciente key={`hoy-${p.expediente}`} p={p} hoy={hoy} abierta={abierta === `hoy-${p.expediente}`}
-                    onAlternar={() => setAbierta((a) => (a === `hoy-${p.expediente}` ? "" : `hoy-${p.expediente}`))} marcar={marcar} />
-                ))}
-              </ul>
-            </section>
-          )}
-
           <section className={`${tarjeta} space-y-4 p-4 md:p-5`}>
             <div className="relative">
               <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -239,6 +226,7 @@ export function FechaGenerica() {
 
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por estado">
               {([
+                ["cita_hoy", `Cita hoy ${conCitaHoy.length}`],
                 ["pendiente", `Pendientes ${resumen.pendiente}`],
                 ["resueltos", `Resueltos ${resueltos}`],
                 ["todos", `Todos ${resumen.total}`],
@@ -277,10 +265,17 @@ export function FechaGenerica() {
 
             {resultados.length === 0 ? (
               <div className={`${tarjeta} px-6 py-10 text-center`}>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Ningún paciente sin DUI coincide</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  {estado === "pendiente" ? "Pruebe con \"Todos\": puede que ya se haya corregido o unificado." : "Pruebe con otra parte del nombre o con el expediente."}
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  {estado === "cita_hoy" && !q.trim() ? "Hoy no viene ningún paciente pendiente" : "Ningún paciente coincide con este filtro"}
                 </p>
+                {enTodos > 0 ? (
+                  <button type="button" onClick={() => { setEstado("todos"); reiniciar(); }}
+                    className="mt-2 text-sm font-semibold text-blue-700 underline dark:text-cyan-300">
+                    Hay {enTodos} en Todos: ver
+                  </button>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Pruebe con otra parte del nombre o con el expediente.</p>
+                )}
               </div>
             ) : (
               <ul className={`${tarjeta} divide-y divide-slate-100 overflow-hidden dark:divide-slate-800`}>
@@ -338,7 +333,7 @@ function FilaPaciente({
           <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400 sm:truncate">
             <span className="font-mono font-bold text-blue-700 dark:text-cyan-300 sm:hidden">{p.expediente} · </span>
             {citaHoy
-              ? <>Cita hoy: {citaHoy.especialidad}{citaHoy.medico ? ` · ${citaHoy.medico}` : ""}</>
+              ? <strong className="font-semibold text-blue-700 dark:text-cyan-300">Cita hoy: {citaHoy.especialidad}{citaHoy.medico ? ` · ${citaHoy.medico}` : ""}</strong>
               : proxima ? <>Próxima cita: {fechaCorta(proxima.fecha)} · {proxima.especialidad}</> : "Sin cita próxima"}
             {p.fechaGenerica && <> · Fecha {FECHA_GENERICA_TEXTO}</>}
           </span>

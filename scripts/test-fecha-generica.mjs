@@ -71,6 +71,9 @@ const hoy = "2026-11-24";
 assert.deepEqual(m.filtrarFechaGenerica(lista, "", { estado: "pendiente", especialidadId: "", orden: "proxima", hoyISO: hoy }).map((p) => p.expediente), ["100-26", "600-26", "500-26"]);
 assert.deepEqual(m.filtrarFechaGenerica(lista, "", { estado: "resueltos", especialidadId: "", orden: "nombre", hoyISO: hoy }).map((p) => p.expediente), ["400-26", "200-26"]);
 assert.deepEqual(m.filtrarFechaGenerica(lista, "", { estado: "todos", especialidadId: "oncologia", orden: "nombre", hoyISO: hoy }).map((p) => p.expediente), ["100-26", "600-26"]);
+// Cita hoy: solo pendientes con cita ese día.
+assert.deepEqual(m.filtrarFechaGenerica(lista, "", { estado: "cita_hoy", especialidadId: "", orden: "nombre", hoyISO: hoy }).map((p) => p.expediente), ["100-26", "600-26"]);
+assert.deepEqual(m.filtrarFechaGenerica(lista, "", { estado: "cita_hoy", especialidadId: "", orden: "nombre", hoyISO: "2026-11-25" }), []);
 
 // ── Unificar ──
 assert.equal(m.validarUnificacion("100-26", "15062-26"), null);

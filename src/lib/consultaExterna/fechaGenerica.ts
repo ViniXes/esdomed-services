@@ -224,7 +224,15 @@ export function resumenFechaGenerica(lista: { estado: EstadoFechaGenerica }[]) {
 }
 
 export type OrdenFG = "nombre" | "proxima";
-export type FiltroEstadoFG = EstadoFechaGenerica | "resueltos" | "todos";
+/** cita_hoy: pendientes con cita hoy (lo que más urge). */
+export type FiltroEstadoFG = EstadoFechaGenerica | "cita_hoy" | "resueltos" | "todos";
+
+export function coincideFiltroEstadoFG(p: PacienteFechaGenerica, filtro: FiltroEstadoFG, hoyISO: string): boolean {
+  if (filtro === "todos") return true;
+  if (filtro === "resueltos") return p.estado !== "pendiente";
+  if (filtro === "cita_hoy") return p.estado === "pendiente" && !!citaDeHoyFG(p, hoyISO);
+  return p.estado === filtro;
+}
 
 /**
  * Buscador: por expediente (lo escrito está dentro del expediente) o por
@@ -247,7 +255,7 @@ export function filtrarFechaGenerica(
 ): PacienteFechaGenerica[] {
   const { estado, especialidadId, orden, hoyISO } = opciones;
   const salida = lista.filter((p) =>
-    (estado === "todos" || (estado === "resueltos" ? p.estado !== "pendiente" : p.estado === estado))
+    coincideFiltroEstadoFG(p, estado, hoyISO)
     && (!especialidadId || p.citas.some((c) => c.especialidadId === especialidadId))
     && coincideFG(p, consulta));
   const porNombre = (a: PacienteFechaGenerica, b: PacienteFechaGenerica) =>
