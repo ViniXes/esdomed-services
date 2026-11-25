@@ -17,7 +17,17 @@ export const EVALUACION_EN_LINEA = {
   id: "lineamientos-2026",
   titulo: "Evaluación de conocimientos",
   tema: "Lineamientos internos de control disciplinarios 2026",
+  /**
+   * Se cierra sola a esta hora aunque el admin no le dé "Cerrar" (pedido del
+   * usuario: medianoche del 25/11/2026, hora de El Salvador = 06:00 UTC del 26).
+   * Para una prueba nueva, cambiar junto con `id`.
+   */
+  cierreAutomaticoMs: Date.UTC(2026, 10, 26, 6, 0, 0),
 };
+
+/** Abierta = el admin la abrió y aún no llega la hora del cierre automático. */
+export const estaAbierta = (estado: { activa?: unknown } | undefined, ahoraMs = Date.now()) =>
+  estado?.activa === true && ahoraMs < EVALUACION_EN_LINEA.cierreAutomaticoMs;
 
 /** Abierta/cerrada. `configuracion` es de lectura pública: aquí no va nada personal. */
 export const DOC_ESTADO_EVALUACION = { coleccion: "configuracion", id: "evaluacion_en_linea" } as const;

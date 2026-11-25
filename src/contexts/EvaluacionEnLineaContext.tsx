@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { doc, onSnapshot } from "@/lib/firestoreMeter";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { DOC_ESTADO_EVALUACION, type MiEvaluacion } from "@/lib/evaluacionEnLinea";
+import { DOC_ESTADO_EVALUACION, EVALUACION_EN_LINEA, type MiEvaluacion } from "@/lib/evaluacionEnLinea";
 
 // Estado de la evaluación en línea para el dashboard: si está abierta (un
 // listener a configuracion/evaluacion_en_linea, lectura pública) y, para el
@@ -43,7 +43,10 @@ export function EvaluacionEnLineaProvider({ children }: { children: React.ReactN
   const rol = profile?.role;
   const esAdmin = rol === "admin";
   const esPersonal = rol === "esdomed" || rol === "asistente_esdomed";
-  const [activa, setActiva] = useState(false);
+  // Abierta por el admin (documento) y sin pasar la hora del cierre automático.
+  const [abiertaDoc, setAbiertaDoc] = useState(false);
+  const [pasoElCierre, setPasoElCierre] = useState(() => Date.now() >= EVALUACION_EN_LINEA.cierreAutomaticoMs);
+  const activa = abiertaDoc && !pasoElCierre;
   const [info, setInfo] = useState<MiEvaluacion | null>(null);
   const [desfaseMs, setDesfaseMs] = useState(0);
   // Se recuerda en la pestaña para que recargar no saque al admin de su prueba.
@@ -68,10 +71,19 @@ export function EvaluacionEnLineaProvider({ children }: { children: React.ReactN
     if (!esAdmin && !esPersonal) return;
     return onSnapshot(
       doc(db, DOC_ESTADO_EVALUACION.coleccion, DOC_ESTADO_EVALUACION.id),
-      (s) => setActiva(s.data()?.activa === true),
-      () => setActiva(false),
+      (s) => setAbiertaDoc(s.data()?.activa === true),
+      () => setAbiertaDoc(false),
     );
   }, [esAdmin, esPersonal]);
+
+  // A la hora del cierre automático se apaga sola, sin recargar.
+  useEffect(() => {
+    if (pasoElCierre) return;
+    const falta = EVALUACION_EN_LINEA.cierreAutomaticoMs - Date.now();
+    if (falta > 2_147_000_000) return; // más de ~24 días: setTimeout no lo admite
+    const t = setTimeout(() => setPasoElCierre(true), Math.max(0, falta));
+    return () => clearTimeout(t);
+  }, [pasoElCierre]);
 
   const pedir = useCallback(async (metodo: "GET" | "POST", cuerpo?: Record<string, unknown>, ruta = "/api/evaluacion-en-linea") => {
     const token = await auth.currentUser?.getIdToken();

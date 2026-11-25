@@ -4,7 +4,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import {
   COL_PARTICIPANTES_EVALUACION, DOC_ESTADO_EVALUACION, EVALUACION_EN_LINEA, MS_GRACIA_ENTREGA, MS_PARA_INICIAR,
-  esElegibleEvaluacion, estadoDeParticipante, finDeEvaluacion, idParticipante, idParticipantePrueba,
+  esElegibleEvaluacion, estaAbierta, estadoDeParticipante, finDeEvaluacion, idParticipante, idParticipantePrueba,
   type FilaPanelEvaluacion, type MiEvaluacion,
 } from "@/lib/evaluacionEnLinea";
 import { CLAVES_EVALUACION, NUMEROS_CLAVE, calificar } from "@/lib/evaluacionEnLineaClaves";
@@ -193,7 +193,8 @@ async function panel(): Promise<NextResponse> {
   filas.sort((a, b) => ordenGrupo(a.grupo) - ordenGrupo(b.grupo) || a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
   const e = estado.data() ?? {};
   return json({
-    activa: e.activa === true,
+    activa: estaAbierta(e),
+    cierreAutomaticoMs: EVALUACION_EN_LINEA.cierreAutomaticoMs,
     abiertaEnMs: ms(e.abiertaEn as Timestamp | undefined),
     cerradaEnMs: ms(e.cerradaEn as Timestamp | undefined),
     filas,
@@ -213,7 +214,7 @@ export async function GET(req: NextRequest) {
     if (prueba && yo.role !== "admin") return json({ error: "No autorizado" }, 403);
     const ahora = Date.now();
     const [estado, existente] = await Promise.all([refEstado().get(), refParticipante(yo.uid, prueba).get()]);
-    const activa = estado.data()?.activa === true;
+    const activa = estaAbierta(estado.data());
     if (existente.exists) {
       const p = await cerrarSiVencio(yo.uid, existente.data() as Participante);
       return json(respuestaDe(p, activa, Date.now()));
@@ -322,7 +323,7 @@ export async function POST(req: NextRequest) {
 
     // ── Acciones de quien hace la evaluación ─────────────────────────────
     if (accion === "iniciar") {
-      const activa = (await refEstado().get()).data()?.activa === true;
+      const activa = estaAbierta((await refEstado().get()).data());
       const p = await adminDb.runTransaction(async (tx) => {
         const snap = await tx.get(refParticipante(yo.uid, prueba));
         const p = snap.data() as Participante | undefined;
@@ -371,7 +372,7 @@ export async function POST(req: NextRequest) {
         return { p: { ...p, ...cambios }, nueva: true };
       });
       if (resultado.nueva) await alFicha(yo.uid, resultado.p);
-      const activa = (await refEstado().get()).data()?.activa === true;
+      const activa = estaAbierta((await refEstado().get()).data());
       return json(respuestaDe(resultado.p, activa, Date.now()));
     }
 

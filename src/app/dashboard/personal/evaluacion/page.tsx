@@ -16,6 +16,9 @@ import { mmss, useRestante } from "@/components/evaluacionEnLinea/AvisoEvaluacio
 // Evaluación en línea (ver src/lib/evaluacionEnLinea.ts): el personal operativo
 // la hace aquí; el admin la abre/cierra y ve quién la hizo y su nota.
 
+const fechaHora = (ms: number) =>
+  new Date(ms).toLocaleString("es-SV", { day: "2-digit", month: "2-digit", hour: "numeric", minute: "2-digit" });
+
 const hora = (ms: number | null | undefined) =>
   ms ? new Date(ms).toLocaleTimeString("es-SV", { hour: "numeric", minute: "2-digit" }) : "—";
 
@@ -314,6 +317,7 @@ interface DatosPanel {
   abiertaEnMs: number | null;
   cerradaEnMs: number | null;
   filas: FilaPanelEvaluacion[];
+  ahoraMs: number;
 }
 
 function PanelAdmin() {
@@ -374,11 +378,16 @@ function PanelAdmin() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           {activa ? <PuntoEnVivo /> : <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden />}
           <span className="font-semibold text-slate-900 dark:text-slate-100">{activa ? "En marcha" : "Cerrada"}</span>
           <span className="text-slate-500 dark:text-slate-400">
             {activa && datos?.abiertaEnMs ? `desde las ${hora(datos.abiertaEnMs)}` : !activa && datos?.cerradaEnMs ? `se cerró a las ${hora(datos.cerradaEnMs)}` : ""}
+          </span>
+          <span className="w-full text-xs text-slate-500 dark:text-slate-400 sm:w-auto">
+            {(datos?.ahoraMs ?? 0) < EVALUACION_EN_LINEA.cierreAutomaticoMs
+              ? `· Se cierra sola el ${fechaHora(EVALUACION_EN_LINEA.cierreAutomaticoMs)}`
+              : "· Ya pasó la hora del cierre automático"}
           </span>
         </div>
         <div className="flex gap-2">
