@@ -21,7 +21,16 @@ for (const t of m.TIPOS_GESTION_TS_CE) {
   }
 }
 assert.deepEqual(m.gruposDeTipos("hemato_onco").map((g) => g.id), ["hemato_onco", "comun", "cardiologia"]);
-assert.equal(m.gruposDeTipos("cardiologia").flatMap((g) => g.tipos).length, ids.length, "el área no bloquea ningún tipo");
+const elegibles = m.TIPOS_GESTION_TS_CE.filter((t) => !t.automatica).map((t) => t.id);
+assert.equal(m.gruposDeTipos("cardiologia").flatMap((g) => g.tipos).length, elegibles.length, "el área no bloquea ningún tipo");
+
+// ── La gestión que deja el directorio no se elige ni se registra a mano ──
+assert.ok(m.esAutomatica(m.TIPO_ACTUALIZACION_DATOS) && !m.esAutomatica("receta"));
+assert.ok(!elegibles.includes(m.TIPO_ACTUALIZACION_DATOS), "no sale en el asistente");
+assert.deepEqual(m.filtrarTipos("actualizacion de datos").flatMap((g) => g.tipos), [], "tampoco al buscarla");
+assert.ok(!m.validarGestion({ tipo: m.TIPO_ACTUALIZACION_DATOS, area: "cardiologia" }).ok, "ni se registra ni se corrige a mano");
+assert.equal(m.labelTipo(m.TIPO_ACTUALIZACION_DATOS), "Actualización de datos del paciente");
+assert.equal(m.areaSugerida(m.TIPO_ACTUALIZACION_DATOS, "oncologia", "cardiologia"), "hemato_onco", "cuenta en el área del paciente");
 
 // ── Área: del tipo, luego de la especialidad, luego de la cuenta ──
 assert.equal(m.areaSugerida("marcapaso", "hematologia", "hemato_onco"), "cardiologia");
@@ -29,6 +38,20 @@ assert.equal(m.areaSugerida("receta", "cirugia_torax", "hemato_onco"), "cardiolo
 assert.equal(m.areaSugerida("receta", "oncologia", "cardiologia"), "hemato_onco");
 assert.equal(m.areaSugerida("receta", "infectologia", "cardiologia"), "otra");
 assert.equal(m.areaSugerida("receta", "", "cardiologia"), "cardiologia");
+
+// ── El área solo se pregunta si no se puede saber ──
+assert.ok(m.pideArea("receta", ""), "común + paciente sin especialidad");
+assert.ok(!m.pideArea("receta", "cardiologia"), "sale de la especialidad");
+assert.ok(!m.pideArea("marcapaso", ""), "sale del tipo");
+
+// ── Buscador de tipos ──
+assert.equal(m.filtrarTipos("", "cardiologia").flatMap((g) => g.tipos).length, ids.length - 1, "sin texto, todos los que se eligen");
+assert.deepEqual(m.filtrarTipos("constancia", "cardiologia").flatMap((g) => g.tipos.map((t) => t.id)), ["constancia_medica", "constancia_permanencia"]);
+assert.deepEqual(m.filtrarTipos("TRAMITE  marcapaso").flatMap((g) => g.tipos.map((t) => t.id)), ["marcapaso"], "cada palabra, sin tildes");
+assert.deepEqual(m.filtrarTipos("medico cambio").flatMap((g) => g.tipos.map((t) => t.id)), ["cambio_medico"], "en cualquier orden");
+assert.deepEqual(m.filtrarTipos("xyz"), [], "los grupos vacíos no salen");
+assert.equal(m.tituloGestion({ tipo: "cita_estudio", detalle: "holter" }), "Cita o estudio: Holter");
+assert.equal(m.tituloGestion({ tipo: "receta", detalle: "" }), "Trámite de receta");
 
 assert.deepEqual(m.sugeridoPorPaso("llamada_recibida"), { medio: "llamada" });
 assert.deepEqual(m.sugeridoPorPaso("entrevista_familiar"), { conQuien: "familiar" });
@@ -126,6 +149,135 @@ const ana = r.porPersona.find((x) => x.uid === "A");
 assert.deepEqual(ana.areas.find((a) => a.area === "hemato_onco"), { area: "hemato_onco", gestiones: 0, notas: 1 }, "se ve la cobertura");
 assert.equal(m.resumirTS("2026-11", datos, HOY, { area: "hemato_onco" }).notas, 1);
 assert.equal(m.resumirTS("2026-11", datos, HOY, { persona: "B" }).nuevas, 0);
+assert.equal(r.delDirectorio, 0);
+const conDirectorio = m.resumirTS("2026-11", {
+  ...datos,
+  gestiones: [...datos.gestiones, g({ id: "g5", tipo: m.TIPO_ACTUALIZACION_DATOS, estado: "finalizada", fecha: "2026-11-20", fechaCierre: "2026-11-20", ultimaNotaFecha: "2026-11-20", clave: "300-26" })],
+}, HOY);
+assert.deepEqual([conDirectorio.nuevas, conDirectorio.delDirectorio, conDirectorio.finalizadas], [3, 1, 2], "la actualización de datos cuenta como gestión nueva y finalizada");
+assert.equal(conDirectorio.porTipo.find((x) => x.id === m.TIPO_ACTUALIZACION_DATOS).nuevas, 1, "y sale en su propio renglón");
 assert.equal(m.finDeMes("2028-02"), "2028-02-29");
 
-console.log(`Trabajo Social CE: bien (${ids.length} tipos de gestión).`);
+// ── Directorio ──
+// El módulo importa el catálogo y la división política: se enlazan con un require mínimo.
+function transpilar(ruta, requerir) {
+  const codigo = ts.transpileModule(readFileSync(new URL(ruta, import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const mod = { exports: {} };
+  new Function("exports", "module", "require", codigo)(mod.exports, mod, requerir);
+  return mod.exports;
+}
+const division = transpilar("../src/lib/divisionPolitica.ts", () => ({}));
+const d = transpilar("../src/lib/consultaExterna/trabajoSocialDirectorio.ts", (r) => (r === "./trabajoSocial" ? m : r === "@/lib/divisionPolitica" ? division : {}));
+
+assert.equal(d.idDirectorio("nom:PEREZ, JOSE"), "nom%3APEREZ%2C%20JOSE", "la clave sirve de id aunque traiga comas");
+assert.equal(d.normalizarTelefono("7123 4567"), "7123-4567");
+assert.equal(d.normalizarTelefono("+503 7123-4567"), "7123-4567", "el código de El Salvador se quita");
+assert.equal(d.normalizarTelefono("+502 1234 5678"), "+50212345678", "el de otro país se conserva");
+assert.equal(d.normalizarTelefono(""), "");
+assert.equal(d.normalizarTelefono("12345"), null);
+
+const ficha = (x) => d.validarFicha({ telefono: "71234567", ...x }, HOY);
+assert.ok(ficha({}).ok);
+assert.equal(ficha({}).datos.telefono, "7123-4567");
+assert.equal(ficha({}).datos.residencia, "sv");
+assert.ok(!d.validarFicha({}, HOY).ok, "vacía no se guarda");
+assert.ok(!d.validarFicha({ nacionalidad: "Salvadoreña", residencia: "sv" }, HOY).ok, "lo marcado de entrada no cuenta como dato");
+assert.ok(d.validarFicha({ nacionalidad: "Hondureña" }, HOY).ok, "otra nacionalidad sí es un dato");
+assert.ok(!ficha({ telefono: "123" }).ok);
+assert.ok(!ficha({ correo: "ana@" }).ok);
+assert.equal(ficha({ correo: " Ana@Correo.COM " }).datos.correo, "ana@correo.com");
+assert.equal(ficha({ telefono: "", telefono2: "22220000" }).datos.telefono, "2222-0000", "el único teléfono queda de principal");
+assert.equal(ficha({ telefono2: "7123-4567" }).datos.telefono2, "", "el mismo número dos veces se guarda una");
+
+// Documento
+assert.ok(!ficha({ documentoNumero: "A123" }).ok, "número sin tipo");
+assert.ok(!ficha({ documentoTipo: "dui", documentoNumero: "123" }).ok);
+assert.equal(ficha({ documentoTipo: "dui", documentoNumero: "004188606" }).datos.documentoNumero, "00418860-6");
+assert.equal(ficha({ documentoTipo: "pasaporte", documentoNumero: " a 123456 " }).datos.documentoNumero, "A 123456");
+assert.equal(ficha({ documentoTipo: "pasaporte" }).datos.documentoTipo, "", "tipo sin número no dice nada");
+assert.deepEqual(d.fichaSugerida({ dui: "00418860-6" }).documentoTipo, "dui", "el DUI de la cita se ofrece");
+assert.equal(d.fichaSugerida({ dui: "" }).documentoTipo, "");
+const soloDui = d.fichaSugerida({ dui: "00418860-6" });
+assert.ok(!d.validarFicha(soloDui, HOY, { duiDeCita: "00418860-6" }).ok, "repetir el DUI de la cita no es completar la ficha");
+assert.ok(d.validarFicha(soloDui, HOY, { duiDeCita: "" }).ok, "un DUI que la cita no traía sí es un dato");
+assert.ok(d.validarFicha({ ...soloDui, telefono: "71234567" }, HOY, { duiDeCita: "00418860-6" }).ok);
+
+// Nacimiento o edad
+assert.ok(!ficha({ fechaNacimiento: "2026-11-25" }).ok, "nacimiento futuro");
+assert.ok(!ficha({ fechaNacimiento: "1890-01-01" }).ok);
+assert.ok(!ficha({ edad: 130 }).ok);
+const conFecha = ficha({ fechaNacimiento: "1960-11-25", edad: 50 }).datos;
+assert.equal(conFecha.edad, null, "con fecha, la edad anotada sobra");
+assert.deepEqual(d.edadDe(conFecha, HOY), { anios: 65, aproximada: false }, "cumple mañana");
+assert.deepEqual(d.edadDe({ fechaNacimiento: "1960-11-24", edad: null, edadAl: "" }, HOY), { anios: 66, aproximada: false });
+const conEdad = ficha({ edad: "70" }).datos;
+assert.deepEqual([conEdad.edad, conEdad.edadAl], [70, HOY]);
+assert.deepEqual(d.edadDe({ fechaNacimiento: "", edad: 70, edadAl: "2024-11-01" }, HOY), { anios: 72, aproximada: true }, "la edad anotada envejece");
+const previa = { edad: 70, edadAl: "2024-11-01" };
+assert.equal(d.validarFicha({ edad: 70 }, HOY, { previa }).datos.edadAl, "2024-11-01", "misma edad: conserva cuándo se anotó");
+assert.equal(d.validarFicha({ edad: 71 }, HOY, { previa }).datos.edadAl, HOY, "edad corregida: se anota hoy");
+assert.equal(d.edadDe(d.fichaVacia(), HOY), null);
+
+// Domicilio
+const enSV = ficha({ zona: "rural", departamento: "San Salvador", distrito: "Soyapango", direccion: " Col. Prueba  #1 ", pais: "Honduras" }).datos;
+assert.equal(enSV.municipio, "San Salvador Este", "el municipio sale del distrito");
+assert.equal(enSV.pais, "", "en El Salvador no se guarda país");
+assert.equal(d.domicilioTexto(enSV), "Col. Prueba #1, Soyapango, San Salvador Este, San Salvador");
+assert.equal(ficha({ departamento: "San Salvador", distrito: "Metapán" }).datos.distrito, "", "distrito de otro departamento no entra");
+assert.equal(ficha({ departamento: "Atlántida" }).datos.departamento, "");
+assert.equal(d.municipioDeDistrito("La Libertad", "Santa Tecla"), "La Libertad Sur");
+const fuera = ficha({ residencia: "exterior", pais: "Honduras", direccion: "Barrio El Centro, Ocotepeque", departamento: "San Salvador", zona: "urbana" }).datos;
+assert.deepEqual([fuera.departamento, fuera.zona], ["", ""], "fuera del país no hay departamento ni zona");
+assert.equal(d.domicilioTexto(fuera), "Barrio El Centro, Ocotepeque, Honduras");
+
+// Responsable
+assert.ok(!ficha({ responsable: { telefono: "71234567" } }).ok, "responsable sin nombre");
+assert.ok(!ficha({ responsable: { nombre: "Ana Pérez", telefono: "12" } }).ok);
+assert.deepEqual(ficha({ responsable: { nombre: " Ana  Pérez ", parentesco: "Hijo (a)", telefono: "22221111" } }).datos.responsable,
+  { nombre: "Ana Pérez", parentesco: "Hijo (a)", telefono: "2222-1111" });
+
+// Qué cambió: es lo que dice la gestión que deja el directorio.
+const base = d.fichaSugerida({ dui: "00418860-6" });
+assert.deepEqual(d.camposCambiados(null, base, "00418860-6"), [], "lo que ya se sabía no es un cambio");
+assert.deepEqual(d.camposCambiados(null, base, ""), ["documento"], "un DUI que la cita no traía sí");
+const llena = ficha({ documentoTipo: "dui", documentoNumero: "004188606", departamento: "San Salvador", distrito: "Soyapango", responsable: { nombre: "Ana Pérez" } }).datos;
+assert.deepEqual(d.camposCambiados(null, llena, "00418860-6"), ["teléfono", "domicilio", "responsable"]);
+assert.deepEqual(d.camposCambiados(llena, llena), [], "guardar sin tocar nada no cambia nada");
+assert.deepEqual(d.camposCambiados(llena, { ...llena, telefono2: "2222-0000" }), ["teléfono"]);
+assert.deepEqual(d.camposCambiados(llena, { ...llena, edadAl: "2026-01-01" }), [], "el día en que se anotó la edad no es un dato");
+assert.deepEqual(d.camposCambiados(llena, { ...llena, nacionalidad: "Hondureña", responsable: { ...llena.responsable, parentesco: "Madre" } }), ["nacionalidad", "responsable"]);
+assert.equal(d.textoActualizacion(["responsable", "teléfono", "domicilio"], true), "Completó en el directorio: teléfono, domicilio y responsable.");
+assert.equal(d.textoActualizacion(["correo"], false), "Actualizó en el directorio: correo.");
+assert.equal(d.textoActualizacion(["correo", "sexo"], false), "Actualizó en el directorio: correo y sexo.");
+
+// ── Adjuntos ──
+const a = transpilar("../src/lib/consultaExterna/trabajoSocialAdjuntos.ts", () => ({}));
+const bytes = (...x) => Uint8Array.from(x);
+const PDF = bytes(0x25, 0x50, 0x44, 0x46, 0x2d);
+const ZIP = bytes(0x50, 0x4b, 0x03, 0x04);
+const EXE = bytes(0x4d, 0x5a, 0x90, 0x00);
+assert.deepEqual(a.validarAdjunto("Constancia Médica.PDF", 2000, PDF).datos, { nombre: "Constancia Médica.PDF", mime: "application/pdf", clase: "pdf" });
+assert.equal(a.validarAdjunto("C:\\Users\\ana\\foto del dui.jpg", 900, bytes(0xff, 0xd8, 0xff, 0xe0)).datos.nombre, "foto del dui.jpg", "sin la carpeta de origen");
+assert.equal(a.validarAdjunto("informe.docx", 900, ZIP).datos.clase, "word");
+assert.equal(a.validarAdjunto("matriz.xls", 900, bytes(0xd0, 0xcf, 0x11, 0xe0)).datos.clase, "excel");
+assert.ok(a.validarAdjunto("basura.pdf", 900, bytes(0, 0, 0x25, 0x50, 0x44, 0x46)).ok, "el %PDF puede venir tras unos bytes");
+assert.ok(!a.validarAdjunto("programa.exe", 900, EXE).ok, "tipo no admitido");
+assert.ok(!a.validarAdjunto("pagina.html", 900).ok);
+assert.ok(!a.validarAdjunto("dibujo.svg", 900).ok);
+assert.ok(!a.validarAdjunto("sin extension", 900).ok);
+assert.ok(!a.validarAdjunto("programa.pdf", 900, EXE).ok, "un ejecutable con extensión .pdf no entra");
+assert.ok(!a.validarAdjunto("foto.png", 900, PDF).ok, "ni un PDF llamado .png");
+assert.ok(a.validarAdjunto("programa.pdf", 900).ok, "sin los bytes solo se mira extensión y tamaño");
+assert.ok(!a.validarAdjunto("vacio.pdf", 0, PDF).ok);
+assert.ok(!a.validarAdjunto("enorme.pdf", a.MAX_ADJUNTO_BYTES + 1, PDF).ok);
+assert.ok(a.validarAdjunto("justo.pdf", a.MAX_ADJUNTO_BYTES, PDF).ok);
+assert.match(a.validarAdjunto("enorme.pdf", 6 * 1024 * 1024).error, /6\.0 MB.*4\.0 MB/);
+assert.equal(a.rutaAdjunto("g1", "a9", "Constancia médica (1) de José.pdf"), "consulta_externa_ts/g1/a9_Constancia_medica__1__de_Jose.pdf");
+assert.ok(!a.rutaAdjunto("g1", "a9", "../../otro/archivo.pdf").slice("consulta_externa_ts/g1/".length).includes("/"), "el nombre no puede salirse de la carpeta");
+assert.deepEqual([a.tamanoTexto(340 * 1024), a.tamanoTexto(1.25 * 1024 * 1024), a.tamanoTexto(10)], ["340 KB", "1.3 MB", "1 KB"]);
+assert.ok(a.seAbreEnNavegador("pdf") && a.seAbreEnNavegador("imagen") && !a.seAbreEnNavegador("word"));
+assert.ok(a.ACEPTA_ADJUNTOS.includes(".docx") && a.ACEPTA_ADJUNTOS.includes("image/jpeg"));
+
+console.log(`Trabajo Social CE: bien (${ids.length} tipos de gestión, directorio y adjuntos incluidos).`);

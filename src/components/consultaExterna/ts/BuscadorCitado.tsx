@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, PencilLine, Search, X } from "lucide-react";
+import { Loader2, PencilLine, Search, UserRoundCheck, X } from "lucide-react";
 import { especialidadPorId } from "@/lib/consultaExterna/especialidades";
 import { nombrePropio } from "@/lib/consultaExterna/nombres";
 import { claveDePaciente, validarPacienteManual, type PacienteTSCE } from "@/lib/consultaExterna/trabajoSocial";
 import { mensaje, useTS } from "./contexto";
-import { Aviso, botonPrimario, botonSecundario, etiquetaCls, fechaCorta, inputCls } from "./ui";
+import { Aviso, TarjetaElegida, botonPrimario, botonSecundario, etiquetaCls, fechaCorta, inputCls } from "./ui";
 
 // Paciente de la gestión: se busca entre los citados (cualquier especialidad y
 // fecha) por expediente, DUI o nombre. Quien no está citado (p. ej. de un
@@ -45,19 +45,16 @@ export function BuscadorCitado({ elegido, onElegir }: { elegido: Elegido | null;
     const p = elegido.paciente;
     const esp = especialidades(p);
     return (
-      <div className="flex items-start justify-between gap-3 rounded-xl border border-cyan-200 bg-cyan-50/60 px-4 py-3 dark:border-cyan-900 dark:bg-cyan-950/30">
-        <div className="min-w-0">
-          <p className="text-base font-bold text-slate-900 dark:text-white">{p.paciente}</p>
-          <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
-            {p.expediente ? <span className="font-mono font-bold">{p.expediente}</span> : "Sin expediente"}
-            {p.dui && <> · DUI <span className="font-mono">{p.dui}</span></>}
-            {esp && <> · {esp}</>}
-            {p.ultima && <> · última cita {fechaCorta(p.ultima)}</>}
-            {elegido.manual && <> · escrito a mano</>}
-          </p>
-        </div>
-        <button type="button" onClick={() => onElegir(null)} className={botonSecundario}>Cambiar</button>
-      </div>
+      <TarjetaElegida icono={UserRoundCheck} cintillo="Paciente" titulo={p.paciente} onCambiar={() => onElegir(null)} textoCambiar="Cambiar paciente">
+        <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+          {p.expediente ? <span className="font-mono font-bold">{p.expediente}</span> : "Sin expediente"}
+          {p.dui && <> · DUI <span className="font-mono">{p.dui}</span></>}
+          {esp && <> · {esp}</>}
+          {p.ultima && <> · última cita {fechaCorta(p.ultima)}</>}
+          {elegido.manual && <> · escrito a mano</>}
+          {p.telefono && <> · Tel. <span className="font-semibold tabular-nums">{p.telefono}</span></>}
+        </p>
+      </TarjetaElegida>
     );
   }
 
@@ -83,6 +80,7 @@ export function BuscadorCitado({ elegido, onElegir }: { elegido: Elegido | null;
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Expediente, DUI o nombre del paciente citado"
           aria-label="Buscar paciente citado"
+          autoFocus
           autoComplete="off"
           spellCheck={false}
           className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-11 text-base text-slate-900 placeholder:text-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-white [&::-webkit-search-cancel-button]:hidden"
@@ -114,6 +112,7 @@ export function BuscadorCitado({ elegido, onElegir }: { elegido: Elegido | null;
                     <span className="font-mono font-bold sm:hidden">{p.expediente ? `${p.expediente} · ` : ""}</span>
                     {p.dui ? <>DUI <span className="font-mono">{p.dui}</span></> : "Sin DUI"}
                     {especialidades(p) && <> · {especialidades(p)}</>}
+                    {p.telefono && <> · Tel. <span className="tabular-nums">{p.telefono}</span></>}
                   </span>
                 </span>
                 {p.ultima && <span className="hidden flex-shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400 sm:block">{fechaCorta(p.ultima)}</span>}

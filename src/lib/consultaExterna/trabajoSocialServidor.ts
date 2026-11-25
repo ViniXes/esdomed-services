@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FieldValue, Timestamp, type DocumentData, type Query } from "firebase-admin/firestore";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, adminStorage } from "@/lib/firebase-admin";
 import { consultaGestionesTSCE, registraGestionesTSCE } from "@/lib/accesoConsultaExterna";
 import type { UserProfile } from "@/types";
 import { coincideCita } from "./busqueda";
@@ -9,6 +9,8 @@ import {
   type ActividadTSCE, type AreaTSCE, type CierreTS, type CitaParaIndice, type DatosDeCita, type DatosPacienteManual,
   type EstadoGestionTS, type GestionTSCE, type NotaTSCE, type PacienteIndice, type PacienteTSCE,
 } from "./trabajoSocial";
+import { CARPETA_ADJUNTOS, type AdjuntoTS, type ClaseAdjunto } from "./trabajoSocialAdjuntos";
+import { COL_TS_DIRECTORIO, idDirectorio, type FichaGuardada } from "./trabajoSocialDirectorio";
 
 // Servidor de Trabajo Social de Consulta Externa: sesión, índice de pacientes y
 // lectura de documentos. Sus colecciones no tienen reglas (el navegador no las
@@ -68,7 +70,37 @@ export function leerGestion(id: string, d: DocumentData): GestionTSCE {
           accion: h.accion, enMs: ms(h.en), porNombre: s(h.porNombre), ...(h.motivo ? { motivo: s(h.motivo) } : {}),
         }))
       : [],
+    // Sin la ruta de Storage: al navegador solo le sirve el id.
+    adjuntos: adjuntosGuardados(d).map((a): AdjuntoTS => ({
+      id: a.id, nombre: a.nombre, tipo: a.tipo, clase: a.clase, tamano: a.tamano,
+      subidoPor: a.subidoPor, subidoPorNombre: a.subidoPorNombre, subidoEnMs: ms(a.subidoEn),
+    })),
   };
+}
+
+// ── Adjuntos ────────────────────────────────────────────────────────────────
+
+/** Un adjunto como está en el documento de la gestión: con su ruta en Storage, que no sale al navegador. */
+export interface AdjuntoGuardado extends Omit<AdjuntoTS, "subidoEnMs"> { ruta: string; subidoEn: unknown }
+
+export function adjuntosGuardados(d: DocumentData | undefined): AdjuntoGuardado[] {
+  if (!Array.isArray(d?.adjuntos)) return [];
+  return d.adjuntos.map((a: DocumentData): AdjuntoGuardado => ({
+    id: s(a.id), nombre: s(a.nombre), tipo: s(a.tipo), clase: s(a.clase) as ClaseAdjunto, tamano: Number(a.tamano ?? 0),
+    subidoPor: s(a.subidoPor), subidoPorNombre: s(a.subidoPorNombre), ruta: s(a.ruta), subidoEn: a.subidoEn,
+  }));
+}
+
+/** El bucket donde van los adjuntos. Su carpeta no la abre ninguna regla: solo entra el servidor. */
+export function bucketTS() {
+  const nombre = process.env.FIREBASE_STORAGE_BUCKET ?? process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  if (!nombre) throw new Error("Storage no está configurado.");
+  return adminStorage.bucket(nombre);
+}
+
+/** Al borrar una gestión se van sus archivos: no deben quedar documentos de pacientes sueltos. */
+export async function borrarAdjuntosDe(gestionId: string): Promise<void> {
+  await bucketTS().deleteFiles({ prefix: `${CARPETA_ADJUNTOS}/${gestionId}/` });
 }
 
 export function leerNota(id: string, d: DocumentData): NotaTSCE {
@@ -198,6 +230,60 @@ export function cambioIndice(
 
 /** Tras registrar, la copia en memoria ya no sirve para la bitácora. */
 export const olvidarPacientes = () => { memoria = null; };
+
+// ── Directorio ──────────────────────────────────────────────────────────────
+
+export function leerFicha(d: DocumentData): FichaGuardada {
+  const r = (d.responsable ?? {}) as DocumentData;
+  return {
+    documentoTipo: s(d.documentoTipo), documentoNumero: s(d.documentoNumero), sexo: s(d.sexo),
+    fechaNacimiento: s(d.fechaNacimiento), edad: typeof d.edad === "number" ? d.edad : null, edadAl: s(d.edadAl),
+    nacionalidad: s(d.nacionalidad), telefono: s(d.telefono), telefono2: s(d.telefono2), correo: s(d.correo),
+    residencia: d.residencia === "exterior" ? "exterior" : "sv", zona: s(d.zona), departamento: s(d.departamento),
+    municipio: s(d.municipio), distrito: s(d.distrito), direccion: s(d.direccion), pais: s(d.pais),
+    responsable: { nombre: s(r.nombre), parentesco: s(r.parentesco), telefono: s(r.telefono) },
+    actualizadoPorNombre: s(d.actualizadoPorNombre), actualizadoEnMs: ms(d.actualizadoEn),
+  };
+}
+
+/**
+ * Id de la gestión que deja el directorio: una por persona, paciente y día,
+ * así guardar varias veces el mismo día no cuenta doble. La clave va en
+ * base64url porque puede traer comas o espacios.
+ */
+export function idGestionDirectorio(fecha: string, uid: string, clave: string): string {
+  return `dir_${fecha}_${uid}_${Buffer.from(clave, "utf8").toString("base64url")}`;
+}
+
+/** La ficha de un paciente, o null si aún no se le ha completado (1 lectura). */
+export async function fichaPorClave(clave: string): Promise<FichaGuardada | null> {
+  const snap = await adminDb.collection(COL_TS_DIRECTORIO).doc(idDirectorio(clave)).get();
+  return snap.exists ? leerFicha(snap.data()!) : null;
+}
+
+/**
+ * Lo que el índice guarda de la ficha: el teléfono (se ve al buscar) y cuándo
+ * se completó (la lista del directorio). Va en el mismo paso que la ficha. Un
+ * paciente escrito a mano entra al índice aquí, aún sin gestiones.
+ */
+export function cambioFicha(
+  clave: string, telefono: string, manual?: DatosPacienteManual,
+): { ref: FirebaseFirestore.DocumentReference; datos: DocumentData } {
+  return {
+    ref: refIndice(fragmentoPaciente(clave)),
+    datos: {
+      pacientes: {
+        [clave]: {
+          ...(manual
+            ? { ...manual, primera: "", ultima: "", especialidades: [], especialidadId: "", medico: "", manual: true }
+            : {}),
+          telefono,
+          fichaMs: Date.now(),
+        },
+      },
+    },
+  };
+}
 
 /**
  * El paciente de una gestión nueva. Si es citado, sus datos salen del índice y
