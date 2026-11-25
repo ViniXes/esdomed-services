@@ -4,11 +4,11 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import {
   COL_PARTICIPANTES_EVALUACION, DOC_ESTADO_EVALUACION, EVALUACION_EN_LINEA, MS_GRACIA_ENTREGA, MS_PARA_INICIAR,
-  esElegibleEvaluacion, estadoDeParticipante, finDeEvaluacion, idParticipante,
+  esElegibleEvaluacion, estadoDeParticipante, finDeEvaluacion, idParticipante, idParticipantePrueba,
   type FilaPanelEvaluacion, type MiEvaluacion,
 } from "@/lib/evaluacionEnLinea";
 import { CLAVES_EVALUACION, NUMEROS_CLAVE, calificar } from "@/lib/evaluacionEnLineaClaves";
-import { filaDe, filasDelPlan, guardarEnFicha, type DatosHoja } from "@/lib/evaluacionEnLineaServidor";
+import { borrarPruebaDeFicha, filaDe, filasDelPlan, guardarEnFicha, type DatosHoja } from "@/lib/evaluacionEnLineaServidor";
 import { ordenGrupo } from "@/lib/esdomed/plan";
 import type { UserProfile } from "@/types";
 
@@ -25,6 +25,10 @@ import type { UserProfile } from "@/types";
 //   guardado, al consultarla ella o el panel.
 // - POST (admin) { accion: "abrir" | "cerrar" } · { accion: "reabrir", uid }
 //   (tiempo de nuevo, 5 + 15, a quien no entró) · { accion: "ficha", uid } (reintentar el PDF).
+// - Modo prueba (solo admin): GET ?prueba=1 y POST { …, prueba: true } hacen el
+//   mismo recorrido con la cuenta del admin, sin abrir la evaluación a nadie y en
+//   un documento aparte (no sale en el panel). La hoja va a su ficha marcada como
+//   prueba. POST { accion: "borrarPrueba" } la borra (documento, registro y PDF).
 //
 // Sin reglas: el navegador no lee ni escribe los participantes. El estado
 // abierta/cerrada va en configuracion/evaluacion_en_linea (lectura pública).
@@ -48,6 +52,8 @@ interface Participante {
   puntaje?: number;
   total?: number;
   enFicha?: boolean;
+  /** Recorrido de prueba del admin: documento aparte, no cuenta. */
+  prueba?: boolean;
 }
 
 /** Respuestas válidas para la clave: lo que no es 0–2 cuenta como sin responder (−1). */
@@ -64,7 +70,8 @@ const seAcaboElTiempo = (p: Participante, ahora: number) =>
 
 const ms = (t?: Timestamp | null) => (t ? t.toMillis() : null);
 const refEstado = () => adminDb.collection(DOC_ESTADO_EVALUACION.coleccion).doc(DOC_ESTADO_EVALUACION.id);
-const refParticipante = (uid: string) => adminDb.collection(COL_PARTICIPANTES_EVALUACION).doc(idParticipante(uid));
+const refParticipante = (uid: string, prueba = false) =>
+  adminDb.collection(COL_PARTICIPANTES_EVALUACION).doc(prueba ? idParticipantePrueba(uid) : idParticipante(uid));
 const json = (cuerpo: unknown, status = 200) => NextResponse.json(cuerpo, { status, headers: SIN_CACHE });
 
 async function autenticar(req: NextRequest): Promise<Perfil | NextResponse> {
@@ -97,6 +104,7 @@ function respuestaDe(p: Participante, activa: boolean, ahora: number): MiEvaluac
     puntaje: estado === "entregada" ? (p.puntaje ?? null) : undefined,
     total: CLAVES_EVALUACION[p.clave].correctas.length,
     entregadaEnMs: datos.entregadaEnMs,
+    prueba: p.prueba || undefined,
   };
 }
 
@@ -109,6 +117,7 @@ const datosHoja = (p: Participante): DatosHoja => ({
   total: p.total ?? CLAVES_EVALUACION[p.clave].correctas.length,
   iniciadaEnMs: ms(p.iniciadaEn) ?? ms(p.entregadaEn) ?? Date.now(),
   entregadaEnMs: ms(p.entregadaEn) ?? Date.now(),
+  prueba: p.prueba,
 });
 
 /**
@@ -119,7 +128,7 @@ const datosHoja = (p: Participante): DatosHoja => ({
 async function cerrarSiVencio(uid: string, p: Participante): Promise<Participante> {
   if (!seAcaboElTiempo(p, Date.now())) return p;
   const r = await adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(refParticipante(uid));
+    const snap = await tx.get(refParticipante(uid, p.prueba));
     const actual = snap.data() as Participante;
     if (!seAcaboElTiempo(actual, Date.now())) return { p: actual, nueva: false };
     const respuestas = normalizar(actual.guardadas, CLAVES_EVALUACION[actual.clave].correctas.length);
@@ -136,7 +145,7 @@ async function cerrarSiVencio(uid: string, p: Participante): Promise<Participant
 async function alFicha(uid: string, p: Participante) {
   try {
     await guardarEnFicha(uid, datosHoja(p));
-    await refParticipante(uid).update({ enFicha: true });
+    await refParticipante(uid, p.prueba).update({ enFicha: true });
     p.enFicha = true;
   } catch (e) {
     console.error("evaluacion-en-linea ficha", e);
@@ -200,12 +209,30 @@ export async function GET(req: NextRequest) {
       if (yo.role !== "admin") return json({ error: "No autorizado" }, 403);
       return await panel();
     }
+    const prueba = req.nextUrl.searchParams.get("prueba") === "1";
+    if (prueba && yo.role !== "admin") return json({ error: "No autorizado" }, 403);
     const ahora = Date.now();
-    const [estado, existente] = await Promise.all([refEstado().get(), refParticipante(yo.uid).get()]);
+    const [estado, existente] = await Promise.all([refEstado().get(), refParticipante(yo.uid, prueba).get()]);
     const activa = estado.data()?.activa === true;
     if (existente.exists) {
       const p = await cerrarSiVencio(yo.uid, existente.data() as Participante);
       return json(respuestaDe(p, activa, Date.now()));
+    }
+    if (prueba) {
+      // Prueba del admin: sin abrir la evaluación y sin revisar si es elegible.
+      const nuevo: Participante = {
+        uid: yo.uid,
+        nombre: yo.nombre,
+        grupo: "Prueba del sistema",
+        evaluacionId: "prueba",
+        clave: NUMEROS_CLAVE[randomInt(NUMEROS_CLAVE.length)],
+        vistaEn: Timestamp.fromMillis(ahora),
+        iniciadaEn: null,
+        entregadaEn: null,
+        prueba: true,
+      };
+      await refParticipante(yo.uid, true).set(nuevo);
+      return json(respuestaDe(nuevo, activa, ahora));
     }
     if (!activa) return json({ activa, elegible: false, ahoraMs: ahora } satisfies MiEvaluacion);
 
@@ -247,14 +274,21 @@ class Rechazo extends Error {
 export async function POST(req: NextRequest) {
   const yo = await autenticar(req).catch(() => json({ error: "No autorizado" }, 401));
   if (yo instanceof NextResponse) return yo;
-  let cuerpo: { accion?: string; respuestas?: unknown; uid?: string };
+  let cuerpo: { accion?: string; respuestas?: unknown; uid?: string; prueba?: boolean };
   try {
     cuerpo = await req.json();
   } catch {
     return json({ error: "Solicitud inválida" }, 400);
   }
   const accion = cuerpo.accion;
+  const prueba = cuerpo.prueba === true;
+  if ((prueba || accion === "borrarPrueba") && yo.role !== "admin") return json({ error: "No autorizado" }, 403);
   try {
+    if (accion === "borrarPrueba") {
+      await Promise.all([refParticipante(yo.uid, true).delete(), borrarPruebaDeFicha(yo.uid)]);
+      return json({ ok: true });
+    }
+
     // ── Acciones del admin ───────────────────────────────────────────────
     if (accion === "abrir" || accion === "cerrar" || accion === "reabrir" || accion === "ficha") {
       if (yo.role !== "admin") return json({ error: "No autorizado" }, 403);
@@ -290,14 +324,14 @@ export async function POST(req: NextRequest) {
     if (accion === "iniciar") {
       const activa = (await refEstado().get()).data()?.activa === true;
       const p = await adminDb.runTransaction(async (tx) => {
-        const snap = await tx.get(refParticipante(yo.uid));
+        const snap = await tx.get(refParticipante(yo.uid, prueba));
         const p = snap.data() as Participante | undefined;
         if (!p) throw new Rechazo("No tienes una evaluación asignada.", 403);
         const estado = estadoDeParticipante({ vistaEnMs: ms(p.vistaEn), iniciadaEnMs: ms(p.iniciadaEn), entregadaEnMs: ms(p.entregadaEn) }, Date.now());
         if (estado === "en_curso") return p; // otra pestaña ya la inició
         if (estado === "entregada") throw new Rechazo("Ya entregaste tu evaluación.");
         if (estado === "vencida") throw new Rechazo("Se acabaron tus 15 minutos sin que entraras a la prueba. Avisa a tu jefatura.");
-        if (!activa) throw new Rechazo("La evaluación ya se cerró.");
+        if (!activa && !prueba) throw new Rechazo("La evaluación ya se cerró.");
         // 5 minutos de preparación: antes no se puede iniciar (2 s de tolerancia por el reloj).
         if (Date.now() < (ms(p.vistaEn) ?? 0) + MS_PARA_INICIAR - 2000) throw new Rechazo("Tu prueba aún no se habilita: termina de prepararte.");
         const iniciadaEn = Timestamp.now();
@@ -309,7 +343,7 @@ export async function POST(req: NextRequest) {
 
     if (accion === "guardar") {
       await adminDb.runTransaction(async (tx) => {
-        const snap = await tx.get(refParticipante(yo.uid));
+        const snap = await tx.get(refParticipante(yo.uid, prueba));
         const p = snap.data() as Participante | undefined;
         if (!p?.iniciadaEn || p.entregadaEn) throw new Rechazo("La evaluación no está en curso.");
         if (Date.now() > finDe(p) + MS_GRACIA_ENTREGA) throw new Rechazo("Se acabó el tiempo.");
@@ -320,7 +354,7 @@ export async function POST(req: NextRequest) {
 
     if (accion === "entregar") {
       const resultado = await adminDb.runTransaction(async (tx) => {
-        const snap = await tx.get(refParticipante(yo.uid));
+        const snap = await tx.get(refParticipante(yo.uid, prueba));
         const p = snap.data() as Participante | undefined;
         if (!p) throw new Rechazo("No tienes una evaluación asignada.", 403);
         if (p.entregadaEn) return { p, nueva: false };

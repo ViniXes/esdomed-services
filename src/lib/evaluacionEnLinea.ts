@@ -24,6 +24,8 @@ export const DOC_ESTADO_EVALUACION = { coleccion: "configuracion", id: "evaluaci
 /** Un documento por persona: `{evaluación}_{uid}`. Sin reglas: todo pasa por la API. */
 export const COL_PARTICIPANTES_EVALUACION = "evaluacion_en_linea_participantes";
 export const idParticipante = (uid: string) => `${EVALUACION_EN_LINEA.id}_${uid}`;
+/** Recorrido de prueba del admin: documento aparte que no sale en el panel. */
+export const idParticipantePrueba = (uid: string) => `prueba_${EVALUACION_EN_LINEA.id}_${uid}`;
 
 /** Preparación: la prueba se habilita a los 5 minutos de abrir services y ahí arrancan sus 15. */
 export const MINUTOS_PARA_INICIAR = 5;
@@ -68,6 +70,8 @@ export interface MiEvaluacion {
   puntaje?: number | null;
   total?: number;
   entregadaEnMs?: number | null;
+  /** Recorrido de prueba del admin (no cuenta). */
+  prueba?: boolean;
 }
 
 /** Fila del panel del admin. */

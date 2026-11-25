@@ -20,6 +20,9 @@ interface Valor {
   veEntrada: boolean;
   pedir: (metodo: "GET" | "POST", cuerpo?: Record<string, unknown>, ruta?: string) => Promise<unknown>;
   recargar: () => Promise<void>;
+  /** El admin hace el recorrido completo con su cuenta, sin abrirla a nadie (no cuenta). */
+  modoPrueba: boolean;
+  cambiarModoPrueba: (valor: boolean) => void;
 }
 
 const Ctx = createContext<Valor>({
@@ -29,7 +32,11 @@ const Ctx = createContext<Valor>({
   veEntrada: false,
   pedir: async () => null,
   recargar: async () => {},
+  modoPrueba: false,
+  cambiarModoPrueba: () => {},
 });
+
+const CLAVE_MODO_PRUEBA = "evaluacion-en-linea:modo-prueba";
 
 export function EvaluacionEnLineaProvider({ children }: { children: React.ReactNode }) {
   const { user, profile } = useAuth();
@@ -39,6 +46,23 @@ export function EvaluacionEnLineaProvider({ children }: { children: React.ReactN
   const [activa, setActiva] = useState(false);
   const [info, setInfo] = useState<MiEvaluacion | null>(null);
   const [desfaseMs, setDesfaseMs] = useState(0);
+  // Se recuerda en la pestaña para que recargar no saque al admin de su prueba.
+  const [modoPruebaGuardado, setModoPruebaGuardado] = useState(() => {
+    try {
+      return typeof window !== "undefined" && sessionStorage.getItem(CLAVE_MODO_PRUEBA) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const modoPrueba = esAdmin && modoPruebaGuardado;
+  const cambiarModoPrueba = useCallback((valor: boolean) => {
+    setModoPruebaGuardado(valor);
+    setInfo(null);
+    try {
+      if (valor) sessionStorage.setItem(CLAVE_MODO_PRUEBA, "1");
+      else sessionStorage.removeItem(CLAVE_MODO_PRUEBA);
+    } catch { /* nada */ }
+  }, []);
 
   useEffect(() => {
     if (!esAdmin && !esPersonal) return;
@@ -61,14 +85,16 @@ export function EvaluacionEnLineaProvider({ children }: { children: React.ReactN
     const datos = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error((datos as { error?: string }).error || "No se pudo completar.");
     if (typeof (datos as { ahoraMs?: number }).ahoraMs === "number") setDesfaseMs((datos as { ahoraMs: number }).ahoraMs - Date.now());
-    if (ruta === "/api/evaluacion-en-linea" && typeof (datos as MiEvaluacion).elegible === "boolean") setInfo(datos as MiEvaluacion);
+    if (ruta.startsWith("/api/evaluacion-en-linea") && !ruta.includes("panel=1") && typeof (datos as MiEvaluacion).elegible === "boolean") {
+      setInfo(datos as MiEvaluacion);
+    }
     return datos;
   }, []);
 
   const recargar = useCallback(async () => {
-    if (!esPersonal) return;
-    await pedir("GET").catch(() => {});
-  }, [esPersonal, pedir]);
+    if (modoPrueba) await pedir("GET", undefined, "/api/evaluacion-en-linea?prueba=1").catch(() => {});
+    else if (esPersonal) await pedir("GET").catch(() => {});
+  }, [esPersonal, modoPrueba, pedir]);
 
   // El personal consulta su evaluación cuando se abre (o al entrar con ella abierta).
   useEffect(() => {
@@ -80,7 +106,11 @@ export function EvaluacionEnLineaProvider({ children }: { children: React.ReactN
   // Ya entregada (o vencida) o cerrada por el admin, todo vuelve a la normalidad.
   const veEntrada = esAdmin || Boolean(info?.elegible && ((activa && info.estado === "por_iniciar") || info.estado === "en_curso"));
 
-  return <Ctx.Provider value={{ activa, info, desfaseMs, veEntrada, pedir, recargar }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={{ activa, info, desfaseMs, veEntrada, pedir, recargar, modoPrueba, cambiarModoPrueba }}>
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export const useEvaluacionEnLinea = () => useContext(Ctx);

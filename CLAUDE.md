@@ -150,6 +150,7 @@ En el plan de trabajo, `tipoJornada` (Administrativo/Operativo) decide la meta d
 - Preguntas y respuestas correctas viven **solo en el servidor** (`evaluacionEnLineaClaves.ts`, copiadas de los PDF de la jefatura). El navegador recibe las preguntas sin respuestas y solo después de iniciar. Al entregar se califica en el servidor (1 punto por acierto) y la persona ve su nota, nunca cuáles eran las correctas.
 - El resultado se guarda solo en su ficha (`evaluaciones_personal`, pestaña Evaluaciones, `nota` 0–10): un PDF armado en el servidor con jsPDF (`evaluacionEnLineaServidor.ts`) que muestra lo que marcó, sin las correctas. Si falla, la nota ya quedó y el panel ofrece "Guardar en ficha".
 - `evaluacion_en_linea_participantes/{evaluación}_{uid}` no tiene reglas: todo pasa por `/api/evaluacion-en-linea` con Admin SDK.
+- **Modo prueba (admin).** "Hacer una prueba" en el panel: el admin hace el mismo recorrido con su cuenta sin abrir la evaluación a nadie, en un documento aparte (`prueba_…`, no sale en el panel). La hoja va a su ficha marcada "PRUEBA DEL SISTEMA" y "Borrar mi prueba" quita documento, registro y PDF.
 
 ### Creating Users
 

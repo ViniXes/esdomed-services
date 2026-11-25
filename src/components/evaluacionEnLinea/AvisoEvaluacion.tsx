@@ -34,7 +34,8 @@ export function AvisoEvaluacion() {
   const { activa, info, desfaseMs, recargar } = useEvaluacionEnLinea();
   const pathname = usePathname();
   const [cerrado, setCerrado] = useState(false);
-  const pendiente = activa && info?.elegible === true && info.estado === "por_iniciar";
+  // En la prueba del admin el aviso sale igual, aunque la evaluación esté cerrada.
+  const pendiente = (activa || info?.prueba === true) && info?.elegible === true && info.estado === "por_iniciar";
   const paraEntrar = useRestante(pendiente ? info?.limiteMs : undefined, desfaseMs);
   const restante = useRestante(pendiente ? info?.finMs : undefined, desfaseMs);
   const vencio = pendiente && restante <= 0;

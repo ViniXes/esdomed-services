@@ -12,7 +12,18 @@ import type { FilaPlanTrabajo, PlanTrabajo } from "@/types";
 // (archivero evaluaciones_personal, pestaña Evaluaciones), con nota 0–10.
 
 export const ORIGEN_EVALUACION_EN_LINEA = "evaluacion_en_linea";
-export const idRegistroFicha = (uid: string) => `conocimientos_${EVALUACION_EN_LINEA.id}_${uid}`;
+export const idRegistroFicha = (uid: string, prueba = false) =>
+  `conocimientos_${prueba ? "prueba_" : ""}${EVALUACION_EN_LINEA.id}_${uid}`;
+
+/** Borra la hoja de prueba del admin de su ficha (registro y PDF). */
+export async function borrarPruebaDeFicha(uid: string): Promise<void> {
+  const ref = adminDb.collection("evaluaciones_personal").doc(idRegistroFicha(uid, true));
+  const datos = (await ref.get()).data() as { archivos?: { storagePath?: string }[] } | undefined;
+  if (!datos) return;
+  const bucket = adminStorage.bucket();
+  await Promise.all((datos.archivos ?? []).filter((a) => a.storagePath).map((a) => bucket.file(a.storagePath as string).delete().catch(() => {})));
+  await ref.delete();
+}
 
 /** Fila del plan del mes de cada persona (por uid, respaldo por código de marcación). */
 export async function filasDelPlan(): Promise<{ porUid: Map<string, FilaPlanTrabajo>; porCodigo: Map<string, FilaPlanTrabajo> }> {
@@ -50,6 +61,8 @@ export interface DatosHoja {
   total: number;
   iniciadaEnMs: number;
   entregadaEnMs: number;
+  /** Recorrido de prueba del admin: la hoja y el registro lo dicen. */
+  prueba?: boolean;
 }
 
 /**
@@ -96,7 +109,7 @@ export function pdfResultado(d: DatosHoja): Buffer {
   y += 13;
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(26, 78, 112);
-  pdf.text("RESULTADO · Evaluación en línea", margen, y);
+  pdf.text(d.prueba ? "RESULTADO · Evaluación en línea · PRUEBA DEL SISTEMA (no cuenta)" : "RESULTADO · Evaluación en línea", margen, y);
   y += 16;
 
   // Datos y nota
@@ -167,7 +180,7 @@ export function pdfResultado(d: DatosHoja): Buffer {
 export async function guardarEnFicha(uid: string, d: DatosHoja): Promise<void> {
   const contenido = pdfResultado(d);
   const bucket = adminStorage.bucket();
-  const nombre = `Evaluación de conocimientos - Clave ${d.clave} - ${d.nombre}.pdf`;
+  const nombre = `${d.prueba ? "PRUEBA - " : ""}Evaluación de conocimientos - Clave ${d.clave} - ${d.nombre}.pdf`;
   const seguro = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w.\- ]+/g, "").replace(/\s+/g, "_");
   const storagePath = `evaluaciones_personal/${uid}/${Date.now()}_${seguro}`;
   const token = randomUUID();
@@ -178,15 +191,15 @@ export async function guardarEnFicha(uid: string, d: DatosHoja): Promise<void> {
   });
   const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
 
-  const ref = adminDb.collection("evaluaciones_personal").doc(idRegistroFicha(uid));
+  const ref = adminDb.collection("evaluaciones_personal").doc(idRegistroFicha(uid, d.prueba));
   const anterior = (await ref.get()).data() as { archivos?: { storagePath?: string }[] } | undefined;
   const dia = new Date(d.entregadaEnMs - 6 * 3600 * 1000);
   await ref.set({
     empleadoId: uid,
     empleadoNombre: d.nombre,
     categoria: "evaluacion",
-    tipo: "Evaluación de conocimientos — Lineamientos internos 2026",
-    notas: `Evaluación en línea · Clave ${d.clave} · ${d.puntaje} de ${d.total} correctas`,
+    tipo: `Evaluación de conocimientos — Lineamientos internos 2026${d.prueba ? " (PRUEBA DEL SISTEMA)" : ""}`,
+    notas: `${d.prueba ? "Prueba del sistema, no cuenta · " : ""}Evaluación en línea · Clave ${d.clave} · ${d.puntaje} de ${d.total} correctas`,
     // Medianoche del día en El Salvador (como las que registra el admin a mano).
     fecha: Timestamp.fromDate(new Date(Date.UTC(dia.getUTCFullYear(), dia.getUTCMonth(), dia.getUTCDate(), 6))),
     nota: Math.round(((d.puntaje * 10) / d.total) * 10) / 10,

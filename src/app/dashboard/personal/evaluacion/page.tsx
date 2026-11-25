@@ -59,12 +59,15 @@ function Aviso({ icono, titulo, children, tono = "slate" }: { icono: React.React
 
 function VistaPersonal() {
   const { user } = useAuth();
-  const { activa, info, desfaseMs, pedir, recargar } = useEvaluacionEnLinea();
+  const { activa: abierta, info, desfaseMs, pedir, recargar, modoPrueba } = useEvaluacionEnLinea();
+  // En la prueba del admin la evaluación funciona aunque esté cerrada para el personal.
+  const activa = abierta || modoPrueba;
+  const extra = modoPrueba ? { prueba: true } : {};
   const [cargando, setCargando] = useState(true);
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState("");
   const [confirmar, setConfirmar] = useState(false);
-  const clave = `evaluacion-en-linea:${EVALUACION_EN_LINEA.id}:${user?.uid ?? ""}`;
+  const clave = `evaluacion-en-linea:${modoPrueba ? "prueba:" : ""}${EVALUACION_EN_LINEA.id}:${user?.uid ?? ""}`;
   const [respuestas, setRespuestas] = useState<(number | null)[]>([]);
 
   useEffect(() => {
@@ -92,7 +95,7 @@ function VistaPersonal() {
     nuevas[i] = j;
     setRespuestas(nuevas);
     try { localStorage.setItem(clave, JSON.stringify(nuevas)); } catch { /* nada */ }
-    void pedir("POST", { accion: "guardar", respuestas: nuevas.map((r) => r ?? -1) }).catch(() => {});
+    void pedir("POST", { accion: "guardar", respuestas: nuevas.map((r) => r ?? -1), ...extra }).catch(() => {});
     setConfirmar(false);
   };
 
@@ -118,7 +121,7 @@ function VistaPersonal() {
     setTrabajando(true);
     setError("");
     try {
-      const r = (await pedir("POST", cuerpo)) as MiEvaluacion;
+      const r = (await pedir("POST", { ...cuerpo, ...extra })) as MiEvaluacion;
       if (r.estado === "entregada") {
         try { localStorage.removeItem(clave); } catch { /* nada */ }
       }
@@ -216,6 +219,11 @@ function VistaPersonal() {
             </p>
           ) : null}
           <p className="mt-2">Entregada a las {hora(info?.entregadaEnMs)}. La hoja queda en tu ficha, pestaña Evaluaciones.</p>
+          {user?.uid && (
+            <Link href={`/dashboard/personal/${user.uid}`} prefetch={false} className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-4 text-sm font-medium text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-transparent dark:text-emerald-300 dark:hover:bg-emerald-900/40">
+              <FileCheck2 size={15} aria-hidden /> Ver en mi ficha
+            </Link>
+          )}
         </Aviso>
       )}
 
@@ -484,14 +492,79 @@ function PanelAdmin() {
   );
 }
 
+/**
+ * Prueba del admin: hace el mismo recorrido que el personal (aviso, 5 min de
+ * preparación, 15 de prueba, nota y hoja en su ficha) sin abrir la evaluación a
+ * nadie. No sale en el panel; al terminar se borra con un botón.
+ */
+function BarraPrueba({ alReiniciar }: { alReiniciar: () => void }) {
+  const { modoPrueba, cambiarModoPrueba, pedir } = useEvaluacionEnLinea();
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState("");
+  const borrar = async (yVolver: boolean) => {
+    if (!window.confirm("¿Borrar tu prueba? Se quitan su registro y la hoja de tu ficha.")) return;
+    setOcupado(true);
+    setError("");
+    try {
+      await pedir("POST", { accion: "borrarPrueba" });
+      try {
+        for (const k of Object.keys(localStorage)) if (k.startsWith("evaluacion-en-linea:prueba:")) localStorage.removeItem(k);
+      } catch { /* nada */ }
+      // Empezar de nuevo: la vista se monta otra vez y pide una prueba nueva.
+      cambiarModoPrueba(!yVolver);
+      if (!yVolver) alReiniciar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo borrar.");
+    } finally {
+      setOcupado(false);
+    }
+  };
+  if (!modoPrueba) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Probar como evaluado.</span> Haces el recorrido completo con tu cuenta (aviso, preparación, prueba, nota y hoja en tu ficha) sin abrirla a nadie. No cuenta ni sale en la lista.
+        </p>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => cambiarModoPrueba(true)} className="min-h-10 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500">
+            Hacer una prueba
+          </button>
+          <button type="button" disabled={ocupado} onClick={() => borrar(true)} className="min-h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+            Borrar mi prueba
+          </button>
+        </div>
+        {error && <p role="alert" className="w-full text-sm text-red-600 dark:text-red-400">{error}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+      <p className="text-sm text-amber-900 dark:text-amber-200">
+        <span className="font-semibold">Modo prueba.</span> Así lo ve el personal. La evaluación sigue cerrada para todos y esto no cuenta.
+      </p>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => cambiarModoPrueba(false)} className="min-h-10 rounded-xl border border-amber-300 bg-white px-3 text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-transparent dark:text-amber-200 dark:hover:bg-amber-900/40">
+          Volver al panel
+        </button>
+        <button type="button" disabled={ocupado} onClick={() => borrar(false)} className="min-h-10 rounded-xl border border-amber-300 bg-white px-3 text-sm text-amber-900 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-800 dark:bg-transparent dark:text-amber-200 dark:hover:bg-amber-900/40">
+          Borrar y empezar de nuevo
+        </button>
+      </div>
+      {error && <p role="alert" className="w-full text-sm text-red-600 dark:text-red-400">{error}</p>}
+    </div>
+  );
+}
+
 export default function EvaluacionEnLineaPage() {
   const { profile } = useAuth();
-  const { activa } = useEvaluacionEnLinea();
+  const { activa, modoPrueba } = useEvaluacionEnLinea();
   const esAdmin = profile?.role === "admin";
+  const [intento, setIntento] = useState(0);
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4 md:p-6">
       <Encabezado activa={activa} />
-      {esAdmin ? <PanelAdmin /> : <div className="mx-auto max-w-3xl"><VistaPersonal /></div>}
+      {esAdmin && <BarraPrueba alReiniciar={() => setIntento((n) => n + 1)} />}
+      {esAdmin && !modoPrueba ? <PanelAdmin /> : <div className="mx-auto max-w-3xl"><VistaPersonal key={modoPrueba ? `prueba-${intento}` : "real"} /></div>}
     </div>
   );
 }
