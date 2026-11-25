@@ -11,6 +11,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import type { UserProfile } from "@/types";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { AcercaDeModal } from "@/components/AcercaDeModal";
+import { PuntoEnVivo } from "@/components/evaluacionEnLinea/PuntoEnVivo";
 
 const SIDEBAR_LOGO_LIGHT_SRC = "/logo_hnes_sidebar.png";
 const SIDEBAR_LOGO_DARK_SRC = "/logo_hnes_sidebar.png";
@@ -23,6 +24,8 @@ export interface NavItem {
   tone?: "rose";
   exact?: boolean;
   badge?: number;
+  /** Punto verde que palpita: algo en marcha para esta persona (evaluación en línea). */
+  live?: boolean;
   /** Encabezado de sección. Los ítems consecutivos con el mismo grupo se muestran juntos. */
   group?: string;
   /** Ícono del botón padre del grupo en modo acordeón (se toma del primer ítem del grupo). */
@@ -111,7 +114,7 @@ function NavLink({
   nested?: boolean;
   variant?: SidebarProps["variant"];
 }) {
-  const { href, label, icon: Icon, badge } = item;
+  const { href, label, icon: Icon, badge, live } = item;
   const portal = variant === "portal";
   // Hijo del acordeón: ícono y márgenes un poco más compactos para que
   // los nombres largos quepan en una línea pese a la sangría.
@@ -143,6 +146,7 @@ function NavLink({
         <Icon size={nested ? 15 : 16} strokeWidth={active ? 2.5 : 2} />
       </span>
       <span className={`flex-1 ${hijoAcordeon ? "leading-snug" : ""}`}>{label}</span>
+      {live && <PuntoEnVivo className="mr-1" />}
       <Badge count={badge ?? 0} />
     </Link>
   );
@@ -187,6 +191,7 @@ function GrupoAcordeon({
   const Icon = items[0]?.groupIcon ?? Folder;
   const contieneActivo = items.some(isActive);
   const globo = items.reduce((s, i) => s + (i.badge ?? 0), 0);
+  const enVivo = items.some((i) => i.live);
 
   return (
     <div data-grupo={group}>
@@ -216,6 +221,7 @@ function GrupoAcordeon({
             grupo ("Lesiones intencionales" con globo cabe en una línea). */}
         <span className="flex flex-shrink-0 items-center gap-1.5">
           {/* Cerrado, el padre resume los globos de sus hijos. */}
+          {!abierto && enVivo && <PuntoEnVivo />}
           {!abierto && <Badge count={globo} />}
           <ChevronDown
             size={15}

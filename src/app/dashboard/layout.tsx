@@ -10,10 +10,16 @@ import { esJefeCuidadosCriticos } from "@/lib/accesoCuidadosCriticos";
 import { TIPO_MEDICO_CRITICO_LABEL } from "@/lib/cuidadosCriticos";
 import { navItemsEsdomed } from "@/lib/navEsdomed";
 import { navItemsTrabajoSocial } from "@/lib/navTrabajoSocial";
+import { ClipboardCheck } from "lucide-react";
+import { EvaluacionEnLineaProvider, useEvaluacionEnLinea } from "@/contexts/EvaluacionEnLineaContext";
+import { AvisoEvaluacion } from "@/components/evaluacionEnLinea/AvisoEvaluacion";
+import { RUTA_EVALUACION_EN_LINEA } from "@/lib/evaluacionEnLinea";
+import type { NavItem } from "@/components/Sidebar";
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
   const { pendientes } = useNotificaciones();
+  const evaluacion = useEvaluacionEnLinea();
   const router = useRouter();
   const pathname = usePathname();
   const esJefeMedicinaCritica = esJefeCuidadosCriticos(profile);
@@ -68,6 +74,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     ? navItemsTrabajoSocial(profile, pendientes)
     : navItemsEsdomed(profile, pendientes);
 
+  // Evaluación en línea: va debajo de "Personal de trabajo" (Mi área) solo
+  // mientras le toca a la persona (el admin la ve siempre, para su panel).
+  if (evaluacion.veEntrada) {
+    const i = navItems.findIndex((item) => item.href === "/dashboard/personal");
+    if (i >= 0) {
+      const entrada: NavItem = {
+        ...navItems[i],
+        href: RUTA_EVALUACION_EN_LINEA,
+        label: "Evaluación en línea",
+        icon: ClipboardCheck,
+        badge: undefined,
+        live: evaluacion.activa,
+      };
+      navItems.splice(i + 1, 0, entrada);
+    }
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[var(--color-institutional-dark)] overflow-hidden">
       <Sidebar
@@ -84,6 +107,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         ) : children}
       </main>
       <ToastContainer />
+      <AvisoEvaluacion />
     </div>
   );
 }
@@ -91,7 +115,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <NotificacionesProvider>
-      <DashboardContent>{children}</DashboardContent>
+      <EvaluacionEnLineaProvider>
+        <DashboardContent>{children}</DashboardContent>
+      </EvaluacionEnLineaProvider>
     </NotificacionesProvider>
   );
 }

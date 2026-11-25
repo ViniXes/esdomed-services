@@ -10,6 +10,9 @@ import type { PlanTrabajo, UserProfile } from "@/types";
 import { COLOR_GRUPO, PERIODO_ACTUAL, compararFilasPlan, labelPeriodo, ordenGrupo } from "@/lib/esdomed/plan";
 import { normalizarCodigoMarcacion } from "@/lib/esdomed/catalogo-plan";
 import { esEnMemoria, fechaBajaCorta } from "@/lib/bajaUsuarios";
+import { useEvaluacionEnLinea } from "@/contexts/EvaluacionEnLineaContext";
+import { RUTA_EVALUACION_EN_LINEA } from "@/lib/evaluacionEnLinea";
+import { PuntoEnVivo } from "@/components/evaluacionEnLinea/PuntoEnVivo";
 
 // Personal de trabajo — el equipo ESDOMED en tarjetas, agrupado por el grupo
 // que cada persona tiene en el plan de trabajo del mes en curso (1 lectura del
@@ -30,6 +33,7 @@ function normalizarBusqueda(valor: string): string {
 
 export default function PersonalTrabajoPage() {
   const { profile } = useAuth();
+  const evaluacion = useEvaluacionEnLinea();
   const role = profile?.role;
   const miUid = profile?.uid;
   const [personal, setPersonal] = useState<Persona[]>([]);
@@ -163,6 +167,15 @@ export default function PersonalTrabajoPage() {
             {!loading && !error && plan ? ` · grupos según el plan de ${labelPeriodo(PERIODO_ACTUAL)}` : ""}
           </p>
         </div>
+        {evaluacion.veEntrada && (
+          <Link
+            href={RUTA_EVALUACION_EN_LINEA}
+            prefetch={false}
+            className="ml-auto inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            {evaluacion.activa && <PuntoEnVivo />} Evaluación en línea
+          </Link>
+        )}
       </div>
       <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
         <label htmlFor="buscar-personal" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Buscar personal</label>
