@@ -82,7 +82,7 @@ export function TableroTS() {
       {!r || !listo ? (!error && <Cargando />) : (
         <>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Cifra etiqueta="Gestiones nuevas" valor={r.nuevas} />
+            <Cifra etiqueta="Gestiones nuevas" valor={r.nuevas} detalle={r.delDirectorio ? `${r.delDirectorio} por actualizar datos de pacientes` : undefined} />
             <Cifra etiqueta="Notas" valor={r.notas} />
             <Cifra etiqueta="Pacientes" valor={r.pacientes} />
             <Cifra etiqueta="Finalizadas" valor={r.finalizadas} />
@@ -267,15 +267,12 @@ function PorDiaGrafico({ titulo, dias, unidad }: { titulo: string; dias: { fecha
 }
 
 function ListaGestiones({ titulo, detalle, lista, hoy }: { titulo: string; detalle: string; lista: GestionTSCE[]; hoy: string }) {
-  // Lo que se cambie desde aquí se ve al instante; el resumen se recalcula al volver a abrir el mes.
-  const [cambios, setCambios] = useState<Record<string, GestionTSCE | null>>({});
-  const visibles = lista.map((g) => (g.id in cambios ? cambios[g.id] : g)).filter((g): g is GestionTSCE => !!g);
-  if (!visibles.length) return null;
+  if (!lista.length) return null;
   return (
     <section className={`${tarjeta} overflow-hidden`}>
-      <TituloSeccion titulo={`${titulo}: ${visibles.length}`} detalle={detalle} />
+      <TituloSeccion titulo={`${titulo}: ${lista.length}`} detalle={detalle} />
       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-        {visibles.map((g) => <TarjetaGestion key={g.id} gestion={g} hoy={hoy} onCambio={(x) => setCambios((c) => ({ ...c, [g.id]: x }))} />)}
+        {lista.map((g) => <TarjetaGestion key={g.id} gestion={g} hoy={hoy} />)}
       </ul>
     </section>
   );
@@ -322,6 +319,7 @@ async function descargarExcel(mes: string, d: DatosMes, filtro: { persona: strin
     "Motivo (no procede)": g.motivoNoProcede,
     Cierre: g.fechaCierre,
     "Notas en total": g.totalNotas,
+    Adjuntos: g.adjuntos?.length || "",
     "Días sin movimiento": g.estado === "en_proceso" ? diasSinMovimiento(g, d.hoy) : "",
     "Registrada por": g.creadoPorNombre,
   })), "Sin casos"), "Casos atendidos");

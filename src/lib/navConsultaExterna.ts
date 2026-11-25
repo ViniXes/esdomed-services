@@ -1,4 +1,4 @@
-import { BarChart3, CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileClock, FileUp, HandHeart, IdCard, LayoutDashboard, ListOrdered, Megaphone, UserPen, MessageSquareText, NotebookPen, Tv, UserPlus } from "lucide-react";
+import { BarChart3, BookUser, CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileClock, FilePlus, FileUp, HandHeart, IdCard, LayoutDashboard, ListChecks, ListOrdered, Megaphone, UserPen, MessageSquareText, Tv, UserPlus, UsersRound } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -62,7 +62,13 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
     icon: HandHeart,
     visibleSi: registraGestionesTSCE,
     entradas: [
-      { href: "/consulta-externa/trabajo-social", label: "Registro de gestiones", icon: NotebookPen },
+      // Dos lugares a propósito (pedido del usuario, 2026-11-25): la gestión nueva
+      // se registra paso a paso; las notas siguientes van en el seguimiento.
+      { href: "/consulta-externa/trabajo-social/nueva", label: "Nueva gestión", icon: FilePlus },
+      { href: "/consulta-externa/trabajo-social", label: "Seguimiento", icon: ListChecks },
+      { href: "/consulta-externa/trabajo-social/actividades", label: "Otras actividades", icon: UsersRound },
+      // Datos personales y de contacto que completan ellas (el reporte de citas no los deja en services).
+      { href: "/consulta-externa/trabajo-social/directorio", label: "Directorio", icon: BookUser },
       { href: "/consulta-externa/trabajo-social/bitacora", label: "Bitácora del paciente", icon: FileClock },
       { href: "/consulta-externa/trabajo-social/productividad", label: "Productividad", icon: BarChart3 },
     ],

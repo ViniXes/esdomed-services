@@ -138,7 +138,6 @@ function FichaPaciente({ paciente: p, onVolver }: { paciente: PacienteTSCE; onVo
               notas={datos.notas.filter((n) => n.gestionId === g.id)}
               abiertaInicial={datos.gestiones.length <= 3}
               mostrarPaciente={false}
-              onCambio={(x) => setDatos((d) => d && { ...d, gestiones: x ? d.gestiones.map((y) => (y.id === x.id ? x : y)) : d.gestiones.filter((y) => y.id !== g.id) })}
             />
           ))}
         </ul>

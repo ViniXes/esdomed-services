@@ -12,6 +12,8 @@
 // Pura y sin imports: la usan la API, las pantallas y
 // scripts/test-trabajo-social-ce.mjs.
 
+import type { AdjuntoTS } from "./trabajoSocialAdjuntos";
+
 export const COL_TS_GESTIONES = "consulta_externa_ts_gestiones";
 export const COL_TS_NOTAS = "consulta_externa_ts_notas";
 export const COL_TS_ACTIVIDADES = "consulta_externa_ts_actividades";
@@ -58,7 +60,16 @@ export interface TipoGestionTSCE {
   pideProcedencia?: boolean;
   /** Pregunta el médico (se sugiere el de su última cita). */
   pideMedico?: boolean;
+  /** No se elige: la registra el sistema (hoy, el directorio al guardar datos de un paciente). */
+  automatica?: boolean;
 }
+
+/**
+ * Completar o corregir los datos de un paciente en el directorio cuenta como
+ * una gestión (pedido del usuario, 2026-11-25). La crea el directorio, ya
+ * finalizada; no sale en el asistente.
+ */
+export const TIPO_ACTUALIZACION_DATOS = "actualizacion_datos";
 
 const ENTREVISTAS: Opcion[] = [
   { id: "entrevista_paciente", label: "Entrevista con el paciente" },
@@ -157,6 +168,7 @@ export const TIPOS_GESTION_TS_CE: TipoGestionTSCE[] = [
     ],
   },
   { id: "otra", label: "Otra gestión (especificar en la nota)", grupo: "comun", pasos: [] },
+  { id: TIPO_ACTUALIZACION_DATOS, label: "Actualización de datos del paciente", grupo: "comun", pasos: [], automatica: true },
 
   // ── Cardiología ──
   {
@@ -228,6 +240,7 @@ export const TIPOS_GESTION_TS_CE: TipoGestionTSCE[] = [
 
 export const tipoGestion = (id: string): TipoGestionTSCE | undefined => TIPOS_GESTION_TS_CE.find((t) => t.id === id);
 export const labelTipo = (id: string): string => tipoGestion(id)?.label ?? id;
+export const esAutomatica = (id: string): boolean => !!tipoGestion(id)?.automatica;
 export const labelDetalle = (tipo: string, detalle: string): string =>
   tipoGestion(tipo)?.detalles?.find((d) => d.id === detalle)?.label ?? detalle;
 export const labelPaso = (tipo: string, paso: string): string =>
@@ -248,7 +261,23 @@ export function gruposDeTipos(areaCuenta?: string): { id: TipoGestionTSCE["grupo
     : areaCuenta === "cardiologia"
       ? ["cardiologia", "comun", "hemato_onco"]
       : ["comun", "cardiologia", "hemato_onco"];
-  return orden.map((id) => ({ id, titulo: titulos[id], tipos: TIPOS_GESTION_TS_CE.filter((t) => t.grupo === id) }));
+  // Las automáticas no se eligen: se registran solas.
+  return orden.map((id) => ({ id, titulo: titulos[id], tipos: TIPOS_GESTION_TS_CE.filter((t) => t.grupo === id && !t.automatica) }));
+}
+
+/** Los mismos grupos, solo con los tipos que calzan con lo escrito (sin tildes ni mayúsculas, cada palabra). */
+export function filtrarTipos(consulta: string, areaCuenta?: string): ReturnType<typeof gruposDeTipos> {
+  const palabras = claveTexto(consulta).split(" ").filter(Boolean);
+  const grupos = gruposDeTipos(areaCuenta);
+  if (!palabras.length) return grupos;
+  return grupos
+    .map((g) => ({ ...g, tipos: g.tipos.filter((t) => palabras.every((p) => claveTexto(t.label).includes(p))) }))
+    .filter((g) => g.tipos.length > 0);
+}
+
+/** "Cita o estudio: Holter"; sin detalle, solo el tipo. */
+export function tituloGestion(g: { tipo: string; detalle: string }): string {
+  return g.detalle ? `${labelTipo(g.tipo)}: ${labelDetalle(g.tipo, g.detalle)}` : labelTipo(g.tipo);
 }
 
 /**
@@ -260,6 +289,14 @@ export function areaSugerida(tipo: string, especialidadId: string, areaCuenta?: 
   const grupo = tipoGestion(tipo)?.grupo;
   if (grupo && grupo !== "comun") return grupo;
   return areaDeEspecialidad(especialidadId) ?? (esAreaTSCE(areaCuenta) ? areaCuenta : "otra");
+}
+
+/**
+ * El área solo se pregunta cuando no se puede saber: gestión común de un
+ * paciente sin especialidad (escrito a mano). En los demás casos sale sola.
+ */
+export function pideArea(tipo: string, especialidadId: string): boolean {
+  return tipoGestion(tipo)?.grupo === "comun" && !especialidadId;
 }
 
 /** Lo que el paso ya dice, para no marcarlo dos veces (se puede cambiar). */
@@ -340,6 +377,8 @@ export interface GestionTSCE {
   totalNotas: number;
   ultimaNotaFecha: string;
   historial: CierreTS[];
+  /** Respaldos de la gestión (ver trabajoSocialAdjuntos.ts). */
+  adjuntos: AdjuntoTS[];
 }
 
 export interface NotaTSCE {
@@ -385,6 +424,9 @@ export interface PacienteIndice {
   /** Gestiones registradas; las de la bitácora son las que tienen al menos una. */
   gestiones?: number;
   ultimaGestionMs?: number;
+  /** Del directorio: el teléfono para verlo en las búsquedas y cuándo se completó la ficha. */
+  telefono?: string;
+  fichaMs?: number;
 }
 export type PacienteTSCE = PacienteIndice & { clave: string };
 
@@ -488,6 +530,7 @@ export function validarGestion(v: unknown): Resultado<DatosGestion> {
   const o = obj(v);
   const t = tipoGestion(String(o.tipo ?? ""));
   if (!t) return falla("Elija el tipo de gestión.");
+  if (t.automatica) return falla("Esa gestión se registra sola al guardar los datos del paciente en el Directorio.");
   const detalle = t.detalles?.some((d) => d.id === o.detalle) ? String(o.detalle) : "";
   if (t.detalles && !detalle) return falla("Elija qué se gestionó.");
   if (!esAreaTSCE(o.area)) return falla("Elija el área.");
@@ -524,7 +567,7 @@ export function validarNota(v: unknown, tipo: string, hoy: string): Resultado<Da
   const contenido = parrafo(o.texto, 2000);
   if (!medio) return falla("Elija el medio (presencial, llamada, WhatsApp o trámite).");
   if (tipo === "otra" && contenido.length < 5) return falla("Escriba en la nota de qué gestión se trata.");
-  if (!paso && contenido.length < 3) return falla("Elija un paso o escriba la nota.");
+  if (!paso && contenido.length < 3) return falla(tipoGestion(tipo)?.pasos.length ? "Marque qué se hizo o escriba la nota." : "Escriba la nota.");
   return {
     ok: true,
     datos: { fecha, paso, conQuien: CON_QUIEN.some((c) => c.id === o.conQuien) ? String(o.conQuien) : "", medio, texto: contenido },
@@ -563,8 +606,8 @@ export interface CitaParaIndice {
   medico: string;
 }
 
-/** Lo que las citas saben del paciente (los contadores de gestiones van aparte). */
-export type DatosDeCita = Omit<PacienteIndice, "gestiones" | "ultimaGestionMs">;
+/** Lo que las citas saben del paciente (los contadores de gestiones y lo del directorio van aparte). */
+export type DatosDeCita = Omit<PacienteIndice, "gestiones" | "ultimaGestionMs" | "telefono" | "fichaMs">;
 
 /** Suma una cita al paciente. Idempotente; manda la cita más reciente. */
 export function fusionarCita(previa: DatosDeCita | undefined, c: CitaParaIndice): DatosDeCita {
@@ -628,6 +671,8 @@ export interface FilaPersona { uid: string; nombre: string; gestiones: number; n
 
 export interface ResumenTS {
   nuevas: number;
+  /** De las nuevas, las que son actualización de datos en el directorio. */
+  delDirectorio: number;
   finalizadas: number;
   noProcede: number;
   enProceso: number;
@@ -735,6 +780,7 @@ export function resumirTS(
   const pacientes = new Set([...nuevas.map((g) => g.clave), ...notas.map((n) => n.clave)]);
   return {
     nuevas: nuevas.length,
+    delDirectorio: nuevas.filter((g) => g.tipo === TIPO_ACTUALIZACION_DATOS).length,
     finalizadas: cerradas.filter((g) => g.estado === "finalizada").length,
     noProcede: cerradas.filter((g) => g.estado === "no_procede").length,
     enProceso: abiertas.length,

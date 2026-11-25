@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase-admin";
 import { hoySV } from "@/lib/consultaExterna/actualizaciones";
 import { COL_TS_GESTIONES, COL_TS_NOTAS, validarNota } from "@/lib/consultaExterna/trabajoSocial";
@@ -8,7 +8,8 @@ import { cuerpo, fallo, leerGestion, leerNota, ok, sesionTS, traer } from "@/lib
 type Rechazo = { error: string; status: number };
 
 // - GET ?gestion=id → notas de una gestión
-// - POST { gestionId, nota } → nota nueva, de cualquiera del equipo (la firma quien la escribe)
+// - POST { gestionId, nota, finalizar? } → nota nueva, de cualquiera del equipo (la firma quien la
+//   escribe). Con `finalizar`, la misma transacción cierra la gestión: la última nota suele ser el cierre.
 export async function GET(req: NextRequest) {
   const sesion = await sesionTS(req, "consultar");
   if (sesion instanceof NextResponse) return sesion;
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
   const datos = await cuerpo(req);
   const gestionId = String(datos.gestionId ?? "");
   if (!gestionId || gestionId.includes("/")) return fallo("Gestión inválida.");
+  const finalizar = datos.finalizar === true;
   const refG = adminDb.collection(COL_TS_GESTIONES).doc(gestionId);
   const refN = adminDb.collection(COL_TS_NOTAS).doc();
   try {
@@ -42,15 +44,25 @@ export async function POST(req: NextRequest) {
       tx.create(refN, {
         ...n.datos, gestionId, clave: g.clave, autor: sesion.uid, autorNombre: sesion.nombre, creadoEn: FieldValue.serverTimestamp(),
       });
+      const ultimaNotaFecha = n.datos.fecha > g.ultimaNotaFecha ? n.datos.fecha : g.ultimaNotaFecha;
       tx.update(refG, {
         totalNotas: FieldValue.increment(1),
-        ultimaNotaFecha: n.datos.fecha > g.ultimaNotaFecha ? n.datos.fecha : g.ultimaNotaFecha,
+        ultimaNotaFecha,
+        // Se cierra con la fecha de su última nota, como al registrarla ya finalizada.
+        ...(finalizar ? {
+          estado: "finalizada",
+          motivoNoProcede: "",
+          fechaCierre: ultimaNotaFecha,
+          historial: FieldValue.arrayUnion({ accion: "finalizada", en: Timestamp.now(), por: sesion.uid, porNombre: sesion.nombre }),
+          actualizadoPor: sesion.uid,
+          actualizadoEn: FieldValue.serverTimestamp(),
+        } : {}),
       });
       return null;
     });
     if (r) return fallo(r.error, r.status);
-    const snap = await refN.get();
-    return ok({ nota: leerNota(snap.id, snap.data()!) });
+    const [snap, snapG] = await Promise.all([refN.get(), refG.get()]);
+    return ok({ nota: leerNota(snap.id, snap.data()!), gestion: leerGestion(snapG.id, snapG.data()!) });
   } catch (e) {
     console.error("Trabajo Social CE: no se pudo guardar la nota", e);
     return fallo("No se pudo guardar la nota. Lo escrito sigue en la pantalla.", 500);
