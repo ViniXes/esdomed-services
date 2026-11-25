@@ -52,7 +52,8 @@ const hoyInput = () => {
   return d.toISOString().slice(0, 10);
 };
 
-const subirAdjunto = (empleadoId: string, file: File, onBytes: (bytes: number) => void) => {
+// También la usa "Guardar en su ficha" de la evaluación semestral (GuardarEnFicha.tsx).
+export const subirAdjunto = (empleadoId: string, file: File, onBytes: (bytes: number) => void) => {
   const storagePath = `evaluaciones_personal/${empleadoId}/${Date.now()}_${nombreSeguro(file.name)}`;
   const tarea = uploadBytesResumable(storageRef(storage, storagePath), file, {
     contentType: file.type || (tipoDeArchivo(file) === "pdf" ? "application/pdf" : undefined),

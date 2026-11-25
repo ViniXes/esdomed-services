@@ -27,6 +27,7 @@ import {
   type EvaluacionDesempeno,
 } from "@/lib/evaluacionDesempeno";
 import { esVotante, quienesVotaron } from "@/lib/evaluacionDesempenoVotacion";
+import { BotonGuardarEnFicha, ORIGEN_EVALUACION_SEMESTRAL } from "@/components/evaluacionDesempeno/GuardarEnFicha";
 
 type Persona = Pick<UserProfile, "uid" | "nombre" | "puesto" | "codigoMarcacion" | "role" | "activo">;
 type Vista = "pendientes" | "evaluadas" | "persona" | "votar";
@@ -88,6 +89,22 @@ export default function EvaluacionPersonalPage() {
       cancelado = true;
     };
   }, [esAdmin]);
+
+  // Evaluaciones que ya tienen su PDF en la ficha de la persona (botón "Guardar en su ficha").
+  const [enFicha, setEnFicha] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!esAdmin) return;
+    let cancelado = false;
+    getDocs(query(collection(db, "evaluaciones_personal"), where("origen", "==", ORIGEN_EVALUACION_SEMESTRAL)))
+      .then((snap) => {
+        if (!cancelado) setEnFicha(new Set(snap.docs.map((d) => String(d.data().evaluacionDesempenoId ?? ""))));
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+    };
+  }, [esAdmin]);
+  const marcarEnFicha = (id: string) => setEnFicha((s) => new Set(s).add(id));
 
   const periodos = useMemo(() => {
     const set = new Set((lista ?? []).map((e) => e.periodo));
@@ -194,7 +211,7 @@ export default function EvaluacionPersonalPage() {
       ) : vista === "votar" && soyVotante ? (
         <VistaPorVotar enVotacion={enVotacion} periodo={periodo} miUid={miUid} coincide={coincide} />
       ) : vista === "evaluadas" ? (
-        <VistaEvaluadas lista={lista ?? []} periodo={periodo} coincide={coincide} />
+        <VistaEvaluadas lista={lista ?? []} periodo={periodo} coincide={coincide} enFicha={enFicha} onGuardada={marcarEnFicha} />
       ) : (
         <VistaPersona lista={lista ?? []} personal={personal} periodos={periodos} coincide={coincide} />
       )}
@@ -262,7 +279,19 @@ function VistaPendientes({
   );
 }
 
-function VistaEvaluadas({ lista, periodo, coincide }: { lista: EvaluacionDesempeno[]; periodo: string; coincide: (t: string) => boolean }) {
+function VistaEvaluadas({
+  lista,
+  periodo,
+  coincide,
+  enFicha,
+  onGuardada,
+}: {
+  lista: EvaluacionDesempeno[];
+  periodo: string;
+  coincide: (t: string) => boolean;
+  enFicha: Set<string>;
+  onGuardada: (id: string) => void;
+}) {
   const delPeriodo = lista
     .filter((e) => e.periodo === periodo)
     .sort((a, b) => a.empleadoNombre.localeCompare(b.empleadoNombre, "es"));
@@ -280,7 +309,7 @@ function VistaEvaluadas({ lista, periodo, coincide }: { lista: EvaluacionDesempe
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
         {visibles.map((e) => (
-          <FilaEvaluacion key={e.id} e={e} />
+          <FilaEvaluacion key={e.id} e={e} enFicha={!!e.id && enFicha.has(e.id)} onGuardada={onGuardada} />
         ))}
       </ul>
     </div>
@@ -356,7 +385,7 @@ function VistaPorVotar({
   );
 }
 
-function FilaEvaluacion({ e }: { e: EvaluacionDesempeno }) {
+function FilaEvaluacion({ e, enFicha, onGuardada }: { e: EvaluacionDesempeno; enFicha: boolean; onGuardada: (id: string) => void }) {
   return (
     <li className="flex items-stretch">
       <Link
@@ -373,6 +402,8 @@ function FilaEvaluacion({ e }: { e: EvaluacionDesempeno }) {
           <Estado e={e} />
         </div>
       </Link>
+      {/* Solo las terminadas: guarda la hoja en PDF en la pestaña Evaluaciones de su ficha. */}
+      {e.calificacion && <BotonGuardarEnFicha evaluacion={e} guardada={enFicha} onGuardada={onGuardada} />}
       <Link
         href={`/dashboard/evaluacion-desempeno/${e.id}?imprimir=1`}
         title="Imprimir hoja de evaluación"
