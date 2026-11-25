@@ -1,4 +1,4 @@
-import { BarChart3, BookUser, CalendarClock, CalendarDays, CalendarPlus, ClipboardCheck, FileClock, FilePlus, FileUp, HandHeart, IdCard, LayoutDashboard, ListChecks, ListOrdered, Megaphone, UserPen, MessageSquareText, Tv, UserPlus, UsersRound } from "lucide-react";
+import { BarChart3, BookUser, CalendarClock, CalendarDays, CalendarPlus, CalendarX, ClipboardCheck, FileClock, FilePlus, FileUp, HandHeart, IdCard, LayoutDashboard, ListChecks, ListOrdered, Megaphone, UserPen, MessageSquareText, Tv, UserPlus, UsersRound } from "lucide-react";
 import type { NavItem } from "@/components/Sidebar";
 import type { UserProfile } from "@/types";
 import type { Pendientes } from "@/contexts/NotificacionesContext";
@@ -12,6 +12,7 @@ import {
   registraGestionesTSCE,
   subeExpedientesCreadosCE,
   veCatalogoTarjetas,
+  veFechaGenericaCE,
   veLlamadosCE,
 } from "@/lib/accesoConsultaExterna";
 
@@ -51,6 +52,8 @@ export const MENU_CONSULTA_EXTERNA: SeccionNav[] = [
       { href: "/consulta-externa/actualizaciones", label: "Actualizaciones", icon: UserPen, visibleSi: subeExpedientesCreadosCE },
       // Pacientes con DUI en cualquier agenda cargada del SIS (con DUI = ya tiene tarjeta). También agenda_ce.
       { href: "/consulta-externa/tarjetas", label: "Catálogo de tarjetas", icon: IdCard, visibleSi: veCatalogoTarjetas },
+      // PROVISIONAL: pacientes sin DUI y con fecha de nacimiento genérica 10/10/2000. Se quita cuando no queden.
+      { href: "/consulta-externa/fecha-generica", label: "Fecha genérica", icon: CalendarX, visibleSi: veFechaGenericaCE },
       // agenda_ce consulta su horario en el plan de trabajo ESDOMED (solo lectura).
       { href: "/esdomed-horarios/mi-horario", label: "Mi horario", icon: CalendarClock, visibleSi: esAgendaCE },
     ],
